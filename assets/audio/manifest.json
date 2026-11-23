@@ -1,0 +1,11 @@
+{
+  "menu": [
+    {"file": "menu-monolith.mp3", "title": "Heavy Metal Riffs - Monolith", "artist": "Tri-Tachyon", "seconds": 121, "lufs": -7.7, "peakDb": 0.0, "loops": false, "licence": "CC-BY 4.0", "attribution": "Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums"},
+    {"file": "menu-3hr-mt3.mp3", "title": "Heavy Metal Riffs - 3HR.MT3", "artist": "Tri-Tachyon", "seconds": 64, "lufs": -8.0, "peakDb": 0.0, "loops": false, "licence": "CC-BY 4.0", "attribution": "Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums"}
+  ],
+  "battle": [
+    {"file": "battle-heavy-1.ogg", "title": "Heavy Battle 1", "artist": "MintoDog", "seconds": 81, "lufs": -11.0, "peakDb": -0.9, "loops": true, "licence": "CC0 1.0"},
+    {"file": "battle-heavy-2.ogg", "title": "Heavy Battle 2", "artist": "MintoDog", "seconds": 83, "lufs": -11.3, "peakDb": -0.9, "loops": true, "licence": "CC0 1.0"},
+    {"file": "battle-urgent.mp3", "title": "Urgent (Dark Sci-Fi Audio Pack)", "artist": "SRG774", "seconds": 57, "lufs": -43.1, "peakDb": -24.4, "loops": true, "licence": "CC0 1.0"}
+  ]
+}
