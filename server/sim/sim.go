@@ -249,7 +249,7 @@ func (s *Sim) spawn(side int, unitID string) *Squad {
 		cx, cy = hq.X+inward*slot*50, s.R.Map.WaterY+60
 	}
 	for i := 0; i < u.Teams; i++ {
-		ox, oy := formation(i, u.Teams)
+		ox, oy := formation(i, u.Teams, side)
 		x, y := s.clamp(u.Domain, cx+ox, cy+oy)
 		sq.Teams = append(sq.Teams, Team{
 			X: x, Y: y, HP: u.HP * float64(u.Members), Members: u.Members,
@@ -261,13 +261,18 @@ func (s *Sim) spawn(side int, unitID string) *Squad {
 	return sq
 }
 
-// formation is a team's slot around the squad's position.
-func formation(i, n int) (float64, float64) {
+// formation is a team's slot around the squad's position. The shape is mirrored for the
+// east side, so both sides meet the enemy with the same teams in front.
+func formation(i, n, side int) (float64, float64) {
 	if n == 1 {
 		return 0, 0
 	}
 	a := 2 * math.Pi * float64(i) / float64(n)
-	return 22 * math.Cos(a), 22 * math.Sin(a)
+	x, y := 22*math.Cos(a), 22*math.Sin(a)
+	if side == 1 {
+		x = -x
+	}
+	return x, y
 }
 
 // clamp keeps a position on the map and inside the unit's domain.

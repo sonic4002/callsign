@@ -44,6 +44,7 @@ func (s *Sim) trackContacts() {
 //	                -0.15 shaken                    -0.90 pinned
 //	advance   0.50  +0.40 order is move             +0.10 order is attack
 //	                +0.20 order is hold, no target  -0.10 under fire
+//	                +0.40 order is hold and the point is still far
 //	                -0.20 shaken (-0.30 more under fire)   -0.70 pinned
 //	cover     0.20  +0.25 under fire   +0.20 shaken   +0.60 pinned
 //	fall back 0.10  +0.45 shaken and outnumbered
@@ -53,7 +54,7 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	order := sq.Order.Kind
 	nerve := s.Nerve(t)
 
-	var target, wanted *teamRef
+	var target, wanted, closest *teamRef
 	targetD, wantedD, nearest := math.MaxFloat64, math.MaxFloat64, math.MaxFloat64
 	friends, enemies := 0, 0
 	for _, o := range live {
@@ -70,7 +71,9 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 		if d <= 250 {
 			enemies++
 		}
-		nearest = math.Min(nearest, d)
+		if d < nearest {
+			closest, nearest = o, d
+		}
 		if d > u.Range {
 			continue
 		}
@@ -94,15 +97,40 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if order != OrderNone {
 		destX, destY = sq.Order.X, sq.Order.Y
 		if sq.Order.Contact == 0 {
-			ox, oy := formation(tr.slot, u.Teams)
+			ox, oy := formation(tr.slot, u.Teams, sq.Side)
 			destX, destY = destX+ox, destY+oy
 		}
 		destX, destY = s.clamp(u.Domain, destX, destY)
-		needMove = dist(t.X, t.Y, destX, destY) > 2
 	}
-
 	quiet := int(s.R.Nerve.QuietSeconds * float64(s.R.TickRate))
 	underFire := s.Tick-t.lastShot <= quiet
+	slotX, slotY := destX, destY
+	squadUnderFire := false // the squad answers as one, not one team at a time
+	for i := range sq.Teams {
+		squadUnderFire = squadUnderFire || (sq.Teams[i].Members > 0 && s.Tick-sq.Teams[i].lastShot <= quiet)
+	}
+
+	// An enemy in sight but out of reach must not get free shots. Attackers close with
+	// it. Defenders being shot step out to meet it, but never farther from their post
+	// than their own weapon reaches.
+	if target == nil && closest != nil {
+		ex, ey := closest.t.X, closest.t.Y
+		switch {
+		case order == OrderAttack && sq.Order.Contact == 0:
+			destX, destY = s.clamp(u.Domain, ex, ey)
+		case order == OrderHold && squadUnderFire && dist(t.X, t.Y, slotX, slotY) <= s.R.Match.HoldRadius+u.Range:
+			gap := dist(slotX, slotY, ex, ey)
+			if step := gap - 0.9*u.Range; step > 0 && step <= u.Range {
+				destX, destY = s.clamp(u.Domain, slotX+(ex-slotX)/gap*step, slotY+(ey-slotY)/gap*step)
+			}
+		}
+	}
+	if order != OrderNone {
+		needMove = dist(t.X, t.Y, destX, destY) > 2
+	}
+	// A squad told to hold a point gets there first; on the way it fights only what is
+	// close or already shooting at it.
+	enRoute := order == OrderHold && dist(t.X, t.Y, slotX, slotY) > s.R.Match.HoldRadius+u.Range
 	shaken, pinned := nerve == Shaken, nerve == Pinned
 	outnumbered := float64(enemies) > 1.5*float64(friends)
 
@@ -120,7 +148,7 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	}
 	if needMove {
 		v := 0.5 + b(order == OrderMove, 0.4) + b(order == OrderAttack, 0.1) +
-			b(order == OrderHold && !canFire, 0.2) - b(underFire, 0.1) -
+			b(order == OrderHold && !canFire, 0.2) + b(enRoute, 0.4) - b(underFire, 0.1) -
 			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7)
 		if v > score {
 			best, score = plan{act: ActAdvance, x: destX, y: destY}, v
