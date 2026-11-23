@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Callsign Game Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Heebo:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a field manual — narrow reading column on a faint map grid, sections tagged with grid callsigns */
+:root{
+  --bg:#F1F2EC; --surface:#FFFFFF; --fg:#1D231E; --muted:#5B645C; --line:#D4D8CC;
+  --olive:#4E6A2C; --olive-soft:#E3EAD6; --amber:#B9800F; --amber-soft:#F6EBD2;
+  --red:#A63D2F; --red-soft:#F4E0DC; --blue:#2F5E8A; --blue-soft:#DDE7F1;
+  --grid:rgba(78,106,44,.07);
+  --display:"Chakra Petch","Heebo","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Heebo",system-ui,-apple-system,sans-serif;
+  --he:"Heebo","Arial Hebrew",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131713; --surface:#1B201B; --fg:#E5E9E1; --muted:#9AA39A; --line:#2D342D;
+  --olive:#9DBD6B; --olive-soft:#253020; --amber:#E7B24A; --amber-soft:#33291A;
+  --red:#E07F6F; --red-soft:#3A2220; --blue:#7FAFDB; --blue-soft:#1C2A38;
+  --grid:rgba(157,189,107,.06); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131713; --surface:#1B201B; --fg:#E5E9E1; --muted:#9AA39A; --line:#2D342D;
+  --olive:#9DBD6B; --olive-soft:#253020; --amber:#E7B24A; --amber-soft:#33291A;
+  --red:#E07F6F; --red-soft:#3A2220; --blue:#7FAFDB; --blue-soft:#1C2A38;
+  --grid:rgba(157,189,107,.06); color-scheme:dark}
+
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[lang="he"]{font-family:var(--he)}
+.he{font-family:var(--he);direction:rtl;unicode-bidi:isolate}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.6;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:48px 48px}
+.wrap{max-width:880px;margin:0 auto;padding-block:40px 80px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2.2rem,7vw,3.6rem);font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.6rem;font-weight:600}
+h3{font-size:1.1rem;font-weight:600}
+p{margin:0;max-width:66ch}
+a{color:var(--olive)}
+code,.mono{font-family:var(--mono);font-size:.88em}
+
+/* hero */
+.hero{display:grid;gap:18px;padding-block:24px 36px;border-bottom:2px solid var(--fg)}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.15rem;color:var(--fg)}
+.order{font-family:var(--mono);background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--amber);
+  padding:14px 16px;display:grid;gap:6px;font-size:.92rem}
+.order .who{color:var(--muted);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:.76rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+
+/* toc */
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;padding-block:18px;border-bottom:1px solid var(--line);font-size:.88rem}
+nav.toc a{text-decoration:none;color:var(--muted)}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--olive);outline:none;text-decoration:underline}
+nav.toc b{font-family:var(--mono);color:var(--amber);font-weight:500;margin-right:4px}
+
+/* sections */
+section{display:grid;gap:18px;padding-block:44px;border-bottom:1px solid var(--line)}
+.sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.callsign{font-family:var(--mono);font-size:.8rem;color:var(--amber);letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--amber);padding:2px 8px;border-radius:3px}
+.muted{color:var(--muted)}
+ul,ol{margin:0;padding-left:1.25em;display:grid;gap:6px;max-width:66ch}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px;display:grid;gap:10px;align-content:start;min-width:0}
+
+/* chain of command */
+.chain{display:grid;gap:0}
+.tier{display:grid;grid-template-columns:120px 1fr;gap:16px;padding:16px 0;border-top:1px dashed var(--line)}
+.tier:first-child{border-top:0}
+.tier .rank{font-family:var(--display);font-weight:600;font-size:1rem}
+.tier .rank small{display:block;font-family:var(--mono);font-weight:400;font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.tier .what{display:grid;gap:6px;min-width:0}
+.tag{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:3px;margin-right:6px}
+.t-llm{background:var(--olive-soft);color:var(--olive)}
+.t-code{background:var(--blue-soft);color:var(--blue)}
+.t-human{background:var(--amber-soft);color:var(--amber)}
+@media (max-width:520px){.tier{grid-template-columns:1fr;gap:6px}}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:520px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;font-family:var(--mono);white-space:nowrap}
+
+/* factions */
+.faction{border-top:4px solid var(--c)}
+.faction .motto{font-style:italic;color:var(--muted)}
+.f-aegis{--c:var(--blue)}
+.f-ash{--c:var(--red)}
+.unitlist{display:grid;gap:0;font-size:.9rem}
+.unitlist div{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+.unitlist dt,.unitlist .k{font-family:var(--mono);font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding-top:2px}
+.super{background:var(--amber-soft);border-radius:4px;padding:10px 12px;font-size:.9rem}
+
+/* factor meter */
+.factors{display:grid;gap:10px}
+.factor{display:grid;grid-template-columns:130px 1fr 46px;gap:12px;align-items:center;font-size:.88rem}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--olive)}
+.bar i.neg{background:var(--red)}
+.factor .v{font-family:var(--mono);font-size:.78rem;text-align:right;color:var(--muted)}
+.decision{font-family:var(--mono);font-size:.85rem;padding:10px 12px;border:1px solid var(--olive);border-radius:4px;color:var(--olive)}
+
+/* map points */
+.points{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.pt{font-family:var(--mono);font-size:.8rem;text-align:center;padding:10px 4px;border:1px solid var(--line);background:var(--surface);border-radius:4px}
+.pt b{display:block;font-family:var(--display);font-size:1.2rem;color:var(--olive)}
+
+/* roadmap */
+.phases{display:grid;gap:0;counter-reset:ph}
+.phase{display:grid;grid-template-columns:110px 1fr;gap:16px;padding:16px 0;border-top:1px solid var(--line)}
+.phase:first-child{border-top:0}
+.phase .when{font-family:var(--mono);font-size:.8rem;color:var(--amber)}
+.phase .when b{display:block;font-family:var(--display);font-size:1.05rem;color:var(--fg)}
+@media (max-width:520px){.phase{grid-template-columns:1fr;gap:4px}}
+
+.callout{border-left:4px solid var(--amber);background:var(--amber-soft);padding:14px 16px;border-radius:0 6px 6px 0;font-size:.95rem}
+.callout.red{border-color:var(--red);background:var(--red-soft)}
+pre.mermaid{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;overflow-x:auto;margin:0}
+footer{padding-top:28px;font-size:.85rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){nav.toc a{transition:color .15s}}
+.pt .he{display:block;font-size:.82rem;color:var(--fg);margin-top:2px}
+.bilingual td.he-cell{font-family:var(--he);direction:rtl;text-align:right}
+pre.code{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:0;font-family:var(--mono);font-size:.82rem;line-height:1.5}
+.gate{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.gate div{border:1px solid var(--line);border-radius:4px;padding:10px 12px;background:var(--surface);font-size:.88rem}
+.gate b{display:block;font-family:var(--display);font-size:.95rem}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Game design plan · working draft · Nov 2026</div>
+  <h1>Callsign · <span class="he" lang="he">אות קריאה</span></h1>
+  <p class="lede">A browser real-time strategy game where every squad is a real AI agent. You don't click units. You talk to your operator, and your army figures out how to win.</p>
+  <div class="order">
+    <span class="who">Hammer → Anvil (voice)</span>
+    <span>"Anvil, this is Hammer. Viper 2 holds Foxtrot, drones over Kilo, nobody pushes until the artillery is up. Over."</span>
+  </div>
+  <div class="chips">
+    <span class="chip">Browser + phone</span><span class="chip">Nothing to install</span><span class="chip">Bring your own AI key</span><span class="chip">One agent per squad</span><span class="chip">Real radio procedure</span><span class="chip">Mission command</span><span class="chip">No pay to win</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#concept"><b>A</b>Concept</a>
+  <a href="#chain"><b>B</b>Chain of command</a>
+  <a href="#autonomy"><b>C</b>Field autonomy</a>
+  <a href="#economy"><b>D</b>Economy & brains</a>
+  <a href="#fair"><b>E</b>Fairness & keys</a>
+  <a href="#factions"><b>F</b>Factions</a>
+  <a href="#map"><b>G</b>Map & orders</a>
+  <a href="#arch"><b>H</b>Architecture</a>
+  <a href="#stack"><b>I</b>Tech stack</a>
+  <a href="#market"><b>J</b>Market</a>
+  <a href="#roadmap"><b>K</b>Roadmap</a>
+  <a href="#risks"><b>L</b>Risks</a>
+  <a href="#language"><b>M</b>Hebrew & English</a>
+  <a href="#assets"><b>N</b>Art & sound</a>
+  <a href="#hooks"><b>O</b>What keeps players</a>
+  <a href="#joining"><b>P</b>Joining & connecting</a>
+  <a href="#radio"><b>Q</b>Radio net</a>
+</nav>
+
+<!-- A -->
+<section id="concept">
+  <div class="sec-head"><span class="callsign">Alpha</span><h2>Concept</h2></div>
+  <p>Think <strong>C&amp;C Generals</strong> meets <strong>EndWar</strong>, played over a real military radio net. EndWar let you speak fixed phrases to your units. Callsign lets you speak freely, because your commander is an LLM that understands intent and breaks it into orders for its squads.</p>
+  <div class="grid2">
+    <div class="card"><h3>Core loop</h3>
+      <ol>
+        <li>Capture oil rigs on land and at sea; they pump gold automatically.</li>
+        <li>Spend on new squads or smarter brains.</li>
+        <li>Give orders over the radio, by voice or text.</li>
+        <li>Squads plan, fireteams fight, you adapt.</li>
+        <li>Destroy the enemy HQ or hold more points at the timer.</li>
+      </ol>
+    </div>
+    <div class="card"><h3>Design pillars</h3>
+      <ul>
+        <li><strong>Quick:</strong> matches of 10–15 minutes, playable on a phone.</li>
+        <li><strong>Command, not clicks:</strong> skill is in strategy and how well you brief your operator.</li>
+        <li><strong>Fair:</strong> brains are earned with in-game gold, never bought with money.</li>
+        <li><strong>Alive:</strong> units react to fatigue, weather and sight on their own.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- B -->
+<section id="chain">
+  <div class="sec-head"><span class="callsign">Bravo</span><h2>Chain of command</h2></div>
+  <p>Four layers, built like a real army. Only the middle two use LLMs, which keeps cost and latency sane even with hundreds of units on the map.</p>
+  <div class="chain">
+    <div class="tier"><div class="rank">You<small>Supreme commander</small></div>
+      <div class="what"><div><span class="tag t-human">Human</span></div><p>Give intent by voice or text from your phone. Watch the map, decide what to buy.</p></div></div>
+    <div class="tier"><div class="rank">Operator<small>General · 1 per player</small></div>
+      <div class="what"><div><span class="tag t-llm">LLM · strong model</span></div><p>Talks with you, understands intent, keeps the big picture, and turns "hold Foxtrot" into tasks for squads. Callsign: Anvil.</p></div></div>
+    <div class="tier"><div class="rank">Squad leader<small>Captain · 1 agent each</small></div>
+      <div class="what"><div><span class="tag t-llm">LLM · tier-based</span></div><p>Runs as its own agent in the player's browser. Wakes on events (new order, contact, losses), not every tick. Decides formation, routes, when to fall back.</p></div></div>
+    <div class="tier"><div class="rank">Fireteams<small>Soldiers · 2–4 per team</small></div>
+      <div class="what"><div><span class="tag t-code">Utility AI · no LLM</span></div><p>Plain game code on the server. Each team scores its options every tick from local conditions and acts at once. Free and instant.</p></div></div>
+  </div>
+  <div class="callout">Buying an agent means buying a new <strong>squad leader</strong>, which starts as a new agent in your browser. A squad of 8–12 units costs one agent, so a big army is a few dozen agents, not hundreds.</div>
+</section>
+
+<!-- C -->
+<section id="autonomy">
+  <div class="sec-head"><span class="callsign">Charlie</span><h2>Field autonomy</h2></div>
+  <p>Mission command, IDF style: the commander gives the goal and the intent, the team on the ground decides how. A pair in an ambush that spots the enemy doesn't wait for permission.</p>
+  <div class="grid2">
+    <div class="card"><h3>What a fireteam reads</h3>
+      <ul>
+        <li>Nerve: fear, suppression and losses in one value, shown only through behavior and radio, never as a bar</li>
+        <li>Ammo and health</li>
+        <li>Line of sight and cover</li>
+        <li>Local weather (rain cuts sight and accuracy)</li>
+        <li>Enemies seen, and how close</li>
+        <li>Current order and the intent behind it</li>
+        <li>Personality: aggressive, careful, steady</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Example: north pair, ambush at Hotel</h3>
+      <div class="factors" aria-label="Scores for the option 'open fire'">
+        <div class="factor"><span>Clear sight</span><div class="bar"><i style="width:80%"></i></div><span class="v">+0.8</span></div>
+        <div class="factor"><span>Enemy is 3 units</span><div class="bar"><i style="width:55%"></i></div><span class="v">+0.55</span></div>
+        <div class="factor"><span>Nerve shaken</span><div class="bar"><i class="neg" style="width:40%"></i></div><span class="v">−0.4</span></div>
+        <div class="factor"><span>Rain on our side</span><div class="bar"><i class="neg" style="width:25%"></i></div><span class="v">−0.25</span></div>
+        <div class="factor"><span>Order: "hold"</span><div class="bar"><i style="width:30%"></i></div><span class="v">+0.3</span></div>
+      </div>
+      <div class="decision">→ Open fire (1.00) beats Stay hidden (0.72) and Fall back (0.41)</div>
+    </div>
+  </div>
+  <p class="muted">The squad leader LLM sees a summary every few seconds and adjusts: "North pair is pinned, send the south pair around the flank."</p>
+  <div class="grid2">
+    <div class="card"><h3>Nerve, in play</h3>
+      <ul>
+        <li><strong>Steady:</strong> normal speed and accuracy.</li>
+        <li><strong>Shaken:</strong> hugs cover, fires less, radio gets tense.</li>
+        <li><strong>Pinned:</strong> crawls or freezes, calls for help: "We're pinned at the bridge!"</li>
+        <li>Recovers out of fire, near a leader, or after a win. Veterans shake less.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Dropped on purpose</h3>
+      <ul>
+        <li><strong>Fatigue:</strong> a hidden bar to manage, too slow for a 10-minute match.</li>
+        <li><strong>Separate morale stat:</strong> merged into nerve.</li>
+        <li>Nerve is tested in Phase 0. If players can't read it at a glance, it goes too.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><strong>Obedience first.</strong> Squads always carry out the order. They improvise only how they do it, never whether. Freedom lives inside your intent, never against it.</div>
+</section>
+
+<!-- D -->
+<section id="economy">
+  <div class="sec-head"><span class="callsign">Delta</span><h2>Economy, brains & superpowers</h2></div>
+  <p><strong>One resource: gold.</strong> Like the oil derricks in Red Alert, oil rigs on land and at sea pump oil that turns into gold on its own. There's nothing to harvest or haul. The economy is pure map control: hold rigs and you get rich, lose them and you go broke. That pushes every fight toward the rigs.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Rig</th><th>Income</th><th>How to take it</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><strong>HQ well</strong></td><td class="num">+10 gold/s</td><td>Starts yours</td><td>Can't be captured; keeps a beaten player alive.</td></tr>
+      <tr><td><strong>Land rig</strong></td><td class="num">+15 gold/s</td><td>Any infantry squad holds it for 10 s</td><td>Easy to take, easy to lose.</td></tr>
+      <tr><td><strong>Sea rig</strong></td><td class="num">+30 gold/s</td><td>Boat, helicopter or amphibious squad</td><td>Rich and exposed; worth a naval fight.</td></tr>
+      <tr><td><strong>Damaged rig</strong></td><td class="num">half income</td><td>Repair with an engineer</td><td>Raiding a rig hurts without capturing it.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every squad starts with a Tier 1 brain. During the match you choose: more squads with simple brains, or fewer elite squads with smart ones. Everything resets when the match ends.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Brain</th><th>Model class</th><th>Upgrade cost</th><th>How it plays</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Tier 1 · Recruit</strong></td><td>Small, fast (Haiku / Flash class)</td><td class="num">included</td><td>Follows orders well, plans simply, slower to adapt.</td></tr>
+      <tr><td><strong>Tier 2 · Sergeant</strong></td><td>Mid-size model</td><td class="num">300 gold</td><td>Uses terrain, coordinates fireteams, spots flanks.</td></tr>
+      <tr><td><strong>Tier 3 · Veteran</strong></td><td>Top model</td><td class="num">800 gold</td><td>Reads the whole fight, sets traps, predicts the enemy.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Purchase</th><th>Cost</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>New infantry squad (new agent)</td><td class="num">100 gold</td><td>Starts a new squad leader agent.</td></tr>
+      <tr><td>New vehicle squad</td><td class="num">250 gold</td><td>Needs a factory.</td></tr>
+      <tr><td>New air squad</td><td class="num">400 gold</td><td>Needs an airfield.</td></tr>
+      <tr><td>Population cap</td><td class="num">12 squads</td><td>Keeps machines and token bills bounded.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Superpowers through the build tree</h3>
+  <p>Superpowers are never unlocked by the clock. Like Red Alert, you build the right chain of buildings, then pay gold for each launch. A recharge after each use stops spamming. The moment a superpower building goes up, the enemy is warned, and a race begins: destroy it, or build your own first.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Faction</th><th>Build chain</th><th>Building cost</th><th>Each launch</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Aegis</strong> · Orbital Eye</td><td>HQ → Power plant → Radar → Satellite uplink</td><td class="num">2,500 gold</td><td class="num">1,000 gold · 4 min recharge</td></tr>
+      <tr><td><strong>Ashfall</strong> · Tunnel Surge</td><td>HQ → Barracks → Tunnel network → Deep tunnel complex</td><td class="num">2,000 gold</td><td class="num">800 gold · 4 min recharge</td></tr>
+    </tbody>
+  </table></div>
+  <p>This gives every match a natural build-up. The early game is about rigs, the middle about the build chain, and the end about who launches first. It has the tension of DEFCON, driven by your choices and not a timer.</p>
+  <p class="muted">Numbers are starting points for balancing, not final.</p>
+</section>
+
+<!-- E -->
+<section id="fair">
+  <div class="sec-head"><span class="callsign">Echo</span><h2>Fairness & who pays</h2></div>
+  <p>Players bring their own AI key and pay for their own army's thinking. Every AI call goes through a thin relay on the game server, and the relay picks the model by the squad's brain tier. You pay for no AI, and nobody's squad thinks smarter than the gold they spent.</p>
+  <div class="grid2">
+    <div class="card"><h3>Main game: casual and ranked</h3>
+      <ul>
+        <li>Connect in one click through OpenRouter, or paste a Claude, Gemini or OpenAI key.</li>
+        <li>Agents never call the AI directly. They send prompts to the relay.</li>
+        <li>The relay checks the squad's tier on the game server, picks the model, and calls the provider with the player's key.</li>
+        <li>A gold upgrade switches that squad's model on its next thought.</li>
+        <li>Fair from day one, so ranked ships at launch.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Open league: MCP</h3>
+      <ul>
+        <li>The game exposes an MCP server with the same tools: radio, move, hold, attack, report, buy.</li>
+        <li>Connect any agent: Claude Code, Codex, Gemini CLI, your own Swarm.</li>
+        <li>The agent picks its own model, so tiers don't apply.</li>
+        <li>Separate ladder, the "whose agent is smartest" arena.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">Your running cost is the game server, the relay and file hosting. The relay only forwards text, so it costs far less than running AI. A Tier 1 match should cost a player a few cents. Revenue later can come from cosmetics or a season pass, never stronger brains.</div>
+</section>
+
+<!-- F -->
+<section id="factions">
+  <div class="sec-head"><span class="callsign">Foxtrot</span><h2>Factions</h2></div>
+  <p>Fictional factions inspired by real doctrines. Each one changes what you build <em>and</em> how its agents think, because every faction ships its own doctrine prompt for operators and squad leaders. Launch with two, add more after the core loop is fun.</p>
+
+  <div class="grid2">
+    <div class="card faction f-aegis">
+      <div class="eyebrow">Launch faction</div>
+      <h3>Aegis Directorate · <span class="he" lang="he">מנהלת אגיס</span></h3>
+      <p class="motto">Fewer soldiers, sharper eyes.</p>
+      <p><strong>Doctrine:</strong> high-tech, small elite squads with high autonomy. Wins with information and precision.</p>
+      <div class="unitlist">
+        <div><span class="k">Infantry</span><span>Recon pairs, commandos with designators</span></div>
+        <div><span class="k">Armor</span><span>Main battle tank with active protection</span></div>
+        <div><span class="k">Artillery</span><span>Precision rocket launcher, long range</span></div>
+        <div><span class="k">Air</span><span>Attack helicopter, stealth strike jet</span></div>
+        <div><span class="k">Drones</span><span>Recon drone, loitering munition</span></div>
+        <div><span class="k">Defense</span><span>Interceptor dome against rockets</span></div>
+        <div><span class="k">Sea</span><span>Patrol boat, amphibious transport for sea rigs</span></div>
+      </div>
+      <div class="super"><strong>Superpower · Orbital Eye:</strong> reveals the whole map for 30 seconds and marks every enemy squad. Needs a Satellite uplink.</div>
+      <p class="muted">Agent bias: patient, waits for intel, prefers flanks and ambushes.</p>
+    </div>
+
+    <div class="card faction f-ash">
+      <div class="eyebrow">Launch faction</div>
+      <h3>Ashfall Network · <span class="he" lang="he">רשת אפר</span></h3>
+      <p class="motto">They can't hit what they can't find.</p>
+      <p><strong>Doctrine:</strong> guerrilla, cheap and many. Hides, strikes, and vanishes. Wins by bleeding the enemy.</p>
+      <div class="unitlist">
+        <div><span class="k">Infantry</span><span>Militia cells, RPG teams, saboteurs</span></div>
+        <div><span class="k">Vehicles</span><span>Technicals, armored trucks, rocket buggies</span></div>
+        <div><span class="k">Artillery</span><span>Mobile rocket rails that relocate after firing</span></div>
+        <div><span class="k">Air</span><span>None. Uses anti-air nests instead</span></div>
+        <div><span class="k">Sea</span><span>Speedboats to raid and take sea rigs</span></div>
+        <div><span class="k">Drones</span><span>Cheap FPV swarms</span></div>
+        <div><span class="k">Special</span><span>Tunnels, traps, decoy squads</span></div>
+      </div>
+      <div class="super"><strong>Superpower · Tunnel Surge:</strong> moves three squads through the tunnel network to any captured point at once. Needs a Deep tunnel complex.</div>
+      <p class="muted">Agent bias: aggressive, avoids open fights, retreats early and returns from a new angle.</p>
+    </div>
+  </div>
+
+  <h3>Later factions</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Faction</th><th>Doctrine</th><th>Signature</th><th>Superpower</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Iron Bloc</strong></td><td>Mass army, strict orders, low autonomy</td><td>Heavy armor, massed artillery</td><td>Firestorm barrage on a whole grid square</td></tr>
+      <tr><td><strong>Hornet Collective</strong></td><td>Drone swarms, fragile and numerous</td><td>FPV drones, electronic jamming</td><td>Blackout: enemy squads lose contact with their operator</td></tr>
+      <tr><td><strong>Tidewall Union</strong></td><td>Naval and coastal power</td><td>Gunboats, landing craft, coastal guns</td><td>Carrier strike from off-map</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">Each faction also gets its own voice lines, radio style and sound set. Units answer in character: Aegis is clipped and calm, Ashfall is loose and fast.</p>
+</section>
+
+<!-- G -->
+<section id="map">
+  <div class="sec-head"><span class="callsign">Golf</span><h2>Map & orders</h2></div>
+  <p>Map points are named with the phonetic alphabet: NATO in English, the IDF alphabet in Hebrew. Each point uses a letter both alphabets share, so Foxtrot and <span class="he" lang="he">פסל</span> are the same place. Say them, tap them, or both. Full table in Quebec.</p>
+  <div class="points">
+    <div class="pt"><b>A · א</b>Alpha · HQ<span class="he" lang="he">אלף · מפקדה</span></div>
+    <div class="pt"><b>B · ב</b>Bravo · Land rig<span class="he" lang="he">בועז · אסדה יבשתית</span></div>
+    <div class="pt"><b>G · ג</b>Golf · Bridge<span class="he" lang="he">גימל · הגשר</span></div>
+    <div class="pt"><b>D · ד</b>Delta · Ridge<span class="he" lang="he">דוד · הרכס</span></div>
+    <div class="pt"><b>H · ה</b>Hotel · Forest<span class="he" lang="he">הגר · היער</span></div>
+    <div class="pt"><b>F · פ</b>Foxtrot · Town<span class="he" lang="he">פסל · העיירה</span></div>
+    <div class="pt"><b>K · כ</b>Kilo · Airfield<span class="he" lang="he">כרמל · שדה התעופה</span></div>
+    <div class="pt"><b>S · ס</b>Sierra · Sea rig<span class="he" lang="he">סמך · אסדה ימית</span></div>
+    <div class="pt"><b>Z · ז</b>Zulu · Enemy HQ<span class="he" lang="he">זאב · מפקדת האויב</span></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>You say</th><th>Operator does</th></tr></thead>
+    <tbody>
+      <tr><td>"Anvil, this is Hammer. Hold Foxtrot. Over."</td><td>Sends the nearest two squads, picks defensive positions, reports in.</td></tr>
+      <tr><td>"Anvil, this is Hammer. Ambush anything crossing Golf. Over."</td><td>Hides fireteams in the forest at Hotel, sets them to fire on contact.</td></tr>
+      <tr><td>"Buy two more tanks and upgrade Third squad."</td><td>Checks gold, queues the purchases, confirms the cost.</td></tr>
+      <tr><td>"What's happening at Kilo?"</td><td>Short radio-style status from the squads there.</td></tr>
+      <tr><td><span class="he" lang="he">"צפע 2, כאן פטיש, תחזיקו את פסל, עבור."</span></td><td>Viper 2 holds Foxtrot and answers in Hebrew.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">Voice input in Hebrew or English, see Mike. Text works everywhere, so the game is playable silently on the bus.</p>
+</section>
+
+<!-- H -->
+<section id="arch">
+  <div class="sec-head"><span class="callsign">Hotel</span><h2>Architecture</h2></div>
+  <p>The server runs the real-time simulation and the radio net. The player's browser runs their agents, and the relay sends every AI call to the model the squad's tier allows, billed to the player's key. A slow AI call never freezes the battle and never costs you.</p>
+<pre class="mermaid">
+flowchart LR
+  subgraph Player's browser or app
+    UI[Map + radio + voice]
+    OP[Operator agent]
+    SL[Squad leader agents]
+  end
+  UI -- radio --> GS[Game server, Go<br/>authoritative sim + radio net]
+  GS -- events + radio --> OP
+  GS -- events + radio --> SL
+  OP -- radio --> GS
+  SL -- actions + radio --> GS
+  GS --> FT[Fireteams<br/>utility AI on server]
+  OP -. prompt .-> RL[Model relay, Go<br/>picks model by tier]
+  SL -. prompt .-> RL
+  GS -. squad tiers .-> RL
+  RL -. player's key .-> LLM[(Claude / Gemini / OpenAI<br/>or OpenRouter)]
+  MCP[Open league agents<br/>via MCP] -- tools --> GS
+  CDN[(Art + voice files)] --> UI
+</pre>
+  <div class="grid2">
+    <div class="card"><h3>What runs where</h3>
+      <ul>
+        <li><strong>Game server:</strong> movement, combat, economy, fog of war, radio routing. Owns all truth. Runs no AI.</li>
+        <li><strong>Player's browser:</strong> map, radio, voice, and all of that player's agents as background workers.</li>
+        <li><strong>Model relay:</strong> holds the player's key encrypted, picks the model by tier, forwards the call. Runs no AI.</li>
+        <li><strong>AI provider:</strong> billed to the player.</li>
+        <li><strong>MCP endpoint:</strong> the same game tools for open league agents.</li>
+        <li><strong>File hosting:</strong> sprites, sounds and voice phrases, made once on your machine.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Agent rules</h3>
+      <ul>
+        <li>Agents act only through game tools: <code>radio</code>, <code>move</code>, <code>hold</code>, <code>attack</code>, <code>report</code>, <code>buy</code>.</li>
+        <li>The server checks every action, so a modified browser can't add gold or units.</li>
+        <li>Agents see structured game state and their own side's radio, never enemy text.</li>
+        <li>Every major model supports this tool-call format, so one runtime serves them all.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- I -->
+<section id="stack">
+  <div class="sec-head"><span class="callsign">India</span><h2>Tech stack</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>Pick</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Client</td><td>Phaser 3 or PixiJS, TypeScript, installable web app</td><td>Chrome, Safari and Edge on Mac, Windows and phones; share a match by link.</td></tr>
+      <tr><td>Game server</td><td><strong>Go</strong>, WebSockets</td><td>Fast tick loop on all cores, low memory per match, tiny GC pauses.</td></tr>
+      <tr><td>Agent runtime</td><td>Web Workers in the player's browser</td><td>No install, no hosting cost, works on phones.</td></tr>
+      <tr><td>Agent protocol</td><td>MCP tools over the game API</td><td>Claude, Gemini and Codex all speak it.</td></tr>
+      <tr><td>Model access</td><td>Relay in Go: player's key, model chosen by tier</td><td>Full tier control; you pay for no AI.</td></tr>
+      <tr><td>Open league</td><td>MCP server over the game tools</td><td>Any agent can join, including Swarm.</td></tr>
+      <tr><td>Data</td><td>Postgres + Redis</td><td>Accounts and ladders; Redis for live match state.</td></tr>
+      <tr><td>Voice in</td><td>Web Speech API, Ozen in the browser</td><td>Free, runs on the player's device.</td></tr>
+      <tr><td>Voice out</td><td>Pre-recorded radio phrases (LightBlue / voxtream2-he + Phonikud)</td><td>Made once on your machine, served as files.</td></tr>
+      <tr><td>Languages</td><td>i18n JSON, RTL layout</td><td>Hebrew and English from the first build.</td></tr>
+      <tr><td>Art</td><td>FLUX.2 / Z-Image via ComfyUI</td><td>Generated on your GPU, reviewed by Claude.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Why Go over Node for the server</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>What matters</th><th>Go</th><th>Node.js</th></tr></thead>
+    <tbody>
+      <tr><td>Simulation speed</td><td>Compiled, runs matches across all CPU cores</td><td>Fast JIT, but one core per process</td></tr>
+      <tr><td>Memory per match</td><td>Small; goroutines cost a few KB each</td><td>Larger heap per process</td></tr>
+      <tr><td>Latency spikes</td><td>Garbage collector pauses are typically under a millisecond</td><td>Longer pauses under heavy load</td></tr>
+      <tr><td>Shared code with client</td><td>No; rules shared as JSON data instead</td><td>Yes, same TypeScript</td></tr>
+      <tr><td>Deploy</td><td>One static binary, tiny container</td><td>Runtime plus node_modules</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Choice: Go</strong> for the game server and relay, TypeScript for the browser client. Unit stats, costs and the build tree live in one JSON file both sides read, so the rules never drift apart.</p>
+</section>
+
+<!-- J -->
+<section id="market">
+  <div class="sec-head"><span class="callsign">Juliett</span><h2>Market check</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Project</th><th>What it does</th><th>What it lacks</th></tr></thead>
+    <tbody>
+      <tr><td><strong>EndWar</strong> (2008)</td><td>Voice orders to units on lettered map points</td><td>Fixed phrases, no AI</td></tr>
+      <tr><td><strong>Agent Arena</strong></td><td>C&amp;C-style RTS, LLMs command teams via MCP</td><td>One model per team, Unity, no voice</td></tr>
+      <tr><td><strong>LLM Skirmish</strong></td><td>LLMs fight 1v1 on a Screeps-style engine</td><td>AI vs AI showcase, not a human game</td></tr>
+      <tr><td><strong>When Agents Rule</strong></td><td>Browser RTS where models play each other</td><td>You watch and coach, not command</td></tr>
+      <tr><td><strong>HIVE</strong> (research)</td><td>Turns high-level commands into unit plans</td><td>Research framework only</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout">Open ground: <strong>human voice command over real radio procedure + one agent per squad, bought with gold + bring your own AI key + Hebrew and English.</strong> Nobody combines these yet.</div>
+</section>
+
+<!-- K -->
+<section id="roadmap">
+  <div class="sec-head"><span class="callsign">Kilo</span><h2>Roadmap</h2></div>
+  <div class="phases">
+    <div class="phase"><div class="when"><b>Phase 0</b>2 weeks</div><div><p><strong>Prototype the brain.</strong> Server sim with a blank map, two squads per side, text orders, one operator, utility AI fireteams with nerve, land and sea rigs. Proves the loop is fun, and that nerve reads at a glance, before any art.</p></div></div>
+    <div class="phase"><div class="when"><b>Phase 1</b>4–6 weeks</div><div><p><strong>Playable MVP.</strong> Phaser client on phone, one map, Aegis vs Ashfall with 4–5 units each, gold economy, brain tiers, Claude only, Hebrew and English text. First art batch generated and reviewed. Play it with your friend.</p></div></div>
+    <div class="phase"><div class="when"><b>Phase 2</b>4 weeks</div><div><p><strong>Agents and voice.</strong> Browser agent runtime, model relay with tier control, OpenRouter sign-in plus Claude, Gemini and OpenAI keys, Hebrew and English voice in and out, radio phrase library.</p></div></div>
+    <div class="phase"><div class="when"><b>Phase 3</b>6 weeks</div><div><p><strong>Online.</strong> Matchmaking, ranked and casual ladders, MCP open league, replays with agent reasoning shown, two more maps.</p></div></div>
+    <div class="phase"><div class="when"><b>Phase 4</b>ongoing</div><div><p><strong>Grow.</strong> More factions, superpowers, naval maps, sound and voice packs, community tournaments.</p></div></div>
+  </div>
+</section>
+
+<!-- L -->
+<section id="risks">
+  <div class="sec-head"><span class="callsign">Lima</span><h2>Risks & open questions</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Risk</th><th>Plan</th></tr></thead>
+    <tbody>
+      <tr><td>LLM latency makes squads feel slow</td><td>Event-driven thinking, utility AI handles the instant stuff, show "thinking" on the radio.</td></tr>
+      <tr><td>Token cost scares players</td><td>Population cap, Tier 1 default, show cost per match up front.</td></tr>
+      <tr><td>A player uses a stronger model than their tier</td><td>Not possible: agents never call AI directly, and the relay picks the model.</td></tr>
+      <tr><td>Relay goes down</td><td>Squads keep their last orders and fireteams keep fighting. The relay keeps no match state, so run two behind a load balancer.</td></tr>
+      <tr><td>Phone pauses the page in the background</td><td>Squads keep their last orders and fireteams keep fighting on the server.</td></tr>
+      <tr><td>A player's AI key leaks</td><td>Encrypted at rest on the relay, never sent back to the browser, revocable anytime. OpenRouter keys can carry a spending cap.</td></tr>
+      <tr><td>Prompt injection between players</td><td>Agents never see enemy text; only structured game state.</td></tr>
+      <tr><td>Balance across model vendors</td><td>Map each tier to one fixed model per vendor and test win rates.</td></tr>
+      <tr><td>Real-world politics</td><td>Fictional factions only, inspired by doctrine, not countries.</td></tr>
+      <tr><td>Hebrew voices sound robotic or stress words wrong</td><td>Phonikud before every line, native-speaker review of the bark library.</td></tr>
+      <tr><td>Voice and image model licenses</td><td>Check each model's license before release; swap research-only models.</td></tr>
+      <tr><td>Generated art looks inconsistent</td><td>Fixed prompt skeleton, style LoRA, Claude quality gate on every batch.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Decisions</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Question</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Game server language</td><td><strong>Go.</strong> See India.</td></tr>
+      <tr><td>Is the operator optional?</td><td><strong>Yes</strong>, set per room. With or without it, you can always talk to any squad directly and override. See Quebec.</td></tr>
+      <tr><td>Match length</td><td><strong>Set when the room opens:</strong> 10, 15 or 20 minutes, or until one HQ falls.</td></tr>
+      <tr><td>Do players need Docker?</td><td><strong>No.</strong> Nothing to install. Agents run in the browser. See Papa.</td></tr>
+      <tr><td>Who pays for AI?</td><td><strong>Each player</strong>, on their own key. You run no AI.</td></tr>
+      <tr><td>Who picks the model?</td><td><strong>The relay</strong>, by squad tier. In the open league, agents connect over MCP and pick their own.</td></tr>
+      <tr><td>Name</td><td><strong>Callsign</strong> (<span class="he" lang="he">אות קריאה</span>).</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- M -->
+<section id="language">
+  <div class="sec-head"><span class="callsign">Mike</span><h2>Hebrew & English</h2></div>
+  <p>Both languages are first-class from day one. Every menu, place name, unit, order and voice line exists in Hebrew and English. You can type or speak in either, and your operator answers in the language you used. Mixing works too: "תחזיקו את Foxtrot" is a valid order.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>How it works</th><th>Model or tool</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Typing</strong></td><td>Chat box switches to right-to-left when you type Hebrew.</td><td>Plain browser input</td></tr>
+      <tr><td><strong>Mic, fast path</strong></td><td>Phone's built-in recognition, he-IL or en-US.</td><td>Web Speech API</td></tr>
+      <tr><td><strong>Mic, on-device</strong></td><td>Small Hebrew model that runs in the browser, for browsers without built-in Hebrew recognition.</td><td>Ozen-v1, 61M parameters</td></tr>
+      <tr><td><strong>Understanding</strong></td><td>Operator LLM reads Hebrew natively; a resolver maps place aliases.</td><td>Claude, Gemini or GPT</td></tr>
+      <tr><td><strong>Radio voices</strong></td><td>Radio talk follows fixed procedure, so almost every line is built from pre-recorded phrases with callsigns, places and numbers stitched in. Costs nothing per match.</td><td>Phrases recorded once with LightBlue or voxtream2-he</td></tr>
+      <tr><td><strong>Free-form answers</strong></td><td>Rare long operator replies use the device's built-in voice.</td><td>Browser speech synthesis</td></tr>
+      <tr><td><strong>Hebrew pronunciation</strong></td><td>Adds vowels and stress before speech, so names sound right.</td><td>Phonikud / ReNikud</td></tr>
+      <tr><td><strong>Troop barks</strong></td><td>Pre-recorded line library per faction and language, place names stitched in.</td><td>Generated offline, see November</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Place names in both languages</h3>
+  <p>Each map point has an id, a callsign and a local name in both languages, plus spoken aliases. The operator matches any of them, so "the town", "פסל" and "העיירה" all mean point F.</p>
+<pre class="code">{
+  "id": "F",
+  "callsign": { "en": "Foxtrot", "he": "פסל" },
+  "name":     { "en": "Town",    "he": "העיירה" },
+  "aliases":  ["foxtrot", "the town", "פסל", "העיירה", "הכפר"]
+}</pre>
+
+  <h3>Voice line samples</h3>
+  <div class="tbl"><table class="bilingual">
+    <thead><tr><th>Event</th><th>English</th><th>עברית</th></tr></thead>
+    <tbody>
+      <tr><td>Order accepted</td><td>Hammer, this is Viper 2. Wilco. Out.</td><td class="he-cell" lang="he">פטיש, כאן צפע 2, רות, יבוצע, סוף.</td></tr>
+      <tr><td>Thinking</td><td>Hammer, this is Viper 2. Stand by.</td><td class="he-cell" lang="he">פטיש, כאן צפע 2, המתן.</td></tr>
+      <tr><td>Unclear order</td><td>Hammer, this is Viper 2. Say again. Over.</td><td class="he-cell" lang="he">פטיש, כאן צפע 2, אמור שנית, עבור.</td></tr>
+      <tr><td>Contact</td><td>Hammer, this is Viper 2. Contact, three vehicles north of Golf. Over.</td><td class="he-cell" lang="he">פטיש, כאן צפע 2, מגע, שלושה רכבים צפונית לגימל, עבור.</td></tr>
+      <tr><td>Pinned</td><td>Hammer, this is Viper 2. Pinned at Golf, request support. Over.</td><td class="he-cell" lang="he">פטיש, כאן צפע 2, מרותקים בגימל, מבקש סיוע, עבור.</td></tr>
+      <tr><td>Low ammo</td><td>Hammer, this is Viper 3. Ammo low, request resupply. Over.</td><td class="he-cell" lang="he">פטיש, כאן צפע 3, תחמושת בחוסר, מבקש השלמה, עבור.</td></tr>
+      <tr><td>Order refused</td><td>Hammer, this is Rhino 1. Negative, bridge at Golf is down. Over.</td><td class="he-cell" lang="he">פטיש, כאן קרנף 1, שלילי, הגשר בגימל הרוס, עבור.</td></tr>
+      <tr><td>Radio check</td><td>Hammer, this is Viper 1. Five by five. Out.</td><td class="he-cell" lang="he">פטיש, כאן צפע 1, חמש על חמש, סוף.</td></tr>
+      <tr><td>Operator status</td><td>Hammer, this is Anvil. Viper 2 holds Foxtrot, one wounded. Over.</td><td class="he-cell" lang="he">פטיש, כאן סדן, צפע 2 מחזיק בפסל, פצוע אחד, עבור.</td></tr>
+      <tr><td>Enemy superpower</td><td>All stations, this is Anvil. Enemy satellite uplink detected. Out.</td><td class="he-cell" lang="he">כל התחנות, כאן סדן, זוהתה תחנת לוויין של האויב, סוף.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="grid2">
+    <div class="card"><h3>Right-to-left interface</h3>
+      <ul>
+        <li>Whole HUD mirrors with <code>dir="rtl"</code>; CSS uses logical properties.</li>
+        <li>Numbers, gold counts and timers stay left-to-right inside Hebrew text.</li>
+        <li>Hebrew font: Heebo or Rubik, matched in weight to the English face.</li>
+        <li>The map itself never mirrors; only panels and text do.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Rules for content</h3>
+      <ul>
+        <li>No text is ever baked into images. Labels are drawn by the game, so one sprite serves both languages.</li>
+        <li>All strings live in <code>he.json</code> and <code>en.json</code>; a missing key fails the build.</li>
+        <li>All radio talk follows real procedure in both languages (see Quebec), reviewed by a native speaker who served, not machine-translated.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- N -->
+<section id="assets">
+  <div class="sec-head"><span class="callsign">November</span><h2>Art & sound pipeline</h2></div>
+  <p>All art, voices and sound effects are generated on your supercomputer with open models, then reviewed by Claude before anything goes into the game. Nothing ships unless it passes the quality gate below.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Asset</th><th>Model</th><th>Runs through</th><th>Output</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Units & buildings</strong></td><td>FLUX.2 [klein] 9B, Z-Image Turbo as second option</td><td>ComfyUI on GPU; Ollama for quick tests</td><td>Top-down sprites, 8 facings, 512px, downscaled to 128px</td></tr>
+      <tr><td><strong>Terrain</strong></td><td>Same models, seamless tiling</td><td>ComfyUI</td><td>Tile sets per biome: desert, forest, town, coast</td></tr>
+      <tr><td><strong>Portraits</strong></td><td>Same models</td><td>ComfyUI</td><td>Operator and squad leader faces per faction</td></tr>
+      <tr><td><strong>Clean-up</strong></td><td>BiRefNet background removal</td><td>Python script</td><td>Transparent PNGs, packed into sprite atlases</td></tr>
+      <tr><td><strong>Voices</strong></td><td>LightBlue, voxtream2-he, Phonikud</td><td>Python on GPU</td><td>Bark library, about 120 lines per faction per language</td></tr>
+      <tr><td><strong>Sound effects</strong></td><td>Stable Audio Open</td><td>Python on GPU</td><td>Gunfire, engines, rotors, radio static, explosions</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">Ollama added image generation in January 2026 as an experimental feature, so ComfyUI is the main path and Ollama the quick one. Voice model licenses differ; some Hebrew voices are research-only, so each one gets checked before a public release.</p>
+
+  <h3>Art direction</h3>
+  <ul>
+    <li>Strict top-down view, light from the top left, soft shadow to the bottom right.</li>
+    <li>Painted realism, muted military palette. Faction color only on a team stripe, which the game recolors at runtime.</li>
+    <li>Same seed, sampler and prompt skeleton for every unit. After the first 20 approved sprites, train a small style LoRA so the rest match.</li>
+  </ul>
+<pre class="code">top-down orthographic game sprite, {unit}, {faction_style},
+seen directly from above, centered, light from top-left,
+painted realism, muted olive and sand palette, clean silhouette,
+plain flat background, no text, no logo, no ground shadow clutter</pre>
+
+  <h3>Quality gate</h3>
+  <p>Claude reviews every batch by looking at it and rejects anything that fails one of these checks, then rewrites the prompt and regenerates.</p>
+  <div class="gate">
+    <div><b>Readable</b>Silhouette clear at 64px on the phone screen.</div>
+    <div><b>Correct view</b>Truly from above, facing the right direction.</div>
+    <div><b>Consistent</b>Same light, scale and palette as approved sprites.</div>
+    <div><b>Clean</b>No baked text, logos, extra limbs or broken edges.</div>
+    <div><b>Original</b>No real-world army insignia or flags.</div>
+    <div><b>Sounds right</b>Hebrew lines checked for stress and natural slang.</div>
+  </div>
+
+  <h3>First batch</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Item</th><th>Count</th></tr></thead>
+    <tbody>
+      <tr><td>Unit sprites (2 factions × 7 units × 8 facings)</td><td class="num">112</td></tr>
+      <tr><td>Buildings (2 factions × 6)</td><td class="num">12</td></tr>
+      <tr><td>Terrain tiles (2 biomes)</td><td class="num">40</td></tr>
+      <tr><td>Portraits</td><td class="num">8</td></tr>
+      <tr><td>Voice lines (2 factions × 2 languages × 120)</td><td class="num">480</td></tr>
+      <tr><td>Sound effects</td><td class="num">60</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- O -->
+<section id="hooks">
+  <div class="sec-head"><span class="callsign">Oscar</span><h2>What keeps players coming back</h2></div>
+  <p>Fast, intense matches get people in. These are what bring them back for "one more game".</p>
+  <div class="grid2">
+    <div class="card"><h3>Veterans with memory</h3>
+      <p>Squads that survive gain a rank, a name and memories of past battles. Next match, the squad leader warns: "Careful, last time we lost two men at this bridge." Power resets every match; the stories carry over. No other RTS can do this, because it needs LLMs.</p>
+    </div>
+    <div class="card"><h3>Radio as the soundtrack</h3>
+      <p>Hebrew and English chatter calling contacts, arguing and joking sets the mood of the whole game. Each faction has its own voice and slang. Done well, people play just to listen.</p>
+    </div>
+    <div class="card"><h3>Clip-worthy moments</h3>
+      <p>Agents will surprise you, like an ambush you never ordered that wins the fight. A one-tap replay shows what happened and the agent's reasoning, ready to share.</p>
+    </div>
+    <div class="card"><h3>The superpower race</h3>
+      <p>The warning when an enemy superpower building goes up turns every match into a race. Destroy it in time, or launch yours first. A clear peak for every game.</p>
+    </div>
+    <div class="card"><h3>Comebacks</h3>
+      <p>The HQ well keeps a beaten player alive, sea rigs offer a big swing, and one well-placed superpower can turn a lost game. Matches stay tense to the end.</p>
+    </div>
+    <div class="card"><h3>Short and complete</h3>
+      <p>10 to 15 minutes, start to finish, on a phone. Long enough for a story, short enough for "one more".</p>
+    </div>
+  </div>
+</section>
+
+<!-- P -->
+<section id="joining">
+  <div class="sec-head"><span class="callsign">Papa</span><h2>Joining & connecting</h2></div>
+  <p>Nothing to install. A player opens a link in Chrome, Safari or Edge, on a phone or a computer, connects an AI key, and plays. The game can also be added to the home screen like an app. No Docker and no desktop service.</p>
+  <ol>
+    <li><strong>Open the link</strong> and sign in.</li>
+    <li><strong>Connect AI:</strong> "Sign in with OpenRouter" in one click, or paste a Claude, Gemini or OpenAI key. The key is stored encrypted on the relay, used only for that player's agents, and never sent back to the browser.</li>
+    <li><strong>Create or join a room.</strong> The game shows the expected AI cost of a match.</li>
+    <li><strong>Match starts:</strong> the browser starts the operator and each squad leader as a background worker, one per agent.</li>
+    <li><strong>Agents think:</strong> each one sends its prompt to the relay with a match token. The relay looks up the squad's tier, picks the model, calls the provider with the player's key, and returns the answer.</li>
+    <li><strong>Agents act</strong> through game tools: <code>radio</code>, <code>move</code>, <code>hold</code>, <code>attack</code>, <code>report</code>, and <code>buy</code> for the operator.</li>
+    <li><strong>Upgrades:</strong> pay 300 gold and that squad's next thought goes to the Tier 2 model. Buying a squad starts a new agent; losing one stops it.</li>
+  </ol>
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Player's browser
+  participant A as Agents (workers in the browser)
+  participant G as Game server
+  participant R as Model relay
+  participant L as AI provider (player's key)
+  B->>G: join room, Ready
+  B->>A: start operator + 3 squads
+  B->>G: radio "Viper 2, this is Hammer, hold Foxtrot, over"
+  G-->>A: message for Viper 2
+  A->>R: prompt + match token
+  R->>G: Viper 2 tier?
+  G-->>R: Tier 1
+  R->>L: small model, player's key
+  L-->>R: plan
+  R-->>A: plan
+  A->>G: hold(F), radio "Hammer, this is Viper 2, wilco, out"
+  G-->>B: map update + radio voice
+</pre>
+  <div class="grid2">
+    <div class="card"><h3>What is OpenRouter?</h3>
+      <p>A service that gives one account and one key for models from Anthropic, Google, OpenAI and others, paid from credit the player adds. Players can cap what the key may spend. It's only a billing route: the relay still chooses the model.</p>
+    </div>
+    <div class="card"><h3>What it costs you</h3>
+      <ul>
+        <li><strong>Game server:</strong> simulation and radio routing.</li>
+        <li><strong>Relay:</strong> forwards text. No AI, no match state.</li>
+        <li><strong>Static hosting:</strong> art, sounds and voice files from a CDN.</li>
+        <li><strong>AI:</strong> zero. Each player pays on their own key.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Phones in the background</h3>
+      <p>If a player switches apps mid-match, the phone pauses the page and their agents stop thinking. Squads keep their last orders and fireteams keep fighting on the server, so the army never just freezes.</p>
+    </div>
+    <div class="card"><h3>Open league over MCP</h3>
+      <p>The game publishes an MCP endpoint with the same tools. A player creates an open league room, gets a match token, and points any MCP agent at it: Claude Code, Codex, Gemini CLI, or Swarm. The agent brings its own model and pays its own way. Optional later: Callsign Base, a small desktop app for local models through Ollama.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Q -->
+<section id="radio">
+  <div class="sec-head"><span class="callsign">Quebec</span><h2>Radio net</h2></div>
+  <p>Everything happens on the radio, using real radio procedure in Hebrew and English. There's one command net. Every message is heard by your whole side and opens with who it's for and who is talking.</p>
+  <div class="order">
+    <span class="who">Hammer → Viper 2</span>
+    <span>"Viper 2, this is Hammer. Hold Foxtrot. Over."</span>
+    <span class="he" lang="he">"צפע 2, כאן פטיש, תחזיקו את פסל, עבור."</span>
+    <span class="who">Viper 2 → Hammer</span>
+    <span>"Hammer, this is Viper 2. Wilco. Out."</span>
+    <span class="he" lang="he">"פטיש, כאן צפע 2, רות, יבוצע, סוף."</span>
+  </div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>You start with</th><th>Who acts</th></tr></thead>
+    <tbody>
+      <tr><td>"Viper 2, this is Hammer…" / <span class="he" lang="he">"צפע 2, כאן פטיש…"</span></td><td>Only Viper 2. Everyone else hears it.</td></tr>
+      <tr><td>"Viper 2 and Rhino 1, this is Hammer…"</td><td>Both squads, and they coordinate with each other.</td></tr>
+      <tr><td>"All stations, this is Hammer…" / <span class="he" lang="he">"כל התחנות, כאן פטיש…"</span></td><td>Everyone.</td></tr>
+      <tr><td>"Anvil, this is Hammer…" / <span class="he" lang="he">"סדן, כאן פטיש…"</span></td><td>The operator, for plans, purchases and status.</td></tr>
+      <tr><td>No callsign</td><td>The operator decides who it's for. Without an operator, the game asks "Who is this for?"</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">Routing happens in game code by matching callsigns in both languages, so it's instant and needs no AI. Only the message content goes to the agents.</p>
+
+  <h3>Procedure words</h3>
+  <p>Agents speak only in proper procedure, and the game turns several of these words into mechanics.</p>
+  <div class="tbl"><table class="bilingual">
+    <thead><tr><th>עברית</th><th>English</th><th>Meaning</th><th>In the game</th></tr></thead>
+    <tbody>
+      <tr><td class="he-cell" lang="he">עבור</td><td>Over</td><td>Done talking, waiting for your reply.</td><td>Ends reports and questions.</td></tr>
+      <tr><td class="he-cell" lang="he">סוף</td><td>Out</td><td>Done talking, conversation over, no reply needed.</td><td>Ends acknowledgments. Never "over and out".</td></tr>
+      <tr><td class="he-cell" lang="he">רות</td><td>Roger</td><td>Message received and understood.</td><td>For information, not orders.</td></tr>
+      <tr><td class="he-cell" lang="he">רות, יבוצע</td><td>Wilco</td><td>Received, understood, will comply.</td><td>Every accepted order.</td></tr>
+      <tr><td class="he-cell" lang="he">חיובי / שלילי</td><td>Affirmative / Negative</td><td>Yes / no.</td><td>A squad answers "Negative" with a reason when an order can't be done.</td></tr>
+      <tr><td class="he-cell" lang="he">אמור שנית</td><td>Say again</td><td>Repeat your last message.</td><td>When speech recognition isn't sure, the squad asks instead of guessing.</td></tr>
+      <tr><td class="he-cell" lang="he">המתן</td><td>Stand by</td><td>Wait a few seconds, I'll come back to you.</td><td>Said instantly while the agent thinks, so AI delay sounds natural.</td></tr>
+      <tr><td class="he-cell" lang="he">איך נשמע?</td><td>Radio check</td><td>Checking signal quality.</td><td>Every squad reports in at match start.</td></tr>
+      <tr><td class="he-cell" lang="he">חמש על חמש</td><td>Five by five / Loud and clear</td><td>I hear you loud and clear.</td><td>Answer to a radio check. Jammed squads report weaker.</td></tr>
+      <tr><td class="he-cell" lang="he">תיקון</td><td>Correction</td><td>My last message was wrong, here's the fix.</td><td>You say it to replace your last order.</td></tr>
+      <tr><td class="he-cell" lang="he">כאן…</td><td>This is…</td><td>Identifies the speaker.</td><td>Every call: "&lt;to&gt;, this is &lt;from&gt;".</td></tr>
+      <tr><td class="he-cell" lang="he">דממת אלחוט</td><td>Radio silence</td><td>No transmitting on the net.</td><td>Squads go quiet and can't be found by enemy intercept, but you hear nothing from them.</td></tr>
+      <tr><td>—</td><td>Repeat</td><td>Reserved for repeat artillery fire.</td><td>Fires the last artillery mission again. Never used to mean "say again". Hebrew term to confirm with the reviewer.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Phonetic alphabet and map points</h3>
+  <p>English uses NATO, Hebrew uses the IDF alphabet. Map points use only letters both share, so each point has a word in each language.</p>
+  <div class="tbl"><table class="bilingual">
+    <thead><tr><th>אות</th><th>צה"ל</th><th>Letter</th><th>NATO</th><th>Map point</th></tr></thead>
+    <tbody>
+      <tr><td class="he-cell" lang="he">א</td><td class="he-cell" lang="he">אלף</td><td>A</td><td>Alpha</td><td>Your HQ</td></tr>
+      <tr><td class="he-cell" lang="he">ב</td><td class="he-cell" lang="he">בועז</td><td>B</td><td>Bravo</td><td>Land rig</td></tr>
+      <tr><td class="he-cell" lang="he">ג</td><td class="he-cell" lang="he">גימל</td><td>G</td><td>Golf</td><td>Bridge</td></tr>
+      <tr><td class="he-cell" lang="he">ד</td><td class="he-cell" lang="he">דוד</td><td>D</td><td>Delta</td><td>Ridge</td></tr>
+      <tr><td class="he-cell" lang="he">ה</td><td class="he-cell" lang="he">הגר</td><td>H</td><td>Hotel</td><td>Forest</td></tr>
+      <tr><td class="he-cell" lang="he">ו</td><td class="he-cell" lang="he">וו</td><td>V / W</td><td>Victor / Whiskey</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">ז</td><td class="he-cell" lang="he">זאב</td><td>Z</td><td>Zulu</td><td>Enemy HQ</td></tr>
+      <tr><td class="he-cell" lang="he">ח</td><td class="he-cell" lang="he">חווה</td><td>—</td><td>—</td><td>Not used</td></tr>
+      <tr><td class="he-cell" lang="he">ט</td><td class="he-cell" lang="he">טוב</td><td>T</td><td>Tango</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">י</td><td class="he-cell" lang="he">יונה</td><td>Y / I</td><td>Yankee / India</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">כ</td><td class="he-cell" lang="he">כרמל</td><td>K</td><td>Kilo</td><td>Airfield</td></tr>
+      <tr><td class="he-cell" lang="he">ל</td><td class="he-cell" lang="he">לאה</td><td>L</td><td>Lima</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">מ</td><td class="he-cell" lang="he">משה</td><td>M</td><td>Mike</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">נ</td><td class="he-cell" lang="he">נשר</td><td>N</td><td>November</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">ס</td><td class="he-cell" lang="he">סמך</td><td>S</td><td>Sierra</td><td>Sea rig</td></tr>
+      <tr><td class="he-cell" lang="he">ע</td><td class="he-cell" lang="he">עין</td><td>—</td><td>—</td><td>Not used</td></tr>
+      <tr><td class="he-cell" lang="he">פ</td><td class="he-cell" lang="he">פסל</td><td>P / F</td><td>Papa / Foxtrot</td><td>Town (Foxtrot)</td></tr>
+      <tr><td class="he-cell" lang="he">צ</td><td class="he-cell" lang="he">ציפור</td><td>—</td><td>—</td><td>Not used</td></tr>
+      <tr><td class="he-cell" lang="he">ק</td><td class="he-cell" lang="he">קורח</td><td>Q</td><td>Quebec</td><td>Spare</td></tr>
+      <tr><td class="he-cell" lang="he">ר</td><td class="he-cell" lang="he">רות</td><td>R</td><td>Romeo</td><td>Never, since "רות" also means Roger</td></tr>
+      <tr><td class="he-cell" lang="he">ש</td><td class="he-cell" lang="he">שמיר</td><td>S</td><td>Sierra</td><td>Not used; Sierra is סמך</td></tr>
+      <tr><td class="he-cell" lang="he">ת</td><td class="he-cell" lang="he">תלם</td><td>T</td><td>Tango</td><td>Not used; Tango is טוב</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">C Charlie, E Echo, J Juliett, O Oscar, U Uniform and X X-ray have no Hebrew letter, and ח, ע, צ have no NATO word, so none of them name a map point. Spare letters are for bigger maps.</p>
+
+  <h3>Callsigns</h3>
+  <div class="tbl"><table class="bilingual">
+    <thead><tr><th>Who</th><th>English</th><th>עברית</th></tr></thead>
+    <tbody>
+      <tr><td>You</td><td>Hammer</td><td class="he-cell" lang="he">פטיש</td></tr>
+      <tr><td>Operator</td><td>Anvil</td><td class="he-cell" lang="he">סדן</td></tr>
+      <tr><td>Infantry squads</td><td>Viper 1, 2, 3…</td><td class="he-cell" lang="he">צפע 1, 2, 3…</td></tr>
+      <tr><td>Armor squads</td><td>Rhino 1, 2…</td><td class="he-cell" lang="he">קרנף 1, 2…</td></tr>
+      <tr><td>Air squads</td><td>Hawk 1, 2…</td><td class="he-cell" lang="he">בז 1, 2…</td></tr>
+      <tr><td>Naval squads</td><td>Shark 1, 2…</td><td class="he-cell" lang="he">כריש 1, 2…</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">No callsign is a word from either phonetic alphabet, so a squad never sounds like a map point. "Eagle / נשר" and "Wolf / זאב" were dropped for that reason.</p>
+
+  <div class="grid2">
+    <div class="card"><h3>You outrank everyone</h3>
+      <ul>
+        <li>Call any squad directly, and your order wins over the operator's.</li>
+        <li>The squad confirms: "Hammer, this is Viper 2. Wilco. Out."</li>
+        <li>The operator hears it on the net and plans around it, never against it.</li>
+        <li>"Anvil, this is Hammer. Take back Viper 2. Out." hands control back.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Room options</h3>
+      <ul>
+        <li><strong>With operator:</strong> you give intent, it handles the details.</li>
+        <li><strong>Without operator:</strong> you command squad leaders directly. Harder.</li>
+        <li>Match length: 10, 15, 20 minutes, or until one HQ falls.</li>
+        <li>Radio language: Hebrew, English or mixed.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Channels</h3>
+      <ul>
+        <li><strong>Command net:</strong> you, the operator and squad leaders. Always on.</li>
+        <li><strong>Squad nets:</strong> tap a squad to listen to its fireteams.</li>
+        <li><strong>Enemy net:</strong> encrypted. A later faction can jam it or listen in.</li>
+      </ul>
+    </div>
+    <div class="card"><h3>On the phone</h3>
+      <ul>
+        <li>A big push-to-talk button, held with the thumb.</li>
+        <li>Tap a squad on the map to fill in its callsign, then speak.</li>
+        <li>A written radio log of every message, for silent play.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>Callsign · <span class="he" lang="he">אות קריאה</span> · design plan v0.6</footer>
+</div>
+</body>
+</html>
