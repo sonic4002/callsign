@@ -55,6 +55,11 @@ function operatorPlan({ wake, rules, agent }) {
   const negative = (why) => radio(back, `${say.negative[lang]}, ${why}`, "over");
   if (call.prowords?.includes("radioCheck")) return [radio(back, say.fiveByFive[lang], "out")];
 
+  if (/\bupgrade\b|שדרג/.test(text)) {
+    const squad = (wake.status?.squads ?? []).find((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));
+    if (!squad) return [radio(back, say.sayAgain[lang], "over")];
+    return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
   if (/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
     const wanted = /\b(tank|vehicle|technical)|טנק|רכב|טנדר/.test(text) ? "vehicle" : /\b(boat|naval|ship)|סירה|ימי/.test(text) ? "naval" : "infantry";
     const [unit] = Object.entries(rules.factions[wake.status?.faction ?? ""]?.units ?? {}).find(([, u]) => u.class === wanted) ?? [];

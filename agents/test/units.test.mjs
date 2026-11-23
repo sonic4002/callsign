@@ -163,6 +163,11 @@ test("scripted operator: relays tasks, buys, reports", async () => {
     ["buy", { unit: "tank", upgrade: "" }],
     ["radio", { to: ["Hammer"], body: "Negative, not enough gold: need 250, have 50", end: "over" }],
   ]);
+  assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Upgrade Viper 2 to the next brain tier")) }), [
+    ["buy", { unit: "", upgrade: "Viper 2" }],
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Upgrade Viper 9")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
   assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("What's the status?")) }), [["radio", { to: ["Hammer"], body: "3 squads, 300 gold, holding A B", end: "over" }]]);
   // A squad's Wilco must not start a conversation.
   assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Wilco", { from: viper2, end: "out" })) }), []);
