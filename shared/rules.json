@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "tickRate": 10,
+  "match": {
+    "lengthSeconds": 600,
+    "startGold": 300,
+    "populationCap": 12,
+    "captureSeconds": 10,
+    "captureRadius": 70,
+    "holdRadius": 45
+  },
+  "hq": { "hp": 3000, "sight": 300 },
+  "nerve": {
+    "shakenAt": 0.35,
+    "pinnedAt": 0.7,
+    "perMiss": 0.008,
+    "perHit": 0.025,
+    "perMemberLost": 0.15,
+    "perTeamLost": 0.25,
+    "recoverPerSecond": 0.04,
+    "recoverNearSteady": 2,
+    "reliefOnKill": 0.15,
+    "quietSeconds": 2
+  },
+  "map": {
+    "width": 1600,
+    "height": 1000,
+    "waterY": 820,
+    "points": [
+      { "id": "A", "kind": "hq", "owner": 0, "x": 150, "y": 480,
+        "callsign": { "en": "Alpha", "he": "אלף" },
+        "name": { "en": "West HQ", "he": "המפקדה המערבית" },
+        "aliases": ["alpha", "west hq", "אלף", "המפקדה המערבית"] },
+      { "id": "B", "kind": "landRig", "owner": -1, "x": 450, "y": 230,
+        "callsign": { "en": "Bravo", "he": "בועז" },
+        "name": { "en": "Land rig", "he": "האסדה היבשתית" },
+        "aliases": ["bravo", "the land rig", "land rig", "בועז", "האסדה היבשתית", "אסדה יבשתית"] },
+      { "id": "G", "kind": "point", "owner": -1, "x": 800, "y": 230,
+        "callsign": { "en": "Golf", "he": "גימל" },
+        "name": { "en": "Bridge", "he": "הגשר" },
+        "aliases": ["golf", "the bridge", "bridge", "גימל", "הגשר", "גשר"] },
+      { "id": "D", "kind": "point", "owner": -1, "x": 450, "y": 690,
+        "callsign": { "en": "Delta", "he": "דוד" },
+        "name": { "en": "Ridge", "he": "הרכס" },
+        "aliases": ["delta", "the ridge", "ridge", "דוד", "הרכס", "רכס"] },
+      { "id": "H", "kind": "point", "owner": -1, "x": 1150, "y": 690,
+        "callsign": { "en": "Hotel", "he": "הגר" },
+        "name": { "en": "Forest", "he": "היער" },
+        "aliases": ["hotel", "the forest", "forest", "הגר", "היער", "יער"] },
+      { "id": "F", "kind": "point", "owner": -1, "x": 800, "y": 500,
+        "callsign": { "en": "Foxtrot", "he": "פסל" },
+        "name": { "en": "Town", "he": "העיירה" },
+        "aliases": ["foxtrot", "the town", "town", "פסל", "העיירה", "עיירה", "הכפר"] },
+      { "id": "K", "kind": "landRig", "owner": -1, "x": 1150, "y": 230,
+        "callsign": { "en": "Kilo", "he": "כרמל" },
+        "name": { "en": "Airfield", "he": "שדה התעופה" },
+        "aliases": ["kilo", "the airfield", "airfield", "כרמל", "שדה התעופה"] },
+      { "id": "S", "kind": "seaRig", "owner": -1, "x": 800, "y": 910,
+        "callsign": { "en": "Sierra", "he": "סמך" },
+        "name": { "en": "Sea rig", "he": "האסדה הימית" },
+        "aliases": ["sierra", "the sea rig", "sea rig", "סמך", "האסדה הימית", "אסדה ימית"] },
+      { "id": "Z", "kind": "hq", "owner": 1, "x": 1450, "y": 480,
+        "callsign": { "en": "Zulu", "he": "זאב" },
+        "name": { "en": "East HQ", "he": "המפקדה המזרחית" },
+        "aliases": ["zulu", "east hq", "זאב", "המפקדה המזרחית"] }
+    ]
+  },
+  "rigs": {
+    "hq": { "income": 10, "captureBy": [] },
+    "landRig": { "income": 15, "captureBy": ["infantry"] },
+    "seaRig": { "income": 30, "captureBy": ["naval"] },
+    "point": { "income": 0, "captureBy": ["infantry", "vehicle"] }
+  },
+  "tiers": [
+    { "tier": 1, "name": { "en": "Recruit", "he": "טירון" }, "upgradeCost": 0, "modelClass": "small" },
+    { "tier": 2, "name": { "en": "Sergeant", "he": "סמל" }, "upgradeCost": 300, "modelClass": "mid" },
+    { "tier": 3, "name": { "en": "Veteran", "he": "ותיק" }, "upgradeCost": 800, "modelClass": "top" }
+  ],
+  "callsigns": {
+    "player": { "en": "Hammer", "he": "פטיש" },
+    "operator": { "en": "Anvil", "he": "סדן" },
+    "allStations": { "en": "All stations", "he": "כל התחנות" },
+    "classes": {
+      "infantry": { "en": "Viper", "he": "צפע" },
+      "vehicle": { "en": "Rhino", "he": "קרנף" },
+      "air": { "en": "Hawk", "he": "בז" },
+      "naval": { "en": "Shark", "he": "כריש" }
+    }
+  },
+  "factions": {
+    "aegis": {
+      "name": { "en": "Aegis Directorate", "he": "מנהלת אגיס" },
+      "startUnits": ["commandos", "commandos"],
+      "units": {
+        "commandos": {
+          "name": { "en": "Commandos", "he": "קומנדו" },
+          "class": "infantry", "domain": "land", "cost": 100,
+          "teams": 3, "members": 2, "hp": 60, "armor": 0,
+          "speed": 28, "range": 190, "sight": 280,
+          "damage": 14, "cooldownTicks": 8, "accuracy": 0.6, "nerveResist": 0.7
+        },
+        "tank": {
+          "name": { "en": "Main battle tank", "he": "טנק מערכה" },
+          "class": "vehicle", "domain": "land", "cost": 250,
+          "teams": 2, "members": 1, "hp": 450, "armor": 0.6,
+          "speed": 34, "range": 260, "sight": 260,
+          "damage": 60, "cooldownTicks": 25, "accuracy": 0.7, "nerveResist": 0.5
+        },
+        "patrolBoat": {
+          "name": { "en": "Patrol boat", "he": "סירת סיור" },
+          "class": "naval", "domain": "sea", "cost": 250,
+          "teams": 2, "members": 1, "hp": 300, "armor": 0.3,
+          "speed": 40, "range": 230, "sight": 300,
+          "damage": 30, "cooldownTicks": 10, "accuracy": 0.6, "nerveResist": 0.6
+        }
+      }
+    },
+    "ashfall": {
+      "name": { "en": "Ashfall Network", "he": "רשת אפר" },
+      "startUnits": ["militia", "militia"],
+      "units": {
+        "militia": {
+          "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
+          "class": "infantry", "domain": "land", "cost": 100,
+          "teams": 4, "members": 3, "hp": 40, "armor": 0,
+          "speed": 30, "range": 150, "sight": 220,
+          "damage": 9, "cooldownTicks": 8, "accuracy": 0.45, "nerveResist": 1.0
+        },
+        "technical": {
+          "name": { "en": "Technical", "he": "טנדר חמוש" },
+          "class": "vehicle", "domain": "land", "cost": 250,
+          "teams": 3, "members": 1, "hp": 200, "armor": 0.25,
+          "speed": 48, "range": 200, "sight": 240,
+          "damage": 22, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.8
+        },
+        "speedboat": {
+          "name": { "en": "Speedboat", "he": "סירה מהירה" },
+          "class": "naval", "domain": "sea", "cost": 250,
+          "teams": 3, "members": 1, "hp": 150, "armor": 0.1,
+          "speed": 58, "range": 170, "sight": 240,
+          "damage": 16, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9
+        }
+      }
+    }
+  },
+  "radio": {
+    "marker": { "en": "this is", "he": "כאן" },
+    "over": { "en": "Over", "he": "עבור" },
+    "out": { "en": "Out", "he": "סוף" },
+    "prowords": {
+      "wilco": { "en": ["wilco"], "he": ["רות, יבוצע", "רות יבוצע"] },
+      "roger": { "en": ["roger"], "he": ["רות"] },
+      "affirmative": { "en": ["affirmative"], "he": ["חיובי"] },
+      "negative": { "en": ["negative"], "he": ["שלילי"] },
+      "sayAgain": { "en": ["say again"], "he": ["אמור שנית"] },
+      "standBy": { "en": ["stand by", "standby"], "he": ["המתן"] },
+      "radioCheck": { "en": ["radio check"], "he": ["איך נשמע"] },
+      "fiveByFive": { "en": ["five by five", "loud and clear"], "he": ["חמש על חמש"] },
+      "correction": { "en": ["correction"], "he": ["תיקון"] },
+      "radioSilence": { "en": ["radio silence"], "he": ["דממת אלחוט"] }
+    }
+  }
+}
