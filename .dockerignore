@@ -1,3 +1,5 @@
 *
 !go.mod
 !go.sum
+!agents/package.json
+!agents/package-lock.json

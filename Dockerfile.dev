@@ -1,10 +1,15 @@
-# Dev image: Go toolchain, the Node binary, and every Go module already downloaded.
-# Rebuild only when go.mod or go.sum changes (make image). Nothing is installed at run time,
-# and the test target runs with the network off to prove it.
+# Dev image: Go toolchain, the Node binary, and every Go module and npm package already
+# downloaded. Rebuild only when go.mod, go.sum or agents/package-lock.json changes
+# (make image). Nothing is installed at run time; the test target runs with the network off.
 FROM node:24-slim AS node
+WORKDIR /deps
+COPY agents/package.json agents/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 
 FROM golang:1.27.4-trixie
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
+# Node looks for packages in every parent directory, so /node_modules serves /src/agents.
+COPY --from=node /deps/node_modules /node_modules
 ENV GOMODCACHE=/go/pkg/mod \
     GOCACHE=/gocache \
     GOFLAGS=-mod=readonly \
