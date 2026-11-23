@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Callsign</title>
+<link rel="stylesheet" href="debug.css">
+</head>
+<body>
+<header>
+  <h1 data-i18n="title"></h1>
+  <dl id="stats">
+    <div><dt data-i18n="gold"></dt><dd><bdi dir="ltr" id="gold">–</bdi> <small>(<bdi dir="ltr" id="income">–</bdi> <span data-i18n="income"></span>)</small></dd></div>
+    <div><dt data-i18n="timeLeft"></dt><dd><bdi dir="ltr" id="time">–</bdi></dd></div>
+    <div><dt data-i18n="points"></dt><dd><bdi dir="ltr" id="held">–</bdi></dd></div>
+    <div><dt data-i18n="hqOurs"></dt><dd><meter id="hq-ours" min="0" max="1" value="1"></meter></dd></div>
+    <div><dt data-i18n="hqEnemy"></dt><dd><meter id="hq-enemy" min="0" max="1" value="1"></meter></dd></div>
+  </dl>
+  <div id="controls">
+    <label><input type="checkbox" id="nerve"> <span data-i18n="showNerve"></span></label>
+    <button type="button" id="restart" data-i18n="restart"></button>
+    <button type="button" id="lang" data-i18n="language"></button>
+  </div>
+</header>
+<main>
+  <section id="map-wrap">
+    <!-- The map never mirrors: the canvas is always drawn west on the left. -->
+    <canvas id="map" dir="ltr"></canvas>
+    <div id="banner" hidden><strong id="banner-title"></strong><span id="banner-reason"></span></div>
+  </section>
+  <aside>
+    <h2 data-i18n="radioLog"></h2>
+    <ol id="log" aria-live="polite"></ol>
+    <form id="send">
+      <input id="text" type="text" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="placeholder">
+      <button type="submit" data-i18n="send"></button>
+    </form>
+    <p id="hint" data-i18n="hint"></p>
+  </aside>
+</main>
+<script type="module" src="debug.js"></script>
+</body>
+</html>
