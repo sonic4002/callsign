@@ -175,6 +175,8 @@ func TestCompose(t *testing.T) {
 		{"he", viper2, []Station{hammer}, "מגע, שלושה רכבים צפונית לגימל", Over, "פטיש, כאן צפע 2, מגע, שלושה רכבים צפונית לגימל, עבור."},
 		{"en", anvil, []Station{viper2, rhino1}, "Viper 2, take Golf. Rhino 1, cover the bridge", Over, "Viper 2 and Rhino 1, this is Anvil. Viper 2, take Golf. Rhino 1, cover the bridge. Over."},
 		{"he", anvil, []Station{viper2, rhino1}, "קחו את גימל", Over, "צפע 2 וקרנף 1, כאן סדן, קחו את גימל, עבור."},
+		{"en", anvil, []Station{viper2, rhino1, shark3}, "Report status", Over, "Viper 2, Rhino 1 and Shark 3, this is Anvil. Report status. Over."},
+		{"he", anvil, []Station{viper2, rhino1, shark3}, "דווחו מצב", Over, "צפע 2, קרנף 1 וכריש 3, כאן סדן, דווחו מצב, עבור."},
 		{"en", anvil, []Station{all}, "Enemy satellite uplink detected", Out, "All stations, this is Anvil. Enemy satellite uplink detected. Out."},
 		{"en", anvil, []Station{hammer}, "Which squad?", Over, "Hammer, this is Anvil. Which squad? Over."},
 		{"he", anvil, []Station{hammer}, "איזו כיתה?", Over, "פטיש, כאן סדן, איזו כיתה? עבור."},

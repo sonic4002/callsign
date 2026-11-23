@@ -453,14 +453,22 @@ func (n *Net) Compose(lang string, from Station, to []Station, body, end string)
 		if asked {
 			sep = " "
 		}
-		return strings.Join(names, " ו") + ", " + n.r.Radio.Marker.He + " " + n.Name(from, lang) +
+		return list(names, " ו") + ", " + n.r.Radio.Marker.He + " " + n.Name(from, lang) +
 			", " + body + sep + endWord + ".", nil
 	}
 	if !asked {
 		body += "."
 	}
-	return strings.Join(names, " and ") + ", " + n.r.Radio.Marker.En + " " + n.Name(from, lang) +
+	return list(names, " and ") + ", " + n.r.Radio.Marker.En + " " + n.Name(from, lang) +
 		". " + body + " " + endWord + ".", nil
+}
+
+// list joins callsigns the way they are spoken: "Viper 1, Viper 2 and Rhino 1".
+func list(names []string, and string) string {
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + and + names[len(names)-1]
 }
 
 func lower(s string) string { return strings.ToLower(s) }
