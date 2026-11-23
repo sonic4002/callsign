@@ -24,6 +24,7 @@ func main() {
 	west := flag.String("west", "aegis", "faction of side 0")
 	east := flag.String("east", "ashfall", "faction of side 1")
 	client := flag.String("client", "client", "directory of the debug page")
+	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
 	flag.Parse()
 
 	rules, err := shared.Load()
@@ -40,7 +41,10 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go rm.Run(ctx, time.Second/time.Duration(rules.TickRate))
+	if *speed < 1 {
+		log.Fatal("-speed must be at least 1")
+	}
+	go rm.Run(ctx, time.Second/time.Duration(rules.TickRate**speed))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", rm.ServeWS)
