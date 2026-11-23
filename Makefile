@@ -16,8 +16,11 @@ test:
 		go build -o /tmp/callsign ./server/cmd/callsign && CALLSIGN_BIN=/tmp/callsign node --test'
 
 # Start the game server and the agents, then open http://localhost:8080
+# The image and the build-cache volume are made here if they are missing; nothing else is fetched.
 play:
-	docker compose up
+	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
+	@docker volume create callsign-gocache >/dev/null
+	CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose up
 
 stop:
 	docker compose down

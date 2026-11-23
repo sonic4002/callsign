@@ -1,0 +1,36 @@
+# make play: the game server and one side's agents, both from the callsign-dev image.
+# Open http://localhost:8080 and transmit as Hammer.
+services:
+  server:
+    image: callsign-dev
+    init: true
+    user: "${CALLSIGN_UID:-1000}:${CALLSIGN_GID:-1000}"
+    working_dir: /src
+    environment:
+      HOME: /tmp
+    volumes:
+      - .:/src:ro
+      - callsign-gocache:/gocache
+    # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
+    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}"]
+    ports:
+      - "127.0.0.1:8080:8080" # this machine only: Phase 0 has no accounts
+
+  agents:
+    image: callsign-dev
+    init: true
+    user: "${CALLSIGN_UID:-1000}:${CALLSIGN_GID:-1000}"
+    working_dir: /src
+    env_file: .env
+    environment:
+      HOME: /tmp
+      CALLSIGN_SERVER: ws://server:8080/ws
+    volumes:
+      - .:/src:ro
+    command: node agents/main.mjs
+    depends_on:
+      - server
+
+volumes:
+  callsign-gocache:
+    external: true
