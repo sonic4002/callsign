@@ -13,8 +13,8 @@
   "nerve": {
     "shakenAt": 0.35,
     "pinnedAt": 0.7,
-    "perMiss": 0.008,
-    "perHit": 0.025,
+    "perMiss": 0.005,
+    "perHit": 0.018,
     "perMemberLost": 0.15,
     "perTeamLost": 0.25,
     "recoverPerSecond": 0.04,
@@ -95,9 +95,9 @@
         "commandos": {
           "name": { "en": "Commandos", "he": "קומנדו" },
           "class": "infantry", "domain": "land", "cost": 100,
-          "teams": 3, "members": 2, "hp": 60, "armor": 0,
-          "speed": 28, "range": 190, "sight": 280,
-          "damage": 14, "cooldownTicks": 8, "accuracy": 0.6, "nerveResist": 0.7
+          "teams": 3, "members": 2, "hp": 66, "armor": 0,
+          "speed": 29, "range": 190, "sight": 280,
+          "damage": 15, "cooldownTicks": 8, "accuracy": 0.6, "nerveResist": 0.7
         },
         "tank": {
           "name": { "en": "Main battle tank", "he": "טנק מערכה" },
@@ -110,7 +110,7 @@
           "name": { "en": "Patrol boat", "he": "סירת סיור" },
           "class": "naval", "domain": "sea", "cost": 250,
           "teams": 2, "members": 1, "hp": 300, "armor": 0.3,
-          "speed": 40, "range": 230, "sight": 300,
+          "speed": 43, "range": 230, "sight": 300,
           "damage": 30, "cooldownTicks": 10, "accuracy": 0.6, "nerveResist": 0.6
         }
       }
@@ -123,22 +123,22 @@
           "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
           "class": "infantry", "domain": "land", "cost": 100,
           "teams": 4, "members": 3, "hp": 40, "armor": 0,
-          "speed": 30, "range": 150, "sight": 220,
-          "damage": 9, "cooldownTicks": 8, "accuracy": 0.45, "nerveResist": 1.0
+          "speed": 30, "range": 160, "sight": 265,
+          "damage": 9, "cooldownTicks": 8, "accuracy": 0.5, "nerveResist": 0.8
         },
         "technical": {
           "name": { "en": "Technical", "he": "טנדר חמוש" },
           "class": "vehicle", "domain": "land", "cost": 250,
-          "teams": 3, "members": 1, "hp": 200, "armor": 0.25,
-          "speed": 48, "range": 200, "sight": 240,
-          "damage": 22, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.8
+          "teams": 3, "members": 1, "hp": 290, "armor": 0.25,
+          "speed": 48, "range": 200, "sight": 265,
+          "damage": 28, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.8
         },
         "speedboat": {
           "name": { "en": "Speedboat", "he": "סירה מהירה" },
           "class": "naval", "domain": "sea", "cost": 250,
-          "teams": 3, "members": 1, "hp": 150, "armor": 0.1,
-          "speed": 58, "range": 170, "sight": 240,
-          "damage": 16, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9
+          "teams": 3, "members": 1, "hp": 190, "armor": 0.1,
+          "speed": 52, "range": 185, "sight": 265,
+          "damage": 21, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9
         }
       }
     }

@@ -346,3 +346,101 @@ func TestDestroyingTheHQWins(t *testing.T) {
 		t.Fatal("the match kept stepping after it ended")
 	}
 }
+
+// A longer reach buys the first shots, not a free win: troops that are being shot by
+// something they cannot hit close the distance instead of standing there.
+func TestReachIsNotAFreeWin(t *testing.T) {
+	s := newSim(t, 1)
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: 3, Point: "F"})
+	tank := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "tank"})
+	run(s, 30) // the militia are dug in at Foxtrot before the tanks roll
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdAttack, Squad: tank.ID, Point: "F"})
+	run(s, 60)
+	full := rules.Factions["aegis"].Units["tank"].HP * 2
+	hp := 0.0
+	for _, tm := range tank.Teams {
+		hp += math.Max(0, tm.HP)
+	}
+	if hp == full {
+		t.Fatalf("tanks outranging the defenders of Foxtrot took no damage in a minute (militia left: %v)", s.Squad(3) != nil)
+	}
+
+	// The same at sea, with both squads ordered to hold the rig.
+	s = newSim(t, 2)
+	boats := [2]*sim.Squad{
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "patrolBoat"}),
+		must(t, s, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "speedboat"}),
+	}
+	for side, b := range boats {
+		must(t, s, sim.Command{Side: side, Kind: sim.CmdHold, Squad: b.ID, Point: "S"})
+	}
+	run(s, 45)
+	for side, b := range boats {
+		alive, fullCrew := b.Strength()
+		hurt := alive < fullCrew
+		for _, tm := range b.Teams {
+			hurt = hurt || (tm.Members > 0 && tm.HP < rules.Factions[s.Sides[side].Faction].Units[b.Unit].HP)
+		}
+		if !hurt {
+			t.Fatalf("side %d's boats fought for the sea rig without taking a hit", side)
+		}
+	}
+}
+
+// Neither faction may run away with the scripted matches, whichever side of the map it
+// starts on. Before tuning, Aegis won nine in ten.
+func TestFactionsAreRoughlyEven(t *testing.T) {
+	const seeds, limit = 8, 0.75
+	wins := map[string]int{}
+	games := 0
+	for _, factions := range [][2]string{{"aegis", "ashfall"}, {"ashfall", "aegis"}} {
+		for seed := uint64(1); seed <= seeds; seed++ {
+			s, err := sim.New(rules, sim.Config{Seed: seed, Factions: factions})
+			if err != nil {
+				t.Fatal(err)
+			}
+			players := [2]*bot.Player{{Side: 0, Style: bot.Standard, R: rules}, {Side: 1, Style: bot.Standard, R: rules}}
+			for !s.Over {
+				if s.Tick%rules.TickRate == 0 {
+					for _, p := range players {
+						for _, c := range p.Act(s.Snapshot(p.Side)) {
+							if _, err := s.Apply(c); err != nil {
+								t.Fatalf("seed %d: scripted command %+v refused: %v", seed, c, err)
+							}
+						}
+					}
+				}
+				s.Step()
+			}
+			games++
+			if s.Winner != sim.NoSide {
+				wins[factions[s.Winner]]++
+			}
+		}
+	}
+	t.Logf("%d games: %v", games, wins)
+	for faction, n := range wins {
+		if share := float64(n) / float64(games); share > limit {
+			t.Fatalf("%s won %d of %d scripted matches (%.0f%%), over the %.0f%% limit", faction, n, games, 100*share, 100*limit)
+		}
+	}
+}
+
+// A unit that can be shot from beyond its own sight never learns what is killing it and
+// cannot answer. Until firing gives a shooter away, sight must cover every enemy weapon.
+func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
+	for mine, f := range rules.Factions {
+		for theirs, g := range rules.Factions {
+			if mine == theirs {
+				continue
+			}
+			for id, u := range f.Units {
+				for enemyID, e := range g.Units {
+					if u.Sight < e.Range {
+						t.Errorf("%s %s sees %.0f but %s %s shoots %.0f", mine, id, u.Sight, theirs, enemyID, e.Range)
+					}
+				}
+			}
+		}
+	}
+}
