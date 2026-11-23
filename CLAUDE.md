@@ -6,6 +6,7 @@ Browser real-time strategy game where every squad is an AI agent, commanded by v
 - **Game server:** Go. Authoritative simulation (10 ticks/s), WebSockets, radio routing. Owns all truth: gold, units, fog of war. Runs no AI.
 - **Model relay:** Go, same repo. Agents never call AI directly. The relay looks up the squad's brain tier on the game server, picks the model, and calls the provider with the player's own key (OpenRouter or Claude/Gemini/OpenAI). Keys encrypted at rest, never returned to the browser.
 - **Client:** TypeScript + Phaser 3, installable web app. Must work in Chrome, Safari and Edge on Mac, Windows and phones.
+- **Command sidebar** (2026-11-24): the client has a sidebar with radar, gold, squad roster and build buttons. Its buttons only compose radio calls; the radio stays the only way to act.
 - **Agents:** operator (callsign Anvil) and squad leaders run as Web Workers in the player's browser. They act only through game tools: `radio`, `move`, `hold`, `attack`, `report`, `buy` (operator only).
 - **Fireteams:** plain utility AI on the server, no LLM. One "nerve" value (steady / shaken / pinned) shown through behavior only. No fatigue.
 - **Open league:** the game also exposes an MCP endpoint with the same tools; any agent can join with its own model. Separate ladder, no tiers.
@@ -19,7 +20,7 @@ Browser real-time strategy game where every squad is an AI agent, commanded by v
 - Radio routing is done by code (callsign match in both languages), never by an LLM.
 
 ## Art
-- Top-down sprites, no text baked into images. Generated locally (ComfyUI, FLUX.2 klein / Z-Image Turbo) under `assets/`, reviewed before use.
+- Isometric (3/4 view) sprites, changed from top-down on 2026-11-24; no text baked into images. Generated locally (ComfyUI, FLUX.2 klein / Z-Image Turbo) under `assets/`, reviewed before use.
 
 ## How to work
 - Build in the plan's phase order. Phase 0 first: no art, no voice, no accounts.

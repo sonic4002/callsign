@@ -1,0 +1,365 @@
+// Art. Every unit, building and prop has an original drawing made in code here, so the
+// page looks finished with no image files at all. When /assets/sprites/manifest.json
+// exists, anything it lists is drawn from its image instead, with no other change.
+//
+// All drawings are made around the origin, standing on it, facing south-east (right and
+// toward the viewer). The caller translates, scales and flips.
+
+const TAU = Math.PI * 2;
+
+// ---- generated sprites ----
+
+export const sprites = { units: {}, buildings: {}, terrain: {} };
+
+const loadImage = (src) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+
+// loadSprites reads the manifest if there is one. A missing manifest or image is not an
+// error: that thing simply keeps its code-drawn look.
+export async function loadSprites(base = "/assets/sprites/") {
+  let manifest;
+  try {
+    const res = await fetch(`${base}manifest.json`);
+    if (!res.ok) return sprites;
+    manifest = await res.json();
+  } catch {
+    return sprites;
+  }
+  const jobs = [];
+  for (const group of ["units", "buildings"]) {
+    for (const [id, entry] of Object.entries(manifest[group] ?? {})) {
+      jobs.push(loadImage(base + entry.image).then((img) => img && (sprites[group][id] = { ...entry, img })));
+    }
+  }
+  for (const [id, path] of Object.entries(manifest.terrain ?? {})) {
+    jobs.push(loadImage(base + path).then((img) => img && (sprites.terrain[id] = img)));
+  }
+  await Promise.all(jobs);
+  return sprites;
+}
+
+// drawSprite draws a manifest sprite standing on the origin, `height` pixels tall.
+// `turn` is the direction of travel on screen in radians (0 = right, clockwise).
+function drawSprite(ctx, entry, height, turn) {
+  const { img, anchor = [0.5, 0.85] } = entry;
+  const facings = Math.max(1, entry.facings ?? 1);
+  const [fw, fh] = entry.frame ?? [img.width / facings, img.height];
+  let frame = 0;
+  let flip = 1;
+  if (facings === 1) {
+    flip = Math.cos(turn) < 0 ? -1 : 1;
+  } else {
+    // The first frame faces south-east; the rest go clockwise.
+    const step = TAU / facings;
+    frame = ((Math.round((turn - Math.PI / 4) / step) % facings) + facings) % facings;
+  }
+  const k = height / fh;
+  ctx.save();
+  ctx.scale(flip, 1);
+  ctx.drawImage(img, frame * fw, 0, fw, fh, -anchor[0] * fw * k, -anchor[1] * fh * k, fw * k, fh * k);
+  ctx.restore();
+}
+
+// ---- building blocks ----
+
+// isoBox draws a box standing on the ground: w along the east axis, d along the south
+// axis, h tall, centred on (cx, cy).
+export function isoBox(ctx, cx, cy, w, d, h, top, left, right) {
+  const ax = w / 2, ay = w / 4; // half the east edge on screen
+  const bx = -d / 2, by = d / 4; // half the south edge on screen
+  const S = [cx + ax + bx, cy + ay + by];
+  const N = [cx - ax - bx, cy - ay - by];
+  const E = [cx + ax - bx, cy + ay - by];
+  const W = [cx - ax + bx, cy - ay + by];
+  const face = (color, pts) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.fill();
+  };
+  face(left, [W, S, [S[0], S[1] - h], [W[0], W[1] - h]]);
+  face(right, [S, E, [E[0], E[1] - h], [S[0], S[1] - h]]);
+  face(top, [[W[0], W[1] - h], [S[0], S[1] - h], [E[0], E[1] - h], [N[0], N[1] - h]]);
+}
+
+function line(ctx, color, width, ...pts) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i += 2) (i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[i], pts[i + 1]));
+  ctx.stroke();
+}
+
+function poly(ctx, color, ...pts) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i += 2) (i ? ctx.lineTo(pts[i], pts[i + 1]) : ctx.moveTo(pts[i], pts[i + 1]));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function disc(ctx, color, x, y, rx, ry = rx) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+  ctx.fill();
+}
+
+export function shadow(ctx, rx, ry = rx / 2, alpha = 0.32) {
+  disc(ctx, `rgba(0,0,0,${alpha})`, 2, 1, rx, ry);
+}
+
+// ---- units ----
+
+const looks = {
+  aegis: { cloth: "#62788a", dark: "#2f3b45", head: "#3b4a57", trim: "#cfeef4", skin: "#d8b08a", hull: "#71889a", hullSide: "#4a5b68", hullLow: "#2b353d" },
+  ashfall: { cloth: "#ab8b58", dark: "#4b3a27", head: "#c9a23f", trim: "#f1dfb0", skin: "#b98a62", hull: "#b79560", hullSide: "#7d6239", hullLow: "#3a2e22" },
+};
+
+function soldier(ctx, look, stride, firing) {
+  const swing = Math.sin(stride) * 3;
+  line(ctx, look.dark, 2.6, -1.5, -8, -2.5 + swing, 0);
+  line(ctx, look.dark, 2.6, 1.5, -8, 2.5 - swing, 0);
+  ctx.fillStyle = look.cloth;
+  ctx.beginPath();
+  ctx.roundRect(-4, -18, 8, 11, 2.5);
+  ctx.fill();
+  poly(ctx, look.dark, -6, -17, -3.5, -17, -3.5, -10, -6, -11); // pack
+  const lift = firing ? -1.5 : 0;
+  line(ctx, "#1b1f22", 1.8, -1, -13, 10, -12 + lift); // rifle
+  line(ctx, look.cloth, 2.4, 0, -15, 5, -12.5 + lift); // arm
+  disc(ctx, look.skin, 0.6, -21, 3.2);
+  ctx.fillStyle = look.head;
+  ctx.beginPath();
+  ctx.arc(0.6, -21.6, 3.6, Math.PI * 0.95, TAU * 1.02);
+  ctx.fill();
+  line(ctx, look.trim, 1, 1.5, -21.3, 3.6, -21.1); // visor or scarf edge
+}
+
+function tank(ctx, look) {
+  // Tracks, hull, turret, gun.
+  poly(ctx, look.hullLow, -24, -3, -8, 7, 24, -8, 24, -1, -8, 14, -24, 4);
+  poly(ctx, look.hullSide, -24, -9, -8, 1, -8, 8, -24, -2);
+  poly(ctx, look.hullSide, -8, 1, 24, -14, 24, -7, -8, 8);
+  poly(ctx, look.hull, -24, -9, 8, -24, 24, -14, -8, 1);
+  for (const [x, y] of [[-3, 9.5], [5, 5.5], [13, 1.5], [20, -2]]) disc(ctx, "#14181b", x, y, 2.6, 2.2);
+  poly(ctx, look.hullSide, -10, -15, 0, -9, 0, -5, -10, -11);
+  poly(ctx, look.hullLow, 0, -9, 12, -15, 12, -11, 0, -5);
+  poly(ctx, look.hull, -10, -15, 2, -21, 12, -15, 0, -9);
+  line(ctx, look.hullLow, 3.2, 5, -13, 30, -2);
+  line(ctx, look.trim, 1, -6, -16, 0, -19);
+}
+
+function technical(ctx, look) {
+  for (const [x, y] of [[-12, 6], [12, -6]]) disc(ctx, "#14181b", x, y, 4.2, 3.6);
+  poly(ctx, look.hullLow, -22, -2, -6, 6, 22, -8, 22, -4, -6, 10, -22, 2);
+  poly(ctx, look.hullSide, -22, -8, -6, 0, -6, 6, -22, -2);
+  poly(ctx, look.hullSide, -6, 0, 22, -14, 22, -8, -6, 6);
+  poly(ctx, look.hull, -22, -8, 6, -22, 22, -14, -6, 0);
+  // Cab at the front, gun on a post in the bed.
+  poly(ctx, look.hullSide, 2, -11, 10, -7, 10, -1, 2, -5);
+  poly(ctx, "#1f2a33", 10, -13, 20, -18, 20, -13, 10, -8);
+  poly(ctx, look.hull, 2, -17, 12, -22, 20, -18, 10, -13);
+  poly(ctx, look.hullSide, 2, -17, 10, -13, 10, -7, 2, -11);
+  line(ctx, "#1b1f22", 2, -9, -8, -9, -17);
+  line(ctx, "#1b1f22", 2.6, -14, -19, 2, -15);
+  disc(ctx, look.head, -12, -17, 2.6);
+}
+
+function boat(ctx, look, small) {
+  const k = small ? 0.8 : 1;
+  ctx.save();
+  ctx.scale(k, k);
+  poly(ctx, look.hullLow, -26, -2, -18, 6, 14, 6, 32, -6, 12, -12, -18, -10);
+  poly(ctx, look.hull, -24, -5, -17, 2, 13, 2, 28, -7, 11, -12, -17, -11);
+  if (small) {
+    line(ctx, "#1b1f22", 2.4, -4, -8, 12, -12);
+    disc(ctx, look.head, -6, -11, 2.8);
+    poly(ctx, look.hullSide, -22, -9, -17, -6, -17, 0, -22, -3);
+  } else {
+    poly(ctx, look.hullSide, -10, -12, 2, -8, 2, -1, -10, -5);
+    poly(ctx, "#1f2a33", 2, -8, 10, -12, 10, -6, 2, -1);
+    poly(ctx, look.trim, -10, -12, -2, -16, 10, -12, 2, -8);
+    line(ctx, look.hullLow, 1.4, -2, -14, -2, -26);
+    line(ctx, "#1b1f22", 2.6, 14, -9, 26, -11);
+  }
+  ctx.restore();
+}
+
+const unitHeight = { infantry: 26, vehicle: 34, naval: 36 };
+
+// drawUnit draws one fireteam. `turn` is its direction of travel on screen.
+export function drawUnit(ctx, { unit, cls, faction, members, moving, firing, time, turn, seed }) {
+  const entry = sprites.units[unit];
+  if (entry) {
+    shadow(ctx, cls === "infantry" ? 9 : 20);
+    drawSprite(ctx, entry, unitHeight[cls] ?? 28, turn);
+    return;
+  }
+  const look = looks[faction] ?? looks.aegis;
+  const flip = Math.cos(turn) < 0 ? -1 : 1;
+  if (cls === "infantry") {
+    // One figure per soldier, standing in a loose file.
+    const spots = [[0, 0], [-8, -4], [8, 3], [-1, -9]];
+    const n = Math.min(members, spots.length);
+    const order = spots.slice(0, n).sort((a, b) => a[1] - b[1]);
+    for (const [i, [ox, oy]] of order.entries()) {
+      ctx.save();
+      ctx.translate(ox, oy);
+      shadow(ctx, 5.5, 2.6);
+      ctx.scale(flip, 1);
+      soldier(ctx, look, moving ? time * 11 + seed + i * 1.7 : 0, firing);
+      ctx.restore();
+    }
+    return;
+  }
+  if (cls === "naval") {
+    // A boat rides its own bow wave instead of casting a shadow.
+    ctx.save();
+    ctx.scale(flip, 1);
+    if (moving) {
+      line(ctx, "rgba(235,248,255,0.55)", 1.6, -22, 4, -44, 0);
+      line(ctx, "rgba(235,248,255,0.4)", 1.4, -18, 8, -40, 12);
+    }
+    disc(ctx, "rgba(235,248,255,0.22)", 2, 3, 28, 7);
+    ctx.translate(0, Math.sin(time * 2 + seed) * 0.8);
+    boat(ctx, look, faction === "ashfall");
+    ctx.restore();
+    return;
+  }
+  shadow(ctx, 24, 9);
+  ctx.save();
+  ctx.scale(flip, 1);
+  (faction === "ashfall" ? technical : tank)(ctx, look);
+  ctx.restore();
+}
+
+// ---- buildings ----
+
+function pennant(ctx, x, y, color, time, size = 1) {
+  const wave = Math.sin(time * 4 + x) * 1.5 * size;
+  poly(ctx, color, x, y, x + 13 * size, y + 3 * size + wave, x, y + 8 * size);
+}
+
+function hqAegis(ctx, color, time) {
+  shadow(ctx, 50, 22, 0.35);
+  isoBox(ctx, 0, 0, 78, 78, 9, "#55636d", "#39444c", "#2a3238"); // apron
+  isoBox(ctx, -4, -6, 52, 46, 26, "#7b8f9c", "#566673", "#3d4a54");
+  isoBox(ctx, 14, -26, 24, 22, 16, "#8ea3b0", "#627482", "#465560");
+  line(ctx, "#cfeef4", 1.6, -24, -16, -6, -7); // lit slit windows
+  line(ctx, "#cfeef4", 1.6, 0, -6, 18, -15);
+  line(ctx, "#2a3238", 2, 16, -50, 16, -72); // mast and dish
+  ctx.fillStyle = "#a9bcc7";
+  ctx.beginPath();
+  ctx.ellipse(16, -74, 9, 5, -0.5, 0, TAU);
+  ctx.fill();
+  disc(ctx, "#39444c", 16, -74, 2);
+  line(ctx, "#2a3238", 1.6, -22, -32, -22, -58);
+  pennant(ctx, -22, -58, color, time);
+}
+
+function hqAshfall(ctx, color, time) {
+  shadow(ctx, 50, 22, 0.35);
+  isoBox(ctx, 0, 0, 80, 80, 6, "#8d7550", "#6a5638", "#4c3e29"); // packed earth yard
+  isoBox(ctx, -26, 8, 10, 60, 11, "#c0a36d", "#8b744b", "#6b5837"); // sandbag walls
+  isoBox(ctx, 10, 26, 60, 10, 11, "#c0a36d", "#8b744b", "#6b5837");
+  isoBox(ctx, 6, -8, 40, 34, 18, "#a98b5a", "#7d6239", "#5c482b"); // blockhouse
+  poly(ctx, "#6f7a4f", -18, -22, 6, -40, 30, -28, 6, -14); // canvas roof
+  poly(ctx, "#59633e", -18, -22, 6, -14, 6, -8, -18, -17);
+  poly(ctx, "#1d1a15", -2, -3, 6, -7, 6, 2, -2, 6); // doorway
+  line(ctx, "#3a2e22", 2, -30, -12, -30, -52);
+  pennant(ctx, -30, -52, color, time);
+  isoBox(ctx, 30, 6, 12, 12, 9, "#5c6a45", "#44502f", "#333c23"); // crates
+}
+
+function landRig(ctx, color, time) {
+  shadow(ctx, 30, 13, 0.3);
+  isoBox(ctx, 0, 0, 44, 44, 4, "#6b6f6a", "#4b4f4b", "#373a37");
+  // Lattice derrick.
+  const apex = [0, -62];
+  const feet = [[-14, -2], [0, 5], [14, -2], [0, -9]];
+  for (const [x, y] of feet) line(ctx, "#2c3134", 2, x, y, apex[0], apex[1]);
+  for (const h of [0.3, 0.55, 0.78]) {
+    const ring = feet.map(([x, y]) => [x + (apex[0] - x) * h, y + (apex[1] - y) * h]);
+    line(ctx, "#454c50", 1.3, ...ring.flat(), ...ring[0]);
+  }
+  // Nodding pump beside it.
+  const nod = Math.sin(time * 2.2) * 0.22;
+  line(ctx, "#2c3134", 2.4, 22, 2, 22, -14);
+  ctx.save();
+  ctx.translate(22, -14);
+  ctx.rotate(nod);
+  line(ctx, "#c4a046", 3, -13, 0, 13, 0);
+  disc(ctx, "#c4a046", 13, 1, 3.4);
+  ctx.restore();
+  isoBox(ctx, -22, 6, 12, 12, 10, "#8c8f8a", "#62655f", "#4a4d48");
+  pennant(ctx, 0, -72, color, time, 0.9);
+  line(ctx, "#2c3134", 1.4, 0, -62, 0, -72);
+}
+
+function seaRig(ctx, color, time) {
+  disc(ctx, "rgba(235,248,255,0.2)", 0, 8, 40, 14);
+  for (const [x, y] of [[-22, 2], [0, 13], [22, 2], [0, -9]]) line(ctx, "#2a3136", 4, x, y, x, y - 22);
+  isoBox(ctx, 0, -20, 54, 54, 8, "#7d868c", "#586067", "#40474d");
+  isoBox(ctx, -8, -30, 22, 20, 14, "#b8873b", "#8a6429", "#69491d");
+  line(ctx, "#2a3136", 2.2, 14, -28, 14, -64); // flare stack
+  const flick = 3 + Math.sin(time * 9) * 1.2;
+  disc(ctx, "rgba(255,170,60,0.9)", 14, -66 - flick / 2, 2.6, flick);
+  line(ctx, "#c4a046", 2.2, -18, -34, -34, -52, -44, -46); // crane
+  line(ctx, "#2a3136", 1.4, -8, -44, -8, -58);
+  pennant(ctx, -8, -58, color, time, 0.9);
+}
+
+function flagPost(ctx, color, time) {
+  shadow(ctx, 12, 5, 0.3);
+  for (const [x, y] of [[-8, 1], [0, 5], [8, 1]]) disc(ctx, "#8b7a58", x, y, 5, 3);
+  line(ctx, "#d8dcd6", 2, 0, 2, 0, -44);
+  const wave = Math.sin(time * 4) * 2;
+  poly(ctx, color, 0, -44, 20, -40 + wave, 20, -28 + wave, 0, -30);
+}
+
+const buildingHeight = { hq_aegis: 96, hq_ashfall: 80, landRig: 84, seaRig: 80, point: 52 };
+const drawn = { hq_aegis: hqAegis, hq_ashfall: hqAshfall, landRig, seaRig, point: flagPost };
+
+// drawBuilding draws what stands on a map point. `color` is the owner's colour.
+export function drawBuilding(ctx, kind, color, time) {
+  const entry = sprites.buildings[kind];
+  if (entry) {
+    shadow(ctx, 30, 13, 0.3);
+    drawSprite(ctx, entry, buildingHeight[kind] ?? 70, 0);
+    // A generated building carries no team colour, so it gets a pennant beside it.
+    line(ctx, "#d8dcd6", 1.6, -26, 4, -26, -30);
+    pennant(ctx, -26, -30, color, time);
+    return;
+  }
+  drawn[kind]?.(ctx, color, time);
+}
+
+// ---- ground props (baked into the terrain once) ----
+
+export function tree(ctx, x, y, k, tint) {
+  disc(ctx, "rgba(0,0,0,0.25)", x + 4, y + 2, 9 * k, 4 * k);
+  line(ctx, "#3a2c1c", 2.4 * k, x, y, x, y - 9 * k);
+  disc(ctx, tint ? "#3d5a35" : "#35502f", x, y - 15 * k, 9 * k, 8 * k);
+  disc(ctx, tint ? "#557a45" : "#4a6b3d", x - 2 * k, y - 18 * k, 6 * k, 5 * k);
+}
+
+export function house(ctx, x, y, w, d, roof) {
+  disc(ctx, "rgba(0,0,0,0.25)", x + 6, y + 4, w * 0.8, w * 0.32);
+  isoBox(ctx, x, y, w, d, 13, "#b9ae98", "#8f8572", "#6f6757");
+  isoBox(ctx, x, y - 13, w + 3, d + 3, 5, roof, "#6e3d2d", "#55301f");
+}
+
+export function rock(ctx, x, y, k) {
+  disc(ctx, "rgba(0,0,0,0.22)", x + 3, y + 2, 8 * k, 3.5 * k);
+  poly(ctx, "#6d6a62", x - 8 * k, y, x - 3 * k, y - 8 * k, x + 5 * k, y - 6 * k, x + 8 * k, y);
+  poly(ctx, "#8b887e", x - 3 * k, y - 8 * k, x + 5 * k, y - 6 * k, x + 1 * k, y - 2 * k);
+}

@@ -1,8 +1,19 @@
-// Phase 0 debug page: dots on a map, the radio log, and a box to transmit as Hammer.
-// It draws only what the server sends this side. Nerve shows in what the dots do; the
-// "show nerve" switch is a debugging aid, off by default.
+// The command screen: an isometric battlefield, a radio console, and a sidebar of
+// instruments. The radio is the only way to act. Every button here does one thing:
+// it writes a radio call, in the page language, and the server routes it like any other.
+// Nerve shows in what the troops do; the "show nerve" switch is a debugging aid.
+
+import { drawUnit, loadSprites } from "./art.js";
+import { Scene, sideColor } from "./map.js";
+import { Music } from "./music.js";
 
 const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
 const query = new URLSearchParams(location.search);
 const side = query.get("side") === "1" ? 1 : 0;
 const role = query.get("role") === "spectator" ? "spectator" : "hammer";
@@ -25,10 +36,15 @@ function applyLanguage() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "he" ? "rtl" : "ltr";
   document.title = t("title");
-  for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
-  for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = t(el.dataset.i18nPlaceholder);
+  for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
+  for (const node of document.querySelectorAll("[data-i18n-placeholder]")) node.placeholder = t(node.dataset.i18nPlaceholder);
+  for (const node of document.querySelectorAll("[data-i18n-aria]")) node.setAttribute("aria-label", t(node.dataset.i18nAria));
   syncInputDirection();
   renderLog();
+  drawn.roster = drawn.build = "";
+  renderSidebar();
+  renderOverlay();
+  renderTrack();
 }
 
 // An empty box follows the page so the placeholder reads the right way; typed text
@@ -38,11 +54,13 @@ function syncInputDirection() {
 }
 $("text").addEventListener("input", syncInputDirection);
 
-$("lang").addEventListener("click", () => {
+function switchLanguage() {
   lang = lang === "he" ? "en" : "he";
   localStorage.setItem("callsign.lang", lang);
   applyLanguage();
-});
+}
+$("lang").addEventListener("click", switchLanguage);
+$("overlay-lang").addEventListener("click", switchLanguage);
 
 // ---- match state ----
 
@@ -52,6 +70,12 @@ let me = null; // this connection's station
 let faction = "";
 let entries = []; // radio log lines, kept as data so a language switch can redraw them
 let ws = null;
+let started = false; // the player pressed Start
+const drawn = { roster: "", build: "" }; // what the sidebar lists show now
+
+const scene = new Scene($("map"), $("radar-map"), { lang: () => lang, showNerve: () => $("nerve").checked, side });
+const music = await new Music().load();
+await loadSprites();
 
 const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[lang] ?? id;
 const clock = (tick) => {
@@ -59,6 +83,7 @@ const clock = (tick) => {
   const s = Math.floor(tick / rules.tickRate);
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
+const open = () => ws?.readyState === WebSocket.OPEN;
 
 function connect() {
   system("connecting");
@@ -79,11 +104,14 @@ function onFrame(frame) {
       faction = frame.faction;
       entries = frame.log.map((m) => ({ kind: "radio", message: m }));
       system(me ? "matchStarted" : "spectating", { faction });
-      $("banner").hidden = true;
-      fit();
+      scene.setRules(rules);
+      scene.setState(state);
+      drawn.roster = drawn.build = "";
+      hideOrders();
       break;
     case "state":
       state = frame.state;
+      scene.setState(state);
       break;
     case "radio":
       entries.push({ kind: "radio", message: frame.message });
@@ -98,8 +126,9 @@ function onFrame(frame) {
       }
       break;
   }
-  renderLog();
-  renderStats();
+  if (frame.type !== "state") renderLog();
+  renderSidebar();
+  renderOverlay();
 }
 
 function system(key, vars = {}, tone = "") {
@@ -107,26 +136,22 @@ function system(key, vars = {}, tone = "") {
   renderLog();
 }
 
-// ---- radio log ----
+// ---- radio console ----
 
 function renderLog() {
   const log = $("log");
   const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.replaceChildren(
     ...entries.map((e) => {
-      const li = document.createElement("li");
-      const time = document.createElement("time");
-      const text = document.createElement("span");
-      text.className = "text";
+      const li = el("li");
+      const time = el("time");
+      const text = el("span", "text");
       if (e.kind === "radio") {
         const m = e.message;
         time.textContent = clock(m.tick);
         li.className = m.from.squad ? "squad" : m.from.key;
-        const who = document.createElement("span");
-        who.className = "who";
-        who.textContent = m.from[lang];
         text.textContent = m.text; // always as transmitted, in the language it was sent in
-        li.append(time, who, text);
+        li.append(time, el("span", "who", m.from[lang]), text);
         return li;
       }
       li.className = `system ${e.tone ?? ""}`;
@@ -145,20 +170,34 @@ function renderLog() {
   if (pinned) log.scrollTop = log.scrollHeight;
 }
 
+// transmit puts text on the net. It is the one place this page acts on the match.
+function transmit(text) {
+  if (!text || !open()) return false;
+  ws.send(JSON.stringify({ type: "radio", text }));
+  return true;
+}
+
+// draft puts a call in the box for the player to send or edit.
+function draft(text) {
+  $("text").value = text;
+  syncInputDirection();
+  $("text").focus();
+}
+
 $("send").addEventListener("submit", (ev) => {
   ev.preventDefault();
-  const text = $("text").value.trim();
-  if (!text || ws?.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: "radio", text }));
-  $("text").value = "";
-  syncInputDirection();
+  if (transmit($("text").value.trim())) draft("");
 });
 
-$("restart").addEventListener("click", () => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: "restart" })));
+$("restart").addEventListener("click", () => open() && ws.send(JSON.stringify({ type: "restart" })));
 
-// ---- top bar ----
+// Calls the sidebar and the map write. `to` and `from` are callsigns in the page language.
+const call = (kind, vars) => t(`call.${kind}`, { from: me[lang], ...vars });
+const anvil = () => rules.callsigns.operator[lang];
 
-function renderStats() {
+// ---- sidebar ----
+
+function renderSidebar() {
   if (!state || !rules) return;
   $("gold").textContent = state.gold;
   $("income").textContent = `+${state.income}`; // the sign stays with the number in Hebrew too
@@ -166,149 +205,236 @@ function renderStats() {
   $("time").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const held = (who) => state.points.filter((p) => p.owner === who).length;
   $("held").textContent = `${held(side)} : ${held(1 - side)}`;
-  $("hq-ours").value = state.hq[side];
-  $("hq-enemy").value = state.hq[1 - side];
-  if (state.over) {
-    $("banner").hidden = false;
-    $("banner-title").textContent = t(state.winner === -1 ? "over.draw" : state.winner === side ? "over.won" : "over.lost");
-    $("banner-reason").textContent = t(`over.${state.reason}`);
+  $("hq-ours").style.inlineSize = `${state.hq[side] * 100}%`;
+  $("hq-enemy").style.inlineSize = `${state.hq[1 - side] * 100}%`;
+
+  const mine = state.squads.filter((sq) => sq.side === side);
+  const cap = rules.match.populationCap;
+  $("pop").textContent = `${mine.length}/${cap}`;
+  const canAct = Boolean(me) && !state.over;
+
+  // The lists are rebuilt only when what they show changes, so buttons stay clickable.
+  const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order])]);
+  if (rosterKey !== drawn.roster) {
+    drawn.roster = rosterKey;
+    $("roster").replaceChildren(...(mine.length ? mine.map((sq) => rosterRow(sq, canAct)) : [el("li", "empty", t("rosterEmpty"))]));
   }
+  const units = Object.entries(rules.factions[faction]?.units ?? {});
+  const buildKey = JSON.stringify([lang, faction, canAct, mine.length >= cap, units.map(([, u]) => state.gold >= u.cost)]);
+  if (buildKey !== drawn.build) {
+    drawn.build = buildKey;
+    $("build").replaceChildren(...units.map(([id, u]) => buildButton(id, u, canAct && mine.length < cap && state.gold >= u.cost)));
+  }
+}
+
+function orderText(sq) {
+  if (sq.order.contact) return t("order.contact");
+  return t(`order.${sq.order.kind}`, { point: sq.order.point ? pointName(sq.order.point) : t("order.here") });
+}
+
+function rosterRow(sq, canAct) {
+  const unit = rules.factions[faction].units[sq.unit];
+  const li = el("li", sq.id === scene.selected ? "selected" : "");
+  const name = el("span", "name", sq.callsign[lang]);
+  name.append(el("span", "unit", unit.name[lang]));
+  const pips = el("span", "pips");
+  for (let i = 0; i < sq.full; i++) pips.append(el("i", i < sq.alive ? "" : "lost"));
+  const tier = el("span", "tier", t("tier", { tier: sq.tier }));
+  const next = rules.tiers.find((x) => x.tier === sq.tier + 1);
+  if (next && me) {
+    const up = el("button", "", `▲ ${next.upgradeCost}`);
+    up.type = "button";
+    up.disabled = !canAct || state.gold < next.upgradeCost;
+    up.setAttribute("aria-label", t("upgrade", { squad: sq.callsign[lang], cost: next.upgradeCost }));
+    up.title = up.getAttribute("aria-label");
+    up.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      draft(call("upgrade", { to: anvil(), squad: sq.callsign[lang] }));
+    });
+    tier.append(up);
+  }
+  li.append(name, pips, el("span", "order", orderText(sq)), tier);
+  li.addEventListener("click", () => select(sq));
+  return li;
+}
+
+function buildButton(id, unit, enabled) {
+  const button = el("button");
+  button.type = "button";
+  button.disabled = !enabled;
+  const icon = el("canvas");
+  const dpr = devicePixelRatio || 1;
+  icon.width = 72 * dpr;
+  icon.height = 48 * dpr;
+  const g = icon.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.translate(36, unit.class === "infantry" ? 38 : 36);
+  g.scale(1.25, 1.25);
+  drawUnit(g, { unit: id, cls: unit.class, faction, members: Math.min(unit.members, 3), moving: false, firing: false, time: 0, turn: 0.4, seed: 0 });
+  button.append(icon, el("span", "", unit.name[lang]), el("span", "cost", String(unit.cost)));
+  // Buying is a radio call to the operator like any other; the button only writes and sends it.
+  button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
+  return button;
+}
+
+// select marks a squad and starts a call to it.
+function select(sq) {
+  scene.selected = sq.id;
+  drawn.roster = "";
+  renderSidebar();
+  hideOrders();
+  if (me) draft(t("callPrefix", { to: sq.callsign[lang], from: me[lang] }));
 }
 
 // ---- map ----
 
 const canvas = $("map");
-const ctx = canvas.getContext("2d");
-const colors = { [-1]: "#8a9a91", 0: "#6fb1ff", 1: "#ff7a59" };
-const nerveColors = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
-let scale = 1;
+let drag = null;
 
-function fit() {
-  if (!rules) return;
-  const wrap = $("map-wrap");
-  const { width, height } = rules.map;
-  scale = Math.min((wrap.clientWidth - 24) / width, (wrap.clientHeight - 24) / height);
-  const dpr = devicePixelRatio || 1;
-  canvas.style.width = `${width * scale}px`;
-  canvas.style.height = `${height * scale}px`;
-  canvas.width = Math.round(width * scale * dpr);
-  canvas.height = Math.round(height * scale * dpr);
-  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
-}
-addEventListener("resize", fit);
+canvas.addEventListener("pointerdown", (ev) => {
+  drag = { x: ev.clientX, y: ev.clientY, moved: false };
+  canvas.setPointerCapture(ev.pointerId);
+});
+canvas.addEventListener("pointermove", (ev) => {
+  if (!drag) return;
+  const dx = ev.clientX - drag.x;
+  const dy = ev.clientY - drag.y;
+  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+  drag.moved = true;
+  canvas.classList.add("dragging");
+  hideOrders();
+  scene.cam.pan(dx, dy);
+  drag.x = ev.clientX;
+  drag.y = ev.clientY;
+});
+canvas.addEventListener("pointerup", (ev) => {
+  const wasDrag = drag?.moved;
+  drag = null;
+  canvas.classList.remove("dragging");
+  if (!wasDrag) mapClick(ev);
+});
+canvas.addEventListener("pointercancel", () => (drag = null));
+canvas.addEventListener(
+  "wheel",
+  (ev) => {
+    ev.preventDefault();
+    const box = canvas.getBoundingClientRect();
+    hideOrders();
+    scene.cam.zoomAt(ev.clientX - box.left, ev.clientY - box.top, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
+  },
+  { passive: false },
+);
+const zoomBy = (f) => scene.cam.zoomAt(scene.cam.w / 2, scene.cam.h / 2, f);
+$("zoom-in").addEventListener("click", () => zoomBy(1.3));
+$("zoom-out").addEventListener("click", () => zoomBy(1 / 1.3));
+$("zoom-fit").addEventListener("click", () => scene.cam.fit());
+addEventListener("resize", () => scene.resize());
 
-function label(text, x, y, size = 15, color = "#dfe7e1", align = "center") {
-  ctx.font = `${size}px system-ui, sans-serif`;
-  ctx.textAlign = align;
-  ctx.fillStyle = color;
-  ctx.direction = /[֐-׿]/.test(text) ? "rtl" : "ltr";
-  ctx.fillText(text, x, y);
-}
+$("radar-map").addEventListener("click", (ev) => rules && scene.cam.centerOn(...scene.radarToWorld(ev)));
 
-function drawTeam(tm, cls, color, own) {
-  const r = 5 + Math.min(tm.members, 4);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  if (cls === "vehicle") ctx.rect(tm.x - r, tm.y - r, 2 * r, 2 * r);
-  else if (cls === "naval") {
-    ctx.moveTo(tm.x, tm.y - r - 2);
-    ctx.lineTo(tm.x + r + 1, tm.y + r);
-    ctx.lineTo(tm.x - r - 1, tm.y + r);
-    ctx.closePath();
-  } else ctx.arc(tm.x, tm.y, r, 0, 2 * Math.PI);
-  ctx.fill();
-  if (!own) return;
-  if (tm.action === "fire") {
-    // Muzzle flash: what a team is doing is visible, what it feels is not.
-    ctx.strokeStyle = "#fff7c2";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(tm.x, tm.y, r + 4, 0, 2 * Math.PI);
-    ctx.stroke();
-  }
-  if ($("nerve").checked) {
-    ctx.strokeStyle = nerveColors[tm.nerve];
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(tm.x, tm.y, r + 9, 0, 2 * Math.PI);
-    ctx.stroke();
-  }
-}
-
-function draw() {
-  requestAnimationFrame(draw);
-  if (!rules || !state) return;
-  const { width, height, waterY } = rules.map;
-  ctx.fillStyle = "#18211d";
-  ctx.fillRect(0, 0, width, waterY);
-  ctx.fillStyle = "#10212e";
-  ctx.fillRect(0, waterY, width, height - waterY);
-
-  for (const p of rules.map.points) {
-    const live = state.points.find((s) => s.id === p.id);
-    const color = colors[live.owner];
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.fillStyle = "#0e131180";
-    ctx.beginPath();
-    if (p.kind === "hq") ctx.rect(p.x - 26, p.y - 26, 52, 52);
-    else ctx.arc(p.x, p.y, rules.match.captureRadius, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.setLineDash(p.kind === "hq" ? [] : [6, 6]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    if (live.capSide !== -1 && live.progress > 0) {
-      ctx.strokeStyle = colors[live.capSide];
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, rules.match.captureRadius, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * live.progress);
-      ctx.stroke();
-    }
-    label(p.id, p.x, p.y + 11, 30, color);
-    label(p.callsign[lang], p.x, p.y - rules.match.captureRadius - 28, 22);
-    const income = rules.rigs[p.kind].income;
-    // The isolate marks keep "+15" reading left to right inside a Hebrew label.
-    label(income ? `${t(`kind.${p.kind}`)} \u2066+${income}\u2069` : p.name[lang], p.x, p.y - rules.match.captureRadius - 8, 16, "#9fb0a6");
-  }
-
-  for (const sq of state.squads) {
-    const color = colors[sq.side];
-    const target = sq.order.point && rules.map.points.find((p) => p.id === sq.order.point);
-    if (target) {
-      ctx.strokeStyle = `${color}55`;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([3, 7]);
-      ctx.beginPath();
-      ctx.moveTo(sq.x, sq.y);
-      ctx.lineTo(target.x, target.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    for (const tm of sq.teams ?? []) drawTeam(tm, sq.class, color, true);
-    label(sq.callsign[lang], sq.x, sq.y + 52, 19, color);
-  }
-  for (const c of state.contacts) {
-    for (const tm of c.teams ?? []) drawTeam(tm, c.class, colors[c.side], false);
-  }
-}
-
-// Clicking the map helps write a call: a squad starts the message, a point is added to it.
-canvas.addEventListener("click", (ev) => {
+// A click on a squad selects it and starts a call. A click on a point, with a squad
+// selected, offers the three orders; with none, it adds the point's name to the message.
+function mapClick(ev) {
   if (!rules || !state || !me) return;
   const box = canvas.getBoundingClientRect();
-  const x = (ev.clientX - box.left) / scale;
-  const y = (ev.clientY - box.top) / scale;
-  const near = (o, r) => Math.hypot(o.x - x, o.y - y) <= r;
-  const input = $("text");
-  const squad = state.squads.find((s) => s.side === side && (near(s, 40) || (s.teams ?? []).some((tm) => near(tm, 16))));
-  const point = rules.map.points.find((p) => near(p, rules.match.captureRadius));
-  if (squad) input.value = t("callPrefix", { to: squad.callsign[lang], from: me[lang] });
-  else if (point) input.value += point.callsign[lang];
-  else return;
-  syncInputDirection();
-  input.focus();
+  const sx = ev.clientX - box.left;
+  const sy = ev.clientY - box.top;
+  const hit = scene.pick(sx, sy, side);
+  if (hit.squad) return select(hit.squad);
+  hideOrders();
+  if (!hit.point) return;
+  const squad = state.squads.find((sq) => sq.id === scene.selected);
+  if (!squad) return draft($("text").value + hit.point.callsign[lang]);
+  const menu = $("orders");
+  menu.dataset.point = hit.point.id;
+  $("orders-title").textContent = `${squad.callsign[lang]} → ${hit.point.callsign[lang]}`;
+  menu.style.left = `${Math.max(90, Math.min(box.width - 90, sx))}px`;
+  menu.style.top = `${Math.min(box.height - 90, sy)}px`;
+  menu.hidden = false;
+}
+
+function hideOrders() {
+  $("orders").hidden = true;
+}
+
+for (const button of document.querySelectorAll("#orders button")) {
+  button.addEventListener("click", () => {
+    const squad = state.squads.find((sq) => sq.id === scene.selected);
+    const point = rules.map.points.find((p) => p.id === $("orders").dataset.point);
+    hideOrders();
+    if (squad && point) draft(call(button.dataset.order, { to: squad.callsign[lang], point: point.callsign[lang] }));
+  });
+}
+
+// ---- menus ----
+
+// The overlay is the start screen before the match and the result screen after it.
+function renderOverlay() {
+  const over = Boolean(state?.over);
+  $("overlay").hidden = started && !over;
+  $("overlay-title").textContent = over ? t(state.winner === -1 ? "over.draw" : state.winner === side ? "over.won" : "over.lost") : t("title");
+  $("overlay-line").textContent = over ? t(`over.${state.reason}`) : t("tagline");
+  const factionName = rules?.factions[faction]?.name[lang];
+  $("overlay-side").textContent = t(`side.${side}`) + (factionName ? ` · ${factionName}` : "");
+  $("start").textContent = over ? t("playAgain") : role === "spectator" ? t("watch") : t("start");
+  $("start").hidden = over && !me; // a spectator cannot restart
+  music.setMode(!started || over ? "menu" : "battle");
+
+  $("credits").hidden = !music.available;
+  $("credits-list").replaceChildren(
+    ...music.credits.map((track) => el("li", "", [`${track.title} · ${track.artist}`, track.licence, track.attribution].filter(Boolean).join(" · "))),
+  );
+}
+
+$("start").addEventListener("click", () => {
+  music.unlock();
+  if (state?.over) return open() && ws.send(JSON.stringify({ type: "restart" }));
+  begin();
 });
 
+function begin() {
+  if (started) return;
+  started = true;
+  renderOverlay();
+  connect();
+}
+
+// ---- music ----
+
+function renderTrack() {
+  const track = music.playing?.track;
+  $("music").hidden = !music.available;
+  $("track").textContent = track ? `${track.title} · ${track.artist}` : "";
+  $("mute").classList.toggle("off", music.muted);
+  $("volume").value = music.volume;
+}
+music.onTrack = renderTrack;
+$("mute").addEventListener("click", () => {
+  music.setMuted(!music.muted);
+  renderTrack();
+});
+$("volume").addEventListener("input", (ev) => music.setVolume(Number(ev.target.value)));
+// Browsers allow sound only after the player has touched the page.
+for (const kind of ["pointerdown", "keydown"]) addEventListener(kind, () => music.unlock(), { once: true });
+
+// ---- go ----
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  scene.draw(now);
+}
+
 applyLanguage();
-connect();
-requestAnimationFrame(draw);
+// The battlefield is drawn behind the start screen before any match exists.
+try {
+  scene.setRules(await (await fetch("/shared/rules.json")).json());
+} catch {
+  // The greeting brings the rules anyway.
+}
+scene.resize();
+requestAnimationFrame(frame);
+if (query.has("autostart")) begin(); // for tests and screenshots: skip the start screen
+
+// For debugging from the console.
+window.callsign = { scene, music, sideColor };

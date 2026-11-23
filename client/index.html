@@ -4,40 +4,107 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Callsign</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="debug.css">
 </head>
 <body>
-<header>
-  <h1 data-i18n="title"></h1>
-  <dl id="stats">
-    <div><dt data-i18n="gold"></dt><dd><bdi dir="ltr" id="gold">–</bdi> <small>(<bdi dir="ltr" id="income">–</bdi> <span data-i18n="income"></span>)</small></dd></div>
-    <div><dt data-i18n="timeLeft"></dt><dd><bdi dir="ltr" id="time">–</bdi></dd></div>
-    <div><dt data-i18n="points"></dt><dd><bdi dir="ltr" id="held">–</bdi></dd></div>
-    <div><dt data-i18n="hqOurs"></dt><dd><meter id="hq-ours" min="0" max="1" value="1"></meter></dd></div>
-    <div><dt data-i18n="hqEnemy"></dt><dd><meter id="hq-enemy" min="0" max="1" value="1"></meter></dd></div>
-  </dl>
-  <div id="controls">
-    <label><input type="checkbox" id="nerve"> <span data-i18n="showNerve"></span></label>
-    <button type="button" id="restart" data-i18n="restart"></button>
-    <button type="button" id="lang" data-i18n="language"></button>
-  </div>
-</header>
 <main>
-  <section id="map-wrap">
-    <!-- The map never mirrors: the canvas is always drawn west on the left. -->
-    <canvas id="map" dir="ltr"></canvas>
-    <div id="banner" hidden><strong id="banner-title"></strong><span id="banner-reason"></span></div>
+  <section id="stage">
+    <div id="map-wrap">
+      <!-- The map never mirrors: the canvas is always drawn west on the left. -->
+      <canvas id="map" dir="ltr"></canvas>
+      <div id="zoom" dir="ltr">
+        <button type="button" id="zoom-in" data-i18n-aria="zoomIn">+</button>
+        <button type="button" id="zoom-out" data-i18n-aria="zoomOut">−</button>
+        <button type="button" id="zoom-fit" data-i18n-aria="zoomFit">⤢</button>
+      </div>
+      <div id="orders" hidden>
+        <strong id="orders-title"></strong>
+        <div>
+          <button type="button" data-order="hold" data-i18n="act.hold"></button>
+          <button type="button" data-order="move" data-i18n="act.move"></button>
+          <button type="button" data-order="attack" data-i18n="act.attack"></button>
+        </div>
+      </div>
+    </div>
+    <section id="radio" class="panel">
+      <h2 data-i18n="radioLog"></h2>
+      <ol id="log" aria-live="polite"></ol>
+      <form id="send">
+        <input id="text" type="text" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="placeholder">
+        <button type="submit" class="primary" data-i18n="send"></button>
+      </form>
+    </section>
   </section>
-  <aside>
-    <h2 data-i18n="radioLog"></h2>
-    <ol id="log" aria-live="polite"></ol>
-    <form id="send">
-      <input id="text" type="text" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="placeholder">
-      <button type="submit" data-i18n="send"></button>
-    </form>
-    <p id="hint" data-i18n="hint"></p>
+
+  <aside id="sidebar">
+    <header class="panel">
+      <h1 data-i18n="title"></h1>
+      <div id="controls">
+        <button type="button" id="lang" data-i18n="language"></button>
+        <button type="button" id="restart" data-i18n="restart"></button>
+      </div>
+    </header>
+
+    <section id="treasury" class="panel">
+      <div id="gold-box">
+        <span data-i18n="gold"></span>
+        <strong><bdi dir="ltr" id="gold">–</bdi></strong>
+        <small><bdi dir="ltr" id="income">–</bdi> <span data-i18n="income"></span></small>
+      </div>
+      <dl>
+        <div><dt data-i18n="timeLeft"></dt><dd><bdi dir="ltr" id="time">–</bdi></dd></div>
+        <div><dt data-i18n="points"></dt><dd><bdi dir="ltr" id="held">–</bdi></dd></div>
+      </dl>
+      <div class="bars">
+        <label><span data-i18n="hqOurs"></span><i class="bar ours"><b id="hq-ours"></b></i></label>
+        <label><span data-i18n="hqEnemy"></span><i class="bar enemy"><b id="hq-enemy"></b></i></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="radar"></h2>
+      <canvas id="radar-map" dir="ltr"></canvas>
+    </section>
+
+    <section class="panel grow">
+      <h2><span data-i18n="roster"></span> <bdi dir="ltr" id="pop"></bdi></h2>
+      <ul id="roster"></ul>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="build"></h2>
+      <div id="build"></div>
+    </section>
+
+    <section id="music" class="panel" hidden>
+      <button type="button" id="mute" data-i18n-aria="mute">♪</button>
+      <input type="range" id="volume" min="0" max="1" step="0.05" data-i18n-aria="volume">
+      <span id="track"></span>
+    </section>
+
+    <footer class="panel">
+      <label><input type="checkbox" id="nerve"> <span data-i18n="showNerve"></span></label>
+      <p id="hint" data-i18n="hint"></p>
+    </footer>
   </aside>
 </main>
+
+<div id="overlay">
+  <div class="card">
+    <h1 id="overlay-title"></h1>
+    <p id="overlay-line"></p>
+    <p id="overlay-side"></p>
+    <div class="row">
+      <button type="button" class="primary" id="start"></button>
+      <button type="button" id="overlay-lang" data-i18n="language"></button>
+    </div>
+    <details id="credits" hidden>
+      <summary data-i18n="credits"></summary>
+      <ul id="credits-list"></ul>
+    </details>
+  </div>
+</div>
 <script type="module" src="debug.js"></script>
 </body>
 </html>
