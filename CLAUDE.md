@@ -20,7 +20,7 @@ Browser real-time strategy game where every squad is an AI agent, commanded by v
 - Radio routing is done by code (callsign match in both languages), never by an LLM.
 
 ## Art
-- Isometric (3/4 view) sprites, changed from top-down on 2026-11-24; no text baked into images. Generated locally (ComfyUI, FLUX.2 klein / Z-Image Turbo) under `assets/`, reviewed before use.
+- Isometric (3/4 view) sprites, changed from top-down on 2026-11-24; no text baked into images. Generated locally (ComfyUI, FLUX.2 klein 4B, Apache-2.0; the 9B model is non-commercial) under `assets/`, reviewed before use.
 
 ## How to work
 - Build in the plan's phase order. Phase 0 first: no art, no voice, no accounts.

@@ -2,3 +2,5 @@
 node_modules/
 /bin/
 assets/raw/
+
+# Art generation: model weights live in a Docker volume; assets/raw/ above holds raw model output.

@@ -1,0 +1,173 @@
+{
+  "units": {
+    "commandos": {
+      "image": "units/commandos.png",
+      "frame": [
+        34,
+        72
+      ],
+      "facings": 4,
+      "order": [
+        "SE",
+        "SW",
+        "NW",
+        "NE"
+      ],
+      "anchor": [
+        0.5,
+        0.85
+      ]
+    },
+    "militia": {
+      "image": "units/militia.png",
+      "frame": [
+        52,
+        74
+      ],
+      "facings": 4,
+      "order": [
+        "SE",
+        "SW",
+        "NW",
+        "NE"
+      ],
+      "anchor": [
+        0.5,
+        0.85
+      ]
+    },
+    "tank": {
+      "image": "units/tank.png",
+      "frame": [
+        131,
+        111
+      ],
+      "facings": 4,
+      "order": [
+        "SE",
+        "SW",
+        "NW",
+        "NE"
+      ],
+      "anchor": [
+        0.5,
+        0.85
+      ]
+    },
+    "technical": {
+      "image": "units/technical.png",
+      "frame": [
+        90,
+        84
+      ],
+      "facings": 4,
+      "order": [
+        "SE",
+        "SW",
+        "NW",
+        "NE"
+      ],
+      "anchor": [
+        0.5,
+        0.85
+      ]
+    },
+    "patrolBoat": {
+      "image": "units/patrolBoat.png",
+      "frame": [
+        98,
+        104
+      ],
+      "facings": 4,
+      "order": [
+        "SE",
+        "SW",
+        "NW",
+        "NE"
+      ],
+      "anchor": [
+        0.5,
+        0.85
+      ]
+    },
+    "speedboat": {
+      "image": "units/speedboat.png",
+      "frame": [
+        98,
+        83
+      ],
+      "facings": 4,
+      "order": [
+        "SE",
+        "SW",
+        "NW",
+        "NE"
+      ],
+      "anchor": [
+        0.5,
+        0.85
+      ]
+    }
+  },
+  "buildings": {
+    "hq_aegis": {
+      "image": "buildings/hq_aegis.png",
+      "size": [
+        257,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    },
+    "hq_ashfall": {
+      "image": "buildings/hq_ashfall.png",
+      "size": [
+        293,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    },
+    "landRig": {
+      "image": "buildings/landRig.png",
+      "size": [
+        228,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    },
+    "seaRig": {
+      "image": "buildings/seaRig.png",
+      "size": [
+        213,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    },
+    "point": {
+      "image": "buildings/point.png",
+      "size": [
+        85,
+        128
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    }
+  },
+  "terrain": {
+    "land": "terrain/land.png",
+    "sea": "terrain/sea.png"
+  }
+}

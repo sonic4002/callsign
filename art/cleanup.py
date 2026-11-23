@@ -1,0 +1,173 @@
+"""Turns the kept raw images into game sprites.
+
+For every sprite in art/sprites.json that names a `keep` seed (the candidate that passed
+review), this cuts the background away, trims, scales to game size and writes
+
+    assets/sprites/{units,buildings,terrain}/<id>.png
+    assets/sprites/manifest.json     what the page loads; a unit with a back view gets
+                                     four facings in one row (SE, SW, NW, NE)
+    assets/sprites/CREDITS.md        model, licence, seed and prompt of every sprite
+
+Sprites without `keep` are left out of the manifest, and the page draws its own stand-in.
+
+    python art/cleanup.py [--sheet contact.png]
+"""
+
+import argparse
+import json
+import pathlib
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
+
+HERE = pathlib.Path(__file__).resolve().parent
+ROOT = HERE.parent
+RAW = ROOT / "assets" / "raw"
+OUT = ROOT / "assets" / "sprites"
+
+FOLDER = {"unit": "units", "building": "buildings", "terrain": "terrain"}
+ANCHOR = {"unit": [0.5, 0.85], "building": [0.5, 0.8]}
+
+MODEL_NOTE = """Every sprite here was generated on this machine by `make art` and reviewed by eye.
+
+- Image model: FLUX.2 [klein] 4B, distilled (`flux-2-klein-4b.safetensors`), Apache-2.0,
+  Black Forest Labs, https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
+- Text encoder: Qwen3 4B, fp4 (`qwen_3_4b_fp4_flux2.safetensors`), Apache-2.0, as packaged in
+  https://huggingface.co/Comfy-Org/Flux-2-Klein-4B
+- VAE: `flux2-vae.safetensors`, Apache-2.0, same package
+- Runner: ComfyUI, sampler `euler`, Flux2Scheduler, 4 steps, guidance 1, 1024x1024
+- Background removal: BiRefNet (general), MIT, https://github.com/ZhengPeng7/BiRefNet, run through rembg
+
+No third-party artwork is included.
+"""
+
+
+def cut_out(image, session):
+    """Removes the studio background and returns a trimmed RGBA image."""
+    from rembg import remove
+
+    rgba = remove(image.convert("RGB"), session=session, post_process_mask=True)
+    alpha = np.asarray(rgba.getchannel("A"), dtype=np.uint8).copy()
+    alpha[alpha < 40] = 0
+    # Pull the edge in by a pixel so no grey studio fringe survives the downscale.
+    alpha = np.asarray(Image.fromarray(alpha).filter(ImageFilter.MinFilter(3)))
+    rgba.putalpha(Image.fromarray(alpha))
+    box = rgba.getbbox()
+    if box is None:
+        raise SystemExit("background removal left nothing")
+    return rgba.crop(box)
+
+
+def scale_to_height(rgba, height):
+    width = max(1, round(rgba.width * height / rgba.height))
+    # Resize with premultiplied alpha so transparent pixels do not bleed colour into edges.
+    return rgba.convert("RGBa").resize((width, height), Image.LANCZOS).convert("RGBA")
+
+
+def make_tileable(image, size):
+    """Builds a tile from four mirrored copies, so every edge meets its own reflection and
+    the tile repeats with no seam at all."""
+    half = image.convert("RGB").resize((size // 2, size // 2), Image.LANCZOS)
+    tile = Image.new("RGB", (size, size))
+    tile.paste(half, (0, 0))
+    tile.paste(half.transpose(Image.FLIP_LEFT_RIGHT), (size // 2, 0))
+    tile.paste(half.transpose(Image.FLIP_TOP_BOTTOM), (0, size // 2))
+    tile.paste(half.transpose(Image.ROTATE_180), (size // 2, size // 2))
+    return tile
+
+
+def facing_strip(front, back):
+    """Four facings in one row: south-east, south-west, north-west, north-east. The model
+    draws the unit from the front and from behind; the other two are their mirror images."""
+    w, h = max(front.width, back.width), max(front.height, back.height)
+    strip = Image.new("RGBA", (4 * w, h))
+    mirror = lambda im: im.transpose(Image.FLIP_LEFT_RIGHT)
+    for i, frame in enumerate([front, mirror(front), mirror(back), back]):
+        strip.paste(frame, (i * w + (w - frame.width) // 2, h - frame.height))  # centred, standing on the bottom edge
+    return strip, [w, h]
+
+
+def contact_sheet(entries, path):
+    """One picture of the whole set: each sprite at game size and at 48 px, on mid grey."""
+    cell_w, cell_h = 400, 330
+    cols = 3
+    rows = -(-len(entries) // cols)
+    sheet = Image.new("RGB", (cols * cell_w, rows * cell_h), (88, 96, 90))
+    draw = ImageDraw.Draw(sheet)
+    for i, (name, image) in enumerate(entries):
+        x, y = (i % cols) * cell_w, (i // cols) * cell_h
+        draw.rectangle([x, y, x + cell_w - 1, y + cell_h - 1], outline=(60, 66, 62))
+        big = image.copy()
+        big.thumbnail((cell_w - 90, cell_h - 50))
+        sheet.paste(big, (x + 10, y + 30), big if big.mode == "RGBA" else None)
+        small = image.copy()
+        small.thumbnail((48, 48))
+        sheet.paste(small, (x + cell_w - 64, y + 30), small if small.mode == "RGBA" else None)
+        draw.text((x + 10, y + 8), f"{name}  {image.width}x{image.height}", fill=(235, 240, 236))
+    sheet.save(path)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sheet", help="also write a contact sheet of the kept set to this path")
+    args = ap.parse_args()
+
+    spec = json.loads((HERE / "sprites.json").read_text())
+    kept = [s for s in spec["sprites"] if "keep" in s and s["kind"] != "back"]
+    backs = {s["turn"]: s for s in spec["sprites"] if "keep" in s and s["kind"] == "back"}
+    session = None
+    manifest = {"units": {}, "buildings": {}, "terrain": {}}
+    credits = ["# Sprite credits", "", MODEL_NOTE, "| Sprite | Seed | Prompt |", "|---|---|---|"]
+    sheet = []
+
+    def raw_image(sprite):
+        raw = RAW / f"{sprite['id']}__{sprite['keep']}.png"
+        if not raw.exists():
+            raise SystemExit(f"{raw} is missing: run `make art` to generate it")
+        return Image.open(raw)
+
+    def credit(rel, sprite, note=""):
+        prompt = spec["styles"][sprite["style"]].replace("{subject}", sprite["subject"]).replace("|", "/")
+        credits.append(f"| `{rel}`{note} | {sprite['keep']} | {prompt} |")
+
+    for sprite in kept:
+        image = raw_image(sprite)
+        kind = sprite["kind"]
+        rel = f"{FOLDER[kind]}/{sprite['id']}.png"
+        (OUT / FOLDER[kind]).mkdir(parents=True, exist_ok=True)
+        if kind == "terrain":
+            result = make_tileable(image, sprite["height"])
+            manifest["terrain"][sprite["id"]] = rel
+        else:
+            if session is None:
+                from rembg import new_session
+
+                session = new_session("birefnet-general")
+            cut = cut_out(image, session)
+            result = scale_to_height(cut, sprite["height"])
+            if kind == "building":
+                manifest["buildings"][sprite["id"]] = {"image": rel, "size": [result.width, result.height], "anchor": ANCHOR[kind]}
+            elif sprite["id"] in backs:
+                # The back view is scaled by the same factor as the front, so the unit keeps its size when it turns.
+                back = cut_out(raw_image(backs[sprite["id"]]), session)
+                back = scale_to_height(back, max(1, round(back.height * sprite["height"] / cut.height)))
+                result, frame = facing_strip(result, back)
+                manifest["units"][sprite["id"]] = {"image": rel, "frame": frame, "facings": 4, "order": ["SE", "SW", "NW", "NE"], "anchor": ANCHOR[kind]}
+            else:
+                manifest["units"][sprite["id"]] = {"image": rel, "frame": [result.width, result.height], "facings": 1, "order": ["SE"], "anchor": ANCHOR[kind]}
+        result.save(OUT / rel, optimize=True)
+        credit(rel, sprite)
+        if sprite["id"] in backs:
+            credit(rel, backs[sprite["id"]], " (back view, redrawn from the front view)")
+        sheet.append((sprite["id"], result))
+        print(f"{rel}  {result.width}x{result.height}")
+
+    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (OUT / "CREDITS.md").write_text("\n".join(credits) + "\n")
+    if args.sheet:
+        contact_sheet(sheet, args.sheet)
+    print(f"{len(kept)} sprites written, {len(backs)} of them with a back view")
+
+
+if __name__ == "__main__":
+    main()

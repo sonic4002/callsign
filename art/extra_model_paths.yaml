@@ -1,0 +1,6 @@
+# ComfyUI reads its weights from the callsign-art-models volume, mounted at /models.
+callsign:
+  base_path: /models
+  diffusion_models: diffusion_models
+  text_encoders: text_encoders
+  vae: vae
