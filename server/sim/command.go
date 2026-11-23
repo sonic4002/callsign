@@ -1,0 +1,175 @@
+package sim
+
+import (
+	"errors"
+	"fmt"
+)
+
+const (
+	EvSquadSpawned   = "squad_spawned"
+	EvSquadLost      = "squad_lost"
+	EvEnemyDestroyed = "enemy_destroyed"
+	EvLosses         = "losses"
+	EvContact        = "contact"
+	EvPinned         = "pinned"
+	EvArrived        = "arrived"
+	EvCaptured       = "captured"
+	EvPointLost      = "point_lost"
+	EvHQUnderAttack  = "hq_under_attack"
+	EvUpgraded       = "upgraded"
+	EvMatchEnd       = "match_end"
+)
+
+// Event is something one side learns about. It never carries what that side cannot see.
+type Event struct {
+	Tick    int    `json:"tick"`
+	Side    int    `json:"side"`
+	Kind    string `json:"kind"`
+	Squad   int    `json:"squad,omitempty"`   // own squad the event is about
+	Contact int    `json:"contact,omitempty"` // enemy squad id
+	Point   string `json:"point,omitempty"`   // nearest map point
+	Count   int    `json:"count,omitempty"`
+	Winner  *int   `json:"winner,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+func (s *Sim) emit(e Event) { s.events = append(s.events, e) }
+
+const (
+	CmdMove    = "move"
+	CmdHold    = "hold"
+	CmdAttack  = "attack"
+	CmdBuy     = "buy"
+	CmdUpgrade = "upgrade"
+)
+
+// Command is one validated change a side asks for. Everything a player or agent does
+// to the match goes through Apply; nothing else writes to the simulation.
+type Command struct {
+	Side    int    `json:"side"`
+	Kind    string `json:"kind"`
+	Squad   int    `json:"squad,omitempty"`
+	Point   string `json:"point,omitempty"`
+	Contact int    `json:"contact,omitempty"`
+	Unit    string `json:"unit,omitempty"`
+}
+
+var (
+	ErrOver        = errors.New("the match is over")
+	ErrNoSquad     = errors.New("no such squad on your side")
+	ErrNoPoint     = errors.New("no such map point")
+	ErrUnreachable = errors.New("that squad cannot reach that point")
+	ErrNoContact   = errors.New("no such contact in sight")
+	ErrNoUnit      = errors.New("your faction has no such unit")
+	ErrNoGold      = errors.New("not enough gold")
+	ErrPopCap      = errors.New("population cap reached")
+	ErrMaxTier     = errors.New("that squad already has the top brain tier")
+	ErrBadCommand  = errors.New("unknown command")
+)
+
+// Apply carries out a command now, or returns why it cannot be done. For buy it returns
+// the new squad.
+func (s *Sim) Apply(c Command) (*Squad, error) {
+	if s.Over {
+		return nil, ErrOver
+	}
+	if c.Side != 0 && c.Side != 1 {
+		return nil, ErrBadCommand
+	}
+	switch c.Kind {
+	case CmdMove, CmdHold, CmdAttack:
+		return s.order(c)
+	case CmdBuy:
+		return s.buy(c)
+	case CmdUpgrade:
+		return s.upgrade(c)
+	}
+	return nil, ErrBadCommand
+}
+
+func (s *Sim) order(c Command) (*Squad, error) {
+	sq := s.Squad(c.Squad)
+	if sq == nil || sq.Side != c.Side {
+		return nil, ErrNoSquad
+	}
+	o := Order{Kind: c.Kind, Tick: s.Tick}
+	switch {
+	case c.Kind == CmdAttack && c.Contact != 0:
+		enemy := s.Squad(c.Contact)
+		if enemy == nil || enemy.Side == c.Side || !s.visible(enemy) {
+			return nil, ErrNoContact
+		}
+		o.Contact = enemy.ID
+		o.X, o.Y = enemy.Center()
+	case c.Point != "":
+		p := s.pointState(c.Point)
+		if p == nil {
+			return nil, ErrNoPoint
+		}
+		if (p.Y >= s.R.Map.WaterY) != (sq.unit.Domain == "sea") {
+			return nil, fmt.Errorf("%w: %s is a %s unit", ErrUnreachable, sq.unit.Name.En, sq.unit.Domain)
+		}
+		o.Point, o.X, o.Y = p.ID, p.X, p.Y
+	case c.Kind == CmdHold:
+		o.X, o.Y = sq.Center() // hold where you stand
+	default:
+		return nil, ErrNoPoint
+	}
+	sq.Order = o
+	return sq, nil
+}
+
+// visible reports whether any team of an enemy squad is in sight of the other side.
+func (s *Sim) visible(sq *Squad) bool {
+	for i := range sq.Teams {
+		if sq.Teams[i].Members > 0 && sq.Teams[i].Spotted {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Sim) spend(side, gold int) error {
+	if s.Gold(side) < gold {
+		return fmt.Errorf("%w: need %d, have %d", ErrNoGold, gold, s.Gold(side))
+	}
+	s.Sides[side].goldUnit -= int64(gold) * int64(s.R.TickRate)
+	return nil
+}
+
+func (s *Sim) buy(c Command) (*Squad, error) {
+	u, ok := s.R.Factions[s.Sides[c.Side].Faction].Units[c.Unit]
+	if !ok {
+		return nil, ErrNoUnit
+	}
+	alive := 0
+	for _, sq := range s.Squads {
+		if sq.Alive && sq.Side == c.Side {
+			alive++
+		}
+	}
+	if alive >= s.R.Match.PopulationCap {
+		return nil, ErrPopCap
+	}
+	if err := s.spend(c.Side, u.Cost); err != nil {
+		return nil, err
+	}
+	return s.spawn(c.Side, c.Unit), nil
+}
+
+func (s *Sim) upgrade(c Command) (*Squad, error) {
+	sq := s.Squad(c.Squad)
+	if sq == nil || sq.Side != c.Side {
+		return nil, ErrNoSquad
+	}
+	cost, ok := s.R.TierCost(sq.Tier + 1)
+	if !ok {
+		return nil, ErrMaxTier
+	}
+	if err := s.spend(c.Side, cost); err != nil {
+		return nil, err
+	}
+	sq.Tier++
+	s.emit(Event{Side: c.Side, Kind: EvUpgraded, Squad: sq.ID, Count: sq.Tier})
+	return sq, nil
+}
