@@ -24,6 +24,7 @@ func main() {
 	west := flag.String("west", "aegis", "faction of side 0")
 	east := flag.String("east", "ashfall", "faction of side 1")
 	client := flag.String("client", "client", "directory of the debug page")
+	assets := flag.String("assets", "assets", "directory of generated art and audio, served read-only at /assets/")
 	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
 	flag.Parse()
 
@@ -52,6 +53,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(shared.RulesJSON)
 	})
+	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*assets))))
 	mux.Handle("/", http.FileServer(http.Dir(*client)))
 
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
