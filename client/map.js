@@ -875,14 +875,33 @@ export class Scene {
       if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88` });
       else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5 });
       const rising = st.building < 1;
-      if (!rising && st.hp >= 1) continue;
-      const w = 36;
-      const y = top + 8;
-      ctx.fillStyle = "rgba(0,0,0,0.65)";
-      ctx.fillRect(sx - w / 2 - 1, y - 1, w + 2, 6);
-      ctx.fillStyle = rising ? "#c9a44c" : st.hp > 0.5 ? "#63d68a" : st.hp > 0.25 ? "#f0c04a" : "#ff5a5a";
-      ctx.fillRect(sx - w / 2, y, w * (rising ? st.building : st.hp), 4);
+      if (!rising && st.hp >= 0.995) continue; // a whole building shows no bar (building ends a hair under full)
+      this.healthBar(sx, top + 8, rising ? st.building : st.hp, rising ? "#c9a44c" : null);
     }
+    // The two headquarters carry the same bar once they are hit.
+    for (const p of rules.map.points) {
+      if (p.kind !== "hq") continue;
+      const hp = state.hq?.[p.owner];
+      if (!(hp < 0.995) || !(hp > 0)) continue;
+      const [sx, sy] = cam.screen(p.x, p.y);
+      this.healthBar(sx, sy - 118 * buildScale, hp, null);
+    }
+  }
+
+  // healthBar draws a building's health above it: green, yellow under half, and red for
+  // the last fifth. `color` overrides that for a building still going up.
+  healthBar(sx, y, share, color) {
+    const { ctx, cam } = this;
+    const w = Math.max(40, Math.min(72, 64 * cam.zoom + 22));
+    const h = 7;
+    const part = Math.max(0, Math.min(1, share));
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.fillRect(sx - w / 2 - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = color ?? (part <= 0.2 ? "#ff4d4d" : part <= 0.5 ? "#f0c04a" : "#58d67f");
+    ctx.fillRect(sx - w / 2, y, w * part, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx - w / 2 - 0.5, y - 0.5, w + 1, h + 1);
   }
 
   // landmarkLabels shows what the side knows about the buildings (who is inside, how

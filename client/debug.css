@@ -396,3 +396,22 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   .panel.grow { flex: 1 1 10rem; min-block-size: 10rem; }
 }
 #orders-about { display: block; max-inline-size: 17rem; font-size: .7rem; line-height: 1.35; color: var(--muted); text-align: center; }
+
+/* ---- settings (the gear) ---- */
+#settings-open { font-size: 1rem; line-height: 1; padding: .2rem .45rem; }
+#settings { inline-size: min(26rem, 94vw); max-block-size: 90vh; padding: 1.4rem 1.8rem; color: inherit; background: linear-gradient(#222b31, #151b1f); border: 1px solid var(--edge-hi); border-block-start: 3px solid var(--brass); }
+#settings::backdrop { background: #05080ad9; }
+#settings h1 { font-size: 1.3rem; letter-spacing: .12em; margin: 0; }
+#settings h2 { margin: 1.1rem 0 .4rem; }
+#settings label { display: flex; align-items: center; gap: .5rem; min-block-size: 2.2rem; font-size: .9rem; }
+#settings select { font: inherit; color: inherit; background: #10161a; border: 1px solid var(--edge-hi); padding: .25rem .4rem; }
+#settings #volume { flex: 1; }
+#settings .row { display: flex; justify-content: flex-end; margin-block-start: 1.2rem; }
+
+/* ---- build cards: large enough to see the building and read its name ---- */
+#structures { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+#structures button { font-size: .8rem; padding: .35rem .2rem .4rem; gap: .15rem; }
+#structures canvas { inline-size: 84px; block-size: 56px; }
+#structures .why { font-size: .68rem; }
+#build { gap: 5px; }
+#build button { font-size: .8rem; }

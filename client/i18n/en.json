@@ -44,7 +44,6 @@
   "placeholder": "Viper 2, this is Hammer. Hold Foxtrot. Over.",
   "send": "Send",
   "showNerve": "Show nerve (debug)",
-  "hint": "Pick a squad, then a point, then an action: the radio call is sent at once. Help shows how to command.",
   "zoomIn": "Zoom in",
   "zoomOut": "Zoom out",
   "zoomFit": "Show the whole map",
@@ -447,5 +446,10 @@
   "act.capture": "Take over",
   "help.q.orders": "What is the difference between Move, Hold and Attack?",
   "help.a.orders": "All three send the squad to the place; they differ in how it behaves. Move: it goes without stopping to fight, and does not fire on the enemy headquarters. Hold: it takes the place and defends it, firing at anything in range, and does not leave. Attack: it looks for a fight and chases the enemy, even away from the place. So on a point or a gold field use Hold to capture and keep it (a squad standing on a point alone for 10 seconds captures it; one that chases the enemy may leave too soon); on the enemy headquarters use Attack or Hold, because a squad sent there with Move only stands beside it. Rule of thumb: Move to get there fast, Hold to take and defend, Attack to destroy.",
-  "orders.about": "Hold: take and defend · Move: get there, no fighting · Attack: hunt the enemy"
+  "orders.about": "Hold: take and defend · Move: get there, no fighting · Attack: hunt the enemy",
+  "settings": "Settings",
+  "settings.sound": "Sound",
+  "settings.voices": "Speak the radio aloud",
+  "settings.radio": "Radio",
+  "settings.display": "Display"
 }
