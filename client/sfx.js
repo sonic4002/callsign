@@ -20,9 +20,10 @@ const weapons = {
   patrolBoat: { sound: "autocannon", rounds: 3, gap: 140, impact: "pop", travel: 90, heavy: true },
   speedboat: { sound: "mg", rounds: 5, gap: 75, impact: "dust", travel: 70 },
   helicopter: { sound: "autocannon", rounds: 4, gap: 95, impact: "pop", travel: 80, heavy: true },
-  rocketLauncher: { sound: "cannon", rounds: 2, gap: 320, impact: "shell", travel: 520, heavy: true },
+  // Rockets are seen in flight: a salvo that climbs, trails smoke and comes down on the target.
+  rocketLauncher: { sound: "cannon", rounds: 4, gap: 260, impact: "shell", travel: 1100, heavy: true, rocket: 1 },
   fpvSwarm: { sound: "boomS", rounds: 1, gap: 0, impact: "pop", travel: 40 },
-  rpgTeam: { sound: "cannon", rounds: 1, gap: 0, impact: "shell", travel: 260, heavy: true },
+  rpgTeam: { sound: "cannon", rounds: 1, gap: 0, impact: "shell", travel: 480, heavy: true, rocket: 0.25 },
 };
 const byClass = { infantry: weapons.commandos, vehicle: weapons.technical, naval: weapons.speedboat, air: weapons.helicopter };
 export const weaponOf = (unit, cls) => weapons[unit] ?? byClass[cls] ?? weapons.commandos;

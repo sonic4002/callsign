@@ -336,7 +336,8 @@ export class Scene {
       const t0 = now + i * w.gap;
       const x2 = target.x + miss();
       const y2 = target.y + miss();
-      this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
+      if (w.rocket) this.effects.push({ kind: "rocket", x1: v.px, y1: v.py, x2, y2, arc: w.rocket, t0, ttl: w.travel + 500, flight: w.travel });
+      else this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
       const at = t0 + w.travel;
       if (w.impact === "shell") this.fx.shell(x2, y2, at, 1.25);
       else if (w.impact === "pop") this.fx.pop(x2, y2, at);
@@ -649,6 +650,45 @@ export class Scene {
     this.effects = this.effects.filter((e) => now - e.t0 < e.ttl);
     for (const e of this.effects) {
       const life = (now - e.t0) / e.ttl;
+      if (e.kind === "rocket" && life >= 0) {
+        // A rocket climbs and falls along its way; the smoke it left hangs and thins.
+        const [ax, ay] = S(e.x1, e.y1);
+        const [bx, by] = S(e.x2, e.y2);
+        const span = Math.hypot(bx - ax, by - ay);
+        const at = (k) => [ax + (bx - ax) * k, ay + (by - ay) * k - 12 * unitScale * (1 - k) - Math.sin(Math.PI * k) * span * 0.45 * e.arc];
+        const k = Math.min(1, (now - e.t0) / e.flight);
+        const fade = Math.max(0, 1 - Math.max(0, now - e.t0 - e.flight) / 500);
+        ctx.lineCap = "round";
+        const steps = 14;
+        for (let i = 0; i < steps; i++) {
+          const k0 = (k * i) / steps;
+          const k1 = (k * (i + 1)) / steps;
+          const [x0, y0] = at(k0);
+          const [x1, y1] = at(k1);
+          const age = (i + 1) / steps; // 1 at the rocket, 0 at the launcher
+          ctx.strokeStyle = `rgba(214,214,206,${0.5 * fade * (0.25 + 0.75 * age)})`;
+          ctx.lineWidth = (2 + 3.5 * (1 - age)) * unitScale;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        }
+        if (k < 1) {
+          const [hx, hy] = at(k);
+          const [px, py] = at(Math.max(0, k - 0.03));
+          ctx.strokeStyle = "#fff3c4";
+          ctx.lineWidth = 2.6 * unitScale;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(255,170,60,0.9)";
+          ctx.beginPath();
+          ctx.arc(px, py, 3.2 * unitScale, 0, TAU);
+          ctx.fill();
+        }
+        ctx.lineCap = "butt";
+      }
       if (e.kind === "tracer" && life >= 0) {
         const [ax, ay] = S(e.x1, e.y1);
         const [bx, by] = S(e.x2, e.y2);
