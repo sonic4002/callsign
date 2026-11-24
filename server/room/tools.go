@@ -108,9 +108,13 @@ func (rm *Room) toolRadio(c *Client, a toolArgs) (any, error) {
 		}
 		to = append(to, st)
 	}
-	// Answer in the language the station was last spoken to in.
+	// The whole net speaks the language its commander last used; before Hammer has
+	// spoken, the language the station was last spoken to in.
 	lang := a.Lang
 	if lang != "en" && lang != "he" {
+		lang = rm.lang[side][radio.Station{Kind: radio.Player}.Key()]
+	}
+	if lang == "" {
 		lang = rm.lang[side][from.Key()]
 	}
 	if lang == "" {

@@ -377,6 +377,7 @@ func (rm *Room) SayAt(c *Client, text string, level int) (Message, error) {
 	if len(p.To) == 0 {
 		p.To = []radio.Station{{Kind: radio.Operator}}
 	}
+	rm.lang[c.ID.Side][me.Key()] = p.Lang // the net follows the commander's language
 	return rm.transmit(c.ID.Side, me, p, text)
 }
 

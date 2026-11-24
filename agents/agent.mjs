@@ -57,6 +57,7 @@ export class Agent {
     this.wakes = 0;
     this.over = hello.state.over;
     this.traffic = hello.log.slice(-8).map((m) => m.text);
+    this.netLang = hello.log.findLast((m) => m.from.key === "player")?.lang; // a squad joining mid-match learns it too
     if (this.role === "squad") {
       const mine = hello.state.squads.find((s) => s.id === this.squad);
       this.tier = mine.tier;
@@ -75,6 +76,7 @@ export class Agent {
       const m = frame.message;
       this.traffic.push(m.text);
       if (this.traffic.length > 8) this.traffic.shift();
+      if (m.from.key === "player") this.netLang = m.lang; // the net follows the commander's language
       if (m.from.key === this.me.key) return;
       const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
       // "Out" means no reply is expected, so it wakes nobody; it stays in the traffic the
@@ -128,18 +130,16 @@ export class Agent {
       this.history = [];
     }
     const call = items.findLast((i) => i.kind === "radio")?.msg ?? null;
-    if (call) {
-      this.lang = call.lang;
-      this.commander = call.from.en;
-    }
-    this.history.push({ role: "user", content: renderWake(items, compactStatus(status, this.side), this.traffic) });
+    if (call) this.commander = call.from.en;
+    this.lang = this.netLang ?? call?.lang ?? this.lang;
+    this.history.push({ role: "user", content: renderWake(items, compactStatus(status, this.side), this.traffic, this.lang) });
 
     let answered = false;
     const timer =
       call && this.brain.slow
         ? setTimeout(() => {
             // Thinking takes a moment; say so, the way a real operator would.
-            if (!answered) this.link.tool("radio", { to: [call.from.en], body: standBy[call.lang] ?? standBy.en, end: "out" }).catch(() => {});
+            if (!answered) this.link.tool("radio", { to: [call.from.en], body: standBy[this.lang] ?? standBy.en, end: "out" }).catch(() => {});
           }, this.standByMs)
         : null;
 
@@ -258,8 +258,9 @@ function describe(item) {
   return `Event: ${e.kind}.`;
 }
 
-export function renderWake(items, status, traffic) {
+export function renderWake(items, status, traffic, lang) {
   const lines = items.map(describe);
+  if (lang) lines.push(`The net language is ${lang === "he" ? "Hebrew" : "English"}: write every radio body in it, whatever language a call or the traffic below used.`);
   if (status) lines.push("", `Status: ${JSON.stringify(status)}`);
   if (traffic.length) lines.push("", "Net traffic, most recent last:", ...traffic.map((t) => `  ${t}`));
   return lines.join("\n");
