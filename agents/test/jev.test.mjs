@@ -141,6 +141,7 @@ test("the commander's view is told which brain answered: the grammar, or the mod
   assert.deepEqual(byModel.usage, { input_tokens: 1400, output_tokens: 0 });
   assert.equal(brain.plan({ role: "squad", tier: 2 }), "jev+rule-2");
   assert.equal(brain.plan({ role: "anvil", level: 2 }), "rule-2");
+  assert.deepEqual([brain.nameFor({ role: "squad" }), brain.nameFor({ role: "anvil" })], ["jev", "rule"], "Anvil is the rule brain, and is shown as it");
 });
 
 test("with a player's key, tier-1 squads take orders through the fast brain and the rest keep the language model", async () => {

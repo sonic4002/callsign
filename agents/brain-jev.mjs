@@ -131,6 +131,8 @@ export function jevBrain({ base = "/relay/v1", room, token, seat, fetch: fetcher
   return {
     name: "jev",
     slow: false,
+    // Anvil here is the rule brain, and the commander's view says so.
+    nameFor: ({ role }) => (role === "anvil" ? "rule" : "jev"),
     plan: ({ role, tier, level }) => (role === "anvil" ? `rule-${level ?? operatorLevel}` : `jev+rule-${Math.max(1, Math.min(3, tier || 1))}`),
     async think(ctx) {
       let seen = null; // what this thought used, for the commander's view
@@ -182,7 +184,7 @@ export function tiered({ fast, rest, tiers = [1] }) {
       return rest.slow;
     },
     slowFor: (agent) => pick(agent).slow,
-    nameFor: (agent) => pick(agent).name,
+    nameFor: (agent) => pick(agent).nameFor?.(agent) ?? pick(agent).name,
     plan: (agent) => pick(agent).plan?.(agent) ?? null,
     think: (ctx) => pick(ctx.agent).think(ctx),
   };
