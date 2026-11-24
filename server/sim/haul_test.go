@@ -144,7 +144,8 @@ func TestBuyingHaulers(t *testing.T) {
 	if got, want := s.Gold(0), 5000-(rules.Match.HaulerCap-1)*u.Cost; got != want {
 		t.Fatalf("gold after buying haulers = %d, want %d", got, want)
 	}
-	events = append(events, run(s, u.DeploySeconds+1)...)
+	// The works makes them one after another.
+	events = append(events, run(s, float64(rules.Match.HaulerCap)*u.DeploySeconds+1)...)
 	for _, e := range events {
 		if e.Kind == sim.EvSquadSpawned && e.Squad > sim.HaulerIDBase {
 			t.Fatal("a hauler was announced as a squad joining the net")

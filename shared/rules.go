@@ -221,6 +221,15 @@ type Rules struct {
 		BuildRadius     float64  `json:"buildRadius"`
 		DefenceCap      int      `json:"defenceCap"`
 		FenceRuns       int      `json:"fenceRuns"`
+		// Placing base structures (placement.go): how far from its headquarters a side may
+		// put one (BaseRadius), how far from another finished base structure of its own
+		// (BaseReach), and how many it may have (BaseCap). BuildRadius above is the same
+		// for defences and fences, which may also go up beside a point the side holds.
+		BaseRadius float64 `json:"baseRadius"`
+		BaseReach  float64 `json:"baseReach"`
+		BaseCap    int     `json:"baseCap"`
+		// QueueLimit is how many units may wait in line at one structure (queue.go).
+		QueueLimit int `json:"queueLimit"`
 		// GarrisonSight is how close an enemy must be to see a fireteam inside a building.
 		GarrisonSight float64 `json:"garrisonSight"`
 		// GarrisonDamageShare is the share of the damage aimed at a garrison that the building takes too.

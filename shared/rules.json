@@ -17,6 +17,10 @@
     "coverSeek": 64,
     "startStructures": [],
     "buildRadius": 340,
+    "baseRadius": 300,
+    "baseReach": 180,
+    "baseCap": 10,
+    "queueLimit": 5,
     "defenceCap": 6,
     "fenceRuns": 4
   },

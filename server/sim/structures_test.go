@@ -86,7 +86,6 @@ func TestStructuresUnlockUnits(t *testing.T) {
 	refused(t, s, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "speedboat"}, sim.ErrNeedsStructure, "Boat Shed")
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "airbase"}, sim.ErrNeedsStructure, "Vehicle Works")
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "chopShop"}, sim.ErrNoStructure, "")
-	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barracks"}, sim.ErrAlreadyBuilt, "Barracks")
 
 	works := rules.Factions["aegis"].Structures["vehicleWorks"]
 	gun := rules.Factions["aegis"].Structures["sentryGun"]

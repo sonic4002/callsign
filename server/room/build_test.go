@@ -44,11 +44,11 @@ func TestOnlyTheOperatorBuildsAndTheBuildTreeIsEnforced(t *testing.T) {
 		t.Fatalf("a tank with no works: err = %v", err)
 	}
 	for args, want := range map[string]error{
-		`{}`:                                               nil, // a plain message, checked below
-		`{"structure":"castle"}`:                           sim.ErrNoStructure,
-		`{"structure":"Chop Shop"}`:                        sim.ErrNoStructure, // the other faction's
-		`{"structure":"airbase"}`:                          sim.ErrNeedsStructure,
-		`{"structure":"barracks"}`:                         sim.ErrAlreadyBuilt,
+		`{}`:                        nil, // a plain message, checked below
+		`{"structure":"castle"}`:    sim.ErrNoStructure,
+		`{"structure":"Chop Shop"}`: sim.ErrNoStructure, // the other faction's
+		`{"structure":"airbase"}`:   sim.ErrNeedsStructure,
+		`{"structure":"barracks","place":"S200 of G"}`:     sim.ErrTooFar, // a base structure goes near the base
 		`{"structure":"sentryGun","place":"Kilo"}`:         sim.ErrTooFar,
 		`{"structure":"sentryGun","place":"the moon"}`:     sim.ErrBadPlace,
 		`{"structure":"flakBattery","place":"base:front"}`: sim.ErrNeedsStructure,

@@ -248,6 +248,7 @@ func TestPopulationCap(t *testing.T) {
 	run(s, 200) // HQ well alone: plenty of gold
 	for i := 2; i < rules.Match.PopulationCap; i++ {
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"})
+		run(s, 5) // the barracks makes one at a time: let its line move on
 	}
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !errors.Is(err, sim.ErrPopCap) {
 		t.Fatalf("buy past the cap: err = %v, want ErrPopCap", err)
@@ -515,6 +516,7 @@ func TestCapCountsDeployingSquads(t *testing.T) {
 		if sq := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !sq.Deploying() {
 			t.Fatal("a bought squad was fielded at once")
 		}
+		run(s, 3) // the line at the barracks is short: let it move on
 	}
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !errors.Is(err, sim.ErrPopCap) {
 		t.Fatalf("buy past the cap while squads deploy: err = %v, want ErrPopCap", err)
