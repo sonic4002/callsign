@@ -789,6 +789,7 @@ export class Scene {
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner] });
     }
     this.structureLabels(buildScale);
+    this.compass();
     this.landmarkLabels(buildScale, lang);
     for (const group of this.groups.values()) {
       if (!group.visuals.length) continue;
@@ -886,6 +887,43 @@ export class Scene {
       const [sx, sy] = cam.screen(p.x, p.y);
       this.healthBar(sx, sy - 118 * buildScale, hp, null);
     }
+  }
+
+  // compass shows where north, east, south and west lie on the tilted map, in the corner
+  // of the view: the radio speaks of "east of Foxtrot", and the map never turns.
+  compass() {
+    const { ctx, cam } = this;
+    const he = this.lang() === "he";
+    const cx = cam.w - 54;
+    const cy = 58;
+    const [ox, oy] = cam.screen(0, 0);
+    ctx.save();
+    ctx.fillStyle = "rgba(10,14,16,0.72)";
+    ctx.strokeStyle = "rgba(201,164,76,0.55)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const [dx, dy, en, heb] of [[0, -1, "N", "צ"], [1, 0, "E", "מז"], [0, 1, "S", "ד"], [-1, 0, "W", "מע"]]) {
+      const [px, py] = cam.screen(dx, dy);
+      const len = Math.hypot(px - ox, py - oy) || 1;
+      const ux = (px - ox) / len;
+      const uy = (py - oy) / len;
+      const north = dy === -1;
+      ctx.strokeStyle = north ? "#ff6b5a" : "rgba(233,238,228,0.6)";
+      ctx.lineWidth = north ? 2.5 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + ux * 20, cy + uy * 20);
+      ctx.stroke();
+      ctx.fillStyle = north ? "#ff8a7a" : "#e9eee4";
+      ctx.font = `${north ? "700 " : ""}12px system-ui, sans-serif`;
+      ctx.fillText(he ? heb : en, cx + ux * 30, cy + uy * 30);
+    }
+    ctx.restore();
   }
 
   // healthBar draws a building's health above it: green, yellow under half, and red for
