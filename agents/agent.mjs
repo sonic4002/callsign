@@ -102,6 +102,7 @@ export class Agent {
       if (this.traffic.length > 8) this.traffic.shift();
       if (m.from.key === "player") this.netLang = m.lang; // the net follows the commander's language
       if (m.from.key === this.me.key) return;
+      if (m.cue) return; // a base cue is the server's fixed line to the commander: it wakes nobody
       if (callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
       // The operator runs the fight, so every other transmission on the net wakes it too.
       else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
@@ -349,6 +350,7 @@ function describe(item) {
 // next wake shows. Those who give orders are the exception: Hammer and the operator may
 // end an order with Out, and it is still an order.
 export function callsFor(m, me) {
+  if (m.cue) return false;
   const forMe = m.to.some((t) => t.key === me.key || t.key === "all");
   const commander = m.from.key === "player" || m.from.key === "operator";
   return forMe && m.from.key !== me.key && (m.end !== "out" || commander);

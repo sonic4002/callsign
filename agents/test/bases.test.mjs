@@ -144,3 +144,60 @@ test("the prompts explain the build tree, defences, fences and capture", () => {
   assert.ok(plain.includes('such as "s7"') && !plain.includes("Your squad are engineers"));
   assert.ok(eng.includes("Your squad are engineers") && eng.includes(`after ${aegis.units.engineers.captureSeconds} seconds`));
 });
+
+// ---- tech buildings and base cues ----
+
+test("a status lists tech buildings with who holds them and what they give", () => {
+  const status = {
+    structures: [
+      { id: "s3", name: "Barracks", role: "barracks", yours: true, near: "A", x: 1, y: 1, hp: 1 },
+      { id: "s13", name: "Field Clinic", role: "tech", yours: false, holder: "nobody", gives: "heals your infantry standing by it", near: "D", x: 330, y: 790, hp: 1 },
+      { id: "s15", name: "Assay Office", role: "tech", yours: true, holder: "yours", gives: "gold", near: "G", x: 630, y: 170, hp: 1 },
+    ],
+  };
+  const got = compactStructures(status, 0);
+  assert.deepEqual(got.map((s) => s.whose), ["yours", "nobody", "yours"]);
+  assert.equal(got[1].gives, "heals your infantry standing by it");
+  // A raw snapshot structure of no side reads the same way.
+  assert.equal(compactStructures({ structures: [{ id: "s9", kind: "tech_clinic", role: "tech", side: -1, x: 0, y: 0, hp: 1 }] }, 0)[0].whose, "nobody");
+});
+
+test("engineers told to take a tech building capture it, in both languages", async () => {
+  const structures = [
+    { id: "s20", name: "Vehicle Works", role: "works", yours: false, near: "Z", x: 1, y: 1, hp: 1 },
+    { id: "s13", name: "Field Clinic", role: "tech", yours: false, holder: "nobody", near: "D", x: 330, y: 790, hp: 1 },
+    { id: "s14", name: "Service Yard", role: "tech", yours: false, holder: "enemy", near: "E", x: 1, y: 1, hp: 1 },
+    { id: "s15", name: "Assay Office", role: "tech", yours: true, holder: "yours", near: "G", x: 1, y: 1, hp: 1 },
+  ];
+  const list = compactStructures({ structures }, 0);
+  assert.equal(namedStructure("capture the clinic east of Delta", list, { enemy: true })?.id, "s13");
+  assert.equal(namedStructure("השתלטו על המרפאה", list, { enemy: true })?.id, "s13");
+  assert.equal(namedStructure("take over the service yard", list, { enemy: true })?.id, "s14");
+  assert.equal(namedStructure("השתלטו על מוסך השדה", list, { enemy: true })?.id, "s14");
+  assert.equal(namedStructure("capture the assay office", list, { enemy: true }), undefined, "ours already");
+  assert.equal(namedStructure("guard the assay office", list, { enemy: false })?.id, "s15");
+
+  const station = { key: "engineer-1", en: "Wrench 1", he: "מפתח 1", squad: 7 };
+  const engineers = { role: "squad", side: 0, squad: 7, tier: 1, lang: "en", unit: aegis.units.engineers, station };
+  const en = await think({ agent: engineers, wake: { call: call("capture the clinic east of Delta", { to: [station] }), status: { structures } } });
+  assert.deepEqual(en[0], ["capture", { place: "s13" }]);
+  const he = await think({ agent: { ...engineers, lang: "he" }, wake: { call: call("השתלטו על מוסך השדה", { to: [station], lang: "he" }), status: { structures } } });
+  assert.deepEqual(he[0], ["capture", { place: "s14" }]);
+});
+
+test("the prompts tell of the map's tech buildings", () => {
+  const station = { key: "engineer-1", en: "Wrench 1", he: "מפתח 1", squad: 7 };
+  const text = leaderPrompt({ rules, side: 0, faction: "aegis", station, unit: aegis.units.engineers });
+  for (const t of rules.map.techBuildings) assert.ok(text.includes(t.id) && text.includes(t.name.he), `${t.id} is not in the leader's prompt`);
+  assert.match(text, /Tech buildings\. These belong to no army/);
+  assert.match(text, /Assay Office/);
+  assert.match(operatorPrompt({ rules, side: 0, faction: "aegis" }), /Tech buildings\./);
+});
+
+test("a base cue wakes nobody", async () => {
+  const { callsFor } = await import("../agent.mjs");
+  const cue = { from: anvil.station, to: [hammer], end: "out", cue: "unitReady", text: "Hammer, this is Anvil. Rhino 1 in the field. Out." };
+  assert.equal(callsFor(cue, hammer), false);
+  assert.equal(callsFor({ ...cue, to: [{ key: "all" }] }, { key: "infantry-1" }), false);
+  assert.equal(callsFor({ ...cue, cue: undefined, to: [{ key: "all" }] }, { key: "infantry-1" }), true, "an order from the operator still does");
+});

@@ -24,11 +24,24 @@ export function unitFacts(u, rules) {
   if (u.minRange) facts.push(`fires far (${u.range}) but cannot hit anything closer than ${u.minRange}, and needs another squad to see the target; keep it back and screened`);
   if (u.range < 100) facts.push("must close to point-blank range to strike");
   if (u.noCapture) facts.push("cannot capture or hold points");
-  if (u.captureSeconds) facts.push("engineers: they take over enemy base structures and mend bridges, and fight poorly");
+  if (u.captureSeconds) facts.push("engineers: they take over enemy base structures and tech buildings and mend bridges, and fight poorly");
   return facts.join("; ");
 }
 
 const canTake = (rules, kind) => rules.rigs[kind].captureBy.join(" or ");
+
+// techLines tells of the map's tech buildings: what each gives and how one is taken.
+export function techLines(rules) {
+  const sites = rules.map.techBuildings ?? [];
+  if (sites.length === 0) return [];
+  return [
+    "Tech buildings. These belong to no army. An engineer squad ordered to capture one takes it for your side and is used up doing it; the enemy's engineers can take it back the same way, and heavy weapons can knock it down, which ends what it gave. Nobody shoots at one unless ordered. Your status lists the ones your side has seen, with who holds each as your side last saw it.",
+    ...sites.map((t) => {
+      const def = rules.techBuildings?.[t.kind];
+      return `- ${t.id}: ${t.name.en} / ${t.name.he} (${def?.name.en ?? t.kind}): ${def?.about.en ?? ""}`;
+    }),
+  ];
+}
 
 function mapTable(rules, side) {
   const lines = rules.map.points.map((p) => {
@@ -65,6 +78,7 @@ function mapTable(rules, side) {
         ]
       : []),
     'Places. Hammer may describe where to go: "the grove north of Foxtrot", "הבית שליד פסל", "200 metres east of Golf". Pass the landmark\'s id, or the words themselves, as the place. When the words fit more than one landmark the tool says which ones: answer "Say again" and name them. Say where you are the same way, by landmark name.',
+    ...techLines(rules),
     `A point is captured by standing on it alone for ${rules.match.captureSeconds} seconds. When the timer runs out, the side holding more points wins.`,
     `Enemy squads in sight are named by their contact id: "${rules.callsigns.contact.en} 3" (${rules.callsigns.contact.he} 3 in Hebrew) is contact 3 in your status. Hammer orders attacks on them by that name, and you name them the same way on the radio.`,
     "Fog of war: your side sees only what its own squads and headquarters have in sight. In your status, who holds a point that is not in sight now, and the enemy headquarters' strength, are as your side last saw them and may be out of date.",

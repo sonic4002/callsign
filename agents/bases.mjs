@@ -53,7 +53,9 @@ export function compactStructures(status, side) {
       id: s.id,
       name: s.name ?? s.kind,
       role: s.role,
-      whose: (s.yours ?? s.side === side) ? "yours" : "enemy",
+      // A tech building belongs to no army until engineers take it: "nobody".
+      whose: s.holder ?? (s.side === -1 ? "nobody" : (s.yours ?? s.side === side) ? "yours" : "enemy"),
+      ...(s.gives && { gives: s.gives }),
       near: s.near,
       x: s.x,
       y: s.y,
@@ -113,12 +115,25 @@ export function placeOf(text, points) {
   return side ? `base:${side}` : "";
 }
 
+// Plain words for each kind of tech building, in both languages.
+export const techWords = {
+  tech_goldworks: /\b(assay office|assay|gold ?works|mint)\b|הבוחן|בית בוחן|מטבעה/i,
+  tech_clinic: /\b(field clinic|clinic|hospital|aid station)\b|מרפא|בית החולים/i,
+  tech_garage: /\b(service yard|garage|repair yard)\b|מוסך השדה|מוסך שדה|המוסך/i,
+};
+
 // namedStructure finds, among the structures in a status, the enemy (or own) one a call
 // names by its name or by a word for its role. Of several, the first in the status.
 export function namedStructure(text, structures, { enemy }) {
   const low = text.toLowerCase();
+  // "Not ours" is the enemy's and nobody's alike: a tech building nobody holds is taken
+  // the way an enemy structure is. A tech building named by its own word comes first,
+  // so that "the service yard" is not read as the enemy's works.
+  const theirs = (s) => (s.whose !== "yours") === enemy;
+  const tech = (structures ?? []).find((s) => theirs(s) && s.role === "tech" && (has(low, s.name) || techWords[s.kind ?? s.name]?.test(low) || Object.values(techWords).some((re) => re.test(s.name) && re.test(low))));
+  if (tech) return tech;
   return (structures ?? []).find((s) => {
-    if ((s.whose === "enemy") !== enemy) return false;
+    if (!theirs(s) || s.role === "tech") return false;
     if (has(low, s.name) || low.includes(s.id)) return true;
     if (s.role === "defence") return defence.test(low) || antiAir.test(low);
     return roleWords[s.role]?.test(low) ?? false;

@@ -54,8 +54,8 @@ export const leaderTools = [
 export const repairTool = tool("repair", "Go to a bridge and mend it. The squad works from the bank while nobody shoots at it; a fallen bridge stands again part-way through.", {
   place: { type: "string", description: 'The bridge, by id or name ("bridge-south", "the south bridge").' },
 });
-export const captureTool = tool("capture", "Take over an enemy base structure. Your squad walks to it and, after a few seconds beside it without being shot at, the structure is your side's and the squad stays inside it for good.", {
-  place: { type: "string", description: 'The enemy structure: its id from your status, such as "s7", or its name ("the enemy refinery").' },
+export const captureTool = tool("capture", "Take over an enemy base structure, or a tech building (an assay office, a clinic, a service yard) whoever holds it. Your squad walks to it and, after a few seconds beside it without being shot at, the structure is your side's and the squad stays inside it for good.", {
+  place: { type: "string", description: 'The structure: its id from your status, such as "s7", or its name ("the enemy refinery", "the clinic east of Delta").' },
 });
 
 // leaderToolsFor is the tool list of the leader of a squad of that unit.
