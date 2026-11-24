@@ -127,15 +127,17 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
   // The build tree: a tank needs a works, and the refusal says so.
   hammer.say("Anvil, this is Hammer. Buy a tank. Over.");
   assert.match(await hammer.hears("Anvil"), /^Hammer, this is Anvil\. Negative, a structure is missing: build a Vehicle Works first\. Over\.$/);
+  // The works would take the base past the power its headquarters supplies: power first.
+  hammer.say("Anvil, this is Hammer. Build a power plant. Over.");
+  assert.equal(await hammer.hears("Anvil"), "Hammer, this is Anvil. Wilco. Out.");
+  await hammer.next("the power plant standing", (f) => f.type === "event" && f.event.kind === "structure_built" && f.event.unit === "powerPlant");
   // Anvil builds it, in Hebrew as well as in English, and the commander sees it go up.
   const asked = hammer.frames.length;
   hammer.say("סדן, כאן פטיש, בנה מפעל רכב, עבור.");
   assert.equal(await hammer.hears("Anvil"), "פטיש, כאן סדן, רות, יבוצע, סוף.");
-  // The event and the acknowledgement race each other onto the net: look from the order on.
-  const going = (f) => f.type === "event" && f.event.kind === "structure_started";
-  await eventually("the works going up", () => hammer.frames.slice(asked).some(going));
-  const started = hammer.frames.slice(asked).find(going);
-  assert.equal(started.event.unit, "vehicleWorks");
+  // The event may reach Hammer before Anvil's answer does, so it is looked for in everything received.
+  const worksStarted = (f) => f.type === "event" && f.event.kind === "structure_started" && f.event.unit === "vehicleWorks";
+  await eventually("the works going up", () => hammer.frames.some(worksStarted));
   await hammer.next("the works standing", (f) => f.type === "event" && f.event.kind === "structure_built" && f.event.unit === "vehicleWorks");
   const works = hammer.frames.findLast((f) => f.type === "state").state.structures.find((s) => s.kind === "vehicleWorks");
   assert.equal(works.side, 0);
@@ -347,7 +349,7 @@ test("placing a structure, a production line, a cancel and a rally point, end to
   assert.equal(canPlace(rules, latest(), 0, rules.factions.aegis.structures.barracks, spot.x, spot.y), "room");
   const before = latest().structures.length;
   const refused = await ask(say("he", "call.buildSpot", { structure: rules.factions.aegis.structures.barracks.name.he, place: spotWords(tr("he"), spot, alpha("he")) }));
-  assert.match(refused.text, /^פטיש, כאן סדן, שלילי/, "a structure on top of another is refused on the net");
+  assert.match(refused.text, /^פטיש, כאן סדן, שלילי/, `a structure on top of another is refused on the net: ${refused.text}`);
   assert.equal(latest().structures.length, before);
 
   // Three tanks bought one after another wait in one line at the one works.

@@ -8,13 +8,15 @@ import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { wantedStructure } from "/agents/bases.mjs";
 import { drawIcon } from "./bases-art.js";
-import { structureCards, structureDef, structureRows, techSite, unitDef, unitLock } from "./bases.js";
+import { ofRole, structureCards, structureDef, structureRows, techSite, unitDef, unitLock } from "./bases.js";
 import { cueMark, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
 import { haulerRows } from "./gold.js";
+import { powerTag, radarState, renderPower, repairCost, sellValue, structureActions, wouldRunShort } from "./power.js";
+import { iconSvg } from "./marks.js";
 import { Speech } from "./speech/speech.js";
 import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
 import { canPlace, parseSpot, spotAt, spotWords, tint, unitLine } from "./placement.js";
@@ -692,6 +694,10 @@ function renderSidebar() {
   $("held").textContent = `${held(side)} : ${held(1 - side)}`;
   $("hq-ours").style.inlineSize = `${state.hq[side] * 100}%`;
   $("hq-enemy").style.inlineSize = `${state.hq[1 - side] * 100}%`;
+  renderPower($("power"), me ? state : null, t);
+  const radar = me ? radarState(state, side) : "on";
+  $("radar-off").hidden = radar === "on";
+  if (radar !== "on") $("radar-off").textContent = t(`radar.${radar}`, { structure: ofRole(rules, faction, "radar")?.def.name[lang] ?? "" });
 
   const mine = state.squads.filter((sq) => sq.side === side);
   const deploying = (state.deploying ?? []).filter((d) => d.side === side);
@@ -930,7 +936,7 @@ function buildBadges(rising, deploying) {
 
 function renderStructures(canAct) {
   const cards = structureCards(state, rules, faction, side);
-  const key = JSON.stringify([lang, faction, canAct, cards.map((c) => [c.id, c.state, c.have])]);
+  const key = JSON.stringify([lang, faction, canAct, cards.map((c) => [c.id, c.state, c.have, wouldRunShort(state, c.def)])]);
   if (key !== drawn.structures) {
     drawn.structures = key;
     $("structures").replaceChildren(...cards.map((c) => structureButton(c, canAct)));
@@ -945,7 +951,7 @@ function renderStructures(canAct) {
   renderRally(canAct);
   buildBadges(cards.filter((c) => c.state === "rising").length, (state.deploying ?? []).filter((d) => d.side === side).length);
   const rows = structureRows(state, rules, side);
-  const listKey = JSON.stringify([lang, rows.map((r) => [r.id, Math.round(r.hp * 20), r.building >= 1, r.segments])]);
+  const listKey = JSON.stringify([lang, rows.map((r) => [r.id, Math.round(r.hp * 20), r.building >= 1, r.segments, flagsOf(r.id)])]);
   if (listKey !== drawn.structureList) {
     drawn.structureList = listKey;
     $("structure-list").replaceChildren(...rows.map(structureRow));
@@ -973,7 +979,7 @@ function structureButton(card, canAct) {
   drawIcon(g, id, def, faction, sideColor[side]);
   const names = (ids) => ids.map((u) => unitDef(rules, u)?.name[lang] ?? u).join(", ");
   const what =
-    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
+    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "power" ? t("structure.power") : def.role === "radar" ? t("structure.radar") : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
   const why = {
     ready: what,
     poor: what,
@@ -993,6 +999,11 @@ function structureButton(card, canAct) {
     el("span", "why", why),
     count,
   );
+  // What it does to the side's power, and a warning when it would leave the base short.
+  const short = wouldRunShort(state, def) && ["ready", "poor"].includes(card.state);
+  const tag = powerTag(def, short);
+  if (tag) button.querySelector(".cost").after(tag);
+  if (short) button.title = t("structure.short");
   button.addEventListener("click", () => startPlacing(id, def));
   return button;
 }
@@ -1103,9 +1114,18 @@ function renderRally(canAct) {
   $("rally-set").disabled = !canAct;
 }
 
+// flagsOf is how a standing structure of ours is doing besides its health: being
+// repaired, or dark for want of power.
+function flagsOf(id) {
+  const st = (state.structures ?? []).find((s) => s.id === id);
+  return st?.repairing ? "repairing" : st?.dark ? "dark" : "";
+}
+
 function structureRow(r) {
   const def = structureDef(rules, r);
-  const li = el("li", r.building < 1 ? "rising" : "");
+  const flag = flagsOf(r.id);
+  const li = el("li", `${r.building < 1 ? "rising" : ""} ${flag}`.trim());
+  if (flag) li.title = t(`structure.${flag}`);
   li.dataset.structure = r.id;
   const bar = el("span", "bar");
   const fill = el("b", r.hp > 0.5 ? "" : r.hp > 0.25 ? "hurt" : "bad");
@@ -1171,7 +1191,7 @@ $("zoom-out").addEventListener("click", () => zoomBy(1 / 1.3));
 $("zoom-fit").addEventListener("click", () => scene.cam.fit());
 addEventListener("resize", () => scene.resize());
 
-$("radar-map").addEventListener("click", (ev) => rules && scene.cam.centerOn(...scene.radarToWorld(ev)));
+$("radar-map").addEventListener("click", (ev) => rules && state?.radar !== false && scene.cam.centerOn(...scene.radarToWorld(ev)));
 
 // A click on a squad selects it and starts a call. A click on a point, with a squad
 // selected, offers the three orders; with none, it adds the point's name to the message.
@@ -1201,7 +1221,8 @@ function mapClick(ev) {
     // An enemy structure: engineers are sent to take it over, anyone else to attack it.
     const st = hit.structure;
     const mine = state.squads.find((sq) => sq.id === scene.selected);
-    if (st.side === side || !mine) return draft($("text").value + structureName(st));
+    if (st.side === side) return offerStructure(st, mine, box, sx, sy);
+    if (!mine) return draft($("text").value + structureName(st));
     // Engineers may take it over; anyone may attack it. The action pressed is sent at once.
     const actions = unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"];
     const tech = st.role === "tech"; // not "the enemy's": it may be nobody's
@@ -1243,6 +1264,54 @@ function offerOrders(squad, placeName, actions, say, box, sx, sy) {
 
 function hideOrders() {
   $("orders").hidden = true;
+  $("structure-menu").hidden = true;
+}
+
+// ---- our own structures: sell and repair ----
+
+// saidStructure is how a call names one of our structures: by its name, and by its id as
+// well when the side has more than one of the kind.
+function saidStructure(st) {
+  const same = (state.structures ?? []).filter((s) => s.side === side && !s.ruin && s.kind === st.kind && s.role !== "fence");
+  return same.length > 1 ? `${structureName(st)} ${st.id}` : structureName(st);
+}
+
+// offerStructure opens the menu for one of the player's own structures. Its buttons only
+// write a radio call and send it: to Anvil to sell it or to pay for its repair, or to the
+// engineer squad that is selected to go in and mend it.
+let structureCall = null;
+function offerStructure(st, squad, box, sx, sy) {
+  const def = structureDef(rules, st);
+  const menu = $("structure-menu");
+  const engineers = Boolean(squad && unitDef(rules, squad.unit)?.captureSeconds);
+  const actions = me && !state.over ? structureActions(st, side, { engineers }) : [];
+  if (!def || !actions.length) return draft($("text").value + structureName(st));
+  $("structure-menu-title").textContent = structureName(st);
+  const facts = [`${Math.round(st.hp * 100)}%`];
+  if (st.repairing) facts.push(t("structure.repairing"));
+  if (st.dark) facts.push(t("structure.dark"));
+  $("structure-menu-facts").textContent = facts.join(" · ");
+  const gold = { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}`, mend: "" };
+  for (const button of menu.querySelectorAll("button")) {
+    const act = button.dataset.structureAct;
+    button.hidden = !actions.includes(act);
+    button.querySelector(".icon").innerHTML = iconSvg(act === "sell" ? "sell" : "repair", 14);
+    const n = button.querySelector(".gold");
+    if (n) n.textContent = gold[act];
+  }
+  structureCall = (act) =>
+    act === "mend" ? call("mend", { to: squad.callsign[lang], structure: saidStructure(st) }) : call(act === "sell" ? "sell" : "repairStructure", { to: anvil(), structure: saidStructure(st) });
+  menu.style.left = `${Math.max(110, Math.min(box.width - 110, sx))}px`;
+  menu.style.top = `${Math.min(box.height - 110, sy)}px`;
+  menu.hidden = false;
+}
+
+for (const button of document.querySelectorAll("#structure-menu button")) {
+  button.addEventListener("click", () => {
+    const say = structureCall;
+    hideOrders();
+    if (say) order(say(button.dataset.structureAct));
+  });
 }
 
 for (const button of document.querySelectorAll("#orders button")) {

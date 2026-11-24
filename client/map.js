@@ -4,6 +4,7 @@
 import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawSegment, drawUnit, hasAnimation, sprites } from "./art.js";
 import { drawFence, drawStructure } from "./bases-art.js";
 import { structureAt, structureDef } from "./bases.js";
+import { drawRadarOff } from "./power.js";
 import { advance, spreadOut } from "./motion.js";
 import { tint, tintKey } from "./placement.js";
 import { Fog } from "./fog.js";
@@ -1138,6 +1139,8 @@ export class Scene {
     const w = this.radar.width;
     const h = this.radar.height;
     const k = w / rules.map.width;
+    // Without a radar structure that stands and has power, the mini map shows nothing.
+    if (state.radar === false) return drawRadarOff(g, w, h, performance.now() / 1000);
     g.setTransform(1, 0, 0, 1, 0, 0);
     // The terrain, drawn once for this size and redrawn when a bridge falls or stands again.
     if (!this.radarBase || this.radarBase.width !== w || this.radarBase.height !== h) {

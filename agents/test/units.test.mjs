@@ -17,7 +17,7 @@ const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 test("the game tools: the six in the design, build and haul for the operator, capture and repair for engineers only", () => {
   const names = (tools) => tools.map((t) => t.name).sort();
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
-  assert.deepEqual(names(operatorTools), ["build", "buy", "cancel", "command", "haul", "radio", "rally", "report"]);
+  assert.deepEqual(names(operatorTools), ["build", "buy", "cancel", "command", "haul", "radio", "rally", "repair", "report", "sell"]);
   const { units } = rules.factions.aegis;
   assert.deepEqual(names(leaderToolsFor(units.commandos)), names(leaderTools));
   assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "hold", "move", "radio", "repair", "report"]);
@@ -391,7 +391,7 @@ test("status and prompts: the operator is told about haulers, fields and income 
   assert.deepEqual(status.goldFields, [{ field: "B", full: 0.5, inSight: true }]);
   const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
   assert.match(prompt, /haulers drive out, load, and bring it home to your refinery/);
-  assert.match(prompt, /opens with the headquarters alone: the refinery is the first thing to build/);
+  assert.match(prompt, /opens with the headquarters alone: the refinery is built early/);
   assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold, needs a Vehicle Works; an unarmed gold hauler/);
   assert.match(prompt, /on your own you build only while command\.buy is true/);
   assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);

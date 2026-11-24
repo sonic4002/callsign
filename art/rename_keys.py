@@ -63,6 +63,10 @@ def move(root, entry, table):
         body = entry.get("body")
         if isinstance(body, str):
             entry["body"] = renamed(body, table)
+        # Another key of the group named by a part that turns (the radar's bare mast).
+        spin = entry.get("spin")
+        if isinstance(spin, dict) and isinstance(spin.get("body"), str):
+            spin["body"] = renamed(spin["body"], table)
         for value in entry.values():
             move(root, value, table)
 

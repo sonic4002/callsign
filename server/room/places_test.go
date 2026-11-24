@@ -130,7 +130,7 @@ func TestOrdersGoToPlaces(t *testing.T) {
 	if _, err := rm.Tool(viper1, ToolRepair, json.RawMessage(`{"place":"the south bridge"}`)); !errors.Is(err, sim.ErrNoRepair) {
 		t.Fatalf("commandos repairing a bridge: %v", err)
 	}
-	if _, err := rm.Tool(anvil, ToolRepair, json.RawMessage(`{"place":"the south bridge"}`)); err == nil || !strings.Contains(err.Error(), "may not use") {
+	if _, err := rm.Tool(anvil, ToolRepair, json.RawMessage(`{"place":"the south bridge"}`)); !errors.Is(err, sim.ErrNotYours) { // the operator mends structures
 		t.Fatalf("the operator repairing a bridge: %v", err)
 	}
 }

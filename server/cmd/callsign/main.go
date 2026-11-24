@@ -127,7 +127,7 @@ func main() {
 // in that directory is served: not the Node-only brains, the tests or the package files.
 var browserModules = map[string]bool{
 	"agent.mjs": true, "link.mjs": true, "tools.mjs": true, "prompts.mjs": true, "host.mjs": true,
-	"brain-relay.mjs": true, "brain-scripted.mjs": true, "worker.mjs": true, "bases.mjs": true, "telemetry.mjs": true,
+	"brain-relay.mjs": true, "brain-scripted.mjs": true, "worker.mjs": true, "bases.mjs": true, "power.mjs": true, "telemetry.mjs": true,
 }
 
 func agentModules(dir string) http.Handler {

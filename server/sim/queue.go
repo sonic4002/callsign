@@ -133,6 +133,9 @@ func (s *Sim) deploy() {
 			}
 			busy[sq.From] = true
 		}
+		if !s.power[sq.Side].works {
+			continue // the side is short of power: this tick the line stands still (power.go)
+		}
 		if sq.DeployTicks--; sq.DeployTicks == 0 {
 			s.field(sq)
 		}

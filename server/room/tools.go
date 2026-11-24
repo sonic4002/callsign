@@ -28,7 +28,7 @@ var ErrWhichPlace = errors.New("which one")
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
 	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair},
-	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul, ToolCancel, ToolRally},
+	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul, ToolCancel, ToolRally, ToolSell, ToolRepair},
 }
 
 // names accepts "Hammer" as well as ["Viper 1", "Viper 2"].
@@ -97,7 +97,12 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		res, err := rm.toolBuild(side, a)
 		rm.cueRefusal(side, err)
 		return res, err
+	case ToolSell:
+		return rm.toolSell(side, a)
 	case ToolCapture, ToolRepair:
+		if c.ID.Role == RoleAnvil {
+			return rm.toolMend(side, a) // the operator pays to mend; engineers go in themselves
+		}
 		return rm.toolEngineer(c, name, a)
 	case ToolHaul:
 		return rm.toolHaul(side, a)

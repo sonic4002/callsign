@@ -107,7 +107,14 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return nil, ErrBadCommand
 	}
 	switch c.Kind {
-	case CmdMove, CmdHold, CmdAttack, CmdRepair:
+	case CmdRepair:
+		if c.Squad == 0 {
+			return nil, s.repairFor(c) // the side pays to mend one of its structures
+		}
+		return s.order(c)
+	case CmdSell:
+		return nil, s.sell(c)
+	case CmdMove, CmdHold, CmdAttack:
 		return s.order(c)
 	case CmdBuy:
 		return s.buy(c)

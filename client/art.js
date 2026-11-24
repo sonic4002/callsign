@@ -885,3 +885,14 @@ export function rock(ctx, x, y, k) {
   poly(ctx, "#6d6a62", x - 8 * k, y, x - 3 * k, y - 8 * k, x + 5 * k, y - 6 * k, x + 8 * k, y);
   poly(ctx, "#8b887e", x - 3 * k, y - 8 * k, x + 5 * k, y - 6 * k, x + 1 * k, y - 2 * k);
 }
+
+// drawPoweredStructure draws a side's structure from its picture with the side's pennant
+// beside it, as drawBuilding does, and also what power changes: unpowered it stands dark
+// with its warning lamp, and whatever turns on it (a radar's dish) turns only with power.
+// It returns false when there is no picture for `kind`.
+export function drawPoweredStructure(ctx, kind, color, time, powered = true) {
+  if (!drawStructurePicture(ctx, kind, { powered, time })) return false;
+  line(ctx, "#d8dcd6", 1.6, -26, 4, -26, -30);
+  pennant(ctx, -26, -30, color, time);
+  return true;
+}

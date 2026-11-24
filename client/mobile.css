@@ -279,3 +279,13 @@ body.no-server #no-server {
   #lobby-gold-other { min-block-size: 44px; font-size: 16px; }
   #lobby-match canvas { inline-size: 6rem; }
 }
+
+/* ---- power and our own structures, on a phone ---- */
+@media (max-width: 820px), (pointer: coarse) and (max-height: 520px) {
+  /* In the strip there is room for the bolt and the two numbers; low power turns them to the warning colour. */
+  #power { display: flex; align-items: center; gap: .25rem; font-size: .72rem; white-space: nowrap; }
+  #power[hidden] { display: none; }
+  #power .label, #power .bar, #power .state { display: none; }
+  #structure-menu { padding: .6rem; gap: .5rem; }
+  #structure-menu button { min-block-size: 48px; font-size: 1rem; }
+}

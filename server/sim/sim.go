@@ -191,6 +191,7 @@ type Sim struct {
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
 	slots           [2][][2]float64 // where each side's base slots lie on this map (structures.go)
+	power           [2]powerState   // each side's power this tick (power.go)
 	landIdx         map[string]int  // landmark id → index
 	rng             *rand.Rand
 	events          []Event
@@ -393,10 +394,15 @@ func (s *Sim) field(sq *Squad) {
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
 }
 
-// gathered reports whether every team of a squad has reached the place its order names.
+// gathered reports whether a squad that came out of its structure has taken its place
+// beside it: every team is close to the spot, or the squad has had time enough to walk
+// there (a neighbouring structure can keep a team's own slot out of reach for good).
 func (s *Sim) gathered(sq *Squad) bool {
+	if s.Tick-sq.Order.Tick > 10*s.R.TickRate {
+		return true
+	}
 	for i := range sq.Teams {
-		if t := &sq.Teams[i]; t.Members > 0 && dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > 36 {
+		if t := &sq.Teams[i]; t.Members > 0 && dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > 48 {
 			return false
 		}
 	}
@@ -489,6 +495,7 @@ func (s *Sim) Step() []Event {
 	if s.Over {
 		return nil
 	}
+	s.powerStep()
 	s.deploy()
 	s.construct()
 
@@ -520,6 +527,7 @@ func (s *Sim) Step() []Event {
 	s.capture(live)
 	s.engineers()
 	s.techWork()
+	s.repairStructures()
 	s.haulWork()
 	s.squadEvents(live)
 	s.countGarrisons()

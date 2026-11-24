@@ -87,6 +87,14 @@ type Unit struct {
 	NoCapture bool `json:"noCapture,omitempty"`
 	// Requires is the role of the structure a side must have standing to buy this unit.
 	Requires string `json:"requires,omitempty"`
+	// Needs are further roles that must stand as well (a hero needs the radar): the
+	// structure in Requires is the one that makes the unit, these only allow it.
+	Needs []string `json:"needs,omitempty"`
+	// Siege marks the unit a faction breaks defences with: the only kind allowed to reach
+	// farther than a defence does. SiegeRange, when set, is its reach against structures
+	// and fences alone; its reach against units stays Range.
+	Siege      bool    `json:"siege,omitempty"`
+	SiegeRange float64 `json:"siegeRange,omitempty"`
 	// Engineers: how fast they mend, and how long they need beside an enemy structure to
 	// take it over. A unit with CaptureSeconds is an engineer.
 	RepairPerSecond float64 `json:"repairPerSecond,omitempty"`
@@ -232,6 +240,18 @@ type Rules struct {
 		BaseCap    int     `json:"baseCap"`
 		// QueueLimit is how many units may wait in line at one structure (queue.go).
 		QueueLimit int `json:"queueLimit"`
+		// Power (sim/power.go): how many power structures a side may have, and how fast a
+		// side on low power builds and deploys, as a share of the usual speed.
+		PowerStructures int     `json:"powerStructures"`
+		LowPowerFactor  float64 `json:"lowPowerFactor"`
+		// Selling a structure gives back SellShare of its cost. Repairing one from nothing
+		// would cost RepairCostShare of its cost, and mends RepairPerSecond of it a second.
+		SellShare       float64 `json:"sellShare"`
+		RepairCostShare float64 `json:"repairCostShare"`
+		RepairPerSecond float64 `json:"repairPerSecond"`
+		// Opening is the order a base usually grows in, by role: what the scripted player
+		// and an operator with the purse build next.
+		Opening []string `json:"opening"`
 		// GarrisonSight is how close an enemy must be to see a fireteam inside a building.
 		GarrisonSight float64 `json:"garrisonSight"`
 		// GarrisonDamageShare is the share of the damage aimed at a garrison that the building takes too.

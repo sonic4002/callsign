@@ -16,7 +16,7 @@ import (
 func baseSim(t *testing.T, seed uint64) *sim.Sim {
 	t.Helper()
 	// The base as it stands once the opening is done: a refinery (and its hauler) and a barracks.
-	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}, Base: []string{"refinery", "barracks"}})
+	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}, Base: []string{"power", "refinery", "barracks"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestStructuresUnlockUnits(t *testing.T) {
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"})
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "tank"}, sim.ErrNeedsStructure, "Vehicle Works")
 	refused(t, s, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "speedboat"}, sim.ErrNeedsStructure, "Boat Shed")
-	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "airbase"}, sim.ErrNeedsStructure, "Vehicle Works")
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "airbase"}, sim.ErrNeedsStructure, "Radar Station")
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "chopShop"}, sim.ErrNoStructure, "")
 
 	works := rules.Factions["aegis"].Structures["vehicleWorks"]
@@ -223,7 +223,9 @@ func TestDefencesAndFencesNeedOwnGround(t *testing.T) {
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "sentryGun", Place: "B"}); err != nil {
 		t.Fatalf("a gun at a point the side holds: %v", err)
 	}
-	// The cap on defences holds.
+	// The cap on defences holds. Guns use power, so the base gets its power first.
+	wealth(s, 0, 200)
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "power"})
 	for i := 0; i < rules.Match.DefenceCap+2; i++ {
 		run(s, rules.Factions["aegis"].Structures["sentryGun"].BuildSeconds+1)
 		wealth(s, 0, 200)
@@ -342,7 +344,7 @@ func TestEngineersTakeOverAStructure(t *testing.T) {
 
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdCapture, Squad: commandos.ID, Place: works.ID}, sim.ErrNotEngineers, "")
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdCapture, Squad: engineers.ID, Place: "A"}, sim.ErrBadPlace, "")
-	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: engineers.ID, Place: works.ID}, sim.ErrNoBridge, "")
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: engineers.ID, Place: works.ID}, sim.ErrNotYours, "") // only their own side's
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "technical"}, sim.ErrNoUnit, "")
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdCapture, Squad: engineers.ID, Place: works.ID})
 
