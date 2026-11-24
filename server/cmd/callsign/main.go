@@ -1,5 +1,5 @@
-// Command callsign is the game server: one room, one match, served over WebSocket,
-// plus the debug page.
+// Command callsign is the game server: a hub of rooms, each one match, served over
+// WebSocket, plus the page.
 package main
 
 import (
@@ -29,29 +29,31 @@ func main() {
 	assets := flag.String("assets", "assets", "directory of generated art and audio, served read-only at /assets/")
 	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
 	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
+	agentKey := flag.String("agent-key", os.Getenv("CALLSIGN_AGENT_KEY"), "secret this server's agent host and model relay show; with it set, commanders need seat tokens and the open room of Phase 0 is gone")
+	share := flag.String("share", os.Getenv("CALLSIGN_SHARE"), "address other machines reach this server at, for the link a player sends a friend, e.g. http://192.168.1.20:8080")
+	idle := flag.Duration("idle", 10*time.Minute, "drop a match nobody has been in for this long")
 	flag.Parse()
 
 	rules, err := shared.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
-	rm, err := room.New(rules, room.Config{
-		Seed: *seed, Factions: [2]string{*west, *east}, LengthSeconds: *length,
-		Bots: [2]string{"", *enemy},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if *speed < 1 {
 		log.Fatal("-speed must be at least 1")
 	}
-	go rm.Run(ctx, time.Second/time.Duration(rules.TickRate**speed))
+	hub, err := room.NewHub(ctx, rules, room.HubConfig{
+		Seed: *seed, Factions: [2]string{*west, *east}, LengthSeconds: *length, Bot: *enemy,
+		Interval: time.Second / time.Duration(rules.TickRate**speed),
+		AgentKey: *agentKey, Share: *share, IdleAfter: *idle,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", rm.ServeWS)
+	hub.Routes(mux)
 	mux.HandleFunc("/shared/rules.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(shared.RulesJSON)
@@ -84,7 +86,13 @@ func main() {
 		defer cancel()
 		srv.Shutdown(shut)
 	}()
-	log.Printf("callsign: listening on %s, seed %d, the match starts when Hammer joins", *addr, *seed)
+	log.Printf("callsign: listening on %s, first seed %d, matches are made in the lobby", *addr, *seed)
+	if *agentKey == "" {
+		log.Print("callsign: no agent key, so anyone who can reach this server may join any side as an agent; keep it on this machine")
+	}
+	if *share != "" {
+		log.Printf("callsign: other machines on the network open %s", *share)
+	}
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}

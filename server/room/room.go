@@ -36,6 +36,15 @@ type Config struct {
 	LengthSeconds int       // 0 uses the rules default
 	Bots          [2]string // scripted player style per side, "" for none
 	AutoStart     bool      // start the clock at once instead of when the first Hammer joins
+
+	// A room made in the lobby (see lobby.go). Code is what players type to find it.
+	// With Seats on, a Hammer needs the token of a seat and the match starts when every
+	// human seat is ready; off, anyone may command a side and the first Hammer starts it.
+	Code     string
+	Seats    bool
+	Opponent string // "bot" or "friend", for the lobby to show
+	Watch    bool   // spectators, who see both sides, are let in
+	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 }
 
 // Name is a station as clients see it: the stable key and the callsign in both languages.
@@ -83,10 +92,13 @@ type Room struct {
 	lang    [2]map[string]string // language last used toward each station
 	bots    [2]*bot.Player
 	clients map[*Client]struct{}
+	seats   [2]seat
+	quiet   time.Time // since when no person has been connected; zero while one is
+	closed  bool
 }
 
 func New(r *shared.Rules, cfg Config) (*Room, error) {
-	rm := &Room{r: r, net: radio.NewNet(r), cfg: cfg, clients: map[*Client]struct{}{}}
+	rm := &Room{r: r, net: radio.NewNet(r), cfg: cfg, clients: map[*Client]struct{}{}, quiet: time.Now()}
 	if err := rm.reset(); err != nil {
 		return nil, err
 	}
@@ -161,6 +173,7 @@ func (rm *Room) Tick() {
 	}
 	if rm.sim.Over {
 		rm.signOff()
+		rm.tellLobby()
 	}
 	if rm.sim.Tick%2 == 0 || rm.sim.Over {
 		rm.broadcastState()
@@ -232,11 +245,21 @@ func (rm *Room) Join(id Identity, wantState bool) (*Client, error) {
 	if id.Side != 0 && id.Side != 1 {
 		return nil, errors.New("side must be 0 or 1")
 	}
+	if rm.closed {
+		return nil, ErrNoRoom
+	}
 	c := &Client{ID: id, Out: make(chan []byte, 512), wantState: wantState}
 	rm.clients[c] = struct{}{}
 	rm.send(c, rm.hello(c))
-	if id.Role == RoleHammer && !rm.started {
-		rm.started = true
+	if id.Role == RoleHammer || id.Role == RoleSpectator {
+		rm.quiet = time.Time{}
+	}
+	if id.Role == RoleHammer {
+		rm.seats[id.Side].conns++
+		if !rm.cfg.Seats && !rm.started {
+			rm.started = true
+		}
+		rm.tellLobby()
 	}
 	return c, nil
 }
@@ -253,6 +276,7 @@ func (rm *Room) hello(c *Client) []byte {
 		"rules":   json.RawMessage(shared.RulesJSON),
 		"state":   rm.sim.Snapshot(view),
 		"log":     append([]Message{}, rm.logs[side]...),
+		"lobby":   rm.lobby(),
 	}
 	if st, ok := rm.station(c.ID); ok {
 		h["station"] = rm.name(st, side)
@@ -267,10 +291,22 @@ func (rm *Room) Leave(c *Client) {
 }
 
 func (rm *Room) drop(c *Client) {
-	if !c.closed {
-		c.closed = true
-		close(c.Out)
-		delete(rm.clients, c)
+	if c.closed {
+		return
+	}
+	c.closed = true
+	close(c.Out)
+	delete(rm.clients, c)
+	if c.ID.Role == RoleHammer {
+		// The commander is gone, for now or for good. Their squads keep their last orders.
+		s := &rm.seats[c.ID.Side]
+		if s.conns--; s.conns == 0 {
+			s.left = time.Now()
+		}
+		rm.tellLobby()
+	}
+	if !rm.anyone() && rm.quiet.IsZero() {
+		rm.quiet = time.Now()
 	}
 }
 
@@ -304,11 +340,20 @@ func (rm *Room) Restart(c *Client) error {
 	if c.ID.Role != RoleHammer {
 		return errors.New("only Hammer restarts the match")
 	}
+	// Two commanders: neither can throw away a fight the other is still in, and the
+	// rematch waits in the lobby until both are ready again.
+	shared := rm.cfg.Seats && rm.cfg.Opponent == OpponentFriend
+	if shared && rm.started && !rm.sim.Over {
+		return errors.New("the match is still being fought")
+	}
 	rm.match++
 	if err := rm.reset(); err != nil {
 		return err
 	}
-	rm.started = true
+	rm.started = !shared
+	if shared {
+		rm.seats[0].ready, rm.seats[1].ready = false, false
+	}
 	for o := range rm.clients {
 		if o.ID.Role == RoleSquad {
 			rm.drop(o)

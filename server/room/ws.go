@@ -13,6 +13,7 @@ import (
 //	{"type":"radio","text":"Viper 2, this is Hammer. Hold Foxtrot. Over.","strict":1}
 //	{"type":"tool","id":7,"name":"hold","args":{"point":"F"}}
 //	{"type":"restart"}
+//	{"type":"ready","ready":true}
 type inbound struct {
 	Type   string          `json:"type"`
 	Text   string          `json:"text"`
@@ -20,12 +21,16 @@ type inbound struct {
 	ID     int             `json:"id"`
 	Name   string          `json:"name"`
 	Args   json.RawMessage `json:"args"`
+	Ready  *bool           `json:"ready"` // ready frames; absent means true
 }
 
-// ServeWS is the WebSocket endpoint: /ws?side=0&role=hammer|anvil|squad|spectator&squad=<id>&state=0|1
+// ServeWS is the WebSocket endpoint of one room. The Hub picks the room by ?room=<code>.
 //
-// Phase 0 has no accounts: a client is whoever it says it is. The role still limits what
-// that connection can do, and every action is checked by the simulation.
+//	/ws?room=<code>&side=0&role=hammer|anvil|squad|spectator&squad=<id>&state=0|1&token=<seat token>&key=<agent key>
+//
+// There are no accounts. In a room with seats a Hammer is whoever holds that seat's
+// token; agents show the server's agent key or their commander's seat token. The role
+// still limits what a connection can do, and every action is checked by the simulation.
 func (rm *Room) ServeWS(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	side, _ := strconv.Atoi(q.Get("side"))
@@ -38,7 +43,7 @@ func (rm *Room) ServeWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	c, err := rm.Join(id, q.Get("state") != "0")
+	c, err := rm.Enter(id, Auth{Token: q.Get("token"), Key: q.Get("key")}, q.Get("state") != "0")
 	if err != nil {
 		conn.Close(websocket.StatusPolicyViolation, err.Error())
 		return
@@ -83,6 +88,10 @@ func (rm *Room) handle(c *Client, in inbound) {
 			res["data"] = data
 		}
 		rm.reply(c, res)
+	case "ready":
+		if err := rm.Ready(c, in.Ready == nil || *in.Ready); err != nil {
+			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
+		}
 	case "restart":
 		if err := rm.Restart(c); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
