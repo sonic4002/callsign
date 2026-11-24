@@ -33,7 +33,7 @@ export function startGold(choice, typed, { min = 100, max = 20000 } = {}) {
 // matchLengths are the lengths the lobby offers, in seconds, with the server's usual one
 // among them.
 export function matchLengths(usual) {
-  return [...new Set([300, 600, 900, 1200, usual])].filter((s) => s > 0).sort((a, b) => a - b);
+  return [...new Set([300, 600, 900, 1200, 1500, 1800, usual])].filter((s) => s > 0).sort((a, b) => a - b);
 }
 
 // clearOf is how far a plate centred on (x, y) must move up or down to overlap none of the

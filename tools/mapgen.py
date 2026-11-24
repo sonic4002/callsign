@@ -45,9 +45,25 @@ ORDINAL_EN = ["", "second ", "third ", "fourth "]
 ORDINAL_HE = {"m": ["", " השני", " השלישי", " הרביעי"], "f": ["", " השנייה", " השלישית", " הרביעית"], "p": ["", " השניים", " השלישיים", " הרביעיים"]}
 
 
-# A home field feeds about one and a half haulers; a contested one is richer and farther.
+# A home field feeds about one and a half haulers; a contested one is richer and farther;
+# a poor one lies on a side's own ground, out of the way, and pays less.
 HOME = {"ratePerSecond": 12, "fieldRadius": 90, "fieldCap": 1500, "startGold": 1000}
 RICH = {"ratePerSecond": 18, "fieldRadius": 70, "fieldCap": 2400, "startGold": 1000}
+POOR = {"ratePerSecond": 8, "fieldRadius": 70, "fieldCap": 1000, "startGold": 600}
+
+# How far a commander's words reach. "N900 E900 of F" is the longest offset the game
+# reads (server/sim/place.go), so every spot of a map must be that near a point; and a
+# described place ("the grove east of Foxtrot") should never be a long walk from where
+# it is wanted, so every piece of ground has something with a name this near.
+SPOT_REACH = 900
+NAME_REACH = 560
+
+# The base layout around a western headquarters (baseSlots in server/sim/structures.go),
+# the room the widest base structure needs at each place, and the farthest a dockyard's
+# shore may be from the headquarters.
+BASE_SLOTS = [(-60, -170), (-60, 170), (80, -280), (80, 280), (-60, -330), (-60, 330), (-190, -90), (-190, 90), (200, -160), (200, 160)]
+BASE_ROOM = 54
+DOCK_REACH = 460
 
 
 class Map:
@@ -64,6 +80,17 @@ class Map:
             for c in range(self.cols):
                 cx, cy = (c + 0.5) * CELL, (r + 0.5) * CELL
                 if x0 <= cx < x1 and y0 <= cy < y1:
+                    self.grid[r][c] = kind
+
+    def cells(self, c0, r0, c1, r1, kind):
+        """A rectangle in whole cells: columns c0 up to c1 and rows r0 up to r1, c1 and r1 not included."""
+        self.rect(c0 * CELL, r0 * CELL, c1 * CELL, r1 * CELL, kind)
+
+    def oval(self, x, y, rx, ry, kind):
+        for r in range(self.rows):
+            for c in range(self.cols):
+                cx, cy = (c + 0.5) * CELL, (r + 0.5) * CELL
+                if ((cx - x) / rx) ** 2 + ((cy - y) / ry) ** 2 <= 1:
                     self.grid[r][c] = kind
 
     def mirror(self):
@@ -95,13 +122,13 @@ class Map:
             self.bridges.append({"id": mid, "name": {"en": mname[0], "he": mname[1]},
                                  "from": [self.w - a[0], a[1]], "to": [self.w - b[0], b[1]], "width": width, "hp": hp})
 
-    def gusher(self, point, x=None, y=None, rich=False, east=None):
+    def gusher(self, point, x=None, y=None, rich=False, poor=False, east=None):
         """A gold gusher named after a point; by default it stands on the point. `rich` is
-        a contested field in the middle of the map; `east` is the point its mirror image
-        is named after."""
+        a contested field in the middle of the map, `poor` a small one out of the way;
+        `east` is the point its mirror image is named after."""
         p = next(q for q in self.points if q["id"] == point)
         x, y = (p["x"] if x is None else x), (p["y"] if y is None else y)
-        size = RICH if rich else HOME
+        size = RICH if rich else POOR if poor else HOME
         self.fields.append({"id": point, "point": point, "x": x, "y": y, **size})
         if east:
             self.fields.append({"id": east, "point": east, "x": self.w - x, "y": y, **size})
@@ -254,6 +281,50 @@ class Map:
                 assert o is t or math.hypot(o["x"] - t["x"], o["y"] - t["y"]) >= 130, f"{self.key}: {t['id']} crowds {o['id']}"
             twin = [o for o in sites if o["kind"] == t["kind"] and abs(o["x"] - (self.w - t["x"])) < 1 and o["y"] == t["y"]]
             assert twin, f"{self.key}: {t['id']} has no mirror image"
+        # A base is laid out the same on both sides whatever the faction builds: every
+        # place of the layout (baseSlots in server/sim/structures.go) is open land with
+        # room for the widest base structure, and the shore a dockyard goes to (the land
+        # with water beside it nearest a spot just inside the headquarters) is one cell,
+        # not a tie that the two sides would break differently.
+        marks = self.landmarks()
+        for h in hq:
+            inward = 1 if h["x"] < self.w / 2 else -1
+            for ox, oy in BASE_SLOTS:
+                x, y = h["x"] + inward * ox, h["y"] + oy
+                where = f"{self.key}: the base place {ox},{oy} of {h['id']}"
+                for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                    qx, qy = x + dx * BASE_ROOM, y + dy * BASE_ROOM
+                    assert 20 <= qx <= self.w - 20 and 20 <= qy <= self.h - 20 and self.at(qx, qy) == "L", f"{where} is not open land"
+                for m in marks:
+                    assert math.hypot(m["x"] - x, m["y"] - y) >= BASE_ROOM + 34, f"{where} is crowded by {m['id']}"
+                for f in self.fields:
+                    assert math.hypot(f["x"] - x, f["y"] - y) >= BASE_ROOM + f["fieldRadius"] + 10, f"{where} is in the {f['id']} gold field"
+                for p in self.points:
+                    assert math.hypot(p["x"] - x, p["y"] - y) >= BASE_ROOM + 70, f"{where} is in the ring of {p['id']}"
+            sx, sy = h["x"] + inward * 60, h["y"]
+            shore = sorted(math.hypot((c + .5) * CELL - sx, (r + .5) * CELL - sy)
+                           for r in range(self.rows) for c in range(self.cols)
+                           if g[r][c] == "L" and any(0 <= c + dc < self.cols and 0 <= r + dr < self.rows and g[r + dr][c + dc] == "W"
+                                                     for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1))))
+            assert shore[1] - shore[0] > 1, f"{self.key}: two shores are equally near {h['id']}"
+            assert shore[0] <= DOCK_REACH, f"{self.key}: the shore is {shore[0]:.0f} from {h['id']}"
+        # More than one way across: with every bridge down the headquarters still reach
+        # each other (over ice or through a pass), and with the ice gone they still do.
+        assert cell(hq[1]) in flood(cell(hq[0]), lambda n: g[n[1]][n[0]] in "LI"), f"{self.key}: the bridges are the only way across"
+        assert cell(hq[1]) in flood(cell(hq[0]), lambda n: g[n[1]][n[0]] == "L" or n in deck), f"{self.key}: the ice is the only way across"
+        # Everything can be named on the radio: every spot is within an exact offset of a
+        # point, and every piece of ground has a point, landmark, bridge or tech building near it.
+        named = [(p["x"], p["y"]) for p in self.points] + [(m["x"], m["y"]) for m in self.landmarks()] + [(t["x"], t["y"]) for t in sites]
+        named += [((b["from"][0] + b["to"][0]) / 2, (b["from"][1] + b["to"][1]) / 2) for b in self.bridges]
+        far = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                x, y = (c + 0.5) * CELL, (r + 0.5) * CELL
+                assert any(abs(p["x"] - x) <= SPOT_REACH and abs(p["y"] - y) <= SPOT_REACH for p in self.points), \
+                    f"{self.key}: nothing can name the spot {x:.0f},{y:.0f}: no point within {SPOT_REACH} each way"
+                if g[r][c] in "LI" and min(math.hypot(nx - x, ny - y) for nx, ny in named) > NAME_REACH:
+                    far.append((int(x), int(y)))
+        assert not far, f"{self.key}: ground with nothing named within {NAME_REACH}: {far[:12]} ({len(far)} cells)"
 
     def data(self):
         self.check()
@@ -292,139 +363,244 @@ def hqs(m, x, y):
 
 
 def small():
-    m = Map("small", ("Twin Bridges", "שני הגשרים"), 40, 25)
-    m.rect(0, 840, 1600, 1000, "W")          # the sea along the south
-    m.rect(720, 0, 800, 840, "W")            # the river down the middle
-    m.rect(640, 400, 800, 640, "W")          # it widens around the town island
-    m.rect(720, 440, 800, 600, "L")          # the island
-    m.rect(720, 160, 800, 320, "I")          # the frozen ford in the north
-    m.rect(560, 0, 680, 120, "M")            # hills above the ford
-    m.rect(280, 560, 360, 640, "M")          # the ridge
+    """Twin Bridges: a river down the middle and the sea along the south. Three ways
+    across: the frozen ford in the north (slow, and no cover on the ice), the two
+    bridges through the town island in the middle, and the long south bridge by the
+    coast. Boats come round by the sea and up the river."""
+    m = Map("small", ("Twin Bridges", "שני הגשרים"), 70, 44, minutes=15, pace=1.3)
+    m.cells(0, 38, 35, 44, "W")              # the sea along the south
+    m.oval(280, 1580, 280, 200, "W")         # a cove below each base, for its dockyard
+    m.cells(33, 0, 35, 38, "W")              # the river down the middle
+    m.cells(29, 17, 35, 28, "W")             # it widens around the town island
+    m.cells(32, 18, 35, 27, "L")             # the island
+    m.cells(33, 5, 35, 12, "I")              # the frozen ford in the north
+    m.oval(1100, 20, 190, 120, "M")          # hills above the ford
+    m.oval(1080, 590, 110, 80, "M")          # and below it: the way to the ford runs between them
+    m.oval(720, 1160, 110, 70, "M")          # the ridge between a base and the south bridge
+    m.oval(0, 0, 300, 150, "M")              # the corner hills
+    m.oval(400, 420, 100, 70, "I")           # a frozen pond
+    m.oval(1020, 1540, 170, 70, "W")         # a bight in the coast
     m.mirror()
-    hqs(m, 150, 480)
-    m.pair("B", "K", "landRig", 450, 230, ("West field", "השדה המערבי"), ["the west field", "west field", "השדה המערבי"],
+    hqs(m, 280, 960)
+    m.pair("B", "K", "landRig", 620, 720, ("West field", "השדה המערבי"), ["the west field", "west field", "השדה המערבי"],
            east_name=("East field", "השדה המזרחי"), east_aliases=["the east field", "east field", "השדה המזרחי"])
-    m.pair("D", "H", "point", 450, 690, ("Ridge", "הרכס"), ["the ridge", "ridge", "הרכס", "רכס"],
+    m.pair("D", "H", "point", 900, 1300, ("Ridge", "הרכס"), ["the ridge", "ridge", "הרכס", "רכס"],
            east_name=("Farm", "החווה"), east_aliases=["the farm", "farm", "החווה", "חווה"])
-    m.point("G", "point", 800, 240, ("Frozen ford", "המעבר הקפוא"), ["the frozen ford", "the ford", "ford", "המעבר הקפוא", "המעבר"])
-    m.point("F", "point", 800, 520, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה", "הכפר"])
-    m.point("S", "seaRig", 800, 920, ("Sea rig", "האסדה הימית"), ["the sea rig", "sea rig", "האסדה הימית", "אסדה ימית"])
-    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (640, 520), (720, 520),
+    m.pair("T", "N", "point", 720, 280, ("West quarry", "המחצבה המערבית"), ["the west quarry", "west quarry", "המחצבה המערבית"],
+           east_name=("East quarry", "המחצבה המזרחית"), east_aliases=["the east quarry", "east quarry", "המחצבה המזרחית"])
+    m.point("G", "point", 1400, 340, ("Frozen ford", "המעבר הקפוא"), ["the frozen ford", "the ford", "ford", "המעבר הקפוא", "המעבר"])
+    m.point("F", "point", 1400, 900, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה", "הכפר"])
+    m.point("S", "seaRig", 1400, 1640, ("Sea rig", "האסדה הימית"), ["the sea rig", "sea rig", "האסדה הימית", "אסדה ימית"])
+    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (1160, 920), (1280, 920),
              mirrored=("bridge-east", ("the east bridge", "הגשר המזרחי")))
-    m.bridge("bridge-south", ("the south bridge", "הגשר הדרומי"), (720, 760), (880, 760))
+    m.bridge("bridge-south", ("the south bridge", "הגשר הדרומי"), (1320, 1360), (1480, 1360))
     m.gusher("B", east="K")                  # a home field each
+    m.gusher("D", poor=True, east="H")       # a small one on the coast road, each side's own
     m.gusher("F", rich=True)                 # and the rich one on the town island, across the bridges
-    m.around("A", [("wall", "E", 100), ("grove", "N", 110)])
+    m.around("A", [("wall", "E", 100), ("grove", "N", 100), ("rocks", "S", 100)])
     m.around("B", [("rocks", "E", 62), ("ruin", "W", 58)])
     m.around("D", [("bunker", "N", 56), ("rocks", "E", 62), ("grove", "SW", 70)])
-    m.around("F", [("house", "N", 50), ("house", "S", 54)])
-    m.around("F", [("rocks", "NW", 62)])
-    m.mark("grove", 300, 300)
-    m.mark("house", 590, 520)                # the bridgehead houses
-    m.mark("rocks", 600, 330)
-    m.mark("wall", 640, 740)
-    m.tech("tech_goldworks", 630, 170)       # on each bank above the frozen ford
-    m.tech("tech_clinic", 330, 790)          # on the coast behind each ridge
+    m.around("T", [("ruin", "N", 56), ("rocks", "S", 60), ("grove", "E", 76)])
+    m.around("F", [("house", "N", 50), ("house", "S", 54), ("rocks", "NW", 62)])
+    m.mark("house", 1090, 920)               # the bridgehead houses
+    m.mark("house", 1040, 1010)
+    m.mark("grove", 420, 500)                # woods north of each base
+    m.mark("grove", 330, 420)
+    m.mark("ruin", 300, 240)
+    m.mark("ruin", 130, 700)
+    m.mark("rocks", 900, 880)                # on the open road to the bridge
+    m.mark("grove", 960, 620)
+    m.mark("ruin", 1020, 400)                # the approach to the ford
+    m.mark("bunker", 1240, 480)
+    m.mark("rocks", 1190, 660)
+    m.mark("ruin", 1060, 1180)
+    m.mark("wall", 1250, 1290)               # the south bridgehead
+    m.mark("house", 1130, 1420)
+    m.mark("rocks", 780, 1460)
+    m.mark("rocks", 560, 1300)
+    m.tech("tech_goldworks", 1200, 320)      # on each bank above the frozen ford
+    m.tech("tech_clinic", 620, 1370)         # on the coast behind each ridge
     return m
 
 
 def medium():
-    m = Map("medium", ("Frozen River", "הנהר הקפוא"), 60, 38, minutes=15, pace=1.5)
-    m.rect(400, 0, 1040, 160, "M")           # the northern range, open at the pass
-    m.rect(0, 1280, 2400, 1520, "W")         # the sea
-    m.rect(1120, 160, 1200, 1280, "W")       # the river
-    m.rect(1120, 240, 1200, 600, "I")        # its frozen stretch
-    m.rect(1160, 360, 1200, 440, "L")        # the islet in the ice
-    m.rect(1000, 640, 1200, 920, "W")        # the river widens around the town island
-    m.rect(1120, 680, 1200, 880, "L")        # the island
-    m.rect(640, 480, 760, 640, "M")          # the inner hills
-    m.rect(280, 1040, 400, 1120, "I")        # a frozen pond
+    """Frozen Lake: two rivers run out of a frozen lake in the north to the sea in the
+    south, with open country between them. Three ways across each river: over the lake
+    ice round its head, the north bridge to the quarry, and the main bridge on the road
+    to the town. Boats sail the sea and both rivers as far as the ice."""
+    m = Map("medium", ("Frozen Lake", "האגם הקפוא"), 100, 62, minutes=20, pace=1.6)
+    m.cells(26, 0, 50, 2, "M")               # the northern range, behind the lake
+    m.oval(1000, 0, 260, 110, "M")           # and its shoulders
+    m.oval(0, 0, 280, 170, "M")              # the corner hills
+    m.oval(2000, 360, 900, 250, "I")         # the frozen lake below it
+    m.oval(2000, 360, 130, 90, "L")          # the islet in the ice
+    m.cells(32, 12, 35, 27, "W")             # the west river, out of the lake
+    m.cells(31, 27, 34, 29, "W")             # bends west
+    m.cells(30, 29, 33, 31, "W")
+    m.cells(29, 31, 32, 48, "W")             # and runs down to the sea
+    m.cells(27, 48, 34, 54, "W")             # its mouth
+    m.cells(0, 54, 50, 62, "W")              # the sea
+    m.oval(240, 2180, 420, 280, "W")         # a bay below each base, for its dockyard
+    m.oval(2000, 1010, 190, 130, "M")        # the massif in the middle of the open country
+    m.oval(800, 560, 90, 150, "M")           # the heights that shelter the north field
+    m.oval(830, 760, 70, 110, "M")
+    m.oval(880, 1140, 100, 110, "M")         # the spur above the main road
+    m.oval(300, 960, 100, 70, "I")          # a frozen pond
+    m.oval(1700, 2180, 150, 90, "W")         # a bight in the south shore
     m.mirror()
-    hqs(m, 160, 760)
-    m.pair("B", "K", "landRig", 520, 300, ("West field", "השדה המערבי"), ["the west field", "west field", "השדה המערבי"],
-           east_name=("East field", "השדה המזרחי"), east_aliases=["the east field", "east field", "השדה המזרחי"])
-    m.pair("D", "H", "point", 560, 1100, ("Ridge", "הרכס"), ["the ridge", "ridge", "הרכס", "רכס"],
-           east_name=("Farm", "החווה"), east_aliases=["the farm", "farm", "החווה", "חווה"])
-    m.pair("L", "M", "point", 880, 780, ("West village", "הכפר המערבי"), ["the west village", "west village", "הכפר המערבי"],
+    hqs(m, 360, 1480)
+    m.pair("B", "K", "landRig", 460, 760, ("North-west field", "השדה הצפון-מערבי"), ["the north-west field", "north-west field", "השדה הצפון-מערבי"],
+           east_name=("North-east field", "השדה הצפון-מזרחי"), east_aliases=["the north-east field", "north-east field", "השדה הצפון-מזרחי"])
+    m.pair("D", "H", "point", 860, 1900, ("West farm", "החווה המערבית"), ["the west farm", "west farm", "החווה המערבית"],
+           east_name=("East farm", "החווה המזרחית"), east_aliases=["the east farm", "east farm", "החווה המזרחית"])
+    m.pair("L", "M", "point", 940, 1480, ("West village", "הכפר המערבי"), ["the west village", "west village", "הכפר המערבי"],
            east_name=("East village", "הכפר המזרחי"), east_aliases=["the east village", "east village", "הכפר המזרחי"])
-    m.point("N", "point", 1200, 80, ("Pass", "המעבר"), ["the pass", "pass", "המעבר"])
-    m.point("G", "point", 1200, 400, ("Islet", "האי הקטן"), ["the islet", "islet", "האי הקטן"])
-    m.point("F", "point", 1200, 780, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה"])
-    m.point("S", "seaRig", 1200, 1400, ("Sea rig", "האסדה הימית"), ["the sea rig", "sea rig", "האסדה הימית", "אסדה ימית"])
-    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (1000, 780), (1120, 780),
+    m.pair("T", "Y", "point", 1000, 380, ("West fort", "המבצר המערבי"), ["the west fort", "west fort", "המבצר המערבי"],
+           east_name=("East fort", "המבצר המזרחי"), east_aliases=["the east fort", "east fort", "המבצר המזרחי"])
+    m.point("N", "point", 2000, 360, ("Islet", "האי הקטן"), ["the islet", "islet", "האי הקטן"])
+    m.point("G", "point", 2000, 760, ("Quarry", "המחצבה"), ["the quarry", "quarry", "המחצבה", "מחצבה"])
+    m.point("F", "point", 2000, 1480, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה"])
+    m.point("V", "point", 2000, 1960, ("South shore", "החוף הדרומי"), ["the south shore", "south shore", "החוף הדרומי"])
+    m.point("S", "seaRig", 2000, 2320, ("Sea rig", "האסדה הימית"), ["the sea rig", "sea rig", "האסדה הימית", "אסדה ימית"])
+    m.bridge("bridge-north-west", ("the north-west bridge", "הגשר הצפון-מערבי"), (1280, 800), (1400, 800),
+             mirrored=("bridge-north-east", ("the north-east bridge", "הגשר הצפון-מזרחי")))
+    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (1160, 1480), (1280, 1480),
              mirrored=("bridge-east", ("the east bridge", "הגשר המזרחי")))
-    m.bridge("bridge-south", ("the south bridge", "הגשר הדרומי"), (1120, 1120), (1280, 1120))
-    m.gusher("A", 440, 640, east="Z")        # a home field close to each headquarters
-    m.gusher("B", east="K")                  # the fields up north
-    m.gusher("F", rich=True)                 # the rich one on the town island
-    m.around("A", [("wall", "E", 100), ("grove", "N", 110), ("rocks", "S", 110)])
+    m.gusher("A", 700, 1250, east="Z")       # a home field close to each headquarters
+    m.gusher("B", east="K")                  # the fields up north, behind the heights
+    m.gusher("D", poor=True, east="H")       # a small one on the coast
+    m.gusher("G", rich=True)                 # the rich ones between the rivers
+    m.gusher("F", rich=True)
+    m.around("A", [("wall", "E", 100), ("grove", "N", 100), ("rocks", "S", 100)])
     m.around("B", [("rocks", "E", 62), ("ruin", "W", 58), ("grove", "S", 90)])
     m.around("D", [("bunker", "N", 56), ("rocks", "E", 62), ("grove", "W", 70)])
     m.around("L", [("house", "N", 54), ("house", "S", 54), ("wall", "E", 64), ("grove", "W", 80)])
-    m.around("N", [("rocks", "W", 62), ("bunker", "S", 56)])
-    m.around("F", [("house", "N", 56), ("house", "S", 56), ("rocks", "NW", 64)])
-    m.mark("grove", 360, 520)
-    m.mark("rocks", 960, 1000)
-    m.mark("house", 960, 1180)
-    m.mark("ruin", 900, 300)
-    m.tech("tech_goldworks", 1040, 420)      # on each bank of the frozen stretch
-    m.tech("tech_garage", 1020, 1090)        # by the south bridge
+    m.around("T", [("bunker", "N", 56), ("wall", "E", 62), ("rocks", "S", 64)])
+    m.around("N", [("rocks", "W", 60)])
+    m.around("G", [("rocks", "NW", 64), ("ruin", "N", 60)])
+    m.around("F", [("house", "N", 56), ("house", "S", 56), ("rocks", "NW", 64), ("house", "SW", 80)])
+    m.around("V", [("house", "N", 54), ("grove", "W", 70)])
+    m.mark("grove", 300, 420)                # the north-west woods
+    m.mark("grove", 230, 520)
+    m.mark("ruin", 640, 260)
+    m.mark("rocks", 130, 1160)
+    m.mark("grove", 560, 1090)
+    m.mark("ruin", 1100, 980)
+    m.mark("grove", 1160, 1120)
+    m.mark("rocks", 1040, 1300)              # the west bridgehead
+    m.mark("house", 1060, 1570)
+    m.mark("wall", 1190, 880)                # the north bridgehead
+    m.mark("house", 1180, 700)
+    m.mark("house", 700, 1650)
+    m.mark("grove", 540, 1740)
+    m.mark("rocks", 1500, 620)               # the open country between the rivers
+    m.mark("house", 1520, 860)
+    m.mark("grove", 1600, 1060)
+    m.mark("grove", 1690, 1130)
+    m.mark("rocks", 1720, 1620)
+    m.mark("ruin", 1620, 1840)
+    m.mark("grove", 1480, 2040)
+    m.mark("wall", 1420, 1400)
+    m.mark("bunker", 1760, 760)
+    m.tech("tech_goldworks", 1120, 640)      # between each fort and its north bridge
+    m.tech("tech_clinic", 1640, 1320)        # in the open country, short of the town
+    m.tech("tech_garage", 1000, 1960)        # on the coast by each river mouth
     return m
 
 
 def large():
-    m = Map("large", ("Mountain Passes", "מעברי ההרים"), 80, 50, minutes=20, pace=1.9)
-    m.rect(1440, 0, 1600, 1400, "M")         # the central range
-    m.rect(1440, 120, 1600, 320, "L")        # north pass
-    m.rect(1440, 520, 1600, 720, "L")        # middle pass
-    m.rect(1440, 920, 1600, 1200, "L")       # the wide pass with the town
-    m.rect(0, 1400, 1600, 1520, "W")         # the river
-    m.rect(1200, 1400, 1600, 1840, "W")      # the lake
-    m.rect(800, 520, 920, 720, "M")          # western hills
-    m.rect(800, 280, 1000, 440, "I")         # a frozen pond on the way to the fort
-    m.rect(0, 0, 320, 120, "M")
+    """Mountain Passes: a range down the middle and a river with a lake across the south.
+    Four ways through: over the glacier round the north end of the range, the narrow
+    middle pass, the wide pass with the town, and over the river bridges and round the
+    south shore of the lake. Boats sail the river and the lake from one base to the other."""
+    m = Map("large", ("Mountain Passes", "מעברי ההרים"), 130, 80, minutes=25, pace=2)
+    m.cells(61, 0, 65, 57, "M")              # the central range
+    for y, rx, ry in ((440, 230, 200), (700, 190, 150), (1260, 240, 190), (1470, 200, 140), (2060, 230, 150), (2200, 170, 100)):
+        m.oval(2600, y, rx, ry, "M")         # its shoulders
+    m.oval(2600, 0, 540, 250, "I")           # the glacier round its north end
+    m.cells(59, 21, 65, 27, "L")             # the middle pass
+    m.cells(59, 40, 65, 48, "L")             # the wide pass with the town
+    m.cells(0, 57, 65, 60, "W")              # the river
+    m.cells(18, 56, 38, 59, "W")             # it swings north between the bridges
+    m.cells(18, 59, 38, 60, "L")
+    m.oval(2600, 2600, 620, 330, "W")        # the lake
+    m.oval(0, 0, 420, 190, "M")              # the corner hills
+    m.oval(1220, 660, 110, 150, "M")         # the western hills
+    m.oval(1260, 860, 90, 130, "M")
+    m.oval(1280, 1480, 90, 130, "M")         # the ridge between a base and its village
+    m.oval(1560, 1140, 130, 100, "I")        # a frozen pond
+    m.oval(2180, 560, 150, 60, "M")          # a spur of the range, below the glacier
+    m.oval(1040, 2800, 170, 90, "M")         # the hills of the south shore
     m.mirror()
-    hqs(m, 200, 1000)
-    m.pair("B", "K", "landRig", 640, 480, ("North-west field", "השדה הצפון-מערבי"), ["the north-west field", "north-west field", "השדה הצפון-מערבי"],
+    hqs(m, 360, 1880)
+    m.pair("B", "K", "landRig", 800, 760, ("North-west field", "השדה הצפון-מערבי"), ["the north-west field", "north-west field", "השדה הצפון-מערבי"],
            east_name=("North-east field", "השדה הצפון-מזרחי"), east_aliases=["the north-east field", "north-east field", "השדה הצפון-מזרחי"])
-    m.pair("D", "H", "landRig", 600, 1720, ("South-west field", "השדה הדרום-מערבי"), ["the south-west field", "south-west field", "השדה הדרום-מערבי"],
+    m.pair("D", "H", "landRig", 760, 2800, ("South-west field", "השדה הדרום-מערבי"), ["the south-west field", "south-west field", "השדה הדרום-מערבי"],
            east_name=("South-east field", "השדה הדרום-מזרחי"), east_aliases=["the south-east field", "south-east field", "השדה הדרום-מזרחי"])
-    m.pair("L", "M", "point", 1080, 1060, ("West village", "הכפר המערבי"), ["the west village", "west village", "הכפר המערבי"],
+    m.pair("L", "M", "point", 1900, 1760, ("West village", "הכפר המערבי"), ["the west village", "west village", "הכפר המערבי"],
            east_name=("East village", "הכפר המזרחי"), east_aliases=["the east village", "east village", "הכפר המזרחי"])
-    m.pair("T", "Y", "point", 1100, 320, ("West fort", "המבצר המערבי"), ["the west fort", "west fort", "המבצר המערבי"],
+    m.pair("T", "Y", "point", 1900, 600, ("West fort", "המבצר המערבי"), ["the west fort", "west fort", "המבצר המערבי"],
            east_name=("East fort", "המבצר המזרחי"), east_aliases=["the east fort", "east fort", "המבצר המזרחי"])
-    m.point("N", "point", 1600, 220, ("North pass", "המעבר הצפוני"), ["the north pass", "north pass", "המעבר הצפוני"])
-    m.point("G", "point", 1600, 620, ("Middle pass", "המעבר האמצעי"), ["the middle pass", "middle pass", "המעבר האמצעי"])
-    m.point("F", "point", 1600, 1060, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה"])
-    m.point("V", "point", 1600, 1920, ("South shore", "החוף הדרומי"), ["the south shore", "south shore", "החוף הדרומי"])
-    m.point("S", "seaRig", 1600, 1640, ("Lake rig", "אסדת האגם"), ["the lake rig", "lake rig", "the sea rig", "sea rig", "אסדת האגם", "האסדה הימית"])
-    m.bridge("bridge-far-west", ("the far west bridge", "הגשר המערבי הרחוק"), (400, 1400), (400, 1520),
+    m.point("N", "point", 2600, 120, ("Glacier", "הקרחון"), ["the glacier", "glacier", "the north pass", "north pass", "הקרחון", "קרחון", "המעבר הצפוני"])
+    m.point("G", "point", 2600, 960, ("Middle pass", "המעבר האמצעי"), ["the middle pass", "middle pass", "המעבר האמצעי"])
+    m.point("F", "point", 2600, 1760, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה"])
+    m.point("V", "point", 2600, 3040, ("South shore", "החוף הדרומי"), ["the south shore", "south shore", "החוף הדרומי"])
+    m.point("S", "seaRig", 2600, 2600, ("Lake rig", "אסדת האגם"), ["the lake rig", "lake rig", "the sea rig", "sea rig", "אסדת האגם", "האסדה הימית"])
+    m.bridge("bridge-far-west", ("the far west bridge", "הגשר המערבי הרחוק"), (560, 2280), (560, 2400),
              mirrored=("bridge-far-east", ("the far east bridge", "הגשר המזרחי הרחוק")))
-    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (1080, 1400), (1080, 1520),
+    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (1720, 2280), (1720, 2400),
              mirrored=("bridge-east", ("the east bridge", "הגשר המזרחי")))
-    m.gusher("A", 500, 880, east="Z")        # a home field close to each headquarters
-    m.gusher("B", east="K")
-    m.gusher("D", east="H")                  # across the river
-    m.gusher("F", rich=True)                 # the rich ones in the passes
-    m.gusher("G", rich=True)
-    m.around("A", [("wall", "E", 100), ("grove", "N", 110), ("rocks", "S", 110)])
+    m.gusher("A", 720, 1690, east="Z")       # a home field close to each headquarters
+    m.gusher("B", east="K")                  # the fields up north
+    m.gusher("D", poor=True, east="H")       # a small one across the river
+    m.gusher("G", rich=True)                 # the rich ones in the passes
+    m.gusher("F", rich=True)
+    m.around("A", [("wall", "E", 100), ("grove", "N", 100), ("rocks", "S", 100)])
     m.around("B", [("rocks", "E", 62), ("ruin", "W", 58), ("grove", "S", 90)])
     m.around("D", [("rocks", "N", 62), ("ruin", "E", 58), ("grove", "W", 80)])
     m.around("L", [("house", "N", 54), ("house", "S", 54), ("wall", "E", 64), ("grove", "W", 80)])
     m.around("T", [("bunker", "N", 56), ("wall", "E", 62), ("rocks", "S", 64)])
-    m.around("N", [("rocks", "N", 44), ("rocks", "S", 44)])
-    m.around("G", [("bunker", "N", 46), ("rocks", "S", 46)])
+    m.around("G", [("bunker", "N", 50), ("rocks", "S", 50)])
     m.around("F", [("house", "N", 56), ("house", "S", 56), ("rocks", "NW", 64), ("house", "SW", 80)])
     m.around("V", [("house", "N", 54), ("grove", "W", 70)])
-    m.mark("grove", 400, 700)
-    m.mark("rocks", 1280, 760)
-    m.mark("house", 420, 1300)
-    m.mark("wall", 1080, 1330)
-    m.mark("grove", 1000, 1620)
-    m.mark("ruin", 1300, 1920)
-    m.tech("tech_goldworks", 1340, 220)      # at each mouth of the north pass
-    m.tech("tech_clinic", 1280, 1080)        # between each village and the town
-    m.tech("tech_garage", 900, 1760)         # south of the river
+    m.mark("grove", 300, 600)                # the north-west woods
+    m.mark("grove", 400, 520)
+    m.mark("grove", 240, 480)
+    m.mark("ruin", 560, 260)
+    m.mark("rocks", 1000, 300)
+    m.mark("house", 1400, 340)               # the hamlet on the way to the fort
+    m.mark("house", 1480, 420)
+    m.mark("grove", 1560, 820)
+    m.mark("rocks", 200, 1100)
+    m.mark("grove", 620, 1240)
+    m.mark("ruin", 960, 1200)
+    m.mark("house", 420, 1500)
+    m.mark("grove", 980, 1560)
+    m.mark("rocks", 1500, 1480)
+    m.mark("grove", 1760, 1340)
+    m.mark("bunker", 2260, 960)              # the mouths of the middle pass
+    m.mark("rocks", 2180, 1180)
+    m.mark("ruin", 2100, 1420)
+    m.mark("grove", 2280, 1560)
+    m.mark("house", 2300, 2040)
+    m.mark("rocks", 2140, 2160)
+    m.mark("house", 760, 2180)               # the far west bridgehead
+    m.mark("wall", 1720, 2210)               # the west bridgehead
+    m.mark("house", 1300, 2060)
+    m.mark("grove", 1100, 1900)
+    m.mark("grove", 1560, 2560)              # the south shore
+    m.mark("ruin", 1300, 2960)
+    m.mark("house", 1900, 2560)
+    m.mark("grove", 1960, 3000)
+    m.mark("rocks", 2280, 3080)
+    m.mark("ruin", 300, 2640)
+    m.mark("grove", 360, 3000)
+    m.mark("rocks", 900, 3080)
+    m.mark("rocks", 2200, 640)
+    m.mark("ruin", 2040, 320)
+    m.tech("tech_goldworks", 2180, 400)      # at each end of the glacier
+    m.tech("tech_clinic", 2200, 1800)        # between each village and the town
+    m.tech("tech_garage", 1500, 2720)        # south of the river
     return m
 
 

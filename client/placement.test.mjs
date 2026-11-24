@@ -44,7 +44,7 @@ test("why a spot is refused", () => {
   const state = { structures: table.structures, points: table.points };
   const works = defOf("vehicleWorks");
   const hq = rules.map.points.find((p) => p.id === "A");
-  assert.equal(canPlace(rules, state, 0, works, 800, 520), "far");
+  assert.equal(canPlace(rules, state, 0, works, 1400, 900), "far");
   assert.equal(canPlace(rules, state, 0, works, hq.x + 30, hq.y), "room");
   assert.equal(canPlace(rules, state, 0, works, 5, hq.y), "edge");
   const barracks = table.structures.find((s) => s.side === 0 && s.role === "barracks");
@@ -77,18 +77,18 @@ test("the tint lists the ground near the base, green where the structure fits", 
 });
 
 test("a spot is said as metres each way from the nearest point, in both languages", () => {
-  const spot = spotAt(rules, 213, 338); // nearest point is Alpha (150, 480)
-  assert.deepEqual(spot, { point: "A", east: 60, south: -140, x: 210, y: 340 });
+  const spot = spotAt(rules, 343, 818); // nearest point is Alpha (280, 960)
+  assert.deepEqual(spot, { point: "A", east: 60, south: -140, x: 340, y: 820 });
   assert.equal(spotForm(spot), "N140 E60 of A");
   assert.deepEqual(parseSpot(rules, "N140 E60 of A"), spot);
   assert.equal(parseSpot(rules, "N of A 100"), null);
   assert.equal(spotWords(tr("en"), spot, "Alpha"), "140 metres north and 60 metres east of Alpha");
   assert.equal(spotWords(tr("he"), spot, "אלף"), "140 מטר צפונית ו-60 מטר מזרחית לאלף");
-  const sw = spotAt(rules, 430, 712); // Delta (450, 690)
+  const sw = spotAt(rules, 880, 1322); // Delta (900, 1300)
   assert.equal(spotForm(sw), "S20 W20 of D");
   assert.equal(spotWords(tr("en"), sw, "Delta"), "20 metres south and 20 metres west of Delta");
   // Right on a point: still both distances, so it reads as an exact spot.
-  assert.equal(spotWords(tr("en"), spotAt(rules, 800, 520), "Foxtrot"), "0 metres north and 0 metres east of Foxtrot");
+  assert.equal(spotWords(tr("en"), spotAt(rules, 1400, 900), "Foxtrot"), "0 metres north and 0 metres east of Foxtrot");
   assert.equal(strings.en["call.buildSpot"].replace("{to}", "Anvil").replace("{from}", "Hammer").replace("{structure}", "Vehicle Works").replace("{place}", spotWords(tr("en"), spot, "Alpha")),
     "Anvil, this is Hammer. Build a Vehicle Works 140 metres north and 60 metres east of Alpha. Over.");
 });

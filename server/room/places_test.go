@@ -21,7 +21,7 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 		t.Fatalf("the lobby shows map %q, %d gold, %d s", l.Map, l.StartGold, l.Length)
 	}
 	rm.View(func(s *sim.Sim) {
-		if s.Gold(0) != 2500 || s.Gold(1) != 2500 || len(s.Points) != 12 || s.R.Map.ID != "medium" {
+		if s.Gold(0) != 2500 || s.Gold(1) != 2500 || len(s.Points) != 15 || s.R.Map.ID != "medium" {
 			t.Fatalf("the match has %d and %d gold on %q with %d points", s.Gold(0), s.Gold(1), s.R.Map.ID, len(s.Points))
 		}
 	})
@@ -43,7 +43,7 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 	if err := json.Unmarshal(<-c.Out, &hello); err != nil {
 		t.Fatal(err)
 	}
-	if hello.Rules.Map.ID != "medium" || hello.Rules.Map.Width != 2400 || len(hello.Rules.Map.Points) != 12 || len(hello.Rules.Maps) != 3 {
+	if hello.Rules.Map.ID != "medium" || hello.Rules.Map.Width != 4000 || len(hello.Rules.Map.Points) != 15 || len(hello.Rules.Maps) != 3 {
 		t.Fatalf("the greeting's rules play on %+v, with %d maps", hello.Rules.Map, len(hello.Rules.Maps))
 	}
 	// A rematch keeps the choices.

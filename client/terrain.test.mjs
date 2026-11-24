@@ -49,29 +49,29 @@ test("every landmark and terrain kind in the rules can be drawn without a painte
 
 test("the terrain grid is read by position, and water under a standing bridge is no water", () => {
   const map = rules.maps.small;
-  assert.equal(terrainAt(map, 100, 100), "L");
-  assert.equal(terrainAt(map, 800, 900), "W");
-  assert.equal(terrainAt(map, 800, 240), "I");
-  assert.equal(terrainAt(map, 600, 60), "M");
+  assert.equal(terrainAt(map, 200, 600), "L");
+  assert.equal(terrainAt(map, 1400, 1650), "W");
+  assert.equal(terrainAt(map, 1400, 340), "I");
+  assert.equal(terrainAt(map, 1100, 40), "M");
   assert.equal(terrainAt(map, -5, 100), "M", "off the map counts as mountain");
   assert.equal(terrainAt(map, 100, map.height + 1), "M");
 
   const south = map.bridges.find((b) => b.id === "bridge-south");
-  assert.ok(onDeck(south, 800, 760) && onDeck(south, 730, 790));
-  assert.ok(!onDeck(south, 800, 810) && !onDeck(south, 700, 760));
+  assert.ok(onDeck(south, 1400, 1360) && onDeck(south, 1330, 1390));
+  assert.ok(!onDeck(south, 1400, 1410) && !onDeck(south, 1300, 1360));
   assert.equal(deckOf(south).length, 4);
-  assert.equal(isWater(rules, 800, 900), true);
-  assert.equal(isWater(rules, 100, 100), false);
-  assert.equal(isWater(rules, 800, 240), false, "ice is not water");
-  assert.equal(isWater(rules, 800, 760), false, "a shell on a standing bridge hits the deck");
-  assert.equal(isWater(rules, 800, 760, () => false), true, "a fallen bridge is water again");
+  assert.equal(isWater(rules, 1400, 1650), true);
+  assert.equal(isWater(rules, 200, 600), false);
+  assert.equal(isWater(rules, 1400, 340), false, "ice is not water");
+  assert.equal(isWater(rules, 1400, 1360), false, "a shell on a standing bridge hits the deck");
+  assert.equal(isWater(rules, 1400, 1360, () => false), true, "a fallen bridge is water again");
 });
 
 test("a tap finds the landmark or bridge under it", () => {
   const map = rules.maps.small;
-  assert.equal(placeAt(map, 452, 630).landmark?.id, "D-bunker-1");
-  assert.equal(placeAt(map, 800, 765).bridge?.id, "bridge-south");
-  assert.deepEqual(placeAt(map, 300, 500), {});
+  assert.equal(placeAt(map, 902, 1240).landmark?.id, "D-bunker-1");
+  assert.equal(placeAt(map, 1400, 1365).bridge?.id, "bridge-south");
+  assert.deepEqual(placeAt(map, 200, 600), {});
   // The nearest of two close landmarks wins.
   const [a, b] = [map.landmarks.find((l) => l.id === "F-house-1"), map.landmarks.find((l) => l.id === "F-rocks-1")];
   assert.equal(placeAt(map, a.x + 4, a.y, 80).landmark.id, a.id);
@@ -134,8 +134,8 @@ test("places, seats and the lobby's gold and length choices", () => {
   assert.equal(startGold("other", "plenty"), 0, "nonsense leaves the server's default");
   assert.equal(startGold("other", ""), 0);
 
-  assert.deepEqual(matchLengths(600), [300, 600, 900, 1200]);
-  assert.deepEqual(matchLengths(420), [300, 420, 600, 900, 1200]);
+  assert.deepEqual(matchLengths(600), [300, 600, 900, 1200, 1500, 1800]);
+  assert.deepEqual(matchLengths(420), [300, 420, 600, 900, 1200, 1500, 1800]);
 });
 
 test("a name on the map moves out of the way of the names already written", () => {

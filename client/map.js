@@ -1414,7 +1414,9 @@ export class Scene {
     g.drawImage(this.radarBase, 0, 0);
     g.strokeStyle = "rgba(160,220,190,0.10)";
     g.lineWidth = 1;
-    for (let x = 200; x < rules.map.width; x += 200) {
+    // About eight grid lines whatever the map's size: every 200 metres on the smallest.
+    const grid = Math.max(200, Math.ceil(rules.map.width / 1600) * 200);
+    for (let x = grid; x < rules.map.width; x += grid) {
       g.beginPath();
       g.moveTo(x * k, 0);
       g.lineTo(x * k, h);

@@ -111,7 +111,7 @@ func TestEveryMapHasEveryKindOfGround(t *testing.T) {
 	if len(rules.Maps) != 3 {
 		t.Fatalf("%d maps, want 3", len(rules.Maps))
 	}
-	points := map[string]int{"small": 9, "medium": 12, "large": 15}
+	points := map[string]int{"small": 11, "medium": 15, "large": 15}
 	for _, id := range rules.MapIDs() {
 		m := rules.Maps[id]
 		kinds := map[rune]int{}
