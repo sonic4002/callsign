@@ -1851,13 +1851,15 @@
       "style": "portrait",
       "height": 192,
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        21,
+        22,
+        23,
+        24,
+        25,
+        26
       ],
-      "subject": "a lean veteran marksman of a high-tech army, wearing a blue-grey hooded camouflage cloak over light armour, a matte visor pushed up on the forehead, a calm watchful face with a scar through one eyebrow, and the long barrel of a rifle rising behind one shoulder",
-      "keep": 13
+      "subject": "a lean veteran marksman of a high-tech army in a dark charcoal combat uniform with light armour plates, a dark charcoal helmet with a pale blue visor pushed up on the forehead, a calm watchful weathered face with a scar through one eyebrow, and the long barrel of a rifle rising behind one shoulder",
+      "keep": 22
     },
     {
       "id": "portrait_oracle",
