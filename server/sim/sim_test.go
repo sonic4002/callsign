@@ -30,6 +30,14 @@ func must(t *testing.T, s *sim.Sim, c sim.Command) *sim.Squad {
 	return sq
 }
 
+// fielded steps the match until a bought squad has reached the field.
+func fielded(s *sim.Sim, sq *sim.Squad) *sim.Squad {
+	for sq.Deploying() && !s.Over {
+		s.Step()
+	}
+	return sq
+}
+
 // run steps the match for a number of seconds and returns every event.
 func run(s *sim.Sim, seconds float64) []sim.Event {
 	var all []sim.Event
@@ -195,7 +203,7 @@ func TestSeaRigNeedsANavalSquad(t *testing.T) {
 		t.Fatalf("second purchase: err = %v, want ErrNoGold", err)
 	}
 	run(s, 25)
-	boat := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "patrolBoat"})
+	boat := fielded(s, must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "patrolBoat"}))
 	if cs := s.Callsign(boat); cs.En != "Shark 1" || cs.He != "כריש 1" {
 		t.Fatalf("boat callsign = %+v", cs)
 	}
@@ -352,7 +360,7 @@ func TestDestroyingTheHQWins(t *testing.T) {
 func TestReachIsNotAFreeWin(t *testing.T) {
 	s := newSim(t, 1)
 	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: 3, Point: "F"})
-	tank := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "tank"})
+	tank := fielded(s, must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "tank"}))
 	run(s, 30) // the militia are dug in at Foxtrot before the tanks roll
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdAttack, Squad: tank.ID, Point: "F"})
 	run(s, 60)
@@ -372,6 +380,7 @@ func TestReachIsNotAFreeWin(t *testing.T) {
 		must(t, s, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "speedboat"}),
 	}
 	for side, b := range boats {
+		fielded(s, b)
 		must(t, s, sim.Command{Side: side, Kind: sim.CmdHold, Squad: b.ID, Point: "S"})
 	}
 	run(s, 45)
@@ -442,5 +451,104 @@ func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// Buying starts a deployment: the gold is gone and the place under the cap is taken at
+// once, the squad reaches the field when its time is up, and not a tick sooner.
+func TestBoughtSquadsDeploy(t *testing.T) {
+	s := newSim(t, 1)
+	tank := rules.Factions["aegis"].Units["tank"]
+	ticks := int(tank.DeploySeconds * float64(rules.TickRate))
+	gold := s.Gold(0)
+	sq := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "tank"})
+	if !sq.Deploying() || sq.Alive || s.Squad(sq.ID) != nil || s.Gold(0) != gold-tank.Cost || s.Population(0) != 3 {
+		t.Fatalf("just bought: deploying %v alive %v gold %d population %d", sq.Deploying(), sq.Alive, s.Gold(0), s.Population(0))
+	}
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdHold, Squad: sq.ID, Point: "F"}); !errors.Is(err, sim.ErrNoSquad) {
+		t.Fatalf("order to a squad still on its way: err = %v, want ErrNoSquad", err)
+	}
+	snap := s.Snapshot(0)
+	if len(snap.Deploying) != 1 || snap.Deploying[0].Callsign.En != "Rhino 1" || snap.Deploying[0].TicksLeft != ticks || snap.Deploying[0].TicksTotal != ticks || len(snap.Squads) != 2 {
+		t.Fatalf("snapshot while deploying: %+v, %d squads", snap.Deploying, len(snap.Squads))
+	}
+	if d := s.Snapshot(1).Deploying; len(d) != 0 {
+		t.Fatalf("the enemy is shown our deployment: %+v", d)
+	}
+	var events []sim.Event
+	for i := 0; i < ticks-1; i++ {
+		events = append(events, s.Step()...)
+	}
+	if sq.Alive || s.Snapshot(0).Deploying[0].TicksLeft != 1 {
+		t.Fatalf("one tick early: alive %v, %+v", sq.Alive, s.Snapshot(0).Deploying)
+	}
+	events = append(events, s.Step()...)
+	if !sq.Alive || s.Squad(sq.ID) != sq || len(sq.Teams) != tank.Teams || len(s.Snapshot(0).Deploying) != 0 || s.Population(0) != 3 {
+		t.Fatalf("on time: alive %v teams %d deploying %+v", sq.Alive, len(sq.Teams), s.Snapshot(0).Deploying)
+	}
+	started, fielded := -1, -1
+	for _, e := range events {
+		if e.Squad == sq.ID && e.Kind == sim.EvDeploying {
+			started = e.Tick
+		}
+		if e.Squad == sq.ID && e.Kind == sim.EvSquadSpawned {
+			fielded = e.Tick
+		}
+	}
+	if started != 1 || fielded != ticks {
+		t.Fatalf("events: deploying at tick %d, spawned at tick %d, want 1 and %d", started, fielded, ticks)
+	}
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: sq.ID, Point: "F"})
+}
+
+// Squads on their way hold their place under the population cap.
+func TestCapCountsDeployingSquads(t *testing.T) {
+	s := newSim(t, 1)
+	run(s, 200)
+	for i := 2; i < rules.Match.PopulationCap; i++ {
+		if sq := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !sq.Deploying() {
+			t.Fatal("a bought squad was fielded at once")
+		}
+	}
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !errors.Is(err, sim.ErrPopCap) {
+		t.Fatalf("buy past the cap while squads deploy: err = %v, want ErrPopCap", err)
+	}
+	run(s, 10)
+	if n := len(s.Snapshot(0).Squads); n != rules.Match.PopulationCap {
+		t.Fatalf("%d squads on the field after deploying, want %d", n, rules.Match.PopulationCap)
+	}
+}
+
+// Deployments are part of the match state: two runs agree tick by tick, and a run that
+// bought a squad differs from one that did not from the moment of the purchase.
+func TestDeploymentIsDeterministicAndHashed(t *testing.T) {
+	a, b := newSim(t, 7), newSim(t, 7)
+	for _, s := range []*sim.Sim{a, b} {
+		must(t, s, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "militia"})
+	}
+	for i := 0; i < 80; i++ {
+		a.Step()
+		b.Step()
+		if a.Hash() != b.Hash() {
+			t.Fatalf("tick %d: two runs of the same purchase disagree", a.Tick)
+		}
+	}
+	d, e := newSim(t, 7), newSim(t, 7)
+	must(t, d, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "militia"})
+	must(t, e, sim.Command{Side: 1, Kind: sim.CmdBuy, Unit: "militia"})
+	d.Step()
+	e.Step()
+	e.Step()
+	d.Step()
+	if d.Hash() != e.Hash() {
+		t.Fatal("same ticks, different hash")
+	}
+	d.Step()
+	if d.Hash() == e.Hash() {
+		t.Fatal("a deployment one tick further along hashes the same")
+	}
+	// A new match starts with nothing on its way.
+	if n := len(newSim(t, 7).Snapshot(1).Deploying); n != 0 {
+		t.Fatalf("a new match starts with %d deployments", n)
 	}
 }

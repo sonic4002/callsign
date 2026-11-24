@@ -84,7 +84,7 @@ func TestPointsAreShownAsLastSeen(t *testing.T) {
 		t.Fatalf("side 1 stands on Kilo but is shown %+v", p)
 	}
 
-	// Side 0 takes Bravo and walks away; it still knows what happens to its own point.
+	// Side 0 takes Bravo and walks away.
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Point: "B"})
 	run(s, 30)
 	if p := point(s.Snapshot(1), "B"); p.Owner != sim.NoSide {
@@ -93,8 +93,16 @@ func TestPointsAreShownAsLastSeen(t *testing.T) {
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: 1, Point: "A"})
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: 2, Point: "A"})
 	run(s, 15)
-	if p := point(s.Snapshot(0), "B"); p.Owner != 0 || p.Visible {
-		t.Fatalf("side 0 holds Bravo out of sight but is shown %+v", p)
+	// A held point keeps watch: it and the ground around it stay in sight with nobody there.
+	if p := point(s.Snapshot(0), "B"); p.Owner != 0 || !p.Visible {
+		t.Fatalf("side 0 holds Bravo with no squad there but is shown %+v", p)
+	}
+	bravo := rules.PointByID("B")
+	if !s.InSight(0, bravo.X+rules.Match.PointSight-1, bravo.Y) || s.InSight(0, bravo.X+rules.Match.PointSight+1, bravo.Y) {
+		t.Fatalf("side 0 should see exactly %v around Bravo", rules.Match.PointSight)
+	}
+	if s.InSight(1, bravo.X, bravo.Y) {
+		t.Fatal("side 1 sees Bravo, which it does not hold")
 	}
 
 	// Scouting reveals the truth.

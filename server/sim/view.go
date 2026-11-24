@@ -54,6 +54,17 @@ type ContactView struct {
 	Teams []TeamView `json:"teams"`
 }
 
+// DeployView is a bought squad that has not reached the field yet.
+type DeployView struct {
+	ID         int         `json:"id"`
+	Side       int         `json:"side"`
+	Callsign   shared.Text `json:"callsign"` // the name it will answer to
+	Unit       string      `json:"unit"`
+	Class      string      `json:"class"`
+	TicksLeft  int         `json:"ticksLeft"`
+	TicksTotal int         `json:"ticksTotal"`
+}
+
 type PointView struct {
 	ID       string  `json:"id"`
 	Owner    int     `json:"owner"`
@@ -63,20 +74,21 @@ type PointView struct {
 }
 
 type Snapshot struct {
-	Tick     int           `json:"tick"`
-	TimeLeft int           `json:"timeLeft"` // seconds
-	Side     int           `json:"side"`
-	Faction  string        `json:"faction,omitempty"`
-	Gold     int           `json:"gold"`
-	Income   int           `json:"income"`
-	HQ       [2]float64    `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
-	Fog      *FogView      `json:"fog,omitempty"` // absent for spectators, who see everything
-	Points   []PointView   `json:"points"`
-	Squads   []SquadView   `json:"squads"`
-	Contacts []ContactView `json:"contacts"`
-	Over     bool          `json:"over"`
-	Winner   int           `json:"winner"`
-	Reason   string        `json:"reason,omitempty"`
+	Tick      int           `json:"tick"`
+	TimeLeft  int           `json:"timeLeft"` // seconds
+	Side      int           `json:"side"`
+	Faction   string        `json:"faction,omitempty"`
+	Gold      int           `json:"gold"`
+	Income    int           `json:"income"`
+	HQ        [2]float64    `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
+	Fog       *FogView      `json:"fog,omitempty"` // absent for spectators, who see everything
+	Points    []PointView   `json:"points"`
+	Squads    []SquadView   `json:"squads"`
+	Deploying []DeployView  `json:"deploying"` // own squads bought and on their way, oldest first
+	Contacts  []ContactView `json:"contacts"`
+	Over      bool          `json:"over"`
+	Winner    int           `json:"winner"`
+	Reason    string        `json:"reason,omitempty"`
 }
 
 // Snapshot is the match as one side may see it. Enemy squads appear only as contacts,
@@ -84,14 +96,15 @@ type Snapshot struct {
 // side last saw them. Spectator sees everything as it is.
 func (s *Sim) Snapshot(side int) Snapshot {
 	snap := Snapshot{
-		Tick:     s.Tick,
-		TimeLeft: (s.lengthTicks - s.Tick) / s.R.TickRate,
-		Side:     side,
-		Over:     s.Over,
-		Winner:   s.Winner,
-		Reason:   s.Reason,
-		Squads:   []SquadView{},
-		Contacts: []ContactView{},
+		Tick:      s.Tick,
+		TimeLeft:  (s.lengthTicks - s.Tick) / s.R.TickRate,
+		Side:      side,
+		Over:      s.Over,
+		Winner:    s.Winner,
+		Reason:    s.Reason,
+		Squads:    []SquadView{},
+		Deploying: []DeployView{},
+		Contacts:  []ContactView{},
 	}
 	if side != Spectator {
 		snap.Faction = s.Sides[side].Faction
@@ -117,6 +130,12 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		snap.Fog = &FogView{Cell: FogCell, Cols: cols, Rows: rows, Seen: append([]byte{}, s.Sides[side].explored...)}
 	}
 	for _, sq := range s.Squads {
+		if sq.Deploying() && (side == Spectator || sq.Side == side) {
+			snap.Deploying = append(snap.Deploying, DeployView{
+				ID: sq.ID, Side: sq.Side, Callsign: s.Callsign(sq), Unit: sq.Unit, Class: sq.unit.Class,
+				TicksLeft: sq.DeployTicks, TicksTotal: sq.DeployTotal,
+			})
+		}
 		if !sq.Alive {
 			continue
 		}
@@ -196,6 +215,7 @@ func (s *Sim) Hash() uint64 {
 	for _, sq := range s.Squads {
 		put(uint64(sq.ID))
 		put(uint64(sq.Tier))
+		put(uint64(sq.DeployTicks))
 		h.Write([]byte(sq.Order.Kind))
 		h.Write([]byte(sq.Order.Point))
 		for i := range sq.Teams {

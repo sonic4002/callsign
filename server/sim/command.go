@@ -3,9 +3,11 @@ package sim
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 const (
+	EvDeploying      = "deploying" // a squad was bought; Count is the seconds until it is fielded
 	EvSquadSpawned   = "squad_spawned"
 	EvSquadLost      = "squad_lost"
 	EvEnemyDestroyed = "enemy_destroyed"
@@ -26,6 +28,7 @@ type Event struct {
 	Side    int    `json:"side"`
 	Kind    string `json:"kind"`
 	Squad   int    `json:"squad,omitempty"`   // own squad the event is about
+	Unit    string `json:"unit,omitempty"`    // unit id, for a deployment
 	Contact int    `json:"contact,omitempty"` // enemy squad id
 	Point   string `json:"point,omitempty"`   // nearest map point
 	Count   int    `json:"count,omitempty"`
@@ -68,7 +71,7 @@ var (
 )
 
 // Apply carries out a command now, or returns why it cannot be done. For buy it returns
-// the new squad.
+// the new squad, which is still deploying: it takes orders once it is on the field.
 func (s *Sim) Apply(c Command) (*Squad, error) {
 	if s.Over {
 		return nil, ErrOver
@@ -129,6 +132,17 @@ func (s *Sim) visible(sq *Squad) bool {
 	return false
 }
 
+// Population is a side's living squads plus the ones still deploying.
+func (s *Sim) Population(side int) int {
+	n := 0
+	for _, sq := range s.Squads {
+		if sq.Side == side && (sq.Alive || sq.Deploying()) {
+			n++
+		}
+	}
+	return n
+}
+
 func (s *Sim) spend(side, gold int) error {
 	if s.Gold(side) < gold {
 		return fmt.Errorf("%w: need %d, have %d", ErrNoGold, gold, s.Gold(side))
@@ -142,19 +156,22 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 	if !ok {
 		return nil, ErrNoUnit
 	}
-	alive := 0
-	for _, sq := range s.Squads {
-		if sq.Alive && sq.Side == c.Side {
-			alive++
-		}
-	}
-	if alive >= s.R.Match.PopulationCap {
+	// A squad on its way already holds its place under the cap.
+	if s.Population(c.Side) >= s.R.Match.PopulationCap {
 		return nil, ErrPopCap
 	}
 	if err := s.spend(c.Side, u.Cost); err != nil {
 		return nil, err
 	}
-	return s.spawn(c.Side, c.Unit), nil
+	sq := s.raise(c.Side, c.Unit)
+	ticks := int(math.Round(u.DeploySeconds * float64(s.R.TickRate)))
+	if ticks <= 0 {
+		s.field(sq)
+		return sq, nil
+	}
+	sq.DeployTicks, sq.DeployTotal = ticks, ticks
+	s.emit(Event{Side: c.Side, Kind: EvDeploying, Squad: sq.ID, Unit: sq.Unit, Count: int(math.Ceil(u.DeploySeconds))})
+	return sq, nil
 }
 
 func (s *Sim) upgrade(c Command) (*Squad, error) {

@@ -43,15 +43,16 @@ func join(t *testing.T, rm *Room, side int, role string, squad int) *Client {
 }
 
 type frame struct {
-	Type    string    `json:"type"`
-	Match   int       `json:"match"`
-	Message Message   `json:"message"`
-	Event   sim.Event `json:"event"`
-	Log     []Message `json:"log"`
-	ID      int       `json:"id"`
-	OK      bool      `json:"ok"`
-	Error   string    `json:"error"`
-	Reason  string    `json:"reason"`
+	Type     string    `json:"type"`
+	Match    int       `json:"match"`
+	Message  Message   `json:"message"`
+	Event    sim.Event `json:"event"`
+	Callsign *Name     `json:"callsign"`
+	Log      []Message `json:"log"`
+	ID       int       `json:"id"`
+	OK       bool      `json:"ok"`
+	Error    string    `json:"error"`
+	Reason   string    `json:"reason"`
 }
 
 // drain returns everything queued for a client so far.
@@ -264,13 +265,27 @@ func TestRolesLimitTools(t *testing.T) {
 	if _, err := rm.Tool(anvil, ToolBuy, json.RawMessage(`{"upgrade":"Viper 9"}`)); !errors.Is(err, sim.ErrNoSquad) {
 		t.Errorf("upgrade of a missing squad: err = %v", err)
 	}
+	// The tank is on its way first, and joins the side when its deploy time is up.
 	rm.Tick()
-	spawned := false
+	deploying, spawned := false, false
 	for _, f := range drain(t, anvil) {
+		deploying = deploying || (f.Type == "event" && f.Event.Kind == sim.EvDeploying && f.Event.Squad == 5 && f.Callsign != nil && f.Callsign.En == "Rhino 1")
 		spawned = spawned || (f.Type == "event" && f.Event.Kind == sim.EvSquadSpawned && f.Event.Squad == 5)
 	}
+	if !deploying || spawned {
+		t.Errorf("after the purchase: deploying event %v, spawned %v; want the tank on its way and not yet there", deploying, spawned)
+	}
+	if _, err := rm.Tool(anvil, ToolBuy, json.RawMessage(`{"upgrade":"Rhino 1"}`)); !errors.Is(err, sim.ErrNoSquad) {
+		t.Errorf("upgrade of a squad still deploying: err = %v", err)
+	}
+	for i := 0; i < 10*rules.TickRate && !spawned; i++ {
+		rm.Tick()
+		for _, f := range drain(t, anvil) {
+			spawned = spawned || (f.Type == "event" && f.Event.Kind == sim.EvSquadSpawned && f.Event.Squad == 5)
+		}
+	}
 	if !spawned {
-		t.Error("the operator was not told about the new squad")
+		t.Error("the operator was not told when the new squad reached the field")
 	}
 
 	// Reports: a leader gets its own squad, the operator the whole side, nobody the enemy.
@@ -363,9 +378,16 @@ func TestRestart(t *testing.T) {
 	if err := rm.Restart(anvil); err == nil {
 		t.Fatal("an agent restarted the match")
 	}
+	tool(t, rm, anvil, ToolBuy, `{"unit":"tank"}`)
+	if n := len(rm.sim.Snapshot(0).Deploying); n != 1 {
+		t.Fatalf("%d deployments after buying a tank, want 1", n)
+	}
 	drain(t, hammer)
 	if err := rm.Restart(hammer); err != nil {
 		t.Fatal(err)
+	}
+	if snap := rm.sim.Snapshot(0); len(snap.Deploying) != 0 || snap.Gold != rules.Match.StartGold {
+		t.Fatalf("after restart: %d deployments and %d gold, want a clean start", len(snap.Deploying), snap.Gold)
 	}
 	fs := drain(t, hammer)
 	if len(fs) != 1 || fs[0].Type != "hello" || fs[0].Match != 1 || len(fs[0].Log) != 0 {

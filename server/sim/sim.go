@@ -95,6 +95,11 @@ type Squad struct {
 	// Contacts are the enemy squad ids this squad itself can see right now.
 	Contacts []int
 
+	// A bought squad is on its way to the field for DeployTicks more ticks; until then it
+	// has no teams and is not Alive. DeployTotal is the whole wait, for progress bars.
+	DeployTicks int
+	DeployTotal int
+
 	unit        *shared.Unit
 	inContact   bool
 	lastContact int
@@ -156,7 +161,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 			hqAlarm:  never,
 		}
 		for _, u := range f.StartUnits {
-			s.spawn(side, u)
+			s.field(s.raise(side, u))
 		}
 	}
 	s.initFog()
@@ -233,16 +238,24 @@ func (s *Sim) Nerve(t *Team) string {
 	return Steady
 }
 
-func (s *Sim) spawn(side int, unitID string) *Squad {
+// raise creates a squad with its id and callsign number, not yet on the field.
+func (s *Sim) raise(side int, unitID string) *Squad {
 	u := s.R.Factions[s.Sides[side].Faction].Units[unitID]
 	sd := &s.Sides[side]
 	sd.nextNum[u.Class]++
 	sq := &Squad{
 		ID: len(s.Squads) + 1, Side: side, Unit: unitID, Num: sd.nextNum[u.Class],
-		Tier: 1, Alive: true, unit: &u,
+		Tier: 1, unit: &u,
 		Order:       Order{Kind: OrderNone},
 		lastContact: never, lastPinned: never,
 	}
+	s.Squads = append(s.Squads, sq)
+	return sq
+}
+
+// field puts a raised squad beside its headquarters, alive and ready for orders.
+func (s *Sim) field(sq *Squad) {
+	u, side := sq.unit, sq.Side
 	hq := s.R.HQPoint(side)
 	inward := 1.0
 	if hq.X > s.R.Map.Width/2 {
@@ -262,10 +275,24 @@ func (s *Sim) spawn(side int, unitID string) *Squad {
 			Action: ActIdle, lastShot: never,
 		})
 	}
-	s.Squads = append(s.Squads, sq)
+	sq.Alive, sq.DeployTicks = true, 0
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
-	return sq
 }
+
+// deploy counts down the squads on their way and fields the ones whose time has come.
+func (s *Sim) deploy() {
+	for _, sq := range s.Squads {
+		if sq.DeployTicks == 0 {
+			continue
+		}
+		if sq.DeployTicks--; sq.DeployTicks == 0 {
+			s.field(sq)
+		}
+	}
+}
+
+// Deploying reports whether a squad has been bought and has not reached the field yet.
+func (sq *Squad) Deploying() bool { return sq.DeployTicks > 0 }
 
 // formation is a team's slot around the squad's position. The shape is mirrored for the
 // east side, so both sides meet the enemy with the same teams in front.
@@ -347,6 +374,7 @@ func (s *Sim) Step() []Event {
 	for side := range s.Sides {
 		s.Sides[side].goldUnit += int64(s.Income(side))
 	}
+	s.deploy()
 
 	live := s.liveTeams()
 	s.spot(live)
@@ -384,8 +412,7 @@ func (s *Sim) spot(live []*teamRef) {
 	}
 	for _, tr := range live {
 		enemy := 1 - tr.sq.Side
-		hq := s.R.HQPoint(enemy)
-		tr.t.Spotted = dist(tr.t.X, tr.t.Y, hq.X, hq.Y) <= s.R.HQ.Sight
+		tr.t.Spotted = s.postSees(enemy, tr.t.X, tr.t.Y)
 		for _, o := range live {
 			if o.sq.Side != enemy || dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y) > o.u.Sight {
 				continue

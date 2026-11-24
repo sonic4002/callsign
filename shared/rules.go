@@ -58,6 +58,7 @@ type Unit struct {
 	Class         string  `json:"class"`  // infantry, vehicle, naval, air
 	Domain        string  `json:"domain"` // land, sea
 	Cost          int     `json:"cost"`
+	DeploySeconds float64 `json:"deploySeconds"` // from the purchase until the squad stands at the HQ
 	Teams         int     `json:"teams"`
 	Members       int     `json:"members"`
 	HP            float64 `json:"hp"` // per member
@@ -87,6 +88,7 @@ type Rules struct {
 		CaptureSeconds float64 `json:"captureSeconds"`
 		CaptureRadius  float64 `json:"captureRadius"`
 		HoldRadius     float64 `json:"holdRadius"`
+		PointSight     float64 `json:"pointSight"` // how far a side sees from a point it holds
 	} `json:"match"`
 	HQ struct {
 		HP    float64 `json:"hp"`
@@ -199,6 +201,9 @@ func (r *Rules) check() error {
 			}
 			if u.Domain != "land" && u.Domain != "sea" {
 				return fmt.Errorf("unit %s has unknown domain %q", id, u.Domain)
+			}
+			if u.DeploySeconds < 0 {
+				return fmt.Errorf("unit %s has a negative deploy time", id)
 			}
 			if u.Teams <= 0 || u.Members <= 0 || u.HP <= 0 || u.CooldownTicks <= 0 || u.Speed <= 0 {
 				return fmt.Errorf("unit %s has a non-positive stat", id)

@@ -178,5 +178,10 @@ func (rm *Room) toolBuy(side int, a toolArgs) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"squad": rm.squadName(sq), "unit": sq.Unit, "tier": sq.Tier, "gold": rm.sim.Gold(side)}, nil
+	out := map[string]any{"squad": rm.squadName(sq), "unit": sq.Unit, "tier": sq.Tier, "gold": rm.sim.Gold(side)}
+	if sq.Deploying() {
+		// The squad is on its way: it joins the net and takes orders when it reaches the field.
+		out["deploySeconds"] = float64(sq.DeployTicks) / float64(rm.r.TickRate)
+	}
+	return out, nil
 }

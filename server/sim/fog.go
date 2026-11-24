@@ -69,11 +69,10 @@ func (s *Sim) Explored(side int, x, y float64) bool {
 	return s.Sides[side].explored[i/8]&(1<<(i%8)) != 0
 }
 
-// InSight reports whether a side can see (x, y) right now: from its headquarters or
-// from any of its living teams.
+// InSight reports whether a side can see (x, y) right now: from its headquarters, from
+// a point it holds, or from any of its living teams.
 func (s *Sim) InSight(side int, x, y float64) bool {
-	hq := s.R.HQPoint(side)
-	if dist(x, y, hq.X, hq.Y) <= s.R.HQ.Sight {
+	if s.postSees(side, x, y) {
 		return true
 	}
 	for _, sq := range s.Squads {
@@ -89,6 +88,22 @@ func (s *Sim) InSight(side int, x, y float64) bool {
 	return false
 }
 
+// postSees reports whether (x, y) is in sight of a side's fixed posts: its headquarters
+// and every point it holds.
+func (s *Sim) postSees(side int, x, y float64) bool {
+	hq := s.R.HQPoint(side)
+	if dist(x, y, hq.X, hq.Y) <= s.R.HQ.Sight {
+		return true
+	}
+	for i := range s.Points {
+		p := &s.Points[i]
+		if p.Owner == side && dist(x, y, p.X, p.Y) <= s.R.Match.PointSight {
+			return true
+		}
+	}
+	return false
+}
+
 // observe updates what each side has explored and what it remembers of the points and
 // of the enemy headquarters. A side always knows the state of a point it holds: the
 // crew there reports in, which is also how it learns the point was lost.
@@ -97,6 +112,11 @@ func (s *Sim) observe() {
 		sd := &s.Sides[side]
 		hq := s.R.HQPoint(side)
 		s.reveal(side, hq.X, hq.Y, s.R.HQ.Sight)
+		for i := range s.Points {
+			if p := &s.Points[i]; p.Owner == side {
+				s.reveal(side, p.X, p.Y, s.R.Match.PointSight)
+			}
+		}
 		for _, sq := range s.Squads {
 			if !sq.Alive || sq.Side != side {
 				continue

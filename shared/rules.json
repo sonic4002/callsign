@@ -7,7 +7,8 @@
     "populationCap": 12,
     "captureSeconds": 10,
     "captureRadius": 70,
-    "holdRadius": 45
+    "holdRadius": 45,
+    "pointSight": 220
   },
   "hq": { "hp": 3000, "sight": 300 },
   "nerve": {
@@ -95,21 +96,21 @@
       "units": {
         "commandos": {
           "name": { "en": "Commandos", "he": "קומנדו" },
-          "class": "infantry", "domain": "land", "cost": 100,
+          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 4,
           "teams": 3, "members": 2, "hp": 66, "armor": 0,
           "speed": 29, "range": 190, "sight": 280,
           "damage": 15, "cooldownTicks": 8, "accuracy": 0.6, "nerveResist": 0.7
         },
         "tank": {
           "name": { "en": "Main battle tank", "he": "טנק מערכה" },
-          "class": "vehicle", "domain": "land", "cost": 250,
+          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 7,
           "teams": 2, "members": 1, "hp": 450, "armor": 0.6,
           "speed": 34, "range": 260, "sight": 260,
           "damage": 60, "cooldownTicks": 25, "accuracy": 0.7, "nerveResist": 0.5
         },
         "patrolBoat": {
           "name": { "en": "Patrol boat", "he": "סירת סיור" },
-          "class": "naval", "domain": "sea", "cost": 250,
+          "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 7,
           "teams": 2, "members": 1, "hp": 300, "armor": 0.3,
           "speed": 43, "range": 230, "sight": 300,
           "damage": 30, "cooldownTicks": 10, "accuracy": 0.6, "nerveResist": 0.6
@@ -122,21 +123,21 @@
       "units": {
         "militia": {
           "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
-          "class": "infantry", "domain": "land", "cost": 100,
+          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3,
           "teams": 4, "members": 3, "hp": 40, "armor": 0,
           "speed": 30, "range": 160, "sight": 265,
           "damage": 9, "cooldownTicks": 8, "accuracy": 0.5, "nerveResist": 0.8
         },
         "technical": {
           "name": { "en": "Technical", "he": "טנדר חמוש" },
-          "class": "vehicle", "domain": "land", "cost": 250,
+          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 5,
           "teams": 3, "members": 1, "hp": 290, "armor": 0.25,
           "speed": 48, "range": 200, "sight": 265,
           "damage": 28, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.8
         },
         "speedboat": {
           "name": { "en": "Speedboat", "he": "סירה מהירה" },
-          "class": "naval", "domain": "sea", "cost": 250,
+          "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 5,
           "teams": 3, "members": 1, "hp": 190, "armor": 0.1,
           "speed": 52, "range": 185, "sight": 265,
           "damage": 21, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9

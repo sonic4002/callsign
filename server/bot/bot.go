@@ -50,7 +50,18 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		}
 	}
 
-	if len(snap.Squads) >= p.R.Match.PopulationCap {
+	// Squads on their way count as already there, or the bot would buy them twice.
+	for _, d := range snap.Deploying {
+		switch d.Class {
+		case "naval":
+			naval++
+		case "vehicle":
+			vehicles++
+		default:
+			infantry++
+		}
+	}
+	if len(snap.Squads)+len(snap.Deploying) >= p.R.Match.PopulationCap {
 		return cmds
 	}
 	buy := ""
