@@ -46,6 +46,7 @@ type Config struct {
 	Seats    bool
 	Opponent string // "bot" or "friend", for the lobby to show
 	Watch    bool   // spectators, who see both sides, are let in
+	Speed    string // the pace the room is played at, for the lobby to show; "" is normal
 	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the
@@ -98,6 +99,7 @@ type Room struct {
 	seq     int
 	logs    [2][]Message
 	lang    [2]map[string]string // language last used toward each station
+	cmd     [2]command           // who has the initiative on each side: Hammer or the operator
 	bots    [2]*bot.Player
 	clients map[*Client]struct{}
 	host    [2]*Client // the agent host running each side's agents, if any
@@ -126,6 +128,7 @@ func (rm *Room) reset() error {
 	for side := 0; side < 2; side++ {
 		rm.logs[side] = nil
 		rm.lang[side] = map[string]string{}
+		rm.cmd[side] = command{asked: -1}
 		rm.bots[side] = nil
 		if style := rm.cfg.Bots[side]; style != "" {
 			rm.bots[side] = &bot.Player{Side: side, Style: style, R: rm.r}
@@ -298,6 +301,7 @@ func (rm *Room) hello(c *Client) []byte {
 		"state":   rm.sim.Snapshot(view),
 		"log":     append([]Message{}, rm.logs[side]...),
 		"lobby":   rm.lobby(),
+		"command": rm.cmd[side].view(),
 	}
 	if st, ok := rm.station(c.ID); ok {
 		h["station"] = rm.name(st, side)
@@ -486,7 +490,11 @@ func (rm *Room) SayAt(c *Client, text string, level int) (Message, error) {
 		p.To = []radio.Station{{Kind: radio.Operator}}
 	}
 	rm.lang[c.ID.Side][me.Key()] = p.Lang // the net follows the commander's language
-	return rm.transmit(c.ID.Side, me, p, text)
+	m, err := rm.transmit(c.ID.Side, me, p, text)
+	if err == nil {
+		rm.heardHammer(c.ID.Side, p)
+	}
+	return m, err
 }
 
 // transmit checks the addressees, logs the message and sends it to the whole side.

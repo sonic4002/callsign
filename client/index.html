@@ -82,7 +82,7 @@
         <small><bdi dir="ltr" id="income">–</bdi> <span data-i18n="income"></span></small>
       </div>
       <dl>
-        <div><dt data-i18n="timeLeft"></dt><dd><bdi dir="ltr" id="time">–</bdi></dd></div>
+        <div><dt data-i18n="timeLeft"></dt><dd><bdi dir="ltr" id="time">–</bdi><bdi dir="ltr" id="pace" hidden></bdi></dd></div>
         <div><dt data-i18n="points"></dt><dd><bdi dir="ltr" id="held">–</bdi></dd></div>
       </dl>
       <div class="bars">
@@ -98,6 +98,8 @@
 
     <section class="panel grow" data-sheet="squads">
       <h2><span data-i18n="roster"></span> <bdi dir="ltr" id="pop"></bdi></h2>
+      <!-- Who has the initiative: the player, or Anvil. The button only transmits the call. -->
+      <p id="command" hidden><span id="command-mode"></span> <button type="button" id="command-switch"></button></p>
       <ul id="roster"></ul>
     </section>
 
@@ -169,6 +171,14 @@
       <label><span data-i18n="lobby.length"></span>
         <select name="length" id="lobby-length"></select>
       </label>
+      <label id="lobby-speed-row"><span data-i18n="lobby.speed"></span>
+        <select name="speed" id="lobby-speed">
+          <option value="relaxed" data-i18n="lobby.speed.relaxed"></option>
+          <option value="normal" data-i18n="lobby.speed.normal" selected></option>
+          <option value="fast" data-i18n="lobby.speed.fast"></option>
+        </select>
+        <small id="lobby-speed-about"></small>
+      </label>
       <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
       <fieldset id="lobby-host" hidden>
         <legend data-i18n="lobby.hostKey"></legend>
@@ -182,6 +192,7 @@
         <input id="lobby-link" type="text" dir="ltr" readonly data-i18n-aria="lobby.link">
         <button type="button" id="lobby-copy" data-i18n="lobby.copy"></button>
       </p>
+      <p id="lobby-pace"></p>
       <ul id="lobby-seats"></ul>
       <p id="lobby-status"></p>
       <p id="lobby-note"></p>

@@ -180,6 +180,9 @@ function onFrame(frame) {
       lobbyError = null;
       readyUp();
       entries = frame.log.map((m) => ({ kind: "radio", message: m }));
+      command = frame.command ?? { mode: "orders", buy: false };
+      upgrading.clear();
+      promoted.clear();
       system(me ? "matchStarted" : "spectating", { faction });
       brains.agents.newMatch(frame.match);
       brains.agents.sync(); // the seat may be a new one: a match just made or joined
@@ -203,21 +206,36 @@ function onFrame(frame) {
       readyUp();
       break;
     }
+    case "command":
+      // Hammer handed Anvil the fight, or took command back: said once, in plain words.
+      command = frame.command;
+      {
+        const handed = command.mode === "fight";
+        if (me) system(handed ? "command.nowFight" : "command.nowOrders");
+      }
+      break;
     case "radio":
       entries.push({ kind: "radio", message: frame.message });
       // Anvil turning a purchase down ends the wait for it.
       if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) buyAnswered();
+      if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) upgrading.clear();
       // The sign-off ends the match: whatever radio was still waiting is dropped for it.
       if (frame.message.final) speech.silence();
       speech.say(frame.message, { rules, faction });
       break;
     case "refused":
       buyAnswered();
+      upgrading.clear();
       system("refused", { reason: frame.reason }, "warn");
       return;
     case "event":
       if (frame.event.side === side && frame.event.kind === "deploying") buyAnswered(frame.event.unit);
       if (frame.event.side === side && frame.event.kind === "enemy_destroyed") enemyDown = true;
+      if (frame.event.side === side && frame.event.kind === "upgraded") {
+        // The upgrade landed: the wait is over and the squad's row shows its new rank for a while.
+        upgrading.delete(frame.event.squad);
+        promoted.set(frame.event.squad, performance.now() + PROMOTED_FOR);
+      }
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
@@ -257,7 +275,7 @@ function renderLog() {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count });
+        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count) });
       } else {
         time.textContent = clock(e.tick);
         text.textContent = t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" });
@@ -274,7 +292,43 @@ function transmit(text) {
   if (!text || !open()) return false;
   ws.send(JSON.stringify({ type: "radio", text, strict }));
   noteBuy(text);
+  noteUpgrade(text);
   return true;
+}
+
+// ---- who has the initiative ----
+//
+// Anvil acts on the player's orders only, until the player hands it the fight. The server
+// holds the mode and says when it changes; the switch here only transmits the radio call.
+let command = { mode: "orders", buy: false };
+
+// ---- upgrades on their way ----
+//
+// An upgrade is instant on the server, but the call first waits on the operator. From the
+// moment an upgrade call names a squad, that squad's button shows "requested", until the
+// upgrade lands, the operator says Negative, the net refuses the call, or it gives up.
+const upgrading = new Map(); // squad id → time the request gives up
+const promoted = new Map(); // squad id → time its new rank stops being highlighted
+const PROMOTED_FOR = 6000;
+const upgradeWords = /\b(upgrade|promote)\b|שדרג|שדרוג|קדם/i;
+const tierName = (tier) => rules?.tiers.find((x) => x.tier === tier)?.name[lang] ?? "";
+
+function noteUpgrade(text) {
+  if (!state || !upgradeWords.test(text)) return;
+  const low = text.toLowerCase();
+  // The longest callsign that the call names, so that "Viper 12" is not read as "Viper 1".
+  const named = state.squads
+    .filter((sq) => sq.side === side)
+    .flatMap((sq) => [sq.callsign.en, sq.callsign.he].filter(Boolean).map((name) => [name.toLowerCase(), sq.id]))
+    .filter(([name]) => new RegExp(`(^|[^0-9a-z\u0590-\u05ff])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![0-9])`).test(low))
+    .sort((a, b) => b[0].length - a[0].length)[0];
+  if (named) upgrading.set(named[1], performance.now() + REQUEST_TIMEOUT);
+}
+
+// live drops the entries of one of the two maps above whose time has passed, and lists the rest.
+function live(map) {
+  for (const [id, until] of map) if (until <= performance.now()) map.delete(id);
+  return [...map.keys()];
 }
 
 // ---- purchases on their way ----
@@ -488,10 +542,21 @@ function renderSidebar() {
   $("pop").textContent = `${pop}/${cap}`;
   const canAct = Boolean(me) && !state.over;
 
+  // Who has the initiative, and the one-tap way to change it: a radio call to Anvil.
+  const fight = command.mode === "fight";
+  $("command").hidden = !me;
+  $("command").classList.toggle("fight", fight);
+  $("command-mode").textContent = fight ? (command.buy ? t("command.fight") : t("command.fightNoBuy")) : t("command.orders");
+  $("command-switch").textContent = fight ? t("command.take") : t("command.give");
+  $("command-switch").disabled = !canAct;
+  // The match's pace beside the clock, when it is not the usual one.
+  $("pace").hidden = !lobby || lobby.pace === 1 || !lobby.pace;
+  $("pace").textContent = lobby?.pace ? ` ×${lobby.pace}` : "";
+
   // The lists are rebuilt only when what they show changes, so buttons stay clickable.
   // Progress bars are then moved in place on every frame.
   const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
-  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order]), deploying.map((d) => d.id)]);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order]), deploying.map((d) => d.id), live(upgrading), live(promoted)]);
   if (rosterKey !== drawn.roster) {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
@@ -547,6 +612,8 @@ function deployRow(d) {
   return li;
 }
 
+$("command-switch").addEventListener("click", () => transmit(call(command.mode === "fight" ? "take" : "give", { to: anvil() })));
+
 function orderText(sq) {
   if (sq.order.contact) return t("order.contact");
   return t(`order.${sq.order.kind}`, { point: sq.order.point ? pointName(sq.order.point) : t("order.here") });
@@ -559,10 +626,13 @@ function rosterRow(sq, canAct) {
   name.append(el("span", "unit", unit.name[lang]));
   const pips = el("span", "pips");
   for (let i = 0; i < sq.full; i++) pips.append(el("i", i < sq.alive ? "" : "lost"));
-  const tier = el("span", "tier", t("tier", { tier: sq.tier }));
+  const tier = el("span", "tier");
+  tier.append(el("span", "rank", t("tier", { tier: sq.tier, name: tierName(sq.tier) })));
+  if (promoted.has(sq.id)) li.classList.add("promoted");
   const next = rules.tiers.find((x) => x.tier === sq.tier + 1);
   if (next && me) {
-    const up = el("button", "", `▲ ${next.upgradeCost}`);
+    const asked = upgrading.has(sq.id);
+    const up = el("button", asked ? "requested" : "", `▲ ${next.upgradeCost}`);
     up.type = "button";
     up.disabled = !canAct || state.gold < next.upgradeCost;
     up.setAttribute("aria-label", t("upgrade", { squad: sq.callsign[lang], cost: next.upgradeCost }));
@@ -572,6 +642,7 @@ function rosterRow(sq, canAct) {
       draft(call("upgrade", { to: anvil(), squad: sq.callsign[lang] }));
     });
     tier.append(up);
+    if (asked) tier.append(el("small", "asked", t("upgradeAsked")));
   }
   li.append(name, pips, el("span", "order", orderText(sq)), tier);
   li.addEventListener("click", () => select(sq));
@@ -724,6 +795,9 @@ function renderOverlay() {
   const level = chosen("bot") ?? "easy";
   $("lobby-level-about").textContent = t(`lobby.about.${level}`);
   for (const option of $("lobby-length").options) option.textContent = t("lobby.minutes", { minutes: option.value / 60 });
+  // The pace is chosen by whoever makes the match; what it does to the squads is said here.
+  const speed = chosen("speed") ?? "normal";
+  $("lobby-speed-about").textContent = t(`lobby.speedAbout.${speed}`);
 
   const view = lobby ?? found?.lobby ?? null;
   const withFriend = Boolean(room) && view?.opponent === "friend" && !over;
@@ -756,6 +830,9 @@ function renderOverlay() {
 // send, and who sits where.
 function renderSeats(view) {
   $("lobby-code").textContent = room;
+  // Both players see the pace before they press Ready.
+  const pace = view.speed ?? "normal";
+  $("lobby-pace").textContent = t("lobby.pace", { name: t(`lobby.speed.${pace}`) });
   $("lobby-link").value = shareLink(room, offer?.share);
   $("lobby-copy").textContent = t("lobby.copy");
   $("lobby-seats").replaceChildren(
@@ -867,7 +944,8 @@ $("start").addEventListener("click", () => {
   if (!room) {
     const friend = chosen("opponent") === "friend";
     localStorage.setItem("callsign.level", chosen("bot"));
-    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot") });
+    localStorage.setItem("callsign.speed", chosen("speed"));
+    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"), speed: chosen("speed") });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
   if (found && freeSeat(found.lobby)) return takeFreeSeat();
@@ -971,6 +1049,10 @@ for (const seconds of [...new Set([300, 600, 900, usual])].sort((a, b) => a - b)
   $("lobby-length").append(option);
 }
 $("lobby-new").elements.side.value = String(side);
+// The pace the player chose last time, or the usual one.
+const speeds = (offer?.speeds ?? []).map((s) => s.name);
+$("lobby-speed-row").hidden = speeds.length === 0; // an older server has one pace only
+$("lobby-speed").value = [localStorage.getItem("callsign.speed"), offer?.speed, "normal"].find((name) => speeds.includes(name)) ?? "normal";
 // The level the player chose last time, or the server's usual one.
 const levels = offer?.levels ?? ["easy", "normal", "standard"];
 $("lobby-level").value = [localStorage.getItem("callsign.level"), offer?.level, "easy"].find((level) => levels.includes(level));

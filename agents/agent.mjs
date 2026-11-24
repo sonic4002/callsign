@@ -230,6 +230,9 @@ export function compactStatus(status, side) {
   }
   return {
     secondsLeft: status.timeLeft,
+    // Who has the initiative, and whether Hammer has just asked for a purchase.
+    command: status.command,
+    purchaseOrdered: status.purchaseOrdered,
     gold: status.gold,
     goldPerSecond: status.income,
     hqHealth: status.hq,

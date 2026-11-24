@@ -706,11 +706,24 @@ export class Scene {
         this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88` });
         continue;
       }
-      this.plate(group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
+      const h = this.plate(group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
         size: 12,
         color: sideColor[group.side],
         border: group.id === this.selected ? "#ffffff" : `${sideColor[group.side]}88`,
       });
+      // Rank chevrons under the name: one for a Sergeant's brain, two for a Veteran's.
+      const { ctx } = this;
+      ctx.strokeStyle = "#e3b341";
+      ctx.lineWidth = 1.6;
+      ctx.lineJoin = "round";
+      for (let i = 0; i < (group.view.tier ?? 1) - 1; i++) {
+        const y = low + 16 * unitScale + 4 + h / 2 + 4 + i * 4;
+        ctx.beginPath();
+        ctx.moveTo(sx - 6, y);
+        ctx.lineTo(sx, y + 3);
+        ctx.lineTo(sx + 6, y);
+        ctx.stroke();
+      }
     }
     this.coachMark();
   }

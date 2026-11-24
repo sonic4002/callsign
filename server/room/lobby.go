@@ -55,6 +55,8 @@ type LobbyView struct {
 	Length   int         `json:"length"` // seconds
 	Watch    bool        `json:"watch"`
 	Level    string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
+	Speed    string      `json:"speed"`           // the pace: "relaxed", "normal" or "fast"
+	Pace     float64     `json:"pace"`            // match seconds per real second at that pace
 	Phase    string      `json:"phase"`           // "lobby", "playing" or "over"
 	Match    int         `json:"match"`
 	Seats    [2]SeatView `json:"seats"`
@@ -82,7 +84,10 @@ func (rm *Room) Release(c *Client) error {
 func (rm *Room) lobby() LobbyView {
 	v := LobbyView{
 		Room: rm.cfg.Code, Opponent: rm.cfg.Opponent, Watch: rm.cfg.Watch, Match: rm.match,
-		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby", Tutorial: rm.cfg.Tutorial,
+		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby", Tutorial: rm.cfg.Tutorial, Speed: SpeedNormal, Pace: 1,
+	}
+	if f, ok := speedFactor(rm.cfg.Speed); ok {
+		v.Speed, v.Pace = rm.cfg.Speed, f
 	}
 	switch {
 	case rm.sim.Over:

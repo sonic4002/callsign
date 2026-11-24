@@ -209,4 +209,12 @@ test("tidy leaves the calls the page writes alone, typed or spoken", () => {
   // What typing still gets: a callsign that is only roughly spelled, put right.
   assert.equal(tidy("צבע 1 תפוס את דוד", { lang: "he", rules, typed: true }), "צפע 1 תפוס את דוד");
   assert.equal(tidy("vipr 2 attack target three", { lang: "en", rules, typed: true }), "Viper 2 attack Target 3");
+
+test("a callsign inside the message is never respelled as a map point", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  assert.equal(tidy("סדן, שדרג את צפע 1", { lang: "he", rules }), "סדן, שדרג את צפע 1");
+  assert.equal(tidy("סדן, כאן פטיש, שדרג את צפע 1 לדרגת המוח הבאה, עבור.", { lang: "he", rules }), "סדן, כאן פטיש, שדרג את צפע 1 לדרגת המוח הבאה, עבור.");
+  assert.equal(tidy("Anvil, upgrade Viper 1", { lang: "en", rules }), "Anvil, upgrade Viper 1");
+  // A place that only sounds right is still corrected.
+  assert.equal(tidy("צפע 1 תקוף את קרמל", { lang: "he", rules }), "צפע 1 תקוף את כרמל");
 });

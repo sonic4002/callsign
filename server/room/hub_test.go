@@ -252,6 +252,9 @@ func TestSidesOnlyHearAndSeeTheirOwn(t *testing.T) {
 	if _, err := rm.Say(west, "Viper 1, this is Hammer. Hold Bravo. Over."); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := rm.Say(west, "Anvil, buy commandos"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := rm.Tool(anvil, ToolBuy, json.RawMessage(`{"unit":"commandos","upgrade":""}`)); err != nil {
 		t.Fatal(err)
 	}
