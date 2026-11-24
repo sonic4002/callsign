@@ -29,9 +29,10 @@ async function call(method, path, body) {
 
 const at = (code) => `/api/rooms/${encodeURIComponent(code.trim().toUpperCase())}`;
 
-// What this server offers: { factions: [west, east], bot, length, share, open }.
+// What this server offers: { factions: [west, east], bot, levels, level, length, share, open }.
 export const serverInfo = () => call("GET", "/api/server");
-// createRoom({ opponent: "bot" | "friend", side: 0 | 1 | -1, length, watch }) → { room, side, token, share, lobby }
+// createRoom({ opponent: "bot" | "friend", side: 0 | 1 | -1, length, watch, bot: "easy" | "normal" | "standard" | "" })
+//   → { room, side, token, share, lobby }
 export const createRoom = (options) => call("POST", "/api/rooms", options);
 // roomInfo(code) → { lobby, share }
 export const roomInfo = (code) => call("GET", at(code));

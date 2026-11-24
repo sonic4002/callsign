@@ -758,3 +758,30 @@ func TestTheServerRunsOnlySoManyMatches(t *testing.T) {
 		}
 	}
 }
+
+// The player picks how hard the scripted enemy presses, per match.
+func TestLobbyChoosesTheScriptedEnemysLevel(t *testing.T) {
+	h := newHub(t, HubConfig{Bot: "easy"})
+	for _, tc := range []struct{ ask, want string }{{"", "easy"}, {"normal", "normal"}, {"standard", "standard"}} {
+		rm, side, _, err := h.Create(Options{Opponent: OpponentBot, Side: 0, Bot: tc.ask})
+		if err != nil {
+			t.Fatal(err)
+		}
+		l := rm.Lobby()
+		if l.Level != tc.want || !l.Seats[1-side].Bot || rm.cfg.Bots[1-side] != tc.want {
+			t.Errorf("asked for %q: level %q, enemy seat %+v", tc.ask, l.Level, l.Seats[1-side])
+		}
+	}
+	if _, _, _, err := h.Create(Options{Opponent: OpponentBot, Side: 0, Bot: "rush"}); err == nil {
+		t.Error("the rush style is not a level a player may pick")
+	}
+	// Against a friend there is no scripted enemy, whatever was asked.
+	rm, _, _, err := h.Create(Options{Opponent: OpponentFriend, Side: 0, Bot: "normal"})
+	if err != nil || rm.Lobby().Level != "" {
+		t.Errorf("a friend match has a scripted enemy: %+v %v", rm.Lobby(), err)
+	}
+	// A server started with a style that is not a level still offers the levels.
+	if got := newHub(t, HubConfig{Bot: "rush"}).usualBot(); got != "easy" {
+		t.Errorf("the usual level of a rush server = %q", got)
+	}
+}

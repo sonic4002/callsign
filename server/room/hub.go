@@ -16,6 +16,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"callsign/server/bot"
 	"callsign/shared"
 )
 
@@ -90,6 +91,29 @@ type Options struct {
 	Side          int    // the maker's side, -1 for either
 	LengthSeconds int    // 0 for the server's default
 	Watch         bool   // let spectators in
+	Bot           string // how hard the scripted enemy presses, "" for the server's usual
+}
+
+// BotLevels are the scripted enemies a player may choose in the lobby, easiest first.
+// The rush style stays a server flag: it is a test opponent, not a difficulty.
+var BotLevels = []string{bot.Easy, bot.Normal, bot.Standard}
+
+func botLevel(style string) bool {
+	for _, l := range BotLevels {
+		if l == style {
+			return true
+		}
+	}
+	return false
+}
+
+// usualBot is the level the lobby starts on: the server's own when it is one of the
+// levels, otherwise the easiest.
+func (h *Hub) usualBot() string {
+	if botLevel(h.cfg.Bot) {
+		return h.cfg.Bot
+	}
+	return bot.Easy
 }
 
 // Create makes a room and seats its maker. It returns the room, the maker's side and
@@ -103,6 +127,9 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	}
 	if o.Side < -1 || o.Side > 1 {
 		return nil, 0, "", errors.New("side must be 0, 1 or -1 for either")
+	}
+	if o.Bot != "" && !botLevel(o.Bot) {
+		return nil, 0, "", errors.New("the scripted enemy is easy, normal or standard")
 	}
 	if o.Side == -1 {
 		var b [1]byte
@@ -119,8 +146,12 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey,
 	}
-	if o.Opponent == OpponentBot {
+	if o.Opponent == OpponentBot && h.cfg.Bot != "" {
+		// A server started without a scripted enemy has none to choose a level of.
 		cfg.Bots[1-o.Side] = h.cfg.Bot
+		if o.Bot != "" {
+			cfg.Bots[1-o.Side] = o.Bot
+		}
 	}
 
 	h.mu.Lock()
@@ -264,7 +295,7 @@ func (h *Hub) AgentWork() []AgentWork {
 //
 //	GET  /ws                       a connection to a room (see Room.ServeWS)
 //	GET  /api/server               what the lobby offers: factions, scripted enemy, share address
-//	POST /api/rooms                make a match and take a seat
+//	POST /api/rooms                make a match and take a seat: {opponent, side, length, watch, bot}
 //	GET  /api/rooms/{code}         a match's lobby
 //	POST /api/rooms/{code}/seat    take a seat in a match
 //	GET  /internal/rooms           for the agent host: which sides need agents
@@ -307,6 +338,8 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"factions": h.cfg.Factions, // side 0, side 1
 		"bot":      h.cfg.Bot != "",
+		"levels":   BotLevels,    // the scripted enemies on offer, easiest first
+		"level":    h.usualBot(), // the one the lobby starts on
 		"length":   length,
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
 		"open":     h.open != nil, // the open room of a server without an agent key
@@ -319,11 +352,12 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Side     *int   `json:"side"`
 		Length   int    `json:"length"`
 		Watch    bool   `json:"watch"`
+		Bot      string `json:"bot"`
 	}
 	if !readJSON(w, r, &in) {
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

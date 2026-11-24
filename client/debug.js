@@ -695,6 +695,8 @@ function renderOverlay() {
   $("lobby-side-0").textContent = `${t("side.0")} · ${factionName(sides[0])}`;
   $("lobby-side-1").textContent = `${t("side.1")} · ${factionName(sides[1])}`;
   $("lobby-watch").hidden = chosen("opponent") !== "friend";
+  // How hard the scripted enemy presses is the player's choice, per match.
+  $("lobby-level-row").hidden = chosen("opponent") !== "bot" || offer?.bot === false;
   for (const option of $("lobby-length").options) option.textContent = t("lobby.minutes", { minutes: option.value / 60 });
 
   const view = lobby ?? found?.lobby ?? null;
@@ -802,7 +804,11 @@ $("start").addEventListener("click", () => {
   music.unlock();
   if (inRoom() && state?.over) return open() && ws.send(JSON.stringify({ type: "restart" }));
   if (!room && role === "spectator") return begin();
-  if (!room) return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && chosen("opponent") === "friend" });
+  if (!room) {
+    const friend = chosen("opponent") === "friend";
+    localStorage.setItem("callsign.level", chosen("bot"));
+    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot") });
+  }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
   if (found && freeSeat(found.lobby)) return takeFreeSeat();
   if (found?.lobby.watch) location.assign(pageFor({ room, role: "spectator" }));
@@ -881,6 +887,9 @@ for (const seconds of [...new Set([300, 600, 900, usual])].sort((a, b) => a - b)
   $("lobby-length").append(option);
 }
 $("lobby-new").elements.side.value = String(side);
+// The level the player chose last time, or the server's usual one.
+const levels = offer?.levels ?? ["easy", "normal", "standard"];
+$("lobby-level").value = [localStorage.getItem("callsign.level"), offer?.level, "easy"].find((level) => levels.includes(level));
 
 if (room && seat && role !== "spectator" && seat.side !== side) {
   location.replace(pageFor({ room, side: seat.side })); // the seat held here is on the other side

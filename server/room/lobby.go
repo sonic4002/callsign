@@ -54,7 +54,8 @@ type LobbyView struct {
 	Opponent string      `json:"opponent"`
 	Length   int         `json:"length"` // seconds
 	Watch    bool        `json:"watch"`
-	Phase    string      `json:"phase"` // "lobby", "playing" or "over"
+	Level    string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
+	Phase    string      `json:"phase"`           // "lobby", "playing" or "over"
 	Match    int         `json:"match"`
 	Seats    [2]SeatView `json:"seats"`
 }
@@ -71,6 +72,9 @@ func (rm *Room) lobby() LobbyView {
 		v.Phase = "playing"
 	}
 	for side := range v.Seats {
+		if style := rm.cfg.Bots[side]; style != "" {
+			v.Level = style
+		}
 		s := &rm.seats[side]
 		v.Seats[side] = SeatView{
 			Side: side, Faction: rm.sim.Sides[side].Faction, Bot: rm.cfg.Bots[side] != "",

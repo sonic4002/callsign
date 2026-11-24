@@ -211,5 +211,9 @@
   "lobby.unprotected": "There are no accounts and nothing is encrypted. Anyone on this network who has the code can take the free seat, and the traffic can be read on the network. Each seat is kept by this browser. Voice needs this computer or https, so a friend on another machine types.",
   "lobby.localOnly": "This address works only on this computer: start the server with {command} to let a friend in.",
   "lobby.left": "The other commander has left the match. Their squads keep their last orders.",
-  "lobby.back": "The other commander is back."
+  "lobby.back": "The other commander is back.",
+  "lobby.level": "Enemy",
+  "lobby.level.easy": "Easy: slow to buy, few squads, leaves your headquarters alone for five minutes",
+  "lobby.level.normal": "Normal: buys at a human pace and attacks after a few minutes",
+  "lobby.level.standard": "Relentless: buys the moment it can and attacks at once"
 }
