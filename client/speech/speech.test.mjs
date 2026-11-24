@@ -83,7 +83,9 @@ test("queue: a station repeating itself at once is heard once", () => {
 test("pronunciation table: every Hebrew callsign and map point has a pinned reading", () => {
   const names = [...rules.map.points.map((p) => p.callsign.he), ...Object.values(rules.callsigns.classes).map((c) => c.he), rules.callsigns.player.he, rules.callsigns.operator.he];
   assert.deepEqual(names.filter((n) => !table.he[n]?.ipa), []);
-  for (const word of [rules.radio.over.he, rules.radio.out.he]) assert.ok(table.he[word]?.last, `${word} is pinned as a closing word`);
+  // עבור is "avor" only as the closing word (elsewhere it means "for"); סוף is "sof" wherever it stands.
+  assert.ok(table.he[rules.radio.over.he]?.last, "עבור is pinned as a closing word");
+  assert.ok(table.he[rules.radio.out.he] && !table.he[rules.radio.out.he].last, "סוף is pinned everywhere");
 });
 
 test("queue: what is said to the player is kept and heard before chatter between stations", () => {
@@ -107,4 +109,10 @@ test("queue: what is said to the player is kept and heard before chatter between
 test("the pronunciation table pins the rank סמל to samal, not semel", () => {
   const table = JSON.parse(readFileSync(new URL("../../tts/pronounce.json", import.meta.url), "utf8"));
   assert.equal(table.he["סמל"].ipa, "samˈal");
+});
+
+test("the device's own voice is given the radio's words with their vowel points", async () => {
+  const { pointed } = await import("./text.js");
+  assert.equal(pointed("פטיש, כאן צפע 2, המתן, סוף."), "פַּטִּישׁ, כאן צֶפַע 2, הַמְתֵּן, סוֹף.");
+  assert.equal(pointed("בסוף הקרב"), "בסוף הקרב", "a longer word is left alone");
 });
