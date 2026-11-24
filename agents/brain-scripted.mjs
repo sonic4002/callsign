@@ -34,13 +34,14 @@ const eventLines = {
 const radio = (to, body, end) => ({ name: "radio", input: { to, body, end } });
 // placeName is what a landmark or bridge is called on the radio.
 const placeName = (rules, id, lang) => [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id)?.name[lang] ?? id;
-// structureName is what a structure is called on the radio: a tech building by its own
-// name on the map, any other by its kind's.
+// structureName is what a structure in a leader's report is called on the radio: a tech
+// building by its own name on the map, any other by its kind's.
 function structureName(rules, status, id, lang) {
   const st = id && (status?.structures ?? []).find((s) => s.id === id);
   if (!st) return "";
-  const site = (rules.map.techBuildings ?? []).find((t) => t.id === st.site);
-  return site?.name?.[lang] ?? rules.techBuildings?.[st.kind]?.name[lang] ?? rules.factions[st.faction]?.structures[st.kind]?.name[lang] ?? "";
+  if (st.site) return (lang === "he" && st.siteHe) || st.site;
+  const defs = Object.values(rules.factions).flatMap((f) => Object.values(f.structures));
+  return defs.find((d) => d.name.en === st.name)?.name[lang] ?? st.name ?? "";
 }
 const verbOf = (text) => verbs.find(([, re]) => re.test(text.toLowerCase()))?.[0];
 
@@ -194,12 +195,23 @@ function ownMoves({ wake, rules, agent }) {
     // left at all the works comes before any squad.
     const more = hauler && haulers < Math.min(2, rules.match.haulerCap ?? 0);
     const short = s.power?.low && sparePower(s, agent.side, defs) < 0 && base.filter((st) => st.role === "power").length < (rules.match.powerStructures ?? 1);
+    // The base grows in the order of the opening, which the game works out (status.opening):
+    // power, the refinery and the barracks come before anything is bought, and what follows
+    // them goes up when a unit needs it or when there is gold to spare for it. A structure
+    // that has lost a third of itself is mended when the side is rich. Nothing is sold and
+    // no rally point is set: those are Hammer's to ask for.
+    const next = s.opening ?? "";
+    const spare = 2 * (pick?.[1].cost ?? 0);
+    const hurt = base.filter((st) => !st.building && !st.repairing && st.health < 0.66).sort((a, b) => a.health - b.health)[0];
     if (short) raise("power");
+    else if (["power", "refinery", "barracks"].includes(next)) raise(next);
     else if (!stands("refinery")) raise("refinery");
     else if (!stands("barracks")) raise("barracks");
     else if (more && stands(hauler[1].requires)) {
       if (s.gold >= hauler[1].cost) moves.push({ name: "buy", input: { unit: hauler[0], upgrade: "" } });
     } else if (more && haulers === 0) raise(hauler[1].requires);
+    else if (next && !rising && s.gold >= cost(next) + spare) raise(next);
+    else if (hurt && s.gold >= 2 * spare) moves.push({ name: "repair", input: { place: hurt.id } });
     else if (pick && fielded < Math.min(rules.match.populationCap, 8)) {
       if (pick[1].requires && !stands(pick[1].requires)) raise(pick[1].requires);
       else if (s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });

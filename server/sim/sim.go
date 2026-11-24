@@ -867,8 +867,10 @@ func (s *Sim) squadEvents(live []*teamRef) {
 			if sq.Order.landmark > 0 || sq.Order.bridge > 0 {
 				e.Place = sq.Order.Place
 			}
-			if st := s.structure(sq.Order.Structure); st != nil {
-				e.Structure, e.Unit = "s"+fmt.Sprint(st.ID), st.Kind
+			if sq.Order.Place != "" && sq.Order.Point == "" && sq.Order.landmark == 0 && sq.Order.bridge == 0 {
+				if pl, err := s.resolveFor(sq.Side, sq.Order.Place); err == nil && pl.Structure != nil {
+					e.Structure, e.Unit = "s"+fmt.Sprint(pl.Structure.ID), pl.Structure.Kind
+				}
 			}
 			s.emit(e)
 		}

@@ -144,10 +144,32 @@ test("the tools, the status and the prompts carry power, the radar, selling and 
 test("a scripted squad says where it is by the thing it was sent to, not by the nearest point", async () => {
   const leader = { role: "squad", side: 0, squad: 1, tier: 1, station: { key: "squad-1", en: "Viper 1", he: "צפע 1" }, lang: "en", commander: "Hammer" };
   const site = rules.map.techBuildings[2];
-  const status = { structures: [{ id: "s7", kind: site.kind, faction: "tech", role: "tech", side: -1, site: site.id }] };
+  const status = { structures: [{ id: "s7", name: "Field Clinic", role: "tech", holder: "nobody", site: site.name.en, siteHe: site.name.he }, { id: "s2", name: "Barracks", role: "barracks", yours: true }] };
   const arrived = (event, lang = "en") => think({ agent: { ...leader, lang }, wake: { items: [{ kind: "event", event: { kind: "arrived", side: 0, point: "D", ...event } }], status } });
   assert.deepEqual(await arrived({}), [["radio", { to: ["Hammer"], body: "In position at Delta", end: "over" }]]);
   assert.deepEqual(await arrived({ place: "D-bunker-1" }), [["radio", { to: ["Hammer"], body: "In position at the bunker north of Delta", end: "over" }]]);
   assert.deepEqual(await arrived({ structure: "s7", unit: site.kind }), [["radio", { to: ["Hammer"], body: `In position at ${site.name.en}`, end: "over" }]]);
+  assert.deepEqual(await arrived({ structure: "s2", unit: "barracks" }, "he"), [["radio", { to: ["Hammer"], body: `בעמדה ב${aegis.structures.barracks.name.he}`, end: "over" }]]);
   assert.deepEqual(await arrived({ structure: "s7", unit: site.kind }, "he"), [["radio", { to: ["Hammer"], body: `בעמדה ב${site.name.he}`, end: "over" }]]);
+});
+
+test("scripted operator with the purse follows the opening, builds ahead only with gold to spare, and mends when rich", async () => {
+  const st = (role) => ({ id: `o-${role}`, kind: role, role, side: 0, x: 1, y: 2, hp: 1, building: 1 });
+  const squads = Array.from({ length: 2 }, (_, i) => ({ callsign: { en: `Viper ${i + 1}` }, class: "infantry", unit: "commandos", order: { kind: "hold" } }));
+  const base = { faction: "aegis", timeLeft: 500, points: [], squads, haulers: [{ side: 0 }, { side: 0 }], power: { supply: 130, use: 25, low: false }, command: { mode: "orders", buy: true } };
+  const heard = (status) => think({ agent: anvil, wake: { items: [{ kind: "heard", msg: {} }], status: { ...base, ...status } } });
+  const build = (structure) => [["build", { structure, place: "", place2: "" }]];
+  // The opening's first three come before any squad, in its order.
+  assert.deepEqual(await heard({ gold: 2000, structures: [], opening: "power" }), build("powerPlant"));
+  assert.deepEqual(await heard({ gold: 2000, structures: [st("power")], opening: "refinery" }), build("refinery"));
+  assert.deepEqual(await heard({ gold: 2000, structures: [st("power"), st("refinery")], opening: "barracks" }), build("barracks"));
+  // The works is next: with gold to spare it goes up, without it a squad is bought instead.
+  const three = [st("power"), st("refinery"), st("barracks")];
+  const cheap = aegis.units.commandos.cost;
+  assert.deepEqual(await heard({ gold: aegis.structures.vehicleWorks.cost + 2 * cheap, structures: three, opening: "works", haulers: [{ side: 0 }] }), build("vehicleWorks"));
+  assert.deepEqual(await heard({ gold: cheap, structures: three, opening: "works", haulers: [{ side: 0 }] }), [["buy", { unit: "commandos", upgrade: "" }]]);
+  // Rich, with a battered barracks and nothing left of the opening: it pays for the repair.
+  const all = [...three.slice(0, 2), { ...st("barracks"), hp: 0.4 }, st("works")];
+  assert.deepEqual(await heard({ gold: 4 * cheap, structures: all, opening: "" }), [["repair", { place: all[2].id }]]);
+  assert.deepEqual(await heard({ gold: 4 * cheap, structures: [...three, st("works")], opening: "" }), [["buy", { unit: "commandos", upgrade: "" }]]);
 });

@@ -351,3 +351,30 @@ func TestASquadHoldingNamedGroundStaysOutOfTheBuildingBesideIt(t *testing.T) {
 		t.Fatal("a squad sent to the bunker by name stays outside it")
 	}
 }
+
+// A squad that reaches the tech building it was sent to says so: the news names the
+// building, not only the point it happens to be nearest.
+func TestArrivingAtATechBuildingNamesIt(t *testing.T) {
+	s := newSim(t, 1)
+	sq := s.Squads[0]
+	var clinic *sim.StructureView
+	for _, st := range s.Snapshot(0).Structures {
+		if st.Site == "tech-clinic-w" {
+			clinic = &st
+			break
+		}
+	}
+	if clinic == nil {
+		t.Fatal("the small map has no clinic in the west")
+	}
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: sq.ID, Place: clinic.ID})
+	for _, e := range run(s, 90) {
+		if e.Kind == sim.EvArrived && e.Squad == sq.ID {
+			if e.Structure != clinic.ID || e.Unit != clinic.Kind {
+				t.Fatalf("arrived with structure %q (%q), want %q", e.Structure, e.Unit, clinic.ID)
+			}
+			return
+		}
+	}
+	t.Fatal("the squad never arrived at the clinic")
+}
