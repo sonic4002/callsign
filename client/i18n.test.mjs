@@ -32,9 +32,10 @@ const dynamic = {
   "radar.": ["none", "rising", "dark"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer", "timer_hq", "timer_force"],
   "order.": ["none", "move", "hold", "attack", "repair", "fortify", "plant", "seize"],
-  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "buildSpot", "cancel", "rally", "rallyHome", "rallyFrom", "rallyFromHome", "sell", "repairStructure", "mend", "fortify", "plant", "plantStructure", "seize"],
+  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "buildSpot", "buildRun", "cancel", "rally", "rallyHome", "rallyFrom", "rallyFromHome", "sell", "repairStructure", "mend", "fortify", "plant", "plantStructure", "seize"],
   "eventMany.": ["squad_spawned", "squad_lost", "enemy_destroyed", "structure_built"],
   "placer.why.": ["far", "ground", "shore", "room", "edge"],
+  "run.": ["ns", "ew", "nesw", "nwse"],
   "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],
   "bearing.": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
@@ -158,6 +159,15 @@ test("the scripted operator and squad leaders understand the calls the page writ
         const text = fill(strings["call.cancel"], { to: rules.callsigns.operator[lang], from, unit: unit.name[lang] });
         const use = await think("anvil", body(text), { status: { faction, squads: [], points: [], gold: 0 } });
         assert.deepEqual([use?.name, use?.input.unit], ["cancel", id], `${lang}: "${text}" should cancel ${id}`);
+      }
+    }
+    // A fence turned by the player: the call says which way it runs, and the operator passes that on.
+    for (const [run, said] of [["ns", "north-south"], ["ew", "east-west"], ["nesw", "northeast-southwest"], ["nwse", "northwest-southeast"]]) {
+      for (const [faction, id] of [["aegis", "barrierWall"], ["ashfall", "wireFence"]]) {
+        const def = rules.factions[faction].structures[id];
+        const text = fill(strings["call.buildRun"], { to: rules.callsigns.operator[lang], from, structure: def.name[lang], run: strings[`run.${run}`], place: words });
+        const use = await think("anvil", body(text), { points: ["A"], status: { faction, squads: [], points: [], gold: 999 } });
+        assert.deepEqual([use?.name, use?.input.structure, use?.input.place, use?.input.run], ["build", id, words, said], `${lang}: "${text}" should build ${id} running ${said}`);
       }
     }
     const delta = rules.map.points.find((p) => p.id === "D");

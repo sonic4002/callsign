@@ -91,7 +91,7 @@ export function canPlace(rules, state, side, def, x, y) {
 
 // canPlaceWork is the rule for a defence, and for the middle of a fence run: on the side's
 // own ground (near its headquarters, a structure of its own or a point it holds).
-function canPlaceWork(rules, state, side, fp, x, y, structures) {
+function canPlaceWork(rules, state, side, fp, x, y, structures, { anyGround = false } = {}) {
   const map = rules.map;
   const r = rules.match.buildRadius;
   if (x < fp + CLEAR.workEdge || y < fp + CLEAR.workEdge || x > map.width - fp - CLEAR.workEdge || y > map.height - fp - CLEAR.workEdge) return "edge";
@@ -99,12 +99,42 @@ function canPlaceWork(rules, state, side, fp, x, y, structures) {
   const held = (state.points ?? []).filter((p) => p.owner === side).map((p) => map.points.find((q) => q.id === p.id));
   const own =
     dist(x, y, hq.x, hq.y) <= r || structures.some((s) => s.side === side && s.role !== "fence" && dist(x, y, s.x, s.y) <= r) || held.some((p) => p && dist(x, y, p.x, p.y) <= r);
-  if (!own) return "far";
+  if (!own && !anyGround) return "far"; // a run's segments need only its middle on the side's ground
   if (terrainAt(map, x, y) !== "L") return "ground";
   if ((map.landmarks ?? []).some((l) => dist(x, y, l.x, l.y) < fp + CLEAR.landmark)) return "room";
   if (map.points.some((p) => p.kind === "hq" && dist(x, y, p.x, p.y) < fp + CLEAR.workHQ)) return "room";
   if (structures.some((s) => s.role !== "fence" && dist(x, y, s.x, s.y) < fp + footprintOf(rules, s) + CLEAR.work)) return "room";
   return "";
+}
+
+// ---- a fence run, turned ----
+
+// The ways a fence run can lie, in the order a turn steps through them, each with the unit
+// vector along the run (x east, y south). The names are the server's (sim.FenceRuns).
+export const RUNS = [
+  { id: "ns", u: [0, 1] },
+  { id: "nesw", u: [Math.SQRT1_2, -Math.SQRT1_2] },
+  { id: "ew", u: [1, 0] },
+  { id: "nwse", u: [Math.SQRT1_2, Math.SQRT1_2] },
+];
+
+// runSegments lays a fence run of a kind through (x, y) in a direction and judges it the
+// way the server's CanPlaceRun does: `why` is "" when the whole run can stand, otherwise
+// the first reason it cannot, and each segment says whether its own ground is good.
+export function runSegments(rules, state, side, def, x, y, run) {
+  const u = RUNS.find((r) => r.id === run)?.u ?? RUNS[0].u;
+  const structures = (state.structures ?? []).filter((s) => !s.ruin);
+  const half = (def.segments * def.segmentLength) / 2;
+  let why = canPlaceWork(rules, state, side, 2, x, y, structures);
+  const segs = [];
+  for (let i = 0; i < def.segments; i++) {
+    const t0 = -half + i * def.segmentLength;
+    const mid = t0 + def.segmentLength / 2;
+    const bad = canPlaceWork(rules, state, side, 2, x + u[0] * mid, y + u[1] * mid, structures, { anyGround: true });
+    why ||= bad;
+    segs.push({ ax: x + u[0] * t0, ay: y + u[1] * t0, bx: x + u[0] * (t0 + def.segmentLength), by: y + u[1] * (t0 + def.segmentLength), ok: !bad });
+  }
+  return { why, segs };
 }
 
 // ---- the spot under the pointer, and its words ----

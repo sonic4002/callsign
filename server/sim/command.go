@@ -77,8 +77,11 @@ type Command struct {
 	// resolver reads (Point is the older name for the same thing and still works), and
 	// where a defence or a fence is built; Place2 is a fence's far end.
 	// Structure is what to build: a structure id of the side's faction, or a role.
-	Place     string `json:"place,omitempty"`
-	Place2    string `json:"place2,omitempty"`
+	Place  string `json:"place,omitempty"`
+	Place2 string `json:"place2,omitempty"`
+	// Run is the way a fence placed on an exact spot lies: "ns", "ew", "nesw" or "nwse"
+	// (structures.go: FenceRuns). Empty lets the run face the enemy as before.
+	Run       string `json:"run,omitempty"`
 	Structure string `json:"structure,omitempty"`
 	Field     string `json:"field,omitempty"`  // haul: a gusher id, or "auto"
 	Hauler    int    `json:"hauler,omitempty"` // haul: one hauler, or 0 for all of them

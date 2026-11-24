@@ -60,6 +60,7 @@ type toolArgs struct {
 	Structure string `json:"structure"`
 	Place     string `json:"place"`
 	Place2    string `json:"place2"`
+	Run       string `json:"run"`
 	Field     string `json:"field"`  // haul: a gold field by its point ("Kilo", "K", "the airfield"), or "auto"
 	Hauler    int    `json:"hauler"` // haul: one hauler's id, or 0 for all of them
 }

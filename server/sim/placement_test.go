@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"testing"
 
 	"callsign/server/sim"
@@ -263,6 +264,8 @@ func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 		Kind string `json:"kind"`
 		Side int    `json:"side"`
 		OK   string `json:"ok"` // one character per spot, row by row: 1 may, 0 may not
+		// Run is set on a fence's rows for a run turned that way; "" is the run judged by its middle.
+		Run string `json:"run,omitempty"`
 	}
 	const step = 40.0
 	var rows []row
@@ -281,7 +284,22 @@ func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 				}
 			}
 		}
-		rows = append(rows, row{tc.kind, tc.side, string(bits)})
+		rows = append(rows, row{tc.kind, tc.side, string(bits), ""})
+	}
+	// A fence turned each of the four ways: the whole run must fit.
+	for _, turned := range []string{"ns", "ew", "nesw", "nwse"} {
+		def := structureDef("aegis", "barrierWall")
+		bits := []byte{}
+		for y := step / 2; y < rules.Map.Height; y += step {
+			for x := step / 2; x < rules.Map.Width; x += step {
+				if s.CanPlaceRun(0, def, x, y, turned) == nil {
+					bits = append(bits, '1')
+				} else {
+					bits = append(bits, '0')
+				}
+			}
+		}
+		rows = append(rows, row{"barrierWall", 0, string(bits), turned})
 	}
 	type table struct {
 		Step       float64             `json:"step"`
@@ -323,4 +341,101 @@ func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 	if !any || len(want.Rows) != len(rows) {
 		t.Fatal("the table is empty or short")
 	}
+}
+
+// A fence placed on a spot lies the way the order says, in any of the four ways a run can
+// lie, and stands whole or not at all: a run that would cross water or a structure is
+// refused, and nothing is built short.
+func TestAFenceRunLiesTheWayTheOrderSays(t *testing.T) {
+	def := rules.Factions["aegis"].Structures["barrierWall"]
+	length := float64(def.Segments) * def.SegmentLength
+	hq := rules.HQPoint(0)
+	spotOf := func(x, y float64) string {
+		return fmt.Sprintf("%s%.0f %s%.0f of A", ns(y-hq.Y), math.Abs(y-hq.Y), ew(x-hq.X), math.Abs(x-hq.X))
+	}
+	// Open ground near the base where a run fits whichever way it is turned.
+	cx, cy := 0.0, 0.0
+	probe := baseSim(t, 1)
+search:
+	for y := 60.0; y <= rules.Map.Height-60; y += 10 {
+		for x := 60.0; x <= hq.X+320; x += 10 {
+			fits := true
+			for run := range sim.FenceRuns {
+				fits = fits && probe.CanPlaceRun(0, &def, x, y, run) == nil
+			}
+			if fits {
+				cx, cy = x, y
+				break search
+			}
+		}
+	}
+	if cx == 0 {
+		t.Fatal("no open ground near the base takes a run in every direction")
+	}
+	for run, u := range sim.FenceRuns {
+		s := baseSim(t, 1)
+		wealth(s, 0, 500)
+		st, err := s.Build(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: spotOf(cx, cy), Run: run})
+		if err != nil {
+			t.Fatalf("%s at %s: %v", run, spotOf(cx, cy), err)
+		}
+		n, minT, maxT := 0, math.MaxFloat64, -math.MaxFloat64
+		for _, seg := range s.Structures {
+			if seg.Run != st.Run || seg.Def().Role != "fence" {
+				continue
+			}
+			n++
+			for _, p := range [][2]float64{{seg.AX, seg.AY}, {seg.BX, seg.BY}} {
+				dx, dy := p[0]-cx, p[1]-cy
+				along, across := dx*u[0]+dy*u[1], math.Abs(dx*u[1]-dy*u[0])
+				if across > 0.01 {
+					t.Fatalf("%s: a segment end lies %.1f off the run's line", run, across)
+				}
+				minT, maxT = math.Min(minT, along), math.Max(maxT, along)
+			}
+		}
+		if n != def.Segments || math.Abs(maxT-minT-length) > 0.01 || math.Abs(maxT+minT) > 0.01 {
+			t.Fatalf("%s: %d segments from %.0f to %.0f along the run, want %d over %.0f centred on the spot", run, n, minT, maxT, def.Segments, length)
+		}
+	}
+	// Through a structure of one's own, into the sea, and a direction that is none.
+	s := baseSim(t, 1)
+	wealth(s, 0, 500)
+	gold := s.Gold(0)
+	b := own(s, 0, "barracks")
+	if _, err := s.Build(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: spotOf(b.X+110, b.Y), Run: "ew"}); !errors.Is(err, sim.ErrNoRoom) {
+		t.Fatalf("a run through the barracks: err = %v", err)
+	}
+	wet := false
+	for _, at := range [][2]float64{{120, 880}, {200, 900}, {300, 880}, {100, 820}, {260, 860}} {
+		for run := range sim.FenceRuns {
+			_, err := s.Build(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: spotOf(at[0], at[1]), Run: run})
+			if errors.Is(err, sim.ErrBadGround) && strings.Contains(err.Error(), "open land") {
+				wet = true
+			}
+		}
+	}
+	if !wet {
+		t.Fatal("no run toward the shore was refused for the water")
+	}
+	if _, err := s.Build(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: spotOf(cx, cy), Run: "up"}); !errors.Is(err, sim.ErrBadPlace) {
+		t.Fatalf("a direction that is none: err = %v", err)
+	}
+	if spent := gold - s.Gold(0); spent < 0 || spent > 4*def.Cost {
+		t.Fatalf("gold went from %d to %d", gold, s.Gold(0))
+	}
+}
+
+func ns(d float64) string {
+	if d < 0 {
+		return "N"
+	}
+	return "S"
+}
+
+func ew(d float64) string {
+	if d < 0 {
+		return "W"
+	}
+	return "E"
 }

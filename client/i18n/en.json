@@ -589,5 +589,14 @@
   "settings.sound": "Sound",
   "settings.voices": "Speak the radio aloud",
   "settings.radio": "Radio",
-  "settings.display": "Display"
+  "settings.display": "Display",
+  "placer.turn": "Turn ⟳",
+  "placer.run": "Runs {run}. Turn it with R, the wheel or the button.",
+  "run.ns": "north to south",
+  "run.ew": "east to west",
+  "run.nesw": "north-east to south-west",
+  "run.nwse": "north-west to south-east",
+  "call.buildRun": "{to}, this is {from}. Build a {structure} running {run}, {place}. Over.",
+  "help.q.turn": "Can I turn a wall before I place it?",
+  "help.a.turn": "Yes. While a wall or fence follows your pointer, press R or roll the wheel (on a phone, the Turn button beside Build here): the run turns through north to south, east to west and the two diagonals. Each segment shows green or red, and the whole run must fit; the call tells Anvil which way it runs."
 }

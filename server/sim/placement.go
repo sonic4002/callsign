@@ -291,6 +291,17 @@ func (s *Sim) canPlaceWork(side int, fp, x, y float64) error {
 	if !s.ownGround(side, x, y) {
 		return fmt.Errorf("%w: build within %.0f of your base, a structure or a point you hold", ErrTooFar, s.R.Match.BuildRadius)
 	}
+	return s.workGround(fp, x, y)
+}
+
+// workGround is the part of canPlaceWork that is about the ground itself: inside the map,
+// open land, clear of landmarks, headquarters and structures. Every segment of a fence
+// run laid in a chosen direction must pass it.
+func (s *Sim) workGround(fp, x, y float64) error {
+	m := &s.R.Map
+	if x < fp+clearWorkEdge || y < fp+clearWorkEdge || x > m.Width-fp-clearWorkEdge || y > m.Height-fp-clearWorkEdge {
+		return fmt.Errorf("%w: too close to the edge of the map", ErrBadGround)
+	}
 	if m.TerrainAt(x, y) != 'L' {
 		return fmt.Errorf("%w: it must be open land", ErrBadGround)
 	}
@@ -307,6 +318,37 @@ func (s *Sim) canPlaceWork(side int, fp, x, y float64) error {
 	for _, st := range s.Structures {
 		if !st.Ruin && st.def.Role != shared.RoleFence && dist(x, y, st.X, st.Y) < fp+st.def.Footprint+clearWork {
 			return fmt.Errorf("%w: the %s is in the way", ErrNoRoom, st.def.Name.En)
+		}
+	}
+	return nil
+}
+
+// FenceRuns are the ways a fence run can lie, by the name an order gives: north to south,
+// east to west, and the two diagonals. Each is the unit vector along the run (x east, y south).
+var FenceRuns = map[string][2]float64{
+	"ns":   {0, 1},
+	"ew":   {1, 0},
+	"nesw": {math.Sqrt2 / 2, -math.Sqrt2 / 2},
+	"nwse": {math.Sqrt2 / 2, math.Sqrt2 / 2},
+}
+
+// CanPlaceRun judges a fence run of a kind laid through (x, y) in a direction, as an order
+// for it would be: its middle on the side's own ground, and every segment on open land
+// clear of what stands there. A run that would cross water or a structure is refused
+// whole; nothing is built short.
+func (s *Sim) CanPlaceRun(side int, def *shared.Structure, x, y float64, run string) error {
+	u, ok := FenceRuns[run]
+	if !ok {
+		return fmt.Errorf("%w: a fence runs ns, ew, nesw or nwse, not %q", ErrBadPlace, run)
+	}
+	if err := s.canPlaceWork(side, 2, x, y); err != nil {
+		return err
+	}
+	half := float64(def.Segments) * def.SegmentLength / 2
+	for i := 0; i < def.Segments; i++ {
+		t := -half + (float64(i)+0.5)*def.SegmentLength
+		if err := s.workGround(2, x+u[0]*t, y+u[1]*t); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -175,6 +175,9 @@ func (rm *Room) toolBuild(side int, a toolArgs) (any, error) {
 	if cmd.Place2, err = rm.place(side, a.Place2, false, hq.X, hq.Y); err != nil {
 		return nil, err
 	}
+	if cmd.Run, err = fenceRun(a.Run); err != nil {
+		return nil, err
+	}
 	st, err := rm.sim.Build(cmd)
 	if err != nil {
 		return nil, err
@@ -279,4 +282,51 @@ func (rm *Room) structureBriefs(snap sim.Snapshot) []StructureBrief {
 		out = append(out, b)
 	}
 	return out
+}
+
+// fenceRun reads the way a fence is to lie from what the operator wrote: the short form
+// ("ns"), compass words in either order ("north-south", "south to north", "NE-SW"), or
+// the same in Hebrew. Empty stays empty: the run then faces the enemy.
+func fenceRun(text string) (string, error) {
+	low := strings.ToLower(strings.TrimSpace(text))
+	if low == "" {
+		return "", nil
+	}
+	if _, ok := sim.FenceRuns[low]; ok {
+		return low, nil
+	}
+	has := func(words ...string) bool {
+		for _, w := range words {
+			if strings.Contains(low, w) {
+				return true
+			}
+		}
+		return false
+	}
+	n, so := has("north", "צפון"), has("south", "דרום")
+	e, w := has("east", "מזרח"), has("west", "מערב")
+	switch low {
+	case "n-s", "s-n":
+		n, so = true, true
+	case "e-w", "w-e":
+		e, w = true, true
+	case "ne-sw", "sw-ne":
+		return "nesw", nil
+	case "nw-se", "se-nw":
+		return "nwse", nil
+	}
+	switch {
+	case n && so && e && w:
+		// A diagonal: which end is north decides it ("north-east to south-west").
+		ne := strings.Contains(low, "north-east") || strings.Contains(low, "northeast") || strings.Contains(low, "צפון-מזרח") || strings.Contains(low, "צפון־מזרח") || strings.Contains(low, "צפון מזרח")
+		if ne {
+			return "nesw", nil
+		}
+		return "nwse", nil
+	case n && so:
+		return "ns", nil
+	case e && w:
+		return "ew", nil
+	}
+	return "", fmt.Errorf("%w: a fence runs north-south, east-west, northeast-southwest or northwest-southeast, not %q", sim.ErrBadPlace, text)
 }

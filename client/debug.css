@@ -514,3 +514,5 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #sidebar header #monitor-strip[hidden] { display: none; }
 #sidebar header #monitor-strip .agent { display: block; padding: .1rem; line-height: 0; }
 #sidebar header #monitor-strip .agent > :not(.dot) { display: none; }
+#placer-run { font-size: .78rem; color: var(--brass); }
+#placer-run[hidden] { display: none; }

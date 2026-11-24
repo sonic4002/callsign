@@ -406,3 +406,19 @@ func TestTheOperatorCancelsAndSetsRallyPoints(t *testing.T) {
 		}
 	})
 }
+
+func TestTheBuildToolReadsTheWayAFenceRuns(t *testing.T) {
+	for text, want := range map[string]string{
+		"": "", "ns": "ns", "north-south": "ns", "south to north": "ns", "N-S": "ns", "מצפון לדרום": "ns",
+		"east-west": "ew", "west to east": "ew", "ממזרח למערב": "ew",
+		"northeast-southwest": "nesw", "north-east to south-west": "nesw", "NE-SW": "nesw", "מצפון-מזרח לדרום-מערב": "nesw",
+		"northwest-southeast": "nwse", "north-west to south-east": "nwse", "nw-se": "nwse", "מצפון-מערב לדרום-מזרח": "nwse",
+	} {
+		if got, err := fenceRun(text); err != nil || got != want {
+			t.Errorf("fenceRun(%q) = %q, %v; want %q", text, got, err, want)
+		}
+	}
+	if _, err := fenceRun("upwards"); err == nil {
+		t.Error("a direction that is none was accepted")
+	}
+}

@@ -84,6 +84,7 @@ export const operatorTools = [
     structure: { type: "string", description: 'Structure id from your list, for example "vehicleWorks".' },
     place: { type: "string", description: 'Where it goes. When Hammer gave an exact spot, pass those words as they were said ("140 metres north and 60 metres east of Alpha"), or write it as "N140 E60 of A". Otherwise a point, a structure of yours by id, or a side of your base such as "base:front" or "base:north". "" lets the game choose a place by your headquarters (a defence or a fence then goes to the front of your base).' },
     place2: { type: "string", description: 'Only for a fence that runs from `place` toward a second place; otherwise "".' },
+    run: { type: "string", enum: ["", "north-south", "east-west", "northeast-southwest", "northwest-southeast"], description: 'Only for a fence on an exact spot: which way the run lies, when Hammer said ("running north to south"). The whole run must fit or it is refused. "" lets it face the enemy.' },
   }),
   tool("buy", "Spend gold. Fill `unit` to raise a new squad, or `upgrade` to raise a squad's brain tier. Fill one and leave the other empty.", {
     unit: { type: "string", description: 'Unit id to buy, or "".' },

@@ -156,6 +156,21 @@ export function spotOf(body) {
   return bearing.test(spot.toLowerCase()) ? spot : undefined;
 }
 
+// runOf reads the way a fence is to lie out of a call, as the build tool names it, or "".
+// The words stand before the spot ("running north to south, 140 metres north of Alpha"),
+// so only the call up to its first distance is read.
+export function runOf(body) {
+  const at = body.search(/\d/);
+  const head = (at < 0 ? body : body.slice(0, at)).toLowerCase();
+  const ne = /north-?\s?east|צפון[-־ ]מזרח/.test(head);
+  const nw = /north-?\s?west|צפון[-־ ]מערב/.test(head);
+  if (ne && /south-?\s?west|דרום[-־ ]מערב/.test(head)) return "northeast-southwest";
+  if (nw && /south-?\s?east|דרום[-־ ]מזרח/.test(head)) return "northwest-southeast";
+  if (/north to south|south to north|north-south|מצפון לדרום|מדרום לצפון/.test(head)) return "north-south";
+  if (/east to west|west to east|east-west|ממזרח למערב|ממערב למזרח/.test(head)) return "east-west";
+  return "";
+}
+
 // ownMoves is the scripted operator running the fight after Hammer handed it over: one
 // purchase when gold allows, and a point to hold for every squad that has no orders. In
 // the default mode it is never called: the operator acts on Hammer's orders only.
@@ -297,6 +312,9 @@ function operatorPlan(ctx) {
     // on as it was said; the game reads it. A base structure with no spot takes a point
     // named in the call, or the game's own choice.
     const input = { structure: wanted, place: spotOf(call.body) ?? (fixed ? placeOf(text, call.points) : (call.points?.[0] ?? "")), place2: "" };
+    // "running north to south", "מצפון-מזרח לדרום-מערב": the way a fence is to lie.
+    const run = structures[wanted].role === "fence" ? runOf(call.body) : "";
+    if (run) input.run = run;
     return [{ name: "build", input, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (/\b(buy|purchase|build)\b|קנה|קנו|רכוש|בנה/.test(text)) {

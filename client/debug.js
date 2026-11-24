@@ -20,7 +20,7 @@ import { iconSvg } from "./marks.js";
 import { canDigIn, digProgress, eventNames, heroEventKind, heroLock, heroOrders, heroRow, rankBadge, syncHero, withBuilt } from "./heroes.js";
 import { Speech } from "./speech/speech.js";
 import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
-import { canPlace, parseSpot, spotAt, spotWords, tint, unitLine } from "./placement.js";
+import { RUNS, canPlace, parseSpot, runSegments, spotAt, spotWords, tint, unitLine } from "./placement.js";
 import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
@@ -1065,7 +1065,7 @@ let pointerKind = "mouse"; // what last touched the map
 
 function startPlacing(id, def) {
   hideOrders();
-  placing = { mode: "build", id, def, faction, spot: null, why: "", touch: matchMedia("(pointer: coarse)").matches };
+  placing = { mode: "build", id, def, faction, spot: null, why: "", run: RUNS[0].id, segs: null, touch: matchMedia("(pointer: coarse)").matches };
   scene.placing = placing;
   // Start on ground that will take it: under the middle of the view when that fits,
   // otherwise the nearest that does, brought into view.
@@ -1087,11 +1087,31 @@ function startPlacing(id, def) {
   moveGhost(spot.x, spot.y);
 }
 
+// judge works out whether the ghost can stand where it is: a structure by its spot, a
+// fence by its whole run in the direction it was turned to.
+function judge() {
+  const { def, spot } = placing;
+  if (def.role !== "fence") return (placing.why = canPlace(rules, state, side, def, spot.x, spot.y));
+  const laid = runSegments(rules, state, side, def, spot.x, spot.y, placing.run);
+  placing.segs = laid.segs;
+  return (placing.why = laid.why);
+}
+
 function moveGhost(wx, wy) {
   if (placing?.mode !== "build") return;
   placing.spot = spotAt(rules, wx, wy);
-  placing.why = canPlace(rules, state, side, placing.def, placing.spot.x, placing.spot.y);
+  judge();
   renderPlacer();
+}
+
+// turnGhost turns a fence being placed to the next of the ways a run can lie.
+function turnGhost(step = 1) {
+  if (placing?.mode !== "build" || placing.def.role !== "fence" || !placing.spot) return false;
+  const at = RUNS.findIndex((r) => r.id === placing.run);
+  placing.run = RUNS[(at + step + RUNS.length) % RUNS.length].id;
+  judge();
+  renderPlacer();
+  return true;
 }
 
 function renderPlacer() {
@@ -1107,6 +1127,11 @@ function renderPlacer() {
   if (!build) why.textContent = "";
   else if (placing.why) why.textContent = t(`placer.why.${placing.why}`);
   else why.textContent = spotWords(t, placing.spot, pointName(placing.spot.point));
+  // A fence can be turned; the panel says which way it lies now.
+  const fence = build && placing.def.role === "fence";
+  $("placer-turn").hidden = !fence;
+  $("placer-run").hidden = !fence;
+  if (fence) $("placer-run").textContent = t("placer.run", { run: t(`run.${placing.run}`) });
   why.classList.toggle("bad", build && Boolean(placing.why));
   $("placer-hint").textContent = !build ? t("placer.rallyHint") : t(placing.touch ? "placer.hintTouch" : "placer.hint");
   $("placer-ok").hidden = !build;
@@ -1123,14 +1148,21 @@ function stopPlacing() {
 function confirmPlacing() {
   if (placing?.mode !== "build" || !placing.spot || !me) return;
   // The base may have changed since the ghost was put down.
-  placing.why = canPlace(rules, state, side, placing.def, placing.spot.x, placing.spot.y);
-  if (placing.why) return renderPlacer();
-  const { def, spot } = placing;
+  if (judge()) return renderPlacer();
+  const { def, spot, run } = placing;
   stopPlacing();
-  order(call("buildSpot", { to: anvil(), structure: def.name[lang], place: spotWords(t, spot, pointName(spot.point)) }));
+  const place = spotWords(t, spot, pointName(spot.point));
+  // A fence's call says which way it runs, in words: the radio is the only way to act.
+  if (def.role === "fence") order(call("buildRun", { to: anvil(), structure: def.name[lang], run: t(`run.${run}`), place }));
+  else order(call("buildSpot", { to: anvil(), structure: def.name[lang], place }));
 }
 
 $("placer-ok").addEventListener("click", confirmPlacing);
+$("placer-turn").addEventListener("click", () => turnGhost());
+// R turns a fence being placed, unless the player is typing.
+addEventListener("keydown", (ev) => {
+  if ((ev.key === "r" || ev.key === "R" || ev.key === "ר") && !ev.target.closest?.("input, textarea, select") && turnGhost()) ev.preventDefault();
+});
 $("placer-cancel").addEventListener("click", stopPlacing);
 $("placer-home").addEventListener("click", () => {
   const from = placing?.structure;
@@ -1218,6 +1250,8 @@ canvas.addEventListener(
   "wheel",
   (ev) => {
     ev.preventDefault();
+    // While a fence is being placed the wheel turns it; otherwise it zooms the map.
+    if (turnGhost(ev.deltaY < 0 ? -1 : 1)) return;
     const box = canvas.getBoundingClientRect();
     hideOrders();
     scene.cam.zoomAt(ev.clientX - box.left, ev.clientY - box.top, ev.deltaY < 0 ? 1.15 : 1 / 1.15);

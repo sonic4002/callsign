@@ -323,17 +323,19 @@ export class Scene {
     ctx.strokeStyle = ok ? "#7dffa0" : "#ff6b5a";
     ctx.fillStyle = ok ? "rgba(86,224,122,0.35)" : "rgba(236,84,70,0.4)";
     if (p.def.role === "fence") {
-      // A fence run lies across the way to the enemy, centred on the spot.
-      const enemy = this.rules.map.points.find((q) => q.kind === "hq" && q.owner !== this.side);
-      const d = Math.hypot(enemy.x - x, enemy.y - y) || 1;
-      const half = (p.def.segments * p.def.segmentLength) / 2;
-      const [ax, ay] = S(x + ((enemy.y - y) / d) * half, y - ((enemy.x - x) / d) * half);
-      const [bx, by] = S(x - ((enemy.y - y) / d) * half, y + ((enemy.x - x) / d) * half);
+      // A fence run lies the way the player turned it, centred on the spot: each segment
+      // green or red by the ground it would stand on.
       ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(bx, by);
-      ctx.stroke();
+      ctx.lineCap = "round";
+      for (const g of p.segs ?? []) {
+        const [ax, ay] = S(g.ax, g.ay);
+        const [bx, by] = S(g.bx, g.by);
+        ctx.strokeStyle = g.ok && ok ? "#7dffa0" : g.ok ? "#e7c15a" : "#ff6b5a";
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
       ctx.restore();
       return;
     }

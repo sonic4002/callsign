@@ -636,6 +636,15 @@ func (s *Sim) buildFence(c Command, kind string, def *shared.Structure) (*Struct
 			}
 		}
 		ax, ay, bx, by = cx-dy*length/2, cy+dx*length/2, cx+dy*length/2, cy-dx*length/2
+		if c.Run != "" {
+			// The player turned it: the run lies the way the order says, through the chosen
+			// spot, and stands whole or not at all.
+			if err := s.CanPlaceRun(c.Side, def, pl.X, pl.Y, c.Run); err != nil {
+				return nil, err
+			}
+			u := FenceRuns[c.Run]
+			ax, ay, bx, by = pl.X-u[0]*length/2, pl.Y-u[1]*length/2, pl.X+u[0]*length/2, pl.Y+u[1]*length/2
+		}
 	}
 	if !s.ownGround(c.Side, (ax+bx)/2, (ay+by)/2) {
 		return nil, fmt.Errorf("%w: build within %.0f of your base, a structure or a point you hold", ErrTooFar, s.R.Match.BuildRadius)
