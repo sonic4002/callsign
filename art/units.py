@@ -742,6 +742,160 @@ class Drone:
             prop.rotation_euler = (0, 0, spin + i * 0.8)
 
 
+GOLD = ["#e8b830", "#f4d35e", "#c9931c"]
+
+
+def gold_heap(parent, loc, size, lumps=9, seed=3):
+    """A heap of gold lumps centred on loc, `size` metres across. The lumps glow a little so
+    the load reads at game size."""
+    root = joint(parent, loc, "gold")
+    state = seed * 7919 + 13
+    for i in range(lumps):
+        state = (state * 1103515245 + 12345) % (1 << 31)
+        a = (state % 628) / 100
+        state = (state * 1103515245 + 12345) % (1 << 31)
+        r = (state % 100) / 100 * size / 2 * (0.25 + 0.75 * i / lumps)
+        z = 0.07 * (lumps - i) / lumps * size * 2
+        lump = ball(root, 0.1 + 0.07 * ((i * 5) % 3) / 2, (r * math.cos(a), r * math.sin(a), z), GOLD[i % 3], squash=0.8)
+        lump.active_material = mat(GOLD[i % 3], 0.35)
+    return root
+
+
+class Hauler:
+    """The gold collector: a cab, an open hopper that tips to unload, and a loading arm at
+    the front that reaches down into the field. It carries no weapon."""
+
+    cell, centre = 8.2, 1.0
+    sheets = {"": [("idle", [0]), ("move", [0, 1]), ("full", [0]), ("moveFull", [0, 1]),
+                   ("load", [0.2, 0.55, 0.9]), ("unload", [0.35, 0.7, 1.0]), ("wreck", [0])]}
+    manifest = {"fps": {"move": 6, "moveFull": 6, "load": 4, "unload": 4}}
+
+    def __init__(self, look, improvised):
+        c = look
+        self.improvised = improvised
+        self.root = joint(None, name="root")
+        self.body = joint(self.root, name="body")
+        b = self.body
+        tyre = "#1a1917" if improvised else "#17191b"
+        for x in ((1.7, -0.4, -1.6) if not improvised else (1.6, -1.35)):
+            for side in (1, -1):
+                cyl(b, 0.46, 0.36, (x, 0.95 * side, 0.46), tyre, axis="Y", sides=10)
+                cyl(b, 0.2, 0.38, (x, 0.95 * side, 0.46), c["hull2"], axis="Y", sides=6)
+        box(b, (4.9, 1.5, 0.26), (0, 0, 0.78), c["low"])  # frame
+        if improvised:
+            # An old tipper lorry: a rounded bonnet, a patched cab, a plank-sided body.
+            box(b, (1.0, 1.5, 0.5), (2.0, 0, 1.15), c["hull"])  # bonnet
+            box(b, (0.1, 1.2, 0.34), (2.52, 0, 1.12), c["low"])  # grille
+            box(b, (0.14, 1.76, 0.2), (2.55, 0, 0.8), c["rust"])  # bumper
+            prism_y(b, [(0.55, 0.9), (1.5, 0.9), (1.5, 1.45), (1.3, 2.05), (0.55, 2.05)], 1.66, c["hull"])
+            prism_y(b, [(1.52, 1.5), (1.33, 2.0), (1.27, 2.0), (1.46, 1.5)], 1.4, "#1f2a33")  # windscreen
+            box(b, (0.5, 1.7, 0.3), (0.95, 0, 1.75), "#1f2a33")  # side windows
+            box(b, (0.6, 1.72, 0.36), (1.0, 0, 1.2), c["rust"])  # patched doors
+            box(b, (0.7, 1.0, 0.14), (0.95, 0.1, 2.12), c["armour"])  # bedroll on the roof
+        else:
+            # A clean forward-control cab with a light bar.
+            prism_y(b, [(1.2, 0.9), (2.55, 0.9), (2.55, 1.5), (2.2, 2.1), (1.2, 2.1)], 1.72, c["hull"])
+            prism_y(b, [(2.57, 1.52), (2.24, 2.06), (2.16, 2.06), (2.49, 1.52)], 1.44, "#1f2a33")  # windscreen
+            box(b, (0.6, 1.76, 0.3), (1.65, 0, 1.78), "#1f2a33")  # side windows
+            box(b, (0.14, 1.78, 0.22), (2.58, 0, 0.84), c["low"])  # bumper
+            box(b, (0.3, 0.06, 0.06), (2.56, 0.55, 1.16), c["trim"], glow=0.6)
+            box(b, (0.3, 0.06, 0.06), (2.56, -0.55, 1.16), c["trim"], glow=0.6)
+            box(b, (0.5, 1.2, 0.08), (1.7, 0, 2.16), "#e0a82e", glow=0.5)  # amber light bar
+        # The hopper tips about a hinge at the rear of the frame.
+        back = -2.25 if not improvised else -2.2
+        self.hopper = joint(b, (back, 0, 0.95))
+        h = self.hopper
+        length = 3.2 if not improvised else 2.6
+        wall = c["hull2"] if not improvised else c["wood"]
+        box(h, (length, 1.7, 0.1), (length / 2, 0, 0.04), c["low"])  # floor
+        for side in (1, -1):
+            box(h, (length, 0.1, 0.8), (length / 2, 0.82 * side, 0.45), wall)
+            if improvised:
+                box(h, (length, 0.12, 0.1), (length / 2, 0.83 * side, 0.62), c["rust"])  # iron strap
+            else:
+                box(h, (length, 0.12, 0.1), (length / 2, 0.83 * side, 0.8), c["trim"], glow=0.3)
+        box(h, (0.1, 1.7, 0.95), (length, 0, 0.52), wall)  # head board behind the cab
+        box(h, (0.1, 1.7, 0.6), (0.02, 0, 0.35), wall if improvised else c["hull"])  # tail gate
+        self.load = gold_heap(h, (length / 2, 0, 0.12), 1.7, lumps=26)
+        self.load.scale = (length / 2.1, 1.0, 1.0)
+        # The loading arm: a boom from beside the cab to a scoop at the front.
+        self.arm = joint(b, (2.2 if not improvised else 2.3, -0.98, 1.3))
+        box(self.arm, (1.5, 0.14, 0.14), (0.7, 0, 0), c["hull2"] if not improvised else c["rust"])
+        self.scoop = joint(self.arm, (1.45, 0, 0))
+        box(self.scoop, (0.5, 0.7, 0.08), (0.15, 0.3, -0.25), c["low"])
+        box(self.scoop, (0.08, 0.7, 0.4), (-0.08, 0.3, -0.08), c["low"])
+        box(self.scoop, (0.1, 0.1, 0.4), (0, 0, -0.12), c["hull2"] if not improvised else c["rust"])
+        self.scoopload = gold_heap(self.scoop, (0.15, 0.3, -0.2), 0.45, lumps=5, seed=5)
+
+    def pose(self, anim, t):
+        show(self.root, True)
+        char(self.root, anim == "wreck")
+        self.body.location = (0, 0, 0)
+        self.body.rotation_euler = (0, 0, 0)
+        self.hopper.rotation_euler = (0, 0, 0)
+        self.arm.rotation_euler = (0, -0.75, 0)  # stowed, raised over the bonnet
+        self.scoop.rotation_euler = (0, 0.75, 0)
+        level = {"idle": 0, "move": 0, "full": 1, "moveFull": 1, "load": t, "unload": 1 - t, "wreck": 0}[anim]
+        show(self.load, level > 0.05)
+        self.load.scale = (self.load.scale[0], 1.0, max(0.05, 1.5 * level))
+        self.load.location = (self.load.location[0], 0, 0.12)
+        show(self.scoopload, False)
+        if anim in ("move", "moveFull"):
+            self.body.location = (0, 0, 0.03 * t)
+            self.body.rotation_euler = (0, 0.012 * (1 - 2 * t), 0)
+        if anim == "load":
+            # The arm swings down to the ground and comes up full.
+            down = math.sin(math.pi * min(1, t * 1.25))
+            self.arm.rotation_euler = (0, -0.75 + 1.4 * down, 0)
+            self.scoop.rotation_euler = (0, 0.75 - 1.4 * down, 0)
+            show(self.scoopload, t > 0.4)
+        if anim == "unload":
+            # The front of the hopper rises and the load slides out over the tail gate.
+            self.hopper.rotation_euler = (0, -0.8 * math.sin(math.pi * min(1, t) / 2) * (1 if t < 1 else 0.5), 0)
+        if anim == "wreck":
+            self.body.rotation_euler = (0.07, -0.04, 0)
+            self.hopper.rotation_euler = (0.1, -0.2, 0.06)
+            self.arm.rotation_euler = (0.3, 0.5, 0.4)
+
+
+class Engineer(Soldier):
+    """An infantryman who builds and breaks: a tool pack, a bright helmet or scarf, and a
+    working pose down on one knee with a hammer."""
+
+    sheets = {"": Soldier.sheets[""] + [("work", [0, 1])]}
+    manifest = {"per": "member", "fps": {"walk": 11, "die": 9, "work": 5}}
+
+    def __init__(self, look, militia):
+        super().__init__({**look, "head": "#e0a82e" if not militia else "#c9682c"}, militia)
+        c = look
+        box(self.torso, (0.24, 0.42, 0.34), (-0.3, 0, 0.3), "#e0a82e" if not militia else c["rust"])  # tool pack
+        box(self.torso, (0.06, 0.06, 0.5), (-0.34, -0.16, 0.5), c["gun"])  # a bar strapped to it
+        cyl(self.torso, 0.14, 0.1, (-0.4, 0.1, 0.52), "#d8d2c0", axis="X", sides=8)  # coil of wire
+        self.tool = joint(self.torso, (0.5, -0.1, 0.3))
+        box(self.tool, (0.06, 0.06, 0.44), (0, 0, 0.1), c.get("wood", "#6b4526"))
+        box(self.tool, (0.22, 0.1, 0.1), (0, 0, 0.34), "#5a6068")
+        self.spark = joint(self.torso, (0.75, -0.1, -0.05))
+        ball(self.spark, 0.09, (0, 0, 0), "#fff3c4").active_material = mat("#fff3c4", 14)
+        ball(self.spark, 0.05, (0.12, 0.08, 0.08), "#ffd27a").active_material = mat("#ffd27a", 10)
+        ball(self.spark, 0.04, (-0.05, -0.1, 0.12), "#ffd27a").active_material = mat("#ffd27a", 10)
+
+    def pose(self, anim, t):
+        super().pose("cover" if anim == "work" else anim, t)
+        show(self.tool, anim == "work")
+        show(self.spark, anim == "work" and t == 1)
+        if anim == "work":
+            show(self.rifle, False)
+            show(self.muzzle, False)
+            self.torso.rotation_euler = (0, 0.38, 0)
+            self.head.rotation_euler = (0, 0.35, 0)
+            swing = 0.9 if t == 0 else 1.5
+            for (shoulder, elbow), (sw, bend, inward), side in zip(self.arms, [(swing, 0.5, 0.3), (1.2, 0.7, 0.3)], (1, -1)):
+                shoulder.rotation_euler = (-inward * side, -sw, 0)
+                elbow.rotation_euler = (0, -bend, 0)
+            self.tool.rotation_euler = (0, 0.3 if t == 0 else 1.3, 0)
+
+
+
 UNITS = {
     "commandos": lambda: Soldier(AEGIS, militia=False),
     "militia": lambda: Soldier(ASHFALL, militia=True),
@@ -753,6 +907,10 @@ UNITS = {
     "rocketLauncher": lambda: RocketLauncher(AEGIS),
     "fpvSwarm": lambda: Drone(ASHFALL),
     "rpgTeam": lambda: Soldier(ASHFALL, militia=True, rocket=True),
+    "aegis_hauler": lambda: Hauler(AEGIS, improvised=False),
+    "ashfall_hauler": lambda: Hauler(ASHFALL, improvised=True),
+    "aegis_engineer": lambda: Engineer(AEGIS, militia=False),
+    "ashfall_sapper": lambda: Engineer(ASHFALL, militia=True),
 }
 
 # ---------------------------------------------------------------- render and pack

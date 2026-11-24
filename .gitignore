@@ -18,3 +18,5 @@ client/vendor/ort/
 
 # make play-public: the Let's Encrypt certificate and its account key.
 .caddy-data/
+art-sheet.png
+__pycache__/
