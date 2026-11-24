@@ -59,6 +59,7 @@ type PointView struct {
 	Owner    int     `json:"owner"`
 	CapSide  int     `json:"capSide"`
 	Progress float64 `json:"progress"` // 0…1 toward capture by CapSide
+	Visible  bool    `json:"visible"`  // in sight now; otherwise the rest is as last seen
 }
 
 type Snapshot struct {
@@ -68,7 +69,8 @@ type Snapshot struct {
 	Faction  string        `json:"faction,omitempty"`
 	Gold     int           `json:"gold"`
 	Income   int           `json:"income"`
-	HQ       [2]float64    `json:"hq"` // headquarters health 0…1, by side
+	HQ       [2]float64    `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
+	Fog      *FogView      `json:"fog,omitempty"` // absent for spectators, who see everything
 	Points   []PointView   `json:"points"`
 	Squads   []SquadView   `json:"squads"`
 	Contacts []ContactView `json:"contacts"`
@@ -78,7 +80,8 @@ type Snapshot struct {
 }
 
 // Snapshot is the match as one side may see it. Enemy squads appear only as contacts,
-// and only the teams currently in sight. Spectator sees every squad in full.
+// and only the teams currently in sight. Points and the enemy headquarters are as the
+// side last saw them. Spectator sees everything as it is.
 func (s *Sim) Snapshot(side int) Snapshot {
 	snap := Snapshot{
 		Tick:     s.Tick,
@@ -101,9 +104,17 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	need := s.R.Match.CaptureSeconds * float64(s.R.TickRate)
 	for i := range s.Points {
 		p := &s.Points[i]
-		snap.Points = append(snap.Points, PointView{
-			ID: p.ID, Owner: p.Owner, CapSide: p.CapSide, Progress: float64(p.CapTicks) / need,
-		})
+		v := PointView{ID: p.ID, Owner: p.Owner, CapSide: p.CapSide, Progress: float64(p.CapTicks) / need, Visible: true}
+		if side != Spectator {
+			m := s.Sides[side].points[i]
+			v = PointView{ID: p.ID, Owner: m.Owner, CapSide: m.CapSide, Progress: float64(m.CapTicks) / need, Visible: m.Visible}
+		}
+		snap.Points = append(snap.Points, v)
+	}
+	if side != Spectator {
+		snap.HQ[1-side] = s.Sides[side].enemyHQ
+		cols, rows := s.fogSize()
+		snap.Fog = &FogView{Cell: FogCell, Cols: cols, Rows: rows, Seen: append([]byte{}, s.Sides[side].explored...)}
 	}
 	for _, sq := range s.Squads {
 		if !sq.Alive {
@@ -170,6 +181,13 @@ func (s *Sim) Hash() uint64 {
 	for i := range s.Sides {
 		put(uint64(s.Sides[i].goldUnit))
 		f(s.Sides[i].HQHP)
+		h.Write(s.Sides[i].explored)
+		f(s.Sides[i].enemyHQ)
+		for _, m := range s.Sides[i].points {
+			put(uint64(int64(m.Owner)))
+			put(uint64(int64(m.CapSide)))
+			put(uint64(m.CapTicks))
+		}
 	}
 	for i := range s.Points {
 		put(uint64(int64(s.Points[i].Owner)))

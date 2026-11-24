@@ -26,6 +26,7 @@ function mapTable(rules, side) {
     `The map is ${rules.map.width} wide and ${rules.map.height} tall; x grows east, y grows south. Everything south of y=${rules.map.waterY} is sea.`,
     ...lines,
     `A point is captured by standing on it alone for ${rules.match.captureSeconds} seconds. When the timer runs out, the side holding more points wins.`,
+    "Fog of war: your side sees only what its own squads and headquarters have in sight. In your status, who holds a point that is not in sight now, and the enemy headquarters' strength, are as your side last saw them and may be out of date.",
   ].join("\n");
 }
 

@@ -50,6 +50,11 @@ type Side struct {
 	HQHP     float64
 	nextNum  map[string]int // next callsign number per unit class
 	hqAlarm  int            // tick of the last "HQ under attack" event
+
+	// Fog of war: what this side has seen, and what it last knew.
+	explored []byte        // bitset of fog cells seen at any time
+	points   []pointMemory // each map point as last seen
+	enemyHQ  float64       // enemy headquarters health 0…1 as last seen
 }
 
 type Order struct {
@@ -154,6 +159,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 			s.spawn(side, u)
 		}
 	}
+	s.initFog()
 	return s, nil
 }
 
@@ -358,6 +364,7 @@ func (s *Sim) Step() []Event {
 	s.recover(live)
 	s.capture(live)
 	s.squadEvents(live)
+	s.observe()
 	s.checkEnd()
 	s.Tick++
 
