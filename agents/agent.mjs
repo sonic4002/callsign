@@ -18,8 +18,8 @@ export class Agent {
   // `join` is added to the address the agent joins with: its host's id, and { room, key } or
   // { room, token } for a server that holds rooms.
   // `where` says where this agent runs, for its commander's view: "server" or "browser".
-  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
-    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, join });
+  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, quietMs = 30_000, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
+    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, quietMs, join });
     // What this agent tells its own commander about itself; see telemetry.mjs.
     this.tele = new Telemetry({ role, squad, brain: brain?.name ?? "", where, limit: wakesPerConversation, send: (report) => this.link.send({ type: "telemetry", telemetry: report }) });
     this.inbox = [];
@@ -41,16 +41,40 @@ export class Agent {
       (frame) => this.#onFrame(frame),
       () => {
         this.stopped = true;
+        clearInterval(this.quiet);
         this.onStop?.();
       },
     );
     await this.link.open();
+    // An operator that holds the initiative is not left asleep on a quiet map: see #lookUp.
+    if (this.role === "anvil" && this.quietMs > 0) this.quiet = setInterval(() => this.#lookUp(), this.quietMs);
+    this.quiet?.unref?.();
     return this;
+  }
+
+  // #lookUp wakes the operator when nothing has for a while and there is something only it
+  // can do: it runs the fight and a squad has no orders, or it holds the purse and there
+  // is gold for a squad. Events wake it otherwise, and on a big quiet map none may come
+  // for minutes while gold piles up. An operator on Hammer's orders is never woken by this.
+  async #lookUp() {
+    if (this.busy || this.inbox.length || this.over || this.stopped || !this.rules || Date.now() - (this.wokeAt ?? 0) < this.quietMs) return;
+    let status;
+    try {
+      status = await this.link.tool("report");
+    } catch {
+      return;
+    }
+    const units = Object.values(this.rules.factions[this.faction]?.units ?? {}).filter((u) => u.damage > 0);
+    const cheapest = Math.min(...units.map((u) => u.cost));
+    const idle = status.command?.mode === "fight" && (status.squads ?? []).some((sq) => sq.order?.kind === "none");
+    const spend = status.command?.buy && status.gold >= cheapest && (status.squads ?? []).length + (status.deploying ?? []).length < this.rules.match.populationCap;
+    if ((idle || spend) && !this.busy && !this.over && !this.stopped) this.#enqueue({ kind: "event", event: { kind: "quiet" } });
   }
 
   stop(why = "stopped") {
     if (!this.stopped) this.tele.stopped(why);
     this.stopped = true;
+    clearInterval(this.quiet);
     this.link?.close();
   }
 
@@ -141,6 +165,7 @@ export class Agent {
   }
 
   async #wake(items) {
+    this.wokeAt = Date.now();
     let status = null;
     try {
       status = await this.link.tool("report");
@@ -304,6 +329,8 @@ function describe(item) {
   const e = item.event;
   const who = item.callsign?.en ?? "A squad";
   switch (e.kind) {
+    case "quiet":
+      return "Nothing has woken you for a while and you hold the initiative: your status shows a squad without orders or gold you could spend. Act if it helps; otherwise do nothing.";
     case "contact":
       return `Your squad made contact: enemy squad Target ${e.contact} near ${e.point}.`;
     case "pinned":
