@@ -158,7 +158,7 @@ test("manifest: every picture it names is in the repository", () => {
 test("manifest: every structure has its stages in its own frame, and producers have a door and a way out", () => {
   const b = manifest.buildings;
   const structures = Object.keys(b).filter((k) => /^(aegis|ashfall)_[a-zA-Z]+$/.test(k));
-  assert.equal(structures.length, 14);
+  assert.equal(structures.length, 18, "seven a side, and a power and a radar structure each");
   for (const key of structures) {
     const entry = b[key];
     assert.ok(entry.stages?.length >= 3, `${key} goes up in at least three stages before it is finished`);
@@ -209,4 +209,73 @@ test("manifest: heroes, sandbags and the moving frames are all there", () => {
   assert.deepEqual(bags.states, ["whole", "damaged", "flat"]);
   assert.equal(bags.facings, 8);
   assert.ok(has(bags.image));
+});
+
+// ---- third wave: power, radar, buildings of no army, ranks and panel icons ----
+
+test("spinFrame and lampOn: a dish turns once a period, and a dark building blinks twice then rests", async () => {
+  const { lampOn, spinFrame, structureSpot } = await import("./art.js");
+  assert.equal(spinFrame(12, 6, 0), 0);
+  assert.equal(spinFrame(12, 6, 3), 6, "half a turn in half a period");
+  assert.equal(spinFrame(12, 6, 6), 0, "and round again");
+  assert.equal(spinFrame(12, 6, -0.1), 11, "time before zero still names a frame");
+  const seen = new Set(Array.from({ length: 600 }, (_, i) => spinFrame(12, 6, i / 100)));
+  assert.equal(seen.size, 12, "every frame is shown");
+  const lit = Array.from({ length: 160 }, (_, i) => lampOn(i / 100));
+  const blinks = lit.filter((on, i) => on && !lit[i - 1]).length;
+  assert.equal(blinks, 2);
+  assert.ok(lit.filter(Boolean).length < 40, "dark most of the time");
+  assert.equal(lampOn(0.05), lampOn(1.65), "the pattern repeats");
+  // A place given as fractions of the picture, in pixels from where the building stands.
+  const base = { size: [200, 100], anchor: [0.5, 0.8], height: 50 };
+  assert.deepEqual(structureSpot(base, [0.5, 0.8]), [0, 0]);
+  assert.deepEqual(structureSpot(base, [1, 0]), [50, -40]);
+});
+
+test("marks: two ranks and six panel icons, each a well-formed picture unlike the others", async () => {
+  const { iconSvg, icons, rankSvg, ranks } = await import("./marks.js");
+  assert.deepEqual(Object.keys(ranks), ["seasoned", "elite"]);
+  assert.deepEqual(Object.keys(icons).sort(), ["cancel", "lowPower", "power", "rally", "repair", "sell"]);
+  const all = [...Object.keys(ranks).map((r) => rankSvg(r, 14)), ...Object.keys(icons).map((i) => iconSvg(i, 14))];
+  assert.equal(new Set(all).size, all.length, "no two marks are the same picture");
+  for (const svg of all) {
+    assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 16 16" width="14" height="14"/);
+    assert.match(svg, /<\/svg>$/);
+    for (const d of svg.matchAll(/ d="([^"]+)"/g)) assert.match(d[1], /^M[\d\s.MLHVAZ-]+$/, "a path of plain commands and numbers");
+  }
+  assert.equal(rankSvg("recruit"), "", "no rank, no mark");
+  assert.equal(iconSvg("nothing"), "");
+  // A rank is silver so that it is never taken for the brass chevrons of a bought brain tier.
+  assert.ok(!rankSvg("seasoned").includes("#e2b33c") && !rankSvg("elite").includes("#e2b33c"));
+  assert.match(iconSvg("sell", 12, "Sell <this>"), /<title>Sell this<\/title>/, "a label is text, never markup");
+});
+
+test("manifest: the power and radar structures, the buildings of no army and their icons", () => {
+  const b = manifest.buildings;
+  for (const key of ["aegis_powerPlant", "ashfall_generatorYard", "aegis_radar", "ashfall_listeningPost"]) {
+    assert.ok(b[key] && has(b[key].image), key);
+    assert.equal(b[key].stages?.length, 4, `${key} goes up in four stages`);
+    for (const state of [...b[key].stages, `${key}_ruin`, `${key}_site`]) {
+      assert.ok(b[state] && has(b[state].image), state);
+      assert.deepEqual(b[state].size, b[key].size, `${state} is in its building's frame`);
+    }
+    assert.ok(b[key].lamp?.every((f) => f >= 0 && f <= 1), `${key} says where its warning lamp is`);
+  }
+  for (const [key, prop] of [["aegis_radar", "radar_dish"], ["ashfall_listeningPost", "antenna_loop"]]) {
+    const spin = b[key].spin;
+    assert.equal(spin?.prop, prop);
+    assert.ok(spin.at.every((f) => f >= 0 && f <= 1) && spin.height > 0 && spin.period > 0);
+    const part = manifest.props[prop];
+    assert.ok(part && has(part.image) && part.frames >= 8 && part.frame.length === 2 && part.anchor.length === 2);
+  }
+  for (const key of ["tech_goldworks", "tech_clinic", "tech_garage"]) {
+    assert.ok(b[key] && has(b[key].image) && b[`${key}_ruin`] && has(b[`${key}_ruin`].image), key);
+    assert.deepEqual(b[`${key}_ruin`].size, b[key].size);
+    assert.ok(b[key].flag?.every((f) => f >= 0 && f <= 1), `${key} says where its owner's flag stands`);
+    assert.equal(b[key].stages, undefined, "nobody builds these");
+  }
+  for (const key of ["aegis_powerPlant", "ashfall_generatorYard", "aegis_radar", "ashfall_listeningPost", "tech_goldworks", "tech_clinic", "tech_garage"]) {
+    assert.ok(manifest.icons?.[key] && has(manifest.icons[key].image), `${key} has no build-panel picture`);
+    assert.deepEqual(manifest.icons[key].size, [144, 96]);
+  }
 });
