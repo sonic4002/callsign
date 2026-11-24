@@ -6,10 +6,11 @@
 
 import { Link } from "./link.mjs";
 import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
-import { leaderTools, normalize, operatorTools } from "./tools.mjs";
+import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
+import { compactStructures } from "./bases.mjs";
 
 const leaderEvents = new Set(["contact", "pinned", "losses", "arrived"]);
-const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack"]);
+const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
@@ -68,7 +69,7 @@ export class Agent {
       this.tier = mine.tier;
       this.unit = this.rules.factions[this.faction].units[mine.unit];
       this.system = leaderPrompt({ rules: this.rules, side: this.side, faction: this.faction, station: this.me, unit: this.unit });
-      this.tools = leaderTools;
+      this.tools = leaderToolsFor(this.unit);
     } else {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
@@ -160,7 +161,7 @@ export class Agent {
     try {
       for (let turn = 0; turn < 6 && !finished; turn++) {
         const res = await this.brain.think({
-          agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander },
+          agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander, unit: this.unit },
           system: this.system,
           tools: this.tools,
           messages: this.history,
@@ -225,8 +226,9 @@ export function compactStatus(status, side) {
     teams: (s.teams ?? []).map((t) => `${t.nerve}, ${t.action}`),
     contacts: s.contacts,
   });
+  const structures = compactStructures(status, side);
   if (status.you) {
-    return { secondsLeft: status.timeLeft, you: squad(status.you), friends: status.friends, contacts, points };
+    return { secondsLeft: status.timeLeft, you: squad(status.you), friends: status.friends, contacts, points, structures };
   }
   return {
     secondsLeft: status.timeLeft,
@@ -238,6 +240,7 @@ export function compactStatus(status, side) {
     deploying: (status.deploying ?? []).map((d) => ({ callsign: d.callsign.en, unit: d.unit, secondsLeft: Math.ceil(d.ticksLeft / 10) })),
     contacts,
     points,
+    structures,
   };
 }
 
@@ -269,6 +272,14 @@ function describe(item) {
       return `The enemy took ${e.point}.`;
     case "hq_under_attack":
       return "Your headquarters is under attack.";
+    case "structure_built":
+      return `Your ${e.unit} (${e.structure}) near ${e.point} now stands.`;
+    case "structure_attacked":
+      return `Your ${e.unit} (${e.structure}) near ${e.point} is under attack.`;
+    case "structure_lost":
+      return e.owner === e.side ? `Your ${e.unit} (${e.structure}) near ${e.point} was destroyed; what it let you buy is gone until it is rebuilt.` : `The enemy's ${e.unit} (${e.structure}) near ${e.point} was destroyed.`;
+    case "structure_captured":
+      return e.owner === e.side ? `Your engineers took over the ${e.unit} (${e.structure}) near ${e.point}; you can now buy what it builds.` : `The enemy took over your ${e.unit} (${e.structure}) near ${e.point}.`;
   }
   return `Event: ${e.kind}.`;
 }
