@@ -54,6 +54,8 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	infantry, naval, vehicles, air, special := 0, 0, 0, 0, 0
 	count := func(class, unit string) {
 		switch {
+		case class == shared.HaulerClass:
+			// Haulers are counted by the economy below, not as fighting squads.
 		case class == "air":
 			air++
 		case unit != line[class]:
@@ -83,6 +85,9 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		default:
 			// Armour, specialists and spare infantry press the enemy headquarters.
 			want.Kind, want.Point = push, target
+			if raid := p.raid(snap, sq, line); raid.Kind != "" {
+				want = raid
+			}
 		}
 		count(sq.Class, sq.Unit)
 		if want.Contact != 0 {
@@ -95,8 +100,28 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	}
 
 	// Squads on their way count as already there, or the bot would buy them twice.
+	haulers := 0
 	for _, d := range snap.Deploying {
 		count(d.Class, d.Unit)
+		if d.Class == shared.HaulerClass {
+			haulers++
+		}
+	}
+	// The economy comes first: a lost hauler is replaced before anything else is bought,
+	// whatever the pace, because without one there is nothing to buy with.
+	for _, h := range snap.Haulers {
+		if h.Side == p.Side {
+			haulers++
+		}
+	}
+	// A hauler bought with the enemy at the gates is a hauler lost: then fighters come first.
+	if id, u := p.R.HaulerOf(snap.Faction); id != "" && haulers < min(p.haulersWanted(snap.Tick/p.R.TickRate), p.R.Match.HaulerCap) && !p.besieged(snap) {
+		if snap.Gold >= u.Cost {
+			return append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
+		}
+		if haulers == 0 {
+			return cmds // save for the hauler
+		}
 	}
 	if len(snap.Squads)+len(snap.Deploying) >= p.R.Match.PopulationCap {
 		return cmds
@@ -124,6 +149,69 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		p.lastBuy = snap.Tick + 1
 	}
 	return cmds
+}
+
+// haulersWanted is how many haulers a style keeps working at a given second of the match:
+// the second comes once the first squads are out, the third later.
+func (p *Player) haulersWanted(second int) int {
+	most := 3
+	switch p.Style {
+	case Easy:
+		most = 1
+	case Normal, Rush:
+		most = 2
+	}
+	return min(most, 1+(second+70)/90)
+}
+
+// besieged reports whether an armed enemy is in sight close to this side's headquarters.
+func (p *Player) besieged(snap sim.Snapshot) bool {
+	hq := p.R.HQPoint(p.Side)
+	for _, c := range snap.Contacts {
+		if c.Class != shared.HaulerClass && math.Hypot(c.X-hq.X, c.Y-hq.Y) <= 450 {
+			return true
+		}
+	}
+	return false
+}
+
+// raid sends the relentless style's first line vehicle squad after the enemy's gold: at
+// any enemy hauler in sight, and now and then at the enemy's home field. It returns a
+// command with no kind when this squad has other work.
+func (p *Player) raid(snap sim.Snapshot, sq sim.SquadView, line map[string]string) sim.Command {
+	none := sim.Command{}
+	if p.Style != Standard || sq.Class != "vehicle" || sq.Unit != line["vehicle"] {
+		return none
+	}
+	for _, o := range snap.Squads {
+		if o.Class == "vehicle" && o.Unit == line["vehicle"] && o.ID < sq.ID {
+			return none // only the first one raids
+		}
+	}
+	for _, c := range snap.Contacts {
+		if c.Class == shared.HaulerClass {
+			return sim.Command{Side: p.Side, Squad: sq.ID, Kind: sim.CmdAttack, Contact: c.ID}
+		}
+	}
+	// One raid in every two and a half minutes, for forty-five seconds.
+	if t := snap.Tick / p.R.TickRate % 150; t >= 60 && t < 105 {
+		if field := p.enemyField(); field != "" {
+			return sim.Command{Side: p.Side, Squad: sq.ID, Kind: sim.CmdAttack, Point: field}
+		}
+	}
+	return none
+}
+
+// enemyField is the point of the gusher nearest the enemy headquarters.
+func (p *Player) enemyField() string {
+	hq := p.R.HQPoint(1 - p.Side)
+	best, bd := "", math.MaxFloat64
+	for _, g := range p.R.Gushers {
+		if d := math.Hypot(g.X-hq.X, g.Y-hq.Y); d < bd {
+			best, bd = g.Point, d
+		}
+	}
+	return best
 }
 
 // prey picks the enemy squad in sight nearest to this side's headquarters that a unit's
@@ -188,7 +276,7 @@ func (p *Player) unitOf(faction, class string) (string, shared.Unit) {
 func (p *Player) specialist(faction string, line map[string]string) string {
 	units := p.R.Factions[faction].Units
 	for _, id := range sortedIDs(units) {
-		if line[units[id].Class] != id {
+		if line[units[id].Class] != id && units[id].Class != shared.HaulerClass {
 			return id
 		}
 	}

@@ -41,6 +41,7 @@ type Config struct {
 	Seed          uint64
 	Factions      [2]string
 	LengthSeconds int // 0 uses the rules default
+	StartGold     int // gold each side starts with; 0 uses the rules default
 }
 
 type Side struct {
@@ -55,6 +56,13 @@ type Side struct {
 	explored []byte        // bitset of fog cells seen at any time
 	points   []pointMemory // each map point as last seen
 	enemyHQ  float64       // enemy headquarters health 0…1 as last seen
+	fields   []fieldMemory // each gold field as last seen
+	haulers  []haulerMemory
+
+	// Gold earned in each of the last seconds (gold × tick rate), for the income figure.
+	earned     [incomeWindow]int64
+	earnedAt   int
+	earnedSecs int
 }
 
 type Order struct {
@@ -102,6 +110,7 @@ type Squad struct {
 	DeployTotal int
 
 	unit        *shared.Unit
+	haul        *haul // set for a gold hauler, which works on its own and has no leader
 	inContact   bool
 	lastContact int
 	lastPinned  int
@@ -115,19 +124,23 @@ type PointState struct {
 }
 
 type Sim struct {
-	R      *shared.Rules
-	Tick   int
-	Sides  [2]Side
-	Squads []*Squad // every squad ever raised, in id order; dead ones stay with Alive false
+	R     *shared.Rules
+	Tick  int
+	Sides [2]Side
+	// Squads is every squad and hauler ever raised, in the order they were raised; dead
+	// ones stay with Alive false. A squad's id is not its place in this list: use SquadAny.
+	Squads []*Squad
 	Points []PointState
+	Fields []FieldState // the gold lying around each gusher, in rules order
 	Over   bool
 	Winner int
 	Reason string
 
-	rng         *rand.Rand
-	events      []Event
-	lengthTicks int
-	dt          float64
+	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
+	rng             *rand.Rand
+	events          []Event
+	lengthTicks     int
+	dt              float64
 }
 
 const never = -1 << 30
@@ -165,6 +178,11 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 			s.field(s.raise(side, u))
 		}
 	}
+	startGold := cfg.StartGold
+	if startGold <= 0 {
+		startGold = r.Match.StartGold
+	}
+	s.initHaul(startGold)
 	s.initFog()
 	return s, nil
 }
@@ -172,31 +190,33 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 // Gold is the whole gold a side can spend.
 func (s *Sim) Gold(side int) int { return int(s.Sides[side].goldUnit / int64(s.R.TickRate)) }
 
-// Income is a side's gold per second.
-func (s *Sim) Income(side int) int {
-	total := 0
-	for i := range s.Points {
-		if s.Points[i].Owner == side {
-			total += s.R.Rigs[s.Points[i].Kind].Income
-		}
-	}
-	return total
-}
-
 // LengthTicks is the tick the timer runs out on.
 func (s *Sim) LengthTicks() int { return s.lengthTicks }
 
 // Squad returns a living squad by id, or nil.
 func (s *Sim) Squad(id int) *Squad {
-	if id < 1 || id > len(s.Squads) || !s.Squads[id-1].Alive {
-		return nil
+	if sq := s.SquadAny(id); sq != nil && sq.Alive {
+		return sq
 	}
-	return s.Squads[id-1]
+	return nil
+}
+
+// SquadAny returns a squad or hauler by id whether it is alive or not, or nil.
+func (s *Sim) SquadAny(id int) *Squad {
+	for _, sq := range s.Squads {
+		if sq.ID == id {
+			return sq
+		}
+	}
+	return nil
 }
 
 // Callsign is the squad's radio name in both languages, e.g. Viper 2 / צפע 2.
 func (s *Sim) Callsign(sq *Squad) shared.Text {
 	c := s.R.Callsigns.Classes[sq.unit.Class]
+	if sq.haul != nil {
+		c = s.R.Callsigns.Hauler // a name for the player to read; haulers are not on the net
+	}
 	n := strconv.Itoa(sq.Num)
 	return shared.Text{En: c.En + " " + n, He: c.He + " " + n}
 }
@@ -244,11 +264,23 @@ func (s *Sim) raise(side int, unitID string) *Squad {
 	u := s.R.Factions[s.Sides[side].Faction].Units[unitID]
 	sd := &s.Sides[side]
 	sd.nextNum[u.Class]++
+	// Haulers are numbered apart from squads, so that buying one never shifts a squad's id.
+	var id int
+	if u.Class == shared.HaulerClass {
+		s.haulerN++
+		id = HaulerIDBase + s.haulerN
+	} else {
+		s.squadN++
+		id = s.squadN
+	}
 	sq := &Squad{
-		ID: len(s.Squads) + 1, Side: side, Unit: unitID, Num: sd.nextNum[u.Class],
+		ID: id, Side: side, Unit: unitID, Num: sd.nextNum[u.Class],
 		Tier: 1, unit: &u,
 		Order:       Order{Kind: OrderNone},
 		lastContact: never, lastPinned: never,
+	}
+	if u.Class == shared.HaulerClass {
+		sq.haul = &haul{State: HaulOut, alarm: never}
 	}
 	s.Squads = append(s.Squads, sq)
 	return sq
@@ -277,6 +309,9 @@ func (s *Sim) field(sq *Squad) {
 		})
 	}
 	sq.Alive, sq.DeployTicks = true, 0
+	if sq.haul != nil {
+		return // no leader joins the net for a hauler
+	}
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
 }
 
@@ -375,9 +410,6 @@ func (s *Sim) Step() []Event {
 	if s.Over {
 		return nil
 	}
-	for side := range s.Sides {
-		s.Sides[side].goldUnit += int64(s.Income(side))
-	}
 	s.deploy()
 
 	live := s.liveTeams()
@@ -395,6 +427,7 @@ func (s *Sim) Step() []Event {
 	s.resolveDamage(live)
 	s.recover(live)
 	s.capture(live)
+	s.haulWork()
 	s.squadEvents(live)
 	s.observe()
 	s.checkEnd()
@@ -542,6 +575,10 @@ func (s *Sim) teamLost(tr *teamRef) {
 		}
 	}
 	x, y := tr.t.X, tr.t.Y
+	if tr.sq.haul != nil {
+		s.haulerLost(tr)
+		return
+	}
 	if left > 0 {
 		s.emit(Event{Side: tr.sq.Side, Kind: EvLosses, Squad: tr.sq.ID, Point: s.nearestPoint(x, y), Count: left})
 		return
@@ -624,13 +661,13 @@ func (s *Sim) capture(live []*teamRef) {
 func (s *Sim) squadEvents(live []*teamRef) {
 	rate := s.R.TickRate
 	for _, sq := range s.Squads {
-		if !sq.Alive {
-			continue
+		if !sq.Alive || sq.haul != nil {
+			continue // a hauler has no leader to wake
 		}
 		if len(sq.Contacts) > 0 {
 			if !sq.inContact {
 				sq.inContact = true
-				c := s.Squads[sq.Contacts[0]-1]
+				c := s.SquadAny(sq.Contacts[0])
 				x, y := c.Center()
 				s.emit(Event{Side: sq.Side, Kind: EvContact, Squad: sq.ID, Contact: c.ID,
 					Point: s.nearestPoint(x, y), Count: len(sq.Contacts)})

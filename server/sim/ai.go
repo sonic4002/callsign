@@ -17,7 +17,7 @@ func (s *Sim) trackContacts() {
 		if !sq.Alive || sq.Order.Contact == 0 {
 			continue
 		}
-		c := s.Squads[sq.Order.Contact-1]
+		c := s.SquadAny(sq.Order.Contact)
 		if !c.Alive {
 			x, y := sq.Center()
 			sq.Order = Order{Kind: OrderHold, X: x, Y: y, Tick: s.Tick}
@@ -51,6 +51,9 @@ func (s *Sim) trackContacts() {
 //	                +0.60 an enemy inside the weapon's minimum range and nothing to shoot
 //	                +0.30 under fire with nothing in range and nowhere to go
 func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
+	if tr.sq.haul != nil {
+		return s.haulPlan(tr, live) // haulers run on their own AI
+	}
 	sq, t, u := tr.sq, tr.t, tr.u
 	order := sq.Order.Kind
 	nerve := s.Nerve(t)

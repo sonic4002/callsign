@@ -413,10 +413,7 @@ func (rm *Room) squadOf(side int, st radio.Station) *sim.Squad {
 
 // squadAny returns a squad by id whether it is alive or not, for naming it in events.
 func (rm *Room) squadAny(id int) *sim.Squad {
-	if id < 1 || id > len(rm.sim.Squads) {
-		return nil
-	}
-	return rm.sim.Squads[id-1]
+	return rm.sim.SquadAny(id)
 }
 
 func (rm *Room) squadName(sq *sim.Squad) Name {

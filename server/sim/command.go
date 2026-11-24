@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
+	"callsign/shared"
 )
 
 const (
@@ -28,6 +30,8 @@ type Event struct {
 	Side    int    `json:"side"`
 	Kind    string `json:"kind"`
 	Squad   int    `json:"squad,omitempty"`   // own squad the event is about
+	Hauler  int    `json:"hauler,omitempty"`  // own hauler the event is about
+	Field   string `json:"field,omitempty"`   // gusher id, for a hauler event
 	Unit    string `json:"unit,omitempty"`    // unit id, for a deployment
 	Contact int    `json:"contact,omitempty"` // enemy squad id
 	Point   string `json:"point,omitempty"`   // nearest map point
@@ -55,6 +59,8 @@ type Command struct {
 	Point   string `json:"point,omitempty"`
 	Contact int    `json:"contact,omitempty"`
 	Unit    string `json:"unit,omitempty"`
+	Field   string `json:"field,omitempty"`  // haul: a gusher id, or "auto"
+	Hauler  int    `json:"hauler,omitempty"` // haul: one hauler, or 0 for all of them
 }
 
 var (
@@ -86,13 +92,15 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return s.buy(c)
 	case CmdUpgrade:
 		return s.upgrade(c)
+	case CmdHaul:
+		return s.haulCommand(c)
 	}
 	return nil, ErrBadCommand
 }
 
 func (s *Sim) order(c Command) (*Squad, error) {
 	sq := s.Squad(c.Squad)
-	if sq == nil || sq.Side != c.Side {
+	if sq == nil || sq.Side != c.Side || sq.haul != nil {
 		return nil, ErrNoSquad
 	}
 	o := Order{Kind: c.Kind, Tick: s.Tick}
@@ -132,11 +140,12 @@ func (s *Sim) visible(sq *Squad) bool {
 	return false
 }
 
-// Population is a side's living squads plus the ones still deploying.
+// Population is a side's living squads plus the ones still deploying. Haulers are not
+// squads: they have their own cap.
 func (s *Sim) Population(side int) int {
 	n := 0
 	for _, sq := range s.Squads {
-		if sq.Side == side && (sq.Alive || sq.Deploying()) {
+		if sq.Side == side && sq.haul == nil && (sq.Alive || sq.Deploying()) {
 			n++
 		}
 	}
@@ -156,8 +165,12 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 	if !ok {
 		return nil, ErrNoUnit
 	}
-	// A squad on its way already holds its place under the cap.
-	if s.Population(c.Side) >= s.R.Match.PopulationCap {
+	if u.Class == shared.HaulerClass {
+		if err := s.buyHauler(c, u); err != nil {
+			return nil, err
+		}
+	} else if s.Population(c.Side) >= s.R.Match.PopulationCap {
+		// A squad on its way already holds its place under the cap.
 		return nil, ErrPopCap
 	}
 	if err := s.spend(c.Side, u.Cost); err != nil {
@@ -176,7 +189,7 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 
 func (s *Sim) upgrade(c Command) (*Squad, error) {
 	sq := s.Squad(c.Squad)
-	if sq == nil || sq.Side != c.Side {
+	if sq == nil || sq.Side != c.Side || sq.haul != nil {
 		return nil, ErrNoSquad
 	}
 	cost, ok := s.R.TierCost(sq.Tier + 1)
