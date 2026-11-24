@@ -237,7 +237,7 @@ func TestTheBaseLayoutIsOpenLandOnEveryMap(t *testing.T) {
 // town island they cross a bridge to it, come back the same way, and go down with a
 // bridge that falls under them.
 func TestHaulersCrossBridgesAndFallWithThem(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	s, _ := simOn(t, rules, drillGround, sim.Config{StartGold: 2000})
 	hauler := haulersOf(s.Snapshot(0), 0)[0]
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdHaul, Field: "F"}); err != nil {
 		t.Fatal(err)
@@ -365,7 +365,7 @@ func TestArrivingAtATechBuildingNamesIt(t *testing.T) {
 		}
 	}
 	if clinic == nil {
-		t.Fatal("the small map has no clinic in the west")
+		t.Fatal("the drill ground has no clinic in the west")
 	}
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: sq.ID, Place: clinic.ID})
 	for _, e := range run(s, 90) {

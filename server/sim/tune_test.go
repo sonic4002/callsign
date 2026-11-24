@@ -7,6 +7,7 @@ import (
 
 	"callsign/server/bot"
 	"callsign/server/sim"
+	"callsign/shared"
 )
 
 // TestTune is a balance probe, run by hand: TUNE=<games per orientation> go test -run TestTune -v
@@ -28,7 +29,7 @@ func TestTune(t *testing.T) {
 	games := 0
 	for _, factions := range [][2]string{{"aegis", "ashfall"}, {"ashfall", "aegis"}} {
 		for seed := uint64(1); seed <= uint64(n); seed++ {
-			s, err := sim.New(rules, sim.Config{Seed: seed, Factions: factions, FullBase: os.Getenv("TUNE_FULL") != ""})
+			s, err := sim.New(shared.MustLoad(), sim.Config{Seed: seed, Factions: factions, FullBase: os.Getenv("TUNE_FULL") != ""}) // on the small map as it is played
 			if err != nil {
 				t.Fatal(err)
 			}

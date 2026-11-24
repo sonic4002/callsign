@@ -243,7 +243,8 @@ func TestEveryMapHasGroundForAFullBase(t *testing.T) {
 // The page tints the ground with its own copy of the rule (client/placement.js). Both
 // are checked against one table, so they cannot drift apart: UPDATE_PLACEMENT=1 rewrites it.
 func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
-	s := baseSim(t, 1)
+	// On the small map as it is played: the page reads the same map (client/placement.test.mjs).
+	s, _ := simOn(t, rules, "small", sim.Config{Seed: 1, Base: []string{"power", "refinery", "barracks"}})
 	// A point held away from the base, a gun beside it and a fence at home, so the table
 	// also covers ground that a held point opens and that small works block.
 	wealth(s, 0, 1500)
@@ -275,8 +276,8 @@ func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 	}{{"vehicleWorks", 0}, {"dockyard", 0}, {"chopShop", 1}, {"barracks", 0}, {"sentryGun", 0}, {"barrierWall", 0}, {"gunNest", 1}} {
 		def := structureDef(s.Sides[tc.side].Faction, tc.kind)
 		bits := []byte{}
-		for y := step / 2; y < rules.Map.Height; y += step {
-			for x := step / 2; x < rules.Map.Width; x += step {
+		for y := step / 2; y < s.R.Map.Height; y += step {
+			for x := step / 2; x < s.R.Map.Width; x += step {
 				if s.CanPlaceKind(tc.side, def, x, y) == nil {
 					bits = append(bits, '1')
 				} else {
@@ -290,8 +291,8 @@ func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 	for _, turned := range []string{"ns", "ew", "nesw", "nwse"} {
 		def := structureDef("aegis", "barrierWall")
 		bits := []byte{}
-		for y := step / 2; y < rules.Map.Height; y += step {
-			for x := step / 2; x < rules.Map.Width; x += step {
+		for y := step / 2; y < s.R.Map.Height; y += step {
+			for x := step / 2; x < s.R.Map.Width; x += step {
 				if s.CanPlaceRun(0, def, x, y, turned) == nil {
 					bits = append(bits, '1')
 				} else {

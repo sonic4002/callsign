@@ -12,12 +12,16 @@ import (
 	"callsign/shared"
 )
 
-// simOn starts a match on one of the maps, with rules the test may have changed.
+// simOn starts a match on one of the maps or on the drill ground, with rules the test may have changed.
 func simOn(t *testing.T, r *shared.Rules, mapID string, cfg sim.Config) (*sim.Sim, *shared.Rules) {
 	t.Helper()
-	r, err := r.ForMap(mapID)
-	if err != nil {
-		t.Fatal(err)
+	if mapID == drillGround {
+		r = onDrillGround(r)
+	} else {
+		var err error
+		if r, err = r.ForMap(mapID); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if cfg.Factions == [2]string{} {
 		cfg.Factions = [2]string{"aegis", "ashfall"}
@@ -44,6 +48,7 @@ func engineers(t *testing.T) *shared.Rules {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r = onDrillGround(r)
 	u := r.Factions["aegis"].Units["commandos"]
 	u.RepairPerSecond = 60
 	r.Factions["aegis"].Units["commandos"] = u
@@ -78,10 +83,10 @@ func events(all []sim.Event, kind string, side int) []sim.Event {
 	return out
 }
 
-// onSouthBridge reports whether a position is on the deck of the small map's south bridge.
+// onSouthBridge reports whether a position is on the deck of the drill ground's south bridge.
 func onSouthBridge(x, y float64) bool { return x >= 720 && x <= 880 && math.Abs(y-760) <= 40 }
 
-// wreck has a rocket team of side 1 shoot the south bridge of the small map until it is
+// wreck has a rocket team of side 1 shoot the south bridge of the drill ground until it is
 // at or below a share of its hit points, then stand down. It returns the events.
 func wreck(t *testing.T, s *sim.Sim, share float64) []sim.Event {
 	t.Helper()
@@ -212,7 +217,7 @@ func TestScriptedMatchesOnEveryMapAreDeterministic(t *testing.T) {
 }
 
 func TestGroundUnitsGoRoundWaterAndOverBridges(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{})
+	s, _ := simOn(t, rules, drillGround, sim.Config{})
 	// From the western bank to the farm on the eastern one: the river is in the way.
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: 1, Point: "H"})
 	crossedAt := ""
@@ -255,7 +260,7 @@ func TestGroundUnitsGoRoundWaterAndOverBridges(t *testing.T) {
 }
 
 func TestIceIsCrossedSlowly(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{})
+	s, _ := simOn(t, rules, drillGround, sim.Config{})
 	speed := func(x float64) float64 {
 		place(s.Squad(1), x, 240)
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: 1, Place: "E of G 60"})
@@ -277,7 +282,7 @@ func TestIceIsCrossedSlowly(t *testing.T) {
 }
 
 func TestBridgeFallsWithEverythingOnIt(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	s, _ := simOn(t, rules, drillGround, sim.Config{StartGold: 2000})
 	place(s.Squad(1), 740, 760)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Place: "bridge-south"})
 	all := wreck(t, s, 0)
@@ -323,7 +328,7 @@ func TestBridgeFallsWithEverythingOnIt(t *testing.T) {
 
 func TestEngineersBringABridgeBack(t *testing.T) {
 	r := engineers(t)
-	s, _ := simOn(t, r, "small", sim.Config{StartGold: 2000})
+	s, _ := simOn(t, r, drillGround, sim.Config{StartGold: 2000})
 	wreck(t, s, 0)
 	// Only a bridge can be repaired, and only by a unit that repairs.
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: 1, Point: "D"}); !errors.Is(err, sim.ErrNotBridge) {
@@ -367,7 +372,7 @@ func TestEngineersBringABridgeBack(t *testing.T) {
 }
 
 func TestTroopsStayOffABridgeAboutToFall(t *testing.T) {
-	s, r := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	s, r := simOn(t, rules, drillGround, sim.Config{StartGold: 2000})
 	wreck(t, s, r.BridgeRules.DangerShare-0.01)
 	b := bridge(s, "bridge-south")
 	if !b.Standing || b.Share() <= 0 {
@@ -403,7 +408,7 @@ func TestTroopsStayOffABridgeAboutToFall(t *testing.T) {
 }
 
 func TestInfantryGoInsideABuilding(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{})
+	s, _ := simOn(t, rules, drillGround, sim.Config{})
 	place(s.Squad(1), 450, 560)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Place: "D-bunker-1"})
 	all := run(s, 12)
@@ -461,7 +466,7 @@ func TestInfantryGoInsideABuilding(t *testing.T) {
 }
 
 func TestAGarrisonIsHiddenUntilCloseOrFiring(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{Base: []string{}}) // no base to shoot at on the way
+	s, _ := simOn(t, rules, drillGround, sim.Config{Base: []string{}}) // no base to shoot at on the way
 	place(s.Squad(1), 450, 580)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Place: "D-bunker-1"})
 	run(s, 12)
@@ -517,7 +522,7 @@ func TestAGarrisonIsHiddenUntilCloseOrFiring(t *testing.T) {
 func fight(t *testing.T, garrisoned bool, seed uint64) (commandos, militia float64) {
 	t.Helper()
 	// No base: its buildings would stand where the attackers are put down.
-	s, _ := simOn(t, rules, "small", sim.Config{Seed: seed, Base: []string{}})
+	s, _ := simOn(t, rules, drillGround, sim.Config{Seed: seed, Base: []string{}})
 	place(s.Squad(1), 450, 600)
 	if garrisoned {
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Place: "D-bunker-1"})
@@ -564,7 +569,7 @@ func TestABuildingProtectsItsGarrison(t *testing.T) {
 }
 
 func TestABuildingFallsAndThrowsItsGarrisonOut(t *testing.T) {
-	s, r := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	s, r := simOn(t, rules, drillGround, sim.Config{StartGold: 2000})
 	place(s.Squad(3), 1208, 300)
 	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: 3, Place: "K-ruin-1"})
 	run(s, 12)
@@ -623,7 +628,7 @@ func TestABuildingFallsAndThrowsItsGarrisonOut(t *testing.T) {
 }
 
 func TestAGarrisonLeavesABuildingAboutToFall(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	s, _ := simOn(t, rules, drillGround, sim.Config{StartGold: 2000})
 	place(s.Squad(3), 1208, 300)
 	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: 3, Place: "K-ruin-1"})
 	run(s, 12)
@@ -646,7 +651,7 @@ func TestAGarrisonLeavesABuildingAboutToFall(t *testing.T) {
 }
 
 func TestHoldingSquadsTakeTheCoverAtTheirPost(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{})
+	s, _ := simOn(t, rules, drillGround, sim.Config{})
 	place(s.Squad(1), 400, 600)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Point: "D"})
 	run(s, 25)
@@ -677,7 +682,7 @@ func TestHoldingSquadsTakeTheCoverAtTheirPost(t *testing.T) {
 }
 
 func TestPlaces(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{})
+	s, _ := simOn(t, rules, drillGround, sim.Config{})
 	f := rules.PointByID("F")
 	for text, want := range map[string]struct {
 		kind string
@@ -729,7 +734,7 @@ func TestPlaces(t *testing.T) {
 }
 
 func TestBlockedGroundIsWalkedRound(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{Base: []string{}})
+	s, _ := simOn(t, rules, drillGround, sim.Config{Base: []string{}})
 	// A wall across the straight way from the headquarters to Bravo.
 	s.SetBlocked("test-wall", 335, 340, 240, 20, true)
 	if s.Walkable(335, 340) {
@@ -755,7 +760,7 @@ func TestBlockedGroundIsWalkedRound(t *testing.T) {
 }
 
 func TestBridgesAndBuildingsAreAsLastSeen(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	s, _ := simOn(t, rules, drillGround, sim.Config{StartGold: 2000})
 	wreck(t, s, 0)
 	view := func(side int) sim.BridgeView {
 		for _, v := range s.Snapshot(side).Bridges {

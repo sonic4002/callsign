@@ -242,7 +242,7 @@ func TestTheRadarNeedsItsStructureAndPower(t *testing.T) {
 }
 
 func TestAUnitMayNeedMoreThanTheStructureThatMakesIt(t *testing.T) {
-	r := shared.MustLoad()
+	r := onDrillGround(shared.MustLoad())
 	f := r.Factions["aegis"]
 	u := f.Units["commandos"]
 	u.Needs = []string{shared.RoleRadar} // as a hero would

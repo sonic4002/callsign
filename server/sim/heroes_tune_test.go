@@ -99,7 +99,7 @@ func TestHeroBalanceProbe(t *testing.T) {
 		if only != "" && only != v.name {
 			continue
 		}
-		r := shared.MustLoad()
+		r := shared.MustLoad() // tuning is done on the small map as it is played
 		v.edit(r)
 		wins, byHQ := scriptedGames(t, r, seeds)
 		t.Logf("%-12s %d games: aegis %d, ashfall %d, %d by a fallen headquarters", v.name, 2*seeds, wins["aegis"], wins["ashfall"], byHQ)

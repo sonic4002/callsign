@@ -8,7 +8,7 @@ import (
 	"callsign/server/sim"
 )
 
-// The arena: open ground between Bravo and Delta on the small map, away from every
+// The arena: open ground between Bravo and Delta on the drill ground, away from every
 // landmark and out of reach of both bases.
 const arenaX, arenaY = 450.0, 430.0
 
@@ -419,7 +419,7 @@ func digIn(t *testing.T, s *sim.Sim, sq *sim.Squad) *sim.LandmarkState {
 }
 
 func TestASquadDigsInAndIsCoveredFromTheFrontOnly(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{Seed: 9, Base: []string{}})
+	s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 9, Base: []string{}})
 	viper := s.Squad(1)
 	stand(viper, arenaX, arenaY)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Place: "N of D 260"})
@@ -498,7 +498,7 @@ func TestASquadDigsInAndIsCoveredFromTheFrontOnly(t *testing.T) {
 }
 
 func TestSandbagsFaceTheEnemyInSightAndHaveALimit(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{Seed: 10, Base: []string{}})
+	s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 10, Base: []string{}})
 	viper := s.Squad(1)
 	stand(viper, arenaX, arenaY)
 	stand(s.Squad(3), arenaX+255, arenaY) // in sight, to the east, out of its own range
@@ -546,7 +546,7 @@ func TestOnlyInfantryDigInAndNotUnderFire(t *testing.T) {
 
 func TestATankRunsDownInfantryInTheOpenAndNotBehindSandbags(t *testing.T) {
 	crushed := func(dugIn bool) int {
-		s, _ := simOn(t, rules, "small", sim.Config{Seed: 12, StartGold: 5000, Base: []string{"barracks", "works"}})
+		s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 12, StartGold: 5000, Base: []string{"barracks", "works"}})
 		aside(s)
 		tank := buyFielded(t, s, 0, "tank")
 		militia := s.Squad(3)
@@ -600,7 +600,7 @@ func TestATankRunsDownInfantryInTheOpenAndNotBehindSandbags(t *testing.T) {
 
 func TestSteadyInfantryStepAsideAndATechnicalCrushesNobody(t *testing.T) {
 	pass := func(unit string, side int, pinned bool) int {
-		s, _ := simOn(t, rules, "small", sim.Config{Seed: 13, StartGold: 5000, Base: []string{"barracks", "works"}})
+		s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 13, StartGold: 5000, Base: []string{"barracks", "works"}})
 		aside(s)
 		v := buyFielded(t, s, side, unit)
 		foot := s.Squad(3)
@@ -638,7 +638,7 @@ func TestSteadyInfantryStepAsideAndATechnicalCrushesNobody(t *testing.T) {
 }
 
 func TestAVehicleFlattensSandbagsAndHeavyWeaponsKnockThemDown(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{Seed: 14, StartGold: 5000, Base: []string{"barracks", "works"}})
+	s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 14, StartGold: 5000, Base: []string{"barracks", "works"}})
 	tank := buyFielded(t, s, 0, "tank")
 	aside(s)
 	militia := s.Squad(3)
@@ -663,7 +663,7 @@ func TestAVehicleFlattensSandbagsAndHeavyWeaponsKnockThemDown(t *testing.T) {
 	}
 
 	// Driving over it flattens it at once, and it stays flat.
-	s, _ = simOn(t, rules, "small", sim.Config{Seed: 14, StartGold: 5000, Base: []string{"barracks", "works"}})
+	s, _ = simOn(t, rules, drillGround, sim.Config{Seed: 14, StartGold: 5000, Base: []string{"barracks", "works"}})
 	aside(s)
 	tank = buyFielded(t, s, 0, "tank")
 	viper := s.Squad(1)

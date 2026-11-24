@@ -1,6 +1,8 @@
 package sim_test
 
 import (
+	_ "embed"
+	"encoding/json"
 	"errors"
 	"math"
 	"testing"
@@ -10,7 +12,28 @@ import (
 	"callsign/shared"
 )
 
-var rules = shared.MustLoad()
+// The drill ground is a small fixed map that no player sees (testdata/drill-ground.json).
+// The tests of how the game works stage their fights at fixed spots of it, so redrawing
+// the maps that are played never breaks them. The tests of the maps themselves name
+// them (rules.MapIDs, simOn with an id) and get the real ones.
+const drillGround = "drill"
+
+//go:embed testdata/drill-ground.json
+var drillJSON []byte
+
+// onDrillGround is a set of rules with the drill ground as the map a match is played on
+// when nobody names one. The maps of the game stay as they are.
+func onDrillGround(r *shared.Rules) *shared.Rules {
+	var m shared.Map
+	if err := json.Unmarshal(drillJSON, &m); err != nil {
+		panic(err)
+	}
+	c := *r
+	c.Map = m
+	return &c
+}
+
+var rules = onDrillGround(shared.MustLoad())
 
 func newSim(t *testing.T, seed uint64) *sim.Sim {
 	t.Helper()
