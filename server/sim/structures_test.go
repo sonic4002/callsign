@@ -512,3 +512,42 @@ func TestARushStillPlaysToAResult(t *testing.T) {
 		t.Fatal("the match ended with no reason")
 	}
 }
+
+// A fence can also run from one place toward another: it is centred between them and no
+// longer than a run may be.
+func TestAFenceRunsBetweenTwoPlaces(t *testing.T) {
+	s := newSim(t, 1)
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: "A", Place2: "B"}); err != nil {
+		t.Fatal(err)
+	}
+	a, b := rules.PointByID("A"), rules.PointByID("B")
+	wall := rules.Factions["aegis"].Structures["barrierWall"]
+	n := 0
+	for _, st := range s.Snapshot(0).Structures {
+		if st.Role != shared.RoleFence {
+			continue
+		}
+		n++
+		// Every segment lies on the line from Alpha to Bravo.
+		cross := (b.X-a.X)*(st.Y-a.Y) - (b.Y-a.Y)*(st.X-a.X)
+		if cross > 600 || cross < -600 {
+			t.Fatalf("segment at (%v,%v) is off the line from Alpha to Bravo", st.X, st.Y)
+		}
+	}
+	if n == 0 || n > wall.Segments {
+		t.Fatalf("the run has %d segments, want 1 to %d", n, wall.Segments)
+	}
+	// The cap on runs holds.
+	for i := 0; i < rules.Match.FenceRuns+1; i++ {
+		run(s, wall.BuildSeconds+1)
+		wealth(s, 0, wall.Cost)
+		side := []string{"base:north", "base:south", "base:front", "base:rear", "base:north"}[i]
+		_, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: side})
+		if i >= rules.Match.FenceRuns-1 && !errors.Is(err, sim.ErrTooMany) {
+			t.Fatalf("run %d: err = %v, want the cap", i+2, err)
+		}
+		if i < rules.Match.FenceRuns-1 && err != nil {
+			t.Fatalf("run %d on %s: %v", i+2, side, err)
+		}
+	}
+}
