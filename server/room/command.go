@@ -34,14 +34,14 @@ const (
 )
 
 var (
-	ErrNotOrdered = errors.New("Hammer has not ordered a purchase and has not handed you the fight: you act on Hammer's orders only. Tell Hammer in one short line what you suggest, and wait")
+	ErrNotOrdered = errors.New("Hammer has not ordered a purchase and has not let you buy on your own. Tell Hammer in one short line what you suggest, and wait")
 	ErrNoBuying   = errors.New("Hammer handed you the fight but told you not to buy: ask Hammer before spending")
-	ErrNotHanded  = errors.New("only Hammer can hand you the fight, and Hammer has not just spoken to you")
+	ErrNotHanded  = errors.New("only Hammer can hand you the fight or let you buy on your own, and Hammer has not just spoken to you")
 )
 
 type command struct {
-	fight bool // the operator has the initiative
-	noBuy bool // ...but was told not to spend on its own
+	fight bool // the operator has the initiative: it tasks squads on its own
+	buy   bool // the operator may buy and upgrade on its own, with or without the fight
 	asked int  // tick of Hammer's last word to the operator, -1 for never
 }
 
@@ -53,9 +53,9 @@ type CommandView struct {
 
 func (c command) view() CommandView {
 	if c.fight {
-		return CommandView{Mode: ModeFight, Buy: !c.noBuy}
+		return CommandView{Mode: ModeFight, Buy: c.buy}
 	}
-	return CommandView{Mode: ModeOrders}
+	return CommandView{Mode: ModeOrders, Buy: c.buy}
 }
 
 // ordered reports whether Hammer spoke to the side's operator recently enough for a
@@ -86,65 +86,81 @@ func (rm *Room) heardHammer(side int, p radio.Parsed) {
 		}
 		return false
 	}
+	c := rm.cmd[side]
+	fight, buy := c.fight, c.buy
 	switch {
 	case says("take"):
-		rm.setCommand(side, false, false)
-		rm.cmd[side].asked = -1
+		fight, buy = false, false
 	case says("give"):
-		rm.setCommand(side, true, rm.cmd[side].fight && rm.cmd[side].noBuy)
-		rm.cmd[side].asked = -1
+		// Handing over the fight brings the purse with it, unless Hammer keeps it back.
+		fight, buy = true, c.buy || !c.fight
+	}
+	// "You may buy" and "do not buy" stand on their own, with or without the fight.
+	if says("grant") && !says("take") {
+		buy = true
+	}
+	if says("revoke") {
+		buy = false
+	}
+	if fight != c.fight || buy != c.buy {
+		rm.setCommand(side, fight, buy)
+		rm.cmd[side].asked = -1 // those words set who decides; they were not an order to buy
 	}
 }
 
 // setCommand changes a side's mode and tells the side when it changed.
-func (rm *Room) setCommand(side int, fight, noBuy bool) {
+func (rm *Room) setCommand(side int, fight, buy bool) {
 	c := &rm.cmd[side]
-	if !fight {
-		noBuy = false
-	}
-	if c.fight == fight && c.noBuy == noBuy {
+	if c.fight == fight && c.buy == buy {
 		return
 	}
-	c.fight, c.noBuy = fight, noBuy
+	c.fight, c.buy = fight, buy
 	rm.broadcast(side, map[string]any{"type": "command", "command": c.view()})
 }
 
-// toolCommand is the operator reading or setting the mode after Hammer handed over the
-// fight, or took it back, in words the fixed phrases do not cover.
 func (rm *Room) toolCommand(side int, a toolArgs) (any, error) {
+	c := rm.cmd[side]
+	fight, buy := c.fight, c.buy
 	switch a.Mode {
 	case "":
 	case ModeOrders:
-		rm.setCommand(side, false, false)
-		rm.cmd[side].asked = -1
+		fight, buy = false, false
 	case ModeFight:
-		if !rm.cmd[side].fight && !rm.ordered(side) {
-			return nil, ErrNotHanded
+		if !c.fight {
+			buy = true
 		}
-		rm.setCommand(side, true, a.MayBuy != nil && !*a.MayBuy)
-		rm.cmd[side].asked = -1 // what Hammer said was the hand-over, not an order to buy
+		fight = true
 	default:
 		return nil, errors.New(`mode is "orders" or "fight"`)
+	}
+	if a.MayBuy != nil {
+		buy = *a.MayBuy
+	}
+	// Only Hammer gives the operator more room: taking the fight or the purse needs a
+	// word from Hammer just now. Giving either back is always allowed.
+	if ((fight && !c.fight) || (buy && !c.buy)) && !rm.ordered(side) {
+		return nil, ErrNotHanded
+	}
+	if fight != c.fight || buy != c.buy {
+		rm.setCommand(side, fight, buy)
+		rm.cmd[side].asked = -1 // what Hammer said set who decides, it was not an order to buy
 	}
 	return rm.cmd[side].view(), nil
 }
 
-// mayBuy decides whether the operator may spend now. own reports that the purchase is
-// the operator's own, which the net then announces.
 func (rm *Room) mayBuy(side int) (own bool, err error) {
 	c := rm.cmd[side]
 	switch {
 	case rm.ordered(side):
 		return false, nil
-	case !c.fight:
-		return false, ErrNotOrdered
-	case c.noBuy:
+	case c.buy:
+		return true, nil
+	case c.fight:
 		return false, ErrNoBuying
 	}
-	return true, nil
+	return false, ErrNotOrdered
 }
 
-// announce puts the operator's own purchase on the net, addressed to Hammer.
 func (rm *Room) announce(side int, kind string, sq *sim.Squad, cost int) {
 	from, to := radio.Station{Kind: radio.Operator}, radio.Station{Kind: radio.Player}
 	lang := rm.lang[side][to.Key()]

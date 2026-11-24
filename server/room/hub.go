@@ -106,6 +106,7 @@ type Options struct {
 	Watch         bool   // let spectators in
 	Bot           string // how hard the scripted enemy presses, "" for the server's usual
 	Speed         string // how fast the match's clock runs, "" for normal (see Speeds)
+	Purse         bool   // the operators may buy on their own from the start
 }
 
 // Speed is a pace a match can be played at. It changes only how much real time one tick
@@ -207,7 +208,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
-		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed,
+		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
 	}
 	if lesson {
 		cfg.Bots[1-o.Side] = bot.Tutorial // also on a server started without a scripted enemy
@@ -433,6 +434,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Watch    bool   `json:"watch"`
 		Bot      string `json:"bot"`
 		Speed    string `json:"speed"`
+		Purse    bool   `json:"purse"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -445,7 +447,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

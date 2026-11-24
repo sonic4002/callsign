@@ -75,7 +75,8 @@ export function wantedUnit(text, units) {
 const tasked = new Map(); // "side:callsign" → seconds left in the match when the operator last tasked it
 function ownMoves({ wake, rules, agent }) {
   const s = wake.status;
-  if (s?.command?.mode !== "fight") return [];
+  const fight = s?.command?.mode === "fight";
+  if (!fight && !s?.command?.buy) return [];
   // A squad just told where to go still shows no order for a moment; it is not told twice.
   const fresh = (sq) => {
     const at = tasked.get(`${agent.side}:${sq.callsign.en}`);
@@ -92,6 +93,7 @@ function ownMoves({ wake, rules, agent }) {
     // The net announces a purchase made on the operator's own, so nothing is said here.
     if (pick && s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
   }
+  if (!fight) return moves; // the purse without the fight: it buys, and tasks nobody
   const mine = (p) => s.points.find((q) => q.id === p.id)?.owner === agent.side;
   const taken = new Set(s.squads.map((q) => q.order?.point).filter(Boolean)); // one squad per point
   for (const sq of s.squads.filter((q) => q.order?.kind === "none" && !fresh(q)).slice(0, 2)) {
@@ -118,7 +120,7 @@ function operatorPlan(ctx) {
   // Handing over the fight, or taking command back: the net has already switched the mode
   // on the fixed words, so the operator only acknowledges, and gets to work if it is its fight.
   const says = (kind) => [...rules.radio.command[kind].en, ...rules.radio.command[kind].he].some((phrase) => text.includes(phrase.toLowerCase()));
-  if (says("take") || says("give")) return [radio(back, say.wilco[lang], "out"), ...ownMoves(ctx)];
+  if (says("take") || says("give") || says("grant") || says("revoke")) return [radio(back, say.wilco[lang], "out"), ...ownMoves(ctx)];
 
   if (/\bupgrade\b|שדרג/.test(text)) {
     const squad = (wake.status?.squads ?? []).find((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));

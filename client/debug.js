@@ -210,8 +210,13 @@ function onFrame(frame) {
       // Hammer handed Anvil the fight, or took command back: said once, in plain words.
       command = frame.command;
       {
+        const was = shownCommand;
+        shownCommand = command;
+        // Said once, in plain words: who tasks the squads, and who holds the purse.
         const handed = command.mode === "fight";
-        if (me) system(handed ? "command.nowFight" : "command.nowOrders");
+        const purse = command.buy;
+        if (me && was.mode !== command.mode) system(handed ? "command.nowFight" : "command.nowOrders");
+        if (me && was.buy !== command.buy) system(purse ? "command.nowBuys" : "command.nowAsks");
       }
       break;
     case "radio":
@@ -301,6 +306,7 @@ function transmit(text) {
 // Anvil acts on the player's orders only, until the player hands it the fight. The server
 // holds the mode and says when it changes; the switch here only transmits the radio call.
 let command = { mode: "orders", buy: false };
+let shownCommand = { mode: "orders", buy: false }; // what the log last said about it
 
 // ---- upgrades on their way ----
 //
@@ -546,7 +552,9 @@ function renderSidebar() {
   const fight = command.mode === "fight";
   $("command").hidden = !me;
   $("command").classList.toggle("fight", fight);
-  $("command-mode").textContent = fight ? (command.buy ? t("command.fight") : t("command.fightNoBuy")) : t("command.orders");
+  $("command-mode").textContent = fight ? (command.buy ? t("command.fight") : t("command.fightNoBuy")) : command.buy ? t("command.ordersBuy") : t("command.orders");
+  $("command-purse").textContent = command.buy ? t("command.revoke") : t("command.grant");
+  $("command-purse").disabled = !canAct;
   $("command-switch").textContent = fight ? t("command.take") : t("command.give");
   $("command-switch").disabled = !canAct;
   // The match's pace beside the clock, when it is not the usual one.
@@ -613,6 +621,7 @@ function deployRow(d) {
 }
 
 $("command-switch").addEventListener("click", () => transmit(call(command.mode === "fight" ? "take" : "give", { to: anvil() })));
+$("command-purse").addEventListener("click", () => transmit(call(command.buy ? "revoke" : "grant", { to: anvil() })));
 
 function orderText(sq) {
   if (sq.order.contact) return t("order.contact");
@@ -945,7 +954,7 @@ $("start").addEventListener("click", () => {
     const friend = chosen("opponent") === "friend";
     localStorage.setItem("callsign.level", chosen("bot"));
     localStorage.setItem("callsign.speed", chosen("speed"));
-    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"), speed: chosen("speed") });
+    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"), speed: chosen("speed"), purse: chosen("purse") === "on" });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
   if (found && freeSeat(found.lobby)) return takeFreeSeat();

@@ -47,6 +47,7 @@ type Config struct {
 	Opponent string // "bot" or "friend", for the lobby to show
 	Watch    bool   // spectators, who see both sides, are let in
 	Speed    string // the pace the room is played at, for the lobby to show; "" is normal
+	Purse    bool   // the operators may buy on their own from the first second (a lobby option)
 	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the
@@ -128,7 +129,7 @@ func (rm *Room) reset() error {
 	for side := 0; side < 2; side++ {
 		rm.logs[side] = nil
 		rm.lang[side] = map[string]string{}
-		rm.cmd[side] = command{asked: -1}
+		rm.cmd[side] = command{asked: -1, buy: rm.cfg.Purse}
 		rm.bots[side] = nil
 		if style := rm.cfg.Bots[side]; style != "" {
 			rm.bots[side] = &bot.Player{Side: side, Style: style, R: rm.r}

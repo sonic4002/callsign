@@ -271,8 +271,8 @@
   "command.fightNoBuy": "Anvil: running the fight, not buying",
   "command.give": "Hand over the fight",
   "command.take": "Take command",
-  "command.nowFight": "Anvil now runs the fight: it tasks squads and buys on its own, and tells you what it bought.",
-  "command.nowOrders": "Anvil is on your orders: it buys and tasks squads only when you say so.",
+  "command.nowFight": "Anvil now runs the fight: it tasks squads on its own.",
+  "command.nowOrders": "Anvil is on your orders: it tasks squads only when you say so.",
   "call.give": "{to}, this is {from}. Run the fight. Over.",
   "call.take": "{to}, this is {from}. I have command. Over.",
   "lobby.speed": "Speed",
@@ -282,5 +282,13 @@
   "lobby.speedAbout.relaxed": "The clock runs slower. Squad leaders still take a few real seconds to think, so they answer sooner in game terms: the easiest pace to command at.",
   "lobby.speedAbout.normal": "The pace the game is balanced for.",
   "lobby.speedAbout.fast": "The clock runs half as fast again. Squad leaders still take a few real seconds to think, so they answer later in game terms, and more rides on the orders you gave beforehand.",
-  "lobby.pace": "Speed: {name}"
+  "lobby.pace": "Speed: {name}",
+  "command.ordersBuy": "Anvil: on your orders, buying on its own",
+  "command.grant": "Let Anvil buy",
+  "command.revoke": "Stop Anvil buying",
+  "command.nowBuys": "Anvil may now buy on its own. It tells you what it bought.",
+  "command.nowAsks": "Anvil now buys only when you order it.",
+  "call.grant": "{to}, this is {from}. You may buy as you see fit. Over.",
+  "call.revoke": "{to}, this is {from}. Do not buy on your own. Over.",
+  "lobby.purse": "Anvil may buy troops on its own from the start. You can change it during the match."
 }

@@ -99,7 +99,7 @@
     <section class="panel grow" data-sheet="squads">
       <h2><span data-i18n="roster"></span> <bdi dir="ltr" id="pop"></bdi></h2>
       <!-- Who has the initiative: the player, or Anvil. The button only transmits the call. -->
-      <p id="command" hidden><span id="command-mode"></span> <button type="button" id="command-switch"></button></p>
+      <p id="command" hidden><span id="command-mode"></span> <button type="button" id="command-switch"></button> <button type="button" id="command-purse"></button></p>
       <ul id="roster"></ul>
     </section>
 
@@ -179,6 +179,7 @@
         </select>
         <small id="lobby-speed-about"></small>
       </label>
+      <label id="lobby-purse"><input type="checkbox" name="purse"> <span data-i18n="lobby.purse"></span></label>
       <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
       <fieldset id="lobby-host" hidden>
         <legend data-i18n="lobby.hostKey"></legend>

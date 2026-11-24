@@ -187,3 +187,63 @@ func TestOperatorSetsTheModeWithTheCommandTool(t *testing.T) {
 		t.Fatalf("the operator's report: %s", raw[:min(len(raw), 200)])
 	}
 }
+
+func TestHammerLetsTheOperatorBuyWithoutHandingOverTheFight(t *testing.T) {
+	rm := newRoom(t, Config{})
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	enrich(rm)
+	if err := buyErr(rm, anvil, `{"unit":"commandos","upgrade":""}`); !errors.Is(err, ErrNotOrdered) {
+		t.Fatalf("an unordered buy before any permission: %v", err)
+	}
+	say := func(text string) {
+		t.Helper()
+		if _, err := rm.Say(hammer, text); err != nil {
+			t.Fatal(err)
+		}
+	}
+	say("סדן, אני מאשר לך לקנות כוחות")
+	if v := rm.cmd[0].view(); v.Mode != ModeOrders || !v.Buy {
+		t.Fatalf("after the grant: %+v, want orders with buying allowed", v)
+	}
+	// The permission stands long after Hammer's last word.
+	for i := 0; i < (orderSeconds+30)*rules.TickRate; i++ {
+		rm.sim.Step()
+	}
+	if err := buyErr(rm, anvil, `{"unit":"commandos","upgrade":""}`); err != nil {
+		t.Fatalf("a buy on a standing permission: %v", err)
+	}
+	say("Anvil, stop buying")
+	if v := rm.cmd[0].view(); v.Buy {
+		t.Fatalf("after the revoke: %+v", v)
+	}
+	for i := 0; i < (orderSeconds+1)*rules.TickRate; i++ {
+		rm.sim.Step()
+	}
+	if err := buyErr(rm, anvil, `{"unit":"commandos","upgrade":""}`); !errors.Is(err, ErrNotOrdered) {
+		t.Fatalf("a buy after the permission was taken back: %v", err)
+	}
+	// Handing over the fight brings the purse; "but do not buy" keeps it back.
+	say("Anvil, run the fight")
+	if v := rm.cmd[0].view(); v.Mode != ModeFight || !v.Buy {
+		t.Fatalf("after the hand-over: %+v", v)
+	}
+	say("Anvil, I have command")
+	say("Anvil, run the fight but do not buy")
+	if v := rm.cmd[0].view(); v.Mode != ModeFight || v.Buy {
+		t.Fatalf("a hand-over without the purse: %+v", v)
+	}
+}
+
+func TestALobbyOptionGivesTheOperatorsThePurseFromTheStart(t *testing.T) {
+	rm := newRoom(t, Config{Purse: true})
+	join(t, rm, 0, RoleHammer, 0)
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	enrich(rm)
+	if v := rm.cmd[0].view(); v.Mode != ModeOrders || !v.Buy {
+		t.Fatalf("at the start: %+v", v)
+	}
+	if err := buyErr(rm, anvil, `{"unit":"commandos","upgrade":""}`); err != nil {
+		t.Fatalf("a buy with the purse from the start: %v", err)
+	}
+}

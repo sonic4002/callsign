@@ -284,6 +284,8 @@ test("command tool: the operator's own switch keeps a false `buy`", () => {
   assert.deepEqual(normalize("command", { mode: "fight", buy: false }), { mode: "fight", buy: false });
   assert.deepEqual(normalize("command", { mode: "orders", buy: true }), { mode: "orders", buy: true });
   const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
-  assert.match(prompt, /never buy, upgrade or give a squad a new task on your own/);
-  assert.match(prompt, /only Hammer hands it over/);
+  assert.match(prompt, /you give no squad a new task on your own/);
+  assert.match(prompt, /buy and upgrade only on Hammer's order/);
+  assert.match(prompt, /Never give yourself the fight or the purse/);
+  assert.match(prompt, /Buy troops and push forward/);
 });

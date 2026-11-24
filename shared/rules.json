@@ -196,6 +196,14 @@
       "take": {
         "en": ["i have command", "i am taking command", "i'm taking command", "i take command", "on my orders only"],
         "he": ["הפיקוד אצלי", "אני לוקח פיקוד", "אני לוקחת פיקוד", "רק בפקודה שלי"]
+      },
+      "grant": {
+        "en": ["you may buy", "you can buy", "permission to buy", "buy as you see fit", "buy on your own", "buy what you need", "keep buying"],
+        "he": ["מותר לך לקנות", "אתה יכול לקנות", "אני מאשר לך לקנות", "מאשר לך לקנות", "אישור לקנות", "קנה לפי שיקולך", "קנה מה שצריך", "תמשיך לקנות"]
+      },
+      "revoke": {
+        "en": ["do not buy", "don't buy", "stop buying", "no buying", "no more buying"],
+        "he": ["אל תקנה", "תפסיק לקנות", "הפסק לקנות", "בלי קניות", "לא לקנות"]
       }
     },
     "ownPurchase": {

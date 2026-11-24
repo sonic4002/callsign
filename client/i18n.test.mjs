@@ -22,7 +22,7 @@ const dynamic = {
   "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer"],
   "order.": ["none", "move", "hold", "attack"],
-  "call.": ["hold", "move", "attack", "buy", "upgrade", "give", "take"],
+  "call.": ["hold", "move", "attack", "buy", "upgrade", "give", "take", "grant", "revoke"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
   "class.": classes,
   "side.": ["0", "1"],

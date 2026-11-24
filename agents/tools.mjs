@@ -56,10 +56,10 @@ export const operatorTools = [
   }),
   tool(
     "command",
-    'Set who has the initiative, after Hammer handed you the fight or took command back in words of their own. The fixed phrases ("run the fight", "I have command") switch it without you; your status always shows the current mode.',
+    'Set who decides, after Hammer gave or took back the fight or the purse in words of their own, or gave you a standing task that needs them ("buy troops and push forward"). The fixed phrases ("run the fight", "I have command", "you may buy", "do not buy") switch them without you; your status always shows both.',
     {
-      mode: { type: "string", enum: ["orders", "fight"], description: '"fight" when Hammer handed you the fight, "orders" when Hammer took command back.' },
-      buy: { type: "boolean", description: "With \"fight\": false when Hammer told you not to spend on your own, otherwise true." },
+      mode: { type: "string", enum: ["orders", "fight"], description: 'Who tasks the squads from now on: "fight" when Hammer handed you the fight, "orders" when Hammer commands. Give the current one to change only `buy`.' },
+      buy: { type: "boolean", description: "Whether you may buy and upgrade on your own from now on: true when Hammer let you (or handed you the fight without holding the purse back), false when Hammer told you not to spend or took command back." },
     },
   ),
 ];
