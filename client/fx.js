@@ -205,6 +205,15 @@ export class Fx {
   }
 
   // shell is where a round lands: a burst on the ground, a plume in the sea.
+  // coins is gold pouring out of a hauler at the drop-off: a small bright shower.
+  coins(x, y, now) {
+    if (!this.onScreen(x, y)) return;
+    this.blob("flash", x, y, { t0: now, ttl: 160, r0: 2, r1: 8, a: 0.5, add: true, h: 6 });
+    for (let i = 0; i < 9; i++) {
+      this.speck(i % 3 ? "#f0c95a" : "#fff3b8", x, y, { t0: now + i * 35, ttl: rand(450, 750), vx: rand(-26, 26), vy: rand(-26, 26), vh: rand(60, 120), size: 1.4, pri: 0 });
+    }
+  }
+
   shell(x, y, now, s = 1) {
     if (this.onWater(y)) {
       this.spray(x, y, now, 1.1 * s);

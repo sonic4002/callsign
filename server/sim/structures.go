@@ -292,12 +292,26 @@ func (s *Sim) freeSlot(side int, role string) int {
 		}
 		return -1
 	}
+	// A refinery goes where the haulers' trip is shortest: the free slot nearest a gusher.
+	best, bd := -1, math.MaxFloat64
 	for i := range baseSlots {
-		if x, y := s.baseSlot(side, i); !taken(x, y) {
+		x, y := s.baseSlot(side, i)
+		if taken(x, y) {
+			continue
+		}
+		if role != shared.RoleRefinery {
+			return i
+		}
+		for g := range s.R.Gushers {
+			if d := dist(x, y, s.R.Gushers[g].X, s.R.Gushers[g].Y); d < bd {
+				best, bd = i, d
+			}
+		}
+		if len(s.R.Gushers) == 0 {
 			return i
 		}
 	}
-	return -1
+	return best
 }
 
 // structureByKey finds a faction's structure by its id or by its role.

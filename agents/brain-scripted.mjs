@@ -10,11 +10,18 @@ const verbs = [
   ["move", /\b(move|go|advance|head)\b|נוע|נועו|זוז|זוזו|התקדם/],
   ["hold", /\b(hold|defend|take|capture|secure|guard)\b|תחזיק|החזק|להחזיק|הגן|קח|כבוש|תפוס|תפסו/],
 ];
+// Words for the gold haulers, and for guarding them.
+const haulerWords = /\b(haulers?|trucks?|crawlers?|miners?|harvesters?)\b|משאית|משאיות|מוביל|מובילים|זחל|זחלים/;
+const escortWords = /\b(escort|protect|cover|guard)\b|לווה|ליווי|אבטח|שמור/;
 const say = {
   wilco: { en: "Wilco", he: "רות, יבוצע" },
   sayAgain: { en: "Say again", he: "אמור שנית" },
   fiveByFive: { en: "Five by five", he: "חמש על חמש" },
   negative: { en: "Negative", he: "שלילי" },
+};
+const haulerLines = {
+  hauler_attacked: { en: (p) => `Hauler under attack near ${p}`, he: (p) => `מוביל זהב מותקף ליד ${p}` },
+  hauler_lost: { en: (p) => `Hauler lost near ${p}`, he: (p) => `מוביל זהב אבד ליד ${p}` },
 };
 const eventLines = {
   pinned: { en: (p) => `Pinned at ${p}, request support`, he: (p) => `מרותקים ב${p}, מבקש סיוע` },
@@ -46,11 +53,13 @@ function leaderPlan({ agent, wake, rules }) {
   if (theirs && captureVerb.test(call.body.toLowerCase()) && agent.unit?.captureSeconds > 0) {
     return [{ name: "capture", input: { place: theirs.id }, orElse }, radio(back, say.wilco[lang], "out")];
   }
-  const verb = verbOf(call.body);
+  const escort = escortWords.test(call.body.toLowerCase()) && haulerWords.test(call.body.toLowerCase());
+  const verb = escort ? "hold" : verbOf(call.body);
   if (theirs && verb === "attack") {
     return [{ name: "attack", input: { point: theirs.id, contact: 0 }, orElse }, radio(back, say.wilco[lang], "out")];
   }
-  const point = call.points?.[0];
+  // "Escort the haulers": hold the field they work, or the one nearest home when they are not out.
+  const point = escort ? call.points?.[0] ?? workedField(wake.status, rules, agent.side) : call.points?.[0];
   if (!verb || (!point && verb === "move")) return [radio(back, say.sayAgain[lang], "over")];
   // "Attack" with no target: the nearest enemy in sight, or else the enemy headquarters.
   const named = Number(new RegExp(`(?:${rules.callsigns.contact.en}|${rules.callsigns.contact.he})\\s*#?(\\d+)`, "i").exec(call.body)?.[1] ?? 0);
@@ -63,14 +72,25 @@ function leaderPlan({ agent, wake, rules }) {
   ];
 }
 
+// workedField is the map point of the gold field a side's haulers work now, or of the
+// field nearest its headquarters.
+function workedField(status, rules, side) {
+  const gushers = rules.gushers ?? [];
+  const working = (status?.haulers ?? []).find((h) => h.field)?.field;
+  const hq = rules.map.points.find((p) => p.kind === "hq" && p.owner === side);
+  const near = [...gushers].sort((a, b) => Math.hypot(a.x - hq.x, a.y - hq.y) - Math.hypot(b.x - hq.x, b.y - hq.y))[0];
+  return (gushers.find((g) => g.id === working) ?? near)?.point;
+}
+
 // wantedUnit reads which unit a buy call asks for: a unit named in either language first
 // ("rocket launcher", "מסוק"), otherwise the cheapest unit of the class it mentions.
 const classWords = [
+  ["hauler", haulerWords],
   ["air", /\b(air|aircraft|helicopter|chopper|drones?)\b|אוויר|מסוק|רחפן|רחפנים|נחיל/],
   ["vehicle", /\b(tank|vehicle|technical|armou?r)|טנק|רכב|טנדר|שריון/],
   ["naval", /\b(boat|naval|ship)|סירה|סירת|ימי/],
 ];
-const small = new Set(["team", "squad", "main", "cell", "the", "חוליית", "כיתת"]);
+const small = new Set(["team", "squad", "main", "cell", "the", "gold", "ore", "חוליית", "כיתת", "זהב"]);
 export function wantedUnit(text, units) {
   const low = text.toLowerCase();
   const entries = Object.entries(units);
@@ -124,6 +144,16 @@ function ownMoves({ wake, rules, agent }) {
 function operatorPlan(ctx) {
   const { wake, rules, agent } = ctx;
   const call = wake.call;
+  if (!call) {
+    // A hauler in trouble is the one thing the scripted operator reports unasked.
+    const e = wake.items.find((i) => i.kind === "event" && haulerLines[i.event.kind])?.event;
+    if (e) {
+      const point = rules.map.points.find((p) => p.id === e.point);
+      const lang = agent.lang ?? "en";
+      // To the commander, whoever spoke to the operator last.
+      return [radio([rules.callsigns.player.en], haulerLines[e.kind][lang](point?.callsign[lang] ?? e.point), "out"), ...ownMoves(ctx)];
+    }
+  }
   if (!call || call.from.key !== "player") return ownMoves(ctx); // otherwise Anvil answers to Hammer only
   const lang = call.lang;
   const back = [call.from.en];
@@ -139,6 +169,13 @@ function operatorPlan(ctx) {
     const squad = (wake.status?.squads ?? []).find((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));
     if (!squad) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
+  if (haulerWords.test(text) && !/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
+    // "Haulers to the Kilo field", "המשאיות לשדה כרמל", "haulers on their own".
+    const auto = /\b(auto|on their own|themselves|choose)\b|לבד|בעצמם|בעצמן/.test(text);
+    const field = auto ? "auto" : call.points?.[0];
+    if (!field) return [radio(back, say.sayAgain[lang], "over")];
+    return [{ name: "haul", input: { field, hauler: 0 }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   // Building: a structure named with a word for building, or a defence or a fence asked
   // for by itself ("a gun at Delta", "fence the north side").

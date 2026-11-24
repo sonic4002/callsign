@@ -10,7 +10,7 @@
   "language": "עברית",
   "restart": "Restart",
   "gold": "Gold",
-  "income": "per second",
+  "income": "a minute",
   "timeLeft": "Time left",
   "points": "Points held",
   "hqOurs": "Our HQ",
@@ -315,5 +315,17 @@
   "event.structure_lost": "Our {structure} near {point} was destroyed.",
   "event.structure_lost_theirs": "The enemy's {structure} near {point} was destroyed.",
   "event.structure_captured": "Our engineers took over the enemy's {structure} near {point}.",
-  "event.structure_taken": "The enemy took over our {structure} near {point}."
+  "event.structure_taken": "The enemy took over our {structure} near {point}.",
+  "class.hauler": "hauler",
+  "haulers": "Gold haulers",
+  "haulersNone": "No haulers. Gold comes in only from the headquarters.",
+  "haul.out": "Driving to the {point} field",
+  "haul.loading": "Loading at {point}",
+  "haul.returning": "Bringing gold home",
+  "haul.unloading": "Unloading",
+  "haul.fleeing": "Under fire, running home",
+  "haul.waiting": "Waiting: no safe field with gold",
+  "call.haul": "{to}, this is {from}. Haulers to the {point} field. Over.",
+  "event.hauler_attacked": "A gold hauler is under attack near {point}.",
+  "event.hauler_lost": "A gold hauler was destroyed near {point}."
 }

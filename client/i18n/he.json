@@ -10,7 +10,7 @@
   "language": "English",
   "restart": "התחל מחדש",
   "gold": "זהב",
-  "income": "לשנייה",
+  "income": "לדקה",
   "timeLeft": "זמן שנותר",
   "points": "נקודות בידינו",
   "hqOurs": "המפקדה שלנו",
@@ -315,5 +315,17 @@
   "event.structure_lost": "{structure} שלנו ליד {point} הושמד.",
   "event.structure_lost_theirs": "{structure} של האויב ליד {point} הושמד.",
   "event.structure_captured": "ההנדסה שלנו השתלטה על {structure} של האויב ליד {point}.",
-  "event.structure_taken": "האויב השתלט על {structure} שלנו ליד {point}."
+  "event.structure_taken": "האויב השתלט על {structure} שלנו ליד {point}.",
+  "class.hauler": "מוביל זהב",
+  "haulers": "מובילי זהב",
+  "haulersNone": "אין מובילים. זהב נכנס רק מהמפקדה.",
+  "haul.out": "בדרך לשדה {point}",
+  "haul.loading": "מעמיס ב{point}",
+  "haul.returning": "מביא זהב הביתה",
+  "haul.unloading": "פורק",
+  "haul.fleeing": "תחת אש, בורח הביתה",
+  "haul.waiting": "ממתין: אין שדה בטוח עם זהב",
+  "call.haul": "{to}, כאן {from}, המשאיות לשדה {point}, עבור.",
+  "event.hauler_attacked": "מוביל זהב מותקף ליד {point}.",
+  "event.hauler_lost": "מוביל זהב הושמד ליד {point}."
 }

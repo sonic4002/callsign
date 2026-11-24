@@ -13,10 +13,10 @@ const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.
 const viper2 = { key: "infantry-2", en: "Viper 2", he: "צפע 2", squad: 2 };
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 
-test("the game tools: the six in the design, build for the operator, capture and repair for engineers only", () => {
+test("the game tools: the six in the design, build and haul for the operator, capture and repair for engineers only", () => {
   const names = (tools) => tools.map((t) => t.name).sort();
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
-  assert.deepEqual(names(operatorTools), ["build", "buy", "command", "radio", "report"]);
+  assert.deepEqual(names(operatorTools), ["build", "buy", "command", "haul", "radio", "report"]);
   const { units } = rules.factions.aegis;
   assert.deepEqual(names(leaderToolsFor(units.commandos)), names(leaderTools));
   assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "hold", "move", "radio", "repair", "report"]);
@@ -291,4 +291,87 @@ test("command tool: the operator's own switch keeps a false `buy`", () => {
   assert.match(prompt, /buy and upgrade only on Hammer's order/);
   assert.match(prompt, /Never give yourself the fight or the purse/);
   assert.match(prompt, /Buy troops and push forward/);
+});
+
+test("scripted operator: buys haulers, sends them to a field, and reports one in trouble", async () => {
+  const brain = scriptedBrain();
+  // The last station to call Anvil was a squad; a hauler in trouble is still reported to Hammer.
+  const anvil = (lang) => ({ role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang, commander: "Viper 1" });
+  const status = (faction) => ({ faction, gold: 600, points: [], squads: [], haulers: [] });
+  const wake = (c, faction = "aegis") => ({ items: [{ kind: "radio", msg: c }], call: c, status: status(faction) });
+  // Each faction's own hauler, whatever the caller calls it.
+  for (const [text, lang, faction, unit] of [
+    ["Buy a hauler", "en", "aegis", "crawler"],
+    ["Buy a gold truck", "en", "ashfall", "dumpTruck"],
+    ["קנה משאית זהב", "he", "aegis", "crawler"],
+    ["קנה משאית זהב", "he", "ashfall", "dumpTruck"],
+    ["Buy a tank, we have the gold", "en", "aegis", "tank"],
+  ]) {
+    const steps = await think(brain, { agent: anvil(lang), wake: wake(call(text, { lang }), faction) });
+    assert.deepEqual(steps[0], ["buy", { unit, upgrade: "" }], `${faction}: "${text}"`);
+  }
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Haulers to the Kilo field", { points: ["K"] })) }), [
+    ["haul", { field: "K", hauler: 0 }],
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: anvil("he"), wake: wake(call("המשאיות לשדה כרמל", { lang: "he", points: ["K"] })) }), [
+    ["haul", { field: "K", hauler: 0 }],
+    ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Let the haulers choose on their own")) }), [
+    ["haul", { field: "auto", hauler: 0 }],
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Haulers to the field")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Haulers to Golf", { points: ["G"] })) }, { haul: 'no such gold field: "G"' }), [
+    ["haul", { field: "G", hauler: 0 }],
+    ["radio", { to: ["Hammer"], body: 'Negative, no such gold field: "G"', end: "over" }],
+  ]);
+  // Woken by the event, with no call: one short line to the commander.
+  const event = (kind) => ({ items: [{ kind: "event", event: { kind, hauler: 1001, point: "B" } }], call: null, status: status("aegis") });
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("hauler_attacked") }), [["radio", { to: ["Hammer"], body: "Hauler under attack near Bravo", end: "out" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil("he"), wake: event("hauler_lost") }), [["radio", { to: ["Hammer"], body: "מוביל זהב אבד ליד בועז", end: "out" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("squad_lost") }), []);
+});
+
+test("scripted leader: escorting the haulers means holding the field they work", async () => {
+  const brain = scriptedBrain();
+  const status = (haulers) => ({ you: {}, friends: [], contacts: [], points: [], haulers });
+  const wake = (c, haulers) => ({ items: [{ kind: "radio", msg: c }], call: c, status: status(haulers) });
+  const hold = (point) => [
+    ["hold", { point }],
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+  ];
+  assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Escort the haulers"), [{ id: 1001, state: "loading", field: "F" }]) }), hold("F"));
+  // Nobody is out: the field nearest home.
+  assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Escort the haulers"), [{ id: 1001, state: "waiting", field: "" }]) }), hold("B"));
+  assert.deepEqual(await think(brain, { agent: { ...leader, lang: "he" }, wake: wake(call("לווה את המשאיות", { lang: "he" }), [{ id: 1001, state: "out", field: "B" }]) }), [
+    ["hold", { point: "B" }],
+    ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
+  ]);
+  // A named point wins over the guess.
+  assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Escort the haulers at Kilo", { points: ["K"] }), []) }), hold("K"));
+});
+
+test("status and prompts: the operator is told about haulers, fields and income per minute", () => {
+  const status = compactStatus(
+    {
+      timeLeft: 500, gold: 420, income: 900, hq: [1, 1], points: [], contacts: [], squads: [], deploying: [],
+      haulers: [
+        { id: 1001, side: 0, state: "loading", load: 0.4, field: "B", assigned: "", x: 1, y: 2, visible: true },
+        { id: 1002, side: 1, state: "out", load: 0, x: 900, y: 300, visible: false },
+      ],
+      fields: [{ gusher: "B", gold: 0.5, visible: true }],
+    },
+    0,
+  );
+  assert.equal(status.goldPerMinute, 900);
+  assert.deepEqual(status.haulers, [{ id: 1001, state: "loading", load: 0.4, field: "B", sentTo: undefined }]);
+  assert.deepEqual(status.enemyHaulersSeen, [{ contact: 1002, x: 900, y: 300, inSight: false }]);
+  assert.deepEqual(status.goldFields, [{ field: "B", full: 0.5, inSight: true }]);
+  const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
+  assert.match(prompt, /haulers drive out, load, and bring it home/);
+  assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold; an unarmed gold hauler/);
+  assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);
+  assert.doesNotMatch(prompt, /oil rigs; there are/);
 });

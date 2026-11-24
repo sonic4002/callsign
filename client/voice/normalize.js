@@ -13,7 +13,7 @@ const numbers = {
 };
 
 // Ordinary words that sound like a map point but are not one.
-const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "out", "over", "tell", "dig", "fox", "see", "sir", "zero", "brave", "dealt", "דור", "גם", "כל", "סוף", "הגיע", "פסול", "כיתה", "כיתת", "כיתות", "זהב", "את", "אותה", "אותו", "אותם", "to", "it", "cell"]);
+const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "out", "over", "tell", "dig", "fox", "see", "sir", "zero", "brave", "dealt", "דור", "גם", "כל", "סוף", "הגיע", "פסול", "כיתה", "כיתת", "כיתות", "זהב", "את", "אותה", "אותו", "אותם", "to", "it", "cell", "זהב", "שדה"]);
 
 // sound reduces a word to rough consonant classes, so "vapour" and "viper" come out alike.
 export function sound(word, lang) {

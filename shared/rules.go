@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 //go:embed rules.json
@@ -77,6 +78,10 @@ type Unit struct {
 	// Vs scales damage by the target's class, or "hq" for a headquarters. A target not
 	// listed takes full damage; one at 0 cannot be engaged at all.
 	Vs map[string]float64 `json:"vs,omitempty"`
+	// A hauler collects gold: how much it carries and how long loading and unloading take.
+	Capacity      float64 `json:"capacity,omitempty"`
+	LoadSeconds   float64 `json:"loadSeconds,omitempty"`
+	UnloadSeconds float64 `json:"unloadSeconds,omitempty"`
 	// NoCapture marks a unit that cannot hold ground, whatever its class.
 	NoCapture bool `json:"noCapture,omitempty"`
 	// Requires is the role of the structure a side must have standing to buy this unit.
@@ -98,6 +103,23 @@ func (u *Unit) Against(class string) float64 {
 	return 1
 }
 
+// HaulerClass is the class of the unarmed vehicles that collect gold. They have no leader
+// agent and no radio callsign, and do not count toward the squad population cap.
+const HaulerClass = "hauler"
+
+// Gusher is a gold source. It throws gold up into the field around it at a steady rate,
+// up to the field's cap; haulers collect it from the field.
+type Gusher struct {
+	ID            string  `json:"id"`
+	Point         string  `json:"point"` // the map point it is named after on the radio
+	X             float64 `json:"x"`
+	Y             float64 `json:"y"`
+	RatePerSecond float64 `json:"ratePerSecond"`
+	FieldRadius   float64 `json:"fieldRadius"`
+	FieldCap      float64 `json:"fieldCap"`
+	StartGold     float64 `json:"startGold"` // gold lying in the field when the match starts
+}
+
 type Faction struct {
 	Name       Text                 `json:"name"`
 	StartUnits []string             `json:"startUnits"`
@@ -115,7 +137,10 @@ type Rules struct {
 		CaptureSeconds float64 `json:"captureSeconds"`
 		CaptureRadius  float64 `json:"captureRadius"`
 		HoldRadius     float64 `json:"holdRadius"`
-		PointSight     float64 `json:"pointSight"`    // how far a side sees from a point it holds
+		PointSight     float64 `json:"pointSight"` // how far a side sees from a point it holds
+		HQTrickle      int     `json:"hqTrickle"`  // gold per second every headquarters makes on its own
+		HaulerCap      int     `json:"haulerCap"`  // haulers a side may have, apart from the squad cap
+		StartHaulers   int     `json:"startHaulers"`
 		RevealSeconds  float64 `json:"revealSeconds"` // how long firing gives a team away to the enemy
 		// Bases (structures.go): the roles every side starts with besides its headquarters,
 		// how far from its own ground a side may place a defence or a fence, and how many.
@@ -146,6 +171,7 @@ type Rules struct {
 		WaterY float64 `json:"waterY"` // everything at or below this line is sea
 		Points []Point `json:"points"`
 	} `json:"map"`
+	Gushers   []Gusher       `json:"gushers"`
 	Rigs      map[string]Rig `json:"rigs"`
 	Tiers     []Tier         `json:"tiers"`
 	Callsigns struct {
@@ -153,6 +179,7 @@ type Rules struct {
 		Operator    Text            `json:"operator"`
 		AllStations Text            `json:"allStations"`
 		Contact     Text            `json:"contact"` // what an enemy squad in sight is called, before its id
+		Hauler      Text            `json:"hauler"`  // what a hauler is called, before its number; not a radio station
 		Classes     map[string]Text `json:"classes"`
 	} `json:"callsigns"`
 	Factions map[string]Faction `json:"factions"`
@@ -222,6 +249,16 @@ func (r *Rules) check() error {
 	if hq[0] != 1 || hq[1] != 1 {
 		return fmt.Errorf("each side needs exactly one hq point")
 	}
+	gushers := map[string]bool{}
+	for _, g := range r.Gushers {
+		if gushers[g.ID] || r.PointByID(g.Point) == nil {
+			return fmt.Errorf("gusher %s is defined twice or names no map point", g.ID)
+		}
+		gushers[g.ID] = true
+		if g.RatePerSecond < 0 || g.FieldRadius <= 0 || g.FieldCap <= 0 || g.StartGold < 0 || g.StartGold > g.FieldCap || g.Y >= r.Map.WaterY {
+			return fmt.Errorf("gusher %s has a bad rate, field or place", g.ID)
+		}
+	}
 	if len(r.Tiers) == 0 || r.Tiers[0].Tier != 1 {
 		return fmt.Errorf("tiers must start at tier 1")
 	}
@@ -235,8 +272,11 @@ func (r *Rules) check() error {
 			}
 		}
 		for id, u := range f.Units {
-			if _, ok := r.Callsigns.Classes[u.Class]; !ok {
+			if _, ok := r.Callsigns.Classes[u.Class]; !ok && u.Class != HaulerClass {
 				return fmt.Errorf("unit %s has unknown class %q", id, u.Class)
+			}
+			if u.Class == HaulerClass && (u.Capacity <= 0 || u.LoadSeconds <= 0 || u.UnloadSeconds <= 0 || u.Teams != 1 || u.Members != 1) {
+				return fmt.Errorf("hauler %s needs a capacity, load and unload times, and one vehicle", id)
 			}
 			if u.Domain != "land" && u.Domain != "sea" && u.Domain != "air" {
 				return fmt.Errorf("unit %s has unknown domain %q", id, u.Domain)
@@ -248,7 +288,7 @@ func (r *Rules) check() error {
 				return fmt.Errorf("unit %s has a bad minRange or pierce", id)
 			}
 			for class, v := range u.Vs {
-				if _, ok := r.Callsigns.Classes[class]; (!ok && class != "hq" && class != TargetStructure && class != TargetFence) || v < 0 {
+				if _, ok := r.Callsigns.Classes[class]; (!ok && class != "hq" && class != TargetStructure && class != TargetFence && class != HaulerClass) || v < 0 {
 					return fmt.Errorf("unit %s: bad vs entry %q", id, class)
 				}
 			}
@@ -278,6 +318,33 @@ func (r *Rules) HQPoint(side int) *Point {
 	for i := range r.Map.Points {
 		if p := &r.Map.Points[i]; p.Kind == "hq" && p.Owner == side {
 			return p
+		}
+	}
+	return nil
+}
+
+// HaulerOf returns the id and stats of a faction's hauler, or "" when it has none. Unit ids
+// are tried in order, so the answer never depends on map order.
+func (r *Rules) HaulerOf(faction string) (string, Unit) {
+	units := r.Factions[faction].Units
+	ids := make([]string, 0, len(units))
+	for id := range units {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if units[id].Class == HaulerClass {
+			return id, units[id]
+		}
+	}
+	return "", Unit{}
+}
+
+// GusherByID returns the gusher with that id, or nil.
+func (r *Rules) GusherByID(id string) *Gusher {
+	for i := range r.Gushers {
+		if r.Gushers[i].ID == id {
+			return &r.Gushers[i]
 		}
 	}
 	return nil

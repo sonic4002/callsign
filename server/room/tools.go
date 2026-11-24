@@ -18,12 +18,13 @@ const (
 	ToolAttack = "attack"
 	ToolReport = "report"
 	ToolBuy    = "buy"
+	ToolHaul   = "haul"
 )
 
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
 	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair},
-	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild},
+	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul},
 }
 
 // names accepts "Hammer" as well as ["Viper 1", "Viper 2"].
@@ -54,6 +55,8 @@ type toolArgs struct {
 	Structure string `json:"structure"`
 	Place     string `json:"place"`
 	Place2    string `json:"place2"`
+	Field     string `json:"field"`  // haul: a gold field by its point ("Kilo", "K", "the airfield"), or "auto"
+	Hauler    int    `json:"hauler"` // haul: one hauler's id, or 0 for all of them
 }
 
 // Tool runs one game tool for a client and returns its result.
@@ -87,6 +90,8 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		return rm.toolBuild(side, a)
 	case ToolCapture, ToolRepair:
 		return rm.toolEngineer(c, name, a)
+	case ToolHaul:
+		return rm.toolHaul(side, a)
 	}
 
 	// move, hold, attack: always the caller's own squad.
@@ -184,6 +189,14 @@ func (rm *Room) toolReport(c *Client) (any, error) {
 		Alive    int           `json:"alive"`
 	}
 	out := map[string]any{"timeLeft": snap.TimeLeft, "points": snap.Points, "contacts": snap.Contacts, "structures": rm.structureBriefs(snap)}
+	// A leader told to escort the haulers needs to know where they work.
+	haulers := []sim.HaulerView{}
+	for _, h := range snap.Haulers {
+		if h.Side == c.ID.Side {
+			haulers = append(haulers, h)
+		}
+	}
+	out["haulers"] = haulers
 	friends := []friend{}
 	for _, sq := range snap.Squads {
 		if sq.ID == c.ID.Squad {
@@ -234,4 +247,41 @@ func (rm *Room) toolBuy(side int, a toolArgs) (any, error) {
 		out["deploySeconds"] = float64(sq.DeployTicks) / float64(rm.r.TickRate)
 	}
 	return out, nil
+}
+
+// toolHaul sends the side's haulers to a gold field, named by the map point it lies at,
+// or back to choosing for themselves with "auto".
+func (rm *Room) toolHaul(side int, a toolArgs) (any, error) {
+	field := a.Field
+	if field == "" {
+		return nil, errors.New("haul needs `field`: a gold field by its point, or \"auto\"")
+	}
+	if field != sim.HaulAuto {
+		id, ok := rm.net.ResolvePoint(field)
+		if !ok {
+			// "the Kilo field", "שדה כרמל": the point named anywhere in the words.
+			if pts := rm.net.FindPoints(field); len(pts) > 0 {
+				id, ok = pts[0], true
+			}
+		}
+		field = ""
+		for _, g := range rm.r.Gushers {
+			if ok && g.Point == id {
+				field = g.ID
+			}
+		}
+		if field == "" {
+			return nil, fmt.Errorf("%w: %q", sim.ErrNoField, a.Field)
+		}
+	}
+	if _, err := rm.sim.Apply(sim.Command{Side: side, Kind: sim.CmdHaul, Field: field, Hauler: a.Hauler}); err != nil {
+		return nil, err
+	}
+	told := 0
+	for _, h := range rm.sim.Snapshot(side).Haulers {
+		if h.Side == side && (a.Hauler == 0 || h.ID == a.Hauler) {
+			told++
+		}
+	}
+	return map[string]any{"field": field, "haulers": told}, nil
 }

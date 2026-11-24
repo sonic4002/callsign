@@ -219,3 +219,10 @@ test("a callsign inside the message is never respelled as a map point", () => {
   // A place that only sounds right is still corrected.
   assert.equal(tidy("צפע 1 תקוף את קרמל", { lang: "he", rules }), "צפע 1 תקוף את כרמל");
 });
+
+test("gold is not a map point: a call for a gold truck keeps its words", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  assert.equal(relaxed("סדן, קנה משאית זהב", { lang: "he", rules }), "סדן, קנה משאית זהב");
+  assert.equal(relaxed("סדן, המשאיות לשדה כרמל", { lang: "he", rules }), "סדן, המשאיות לשדה כרמל");
+  assert.equal(relaxed("Anvil, haulers to the gold field at kilo", { lang: "en", rules }), "Anvil, haulers to the gold field at Kilo");
+});

@@ -49,7 +49,10 @@ type Config struct {
 	Watch    bool   // spectators, who see both sides, are let in
 	Speed    string // the pace the room is played at, for the lobby to show; "" is normal
 	Purse    bool   // the operators may buy on their own from the first second (a lobby option)
-	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
+	// StartGold is what each side starts with; 0 uses the rules default. The lobby's
+	// control for it comes with the map options.
+	StartGold int
+	AgentKey  string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the
 	// learner's own browser with the scripted brain, never by this machine's agents, so a
@@ -122,7 +125,7 @@ func New(r *shared.Rules, cfg Config) (*Room, error) {
 func (rm *Room) reset() error {
 	s, err := sim.New(rm.r, sim.Config{
 		Seed: rm.cfg.Seed + uint64(rm.match), Factions: rm.cfg.Factions, LengthSeconds: rm.cfg.LengthSeconds,
-		FullBase: rm.cfg.FullBase,
+		FullBase: rm.cfg.FullBase, StartGold: rm.cfg.StartGold,
 	})
 	if err != nil {
 		return err
@@ -425,10 +428,7 @@ func (rm *Room) squadOf(side int, st radio.Station) *sim.Squad {
 
 // squadAny returns a squad by id whether it is alive or not, for naming it in events.
 func (rm *Room) squadAny(id int) *sim.Squad {
-	if id < 1 || id > len(rm.sim.Squads) {
-		return nil
-	}
-	return rm.sim.Squads[id-1]
+	return rm.sim.SquadAny(id)
 }
 
 func (rm *Room) squadName(sq *sim.Squad) Name {

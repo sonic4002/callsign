@@ -138,5 +138,6 @@ func (s *Sim) observe() {
 		if enemy := s.R.HQPoint(1 - side); s.InSight(side, enemy.X, enemy.Y) {
 			sd.enemyHQ = math.Max(0, s.Sides[1-side].HQHP/s.R.HQ.HP)
 		}
+		s.observeHaul(side)
 	}
 }

@@ -109,7 +109,9 @@ func checkInvariants(t *testing.T, s *sim.Sim) {
 		if !sq.Alive {
 			continue
 		}
-		alive[sq.Side]++
+		if !sq.IsHauler() {
+			alive[sq.Side]++ // haulers have their own cap
+		}
 		domain := rules.Factions[s.Sides[sq.Side].Faction].Units[sq.Unit].Domain
 		for _, tm := range sq.Teams {
 			if tm.Members == 0 {
@@ -172,7 +174,7 @@ func TestSameSeedSameMatch(t *testing.T) {
 func TestHQWellPaysGold(t *testing.T) {
 	s := newSim(t, 1)
 	run(s, 10)
-	want := rules.Match.StartGold + 10*rules.Rigs["hq"].Income
+	want := rules.Match.StartGold + 10*rules.Match.HQTrickle // no hauler is home yet
 	if s.Gold(0) != want || s.Gold(1) != want {
 		t.Fatalf("gold after 10s = %d and %d, want %d", s.Gold(0), s.Gold(1), want)
 	}
@@ -187,9 +189,6 @@ func TestInfantryCapturesLandRig(t *testing.T) {
 	}
 	if !has(events, sim.EvArrived, 0) || !has(events, sim.EvCaptured, 0) {
 		t.Fatalf("missing arrived or captured event in %+v", events)
-	}
-	if got, want := s.Income(0), rules.Rigs["hq"].Income+rules.Rigs["landRig"].Income; got != want {
-		t.Fatalf("income = %d, want %d", got, want)
 	}
 }
 
@@ -345,7 +344,7 @@ func TestDestroyingTheHQWins(t *testing.T) {
 	for _, id := range []int{1, 2} {
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdAttack, Squad: id, Point: "Z"})
 	}
-	events := run(s, 120)
+	events := run(s, 200)
 	if !s.Over || s.Winner != 0 || s.Reason != "hq_destroyed" {
 		t.Fatalf("over=%v winner=%d reason=%q hq=%v", s.Over, s.Winner, s.Reason, s.Snapshot(sim.Spectator).HQ)
 	}
@@ -448,6 +447,9 @@ func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
 				continue
 			}
 			for id, u := range f.Units {
+				if u.Class == shared.HaulerClass {
+					continue // a hauler cannot answer anyway: it runs when it is shot at
+				}
 				for enemyID, e := range g.Units {
 					if e.MinRange == 0 && u.Sight < e.Range {
 						t.Errorf("%s %s sees %.0f but %s %s shoots %.0f", mine, id, u.Sight, theirs, enemyID, e.Range)

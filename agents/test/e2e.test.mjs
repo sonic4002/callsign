@@ -143,6 +143,42 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
   assert.equal(chatter().length, settled, "the net kept talking after everyone acknowledged");
 });
 
+test("haulers work on their own, go where the operator sends them, and can be escorted", { skip }, async (t) => {
+  const server = await startServer(t);
+  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  await host.start();
+  t.after(() => host.stop());
+  await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);
+  const hammer = await Hammer.join(t, server);
+  const haulers = (f) => (f.type === "state" ? f.state.haulers.filter((h) => h.side === 0) : []);
+
+  // Nobody told it to: the starting hauler drives to the home field and loads.
+  await hammer.next("the hauler loading at Bravo", (f) => haulers(f)[0]?.state === "loading" && haulers(f)[0].field === "B");
+  const paid = await hammer.next("the first load home", (f) => f.type === "state" && f.state.income > 60 * 10 && haulers(f)[0]?.state !== "unloading");
+  assert.ok(paid.state.gold > 300, "the load became gold to spend");
+
+  hammer.say("Anvil, this is Hammer. Haulers to the Kilo field. Over.");
+  assert.equal(await hammer.hears("Anvil"), "Hammer, this is Anvil. Wilco. Out.");
+  await hammer.next("the hauler sent to Kilo", (f) => haulers(f)[0]?.assigned === "K");
+
+  // A squad told to escort them holds the field they are working.
+  await hammer.next("the hauler on its way to Kilo", (f) => haulers(f)[0]?.field === "K");
+  hammer.say("Viper 2, this is Hammer. Escort the haulers. Over.");
+  assert.equal(await hammer.hears("Viper 2"), "Hammer, this is Viper 2. Wilco. Out.");
+  const guarding = await hammer.next("Viper 2 holding Kilo", (f) => squadIn(f, 2)?.order.point === "K");
+  assert.equal(squadIn(guarding, 2).order.kind, "hold");
+
+  // Buying one, in Hebrew: it is no squad, so no leader joins the net for it.
+  hammer.say("סדן, כאן פטיש, קנה משאית זהב, עבור.");
+  assert.equal(await hammer.hears("Anvil"), "פטיש, כאן סדן, רות, יבוצע, סוף.");
+  const two = await hammer.next("a second hauler on the field", (f) => haulers(f).length === 2);
+  assert.equal(two.state.squads.length, 2, "a hauler is not listed as a squad");
+  assert.equal(host.agents.size, 3, "no agent was started for a hauler");
+  hammer.say("Anvil, this is Hammer. Let the haulers choose on their own. Over.");
+  assert.equal(await hammer.hears("Anvil"), "Hammer, this is Anvil. Wilco. Out.");
+  await hammer.next("both haulers choosing for themselves", (f) => haulers(f).length === 2 && haulers(f).every((h) => !h.assigned));
+});
+
 test("the agent loop feeds a model's tool calls to the game and the results back", { skip }, async (t) => {
   const server = await startServer(t);
   const requests = [];

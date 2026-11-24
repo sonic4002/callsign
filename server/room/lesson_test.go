@@ -26,7 +26,7 @@ func TestLessonEnemyWaitsUntilItIsReleased(t *testing.T) {
 	enemyOrders := func() (kinds []string, squads int) {
 		rm.View(func(s *sim.Sim) {
 			for _, sq := range s.Squads {
-				if sq.Side == 1 && sq.Alive {
+				if sq.Side == 1 && sq.Alive && !sq.IsHauler() { // its hauler works on its own, which is no act of the enemy's
 					squads++
 					kinds = append(kinds, sq.Order.Kind+" "+sq.Order.Point)
 				}

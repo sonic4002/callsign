@@ -7,6 +7,7 @@ import { structureAt, structureDef } from "./bases.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
+import { drawField, drawFountain, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
 import { pixelRatio, smoothing } from "./touch.js";
@@ -39,6 +40,7 @@ export class Scene {
     this.effects = [];
     this.fx = new Fx(); // blasts, smoke, spray and scorch marks
     this.sfx = null; // battle sounds; the page sets it once it has a volume to follow
+    this.gushAt = {}; // gusher id → when it may next be heard
     this.hqSeen = null; // headquarters health as of the last state, to notice hits
     this.hqHitAt = [-1e9, -1e9];
     this.finale = null; // the fall of a headquarters, while it plays
@@ -96,11 +98,17 @@ export class Scene {
   // ---- state ----
 
   setState(state) {
+    // A hauler that has just emptied its bed: gold rains into the drop-off.
+    for (const h of unloaded(this.state, state, state.side)) {
+      this.fx.coins(h.x, h.y, performance.now());
+      this.sound("coins", h.x, h.y);
+    }
     this.state = state;
     const seen = new Set();
     const groups = [
       ...state.squads.map((s) => ({ ...s, own: true })),
       ...state.contacts.map((c) => ({ ...c, own: false })),
+      ...haulerGroups(state), // haulers are not squads, but they are drawn like any vehicle
     ];
     for (const g of groups) {
       seen.add(g.id);
@@ -114,7 +122,7 @@ export class Scene {
       // `small` is a squad of many small figures (soldiers, drones) and not one big machine;
       // `air` is anything that flies.
       const stats = this.unitOf[g.unit];
-      Object.assign(group, { id: g.id, side: g.side, unit: g.unit, cls: g.class, faction, own: g.own, view: g, small: (stats?.members ?? 1) > 1, air: stats?.domain === "air" });
+      Object.assign(group, { id: g.id, side: g.side, unit: g.unit, cls: g.class, faction, own: g.own, view: g, small: (stats?.members ?? 1) > 1, air: stats?.domain === "air", hauler: g.hauler ?? null });
       // Teams arrive as a list of the living, so each is matched to the nearest one
       // already on screen instead of by its place in the list.
       const free = new Set(group.visuals);
@@ -475,6 +483,7 @@ export class Scene {
     }
     this.gunfire(now);
     this.smoulder(now);
+    this.gush(now);
     this.fx.update(now, dt);
     this.sfx?.refresh();
 
@@ -543,11 +552,15 @@ export class Scene {
       }
     }
 
+    // The gold lying around each gusher, as this side last saw it.
+    for (const g of rules.gushers ?? []) drawField(ctx, S, z, g, fieldShare(state, g.id), time);
+
     this.fx.drawGround(ctx, cam, unitScale, now);
 
     // Everything that stands up, far to near.
     const things = [];
     for (const p of rules.map.points) {
+      if (gusherAt(rules, p)) continue; // the gusher is what stands on this point
       const live = state.points.find((s) => s.id === p.id);
       const kind = p.kind === "hq" ? `hq_${this.hqFaction[p.owner] ?? (p.owner === 0 ? "aegis" : "ashfall")}${this.ruined[p.owner] ? "_ruin" : ""}` : p.kind;
       things.push({ depth: p.x + p.y, x: p.x, y: p.y, scale: buildScale, draw: () => drawBuilding(ctx, kind, sideColor[live.owner], time) });
@@ -558,6 +571,31 @@ export class Scene {
       if (!def) continue;
       if (st.role === "fence") things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: z, draw: () => drawFence(ctx, st, sideColor[st.side]) });
       else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, st, def, sideColor[st.side], time) });
+    for (const g of rules.gushers ?? []) {
+      things.push({
+        depth: g.x + g.y,
+        x: g.x,
+        y: g.y,
+        scale: buildScale,
+        draw: () => {
+          drawBuilding(ctx, "gusher", sideColor[-1], time);
+          drawFountain(ctx, time, 0.4 + 0.6 * fieldShare(state, g.id));
+        },
+      });
+    }
+    // An enemy hauler that slipped out of sight is drawn faintly where it was last seen.
+    for (const h of ghosts(state)) {
+      things.push({
+        depth: h.x + h.y,
+        x: h.x,
+        y: h.y,
+        scale: unitScale,
+        draw: () => {
+          ctx.globalAlpha = 0.35;
+          drawUnit(ctx, { unit: h.unit, cls: "hauler", faction: this.factionOf[h.unit], members: 1, moving: false, firing: false, time: 0, turn: h.side === 0 ? 0.4 : Math.PI - 0.4, seed: 0, load: h.load });
+          ctx.globalAlpha = 1;
+        },
+      });
     }
     for (const group of this.groups.values()) {
       for (const v of group.visuals) {
@@ -566,7 +604,7 @@ export class Scene {
           x: v.x,
           y: v.y,
           scale: unitScale,
-          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0 }),
+          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0 }),
         });
       }
     }
@@ -638,6 +676,17 @@ export class Scene {
     return eyes;
   }
 
+  // gush gives every gusher in sight its sound, a soft rush every few seconds.
+  gush(now) {
+    for (const f of this.state.fields ?? []) {
+      if (!f.visible) continue;
+      const g = this.rules.gushers.find((x) => x.id === f.gusher);
+      if (!g || now < (this.gushAt[g.id] ?? 0)) continue;
+      this.gushAt[g.id] = now + 2600 + Math.random() * 900;
+      this.sound("gush", g.x, g.y);
+    }
+  }
+
   // gunfire turns "this team is firing" into tracers. The server says which of our own
   // teams fire; for an enemy in sight it is inferred from having one of ours in its range.
   gunfire(now) {
@@ -700,10 +749,16 @@ export class Scene {
     const { rules, state, cam } = this;
     const lang = this.lang();
     const tall = { hq: 100, landRig: 92, seaRig: 88, point: 60 };
+    // Each gold field says how full it is, as last seen. The isolate marks keep the
+    // percentage reading left to right in a Hebrew page.
+    for (const g of rules.gushers ?? []) {
+      const [sx, sy] = cam.screen(g.x, g.y);
+      this.plate(`◆ ⁦${Math.round(fieldShare(state, g.id) * 100)}%⁩`, sx, sy + 30 * buildScale, { size: 11, color: "#f0c95a", border: "rgba(0,0,0,0)", bold: true, alpha: 0.6 });
+    }
     for (const p of rules.map.points) {
       const live = state.points.find((s) => s.id === p.id);
       const [sx, sy] = cam.screen(p.x, p.y);
-      const top = sy - tall[p.kind] * buildScale;
+      const top = sy - (gusherAt(rules, p) ? 70 : tall[p.kind]) * buildScale;
       const income = rules.rigs[p.kind].income;
       // The isolate marks keep "+15" reading left to right inside a Hebrew label.
       const sub = income ? `${p.name[lang]} ⁦+${income}⁩` : p.name[lang];
@@ -719,6 +774,11 @@ export class Scene {
       if (!group.own) {
         // An enemy in sight gets a name the player can say: "Viper 1 attack Target 3".
         this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88` });
+        continue;
+      }
+      if (group.hauler) {
+        // A hauler shows its load instead of a name plate; the sidebar lists it by name.
+        loadBar(this.ctx, sx, low + 14 * unitScale + 2, group.hauler.load, 22 * Math.max(1, unitScale));
         continue;
       }
       const h = this.plate(group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
@@ -829,6 +889,15 @@ export class Scene {
       g.fill();
       g.stroke();
     }
+    for (const gu of rules.gushers ?? []) {
+      g.fillStyle = "#f0c95a";
+      g.beginPath();
+      g.moveTo(gu.x * k, gu.y * k - 4 * this.dpr);
+      g.lineTo(gu.x * k + 3 * this.dpr, gu.y * k);
+      g.lineTo(gu.x * k, gu.y * k + 4 * this.dpr);
+      g.lineTo(gu.x * k - 3 * this.dpr, gu.y * k);
+      g.fill();
+    }
     this.fog.drawRadar(g, k);
     for (const group of this.groups.values()) {
       g.fillStyle = group.id === this.selected ? "#ffffff" : sideColor[group.side];
@@ -863,7 +932,7 @@ export class Scene {
     let contact = null;
     let bd = 26;
     for (const group of this.groups.values()) {
-      if (group.own && group.side !== side) continue;
+      if ((group.own && group.side !== side) || group.hauler) continue; // haulers take no radio calls
       for (const v of group.visuals) {
         const [vx, vy] = this.cam.screen(v.x, v.y);
         const d = Math.hypot(vx - sx, vy - 10 - sy);
@@ -876,6 +945,8 @@ export class Scene {
     const structure = structureAt(this.state, this.rules, wx, wy);
     if (structure) return { structure };
     const point = this.rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= this.rules.match.captureRadius * 1.15);
-    return point ? { point } : {};
+    // A gold field can lie on a point or away from one; the page decides which the tap meant.
+    const gusher = pickGusher(this.rules, wx, wy);
+    return { ...(point ? { point } : {}), ...(gusher ? { gusher } : {}) };
   }
 }

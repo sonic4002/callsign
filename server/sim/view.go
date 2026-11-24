@@ -81,7 +81,7 @@ type Snapshot struct {
 	Side      int           `json:"side"`
 	Faction   string        `json:"faction,omitempty"`
 	Gold      int           `json:"gold"`
-	Income    int           `json:"income"`
+	Income    int           `json:"income"`        // gold per minute, over the last minute
 	HQ        [2]float64    `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
 	Fog       *FogView      `json:"fog,omitempty"` // absent for spectators, who see everything
 	Points    []PointView   `json:"points"`
@@ -92,6 +92,8 @@ type Snapshot struct {
 	// the other factions' units this side can buy through structures it has captured.
 	Structures   []StructureView `json:"structures"`
 	ForeignUnits []string        `json:"foreignUnits,omitempty"`
+	Fields       []FieldView     `json:"fields"`  // every gold field; out of sight, as last seen
+	Haulers      []HaulerView    `json:"haulers"` // own haulers, then enemy ones as last seen
 	Over         bool            `json:"over"`
 	Winner       int             `json:"winner"`
 	Reason       string          `json:"reason,omitempty"`
@@ -149,12 +151,21 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		if !sq.Alive {
 			continue
 		}
+		if sq.haul != nil {
+			// A hauler is not a squad. An enemy one in sight is still a contact, so that it
+			// can be named and attacked like any other.
+			if side != Spectator && sq.Side != side && s.visible(sq) {
+				snap.Contacts = append(snap.Contacts, s.contactView(sq))
+			}
+			continue
+		}
 		if side == Spectator || sq.Side == side {
 			snap.Squads = append(snap.Squads, s.squadView(sq))
 		} else if s.visible(sq) {
 			snap.Contacts = append(snap.Contacts, s.contactView(sq))
 		}
 	}
+	s.snapHaul(&snap, side)
 	return snap
 }
 
@@ -240,5 +251,6 @@ func (s *Sim) Hash() uint64 {
 		}
 	}
 	s.hashStructures(put, f)
+	s.hashHaul(put, f)
 	return h.Sum64()
 }
