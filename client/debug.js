@@ -108,7 +108,16 @@ const clock = (tick) => {
 const open = () => ws?.readyState === WebSocket.OPEN;
 
 // The player's own agents, when this browser runs them (client/brains).
-const brains = mountAgents({ t, system, server: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`, side, canAct: () => role === "hammer" });
+// They join with the seat this page holds: the lobby's room and seat token, or the open
+// room of a server without seats. A page with no connection has no seat to run agents for.
+const brains = mountAgents({
+  t,
+  system,
+  server: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
+  side,
+  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token } : null) : { room: "" }),
+  canAct: () => role === "hammer",
+});
 
 function connect() {
   system("connecting");
@@ -142,6 +151,7 @@ function turnedAway(reason) {
   } else {
     lobbyError = () => t("lobby.failed", { reason });
   }
+  brains.agents.sync(); // no seat, no agents
   renderOverlay();
 }
 
@@ -158,6 +168,7 @@ function onFrame(frame) {
       entries = frame.log.map((m) => ({ kind: "radio", message: m }));
       system(me ? "matchStarted" : "spectating", { faction });
       brains.agents.newMatch(frame.match);
+      brains.agents.sync(); // the seat may be a new one: a match just made or joined
       scene.setRules(rules);
       scene.setState(state);
       drawn.roster = drawn.build = "";

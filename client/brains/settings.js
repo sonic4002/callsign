@@ -3,18 +3,18 @@
 // and then forgotten by the page: afterwards only its provider and last characters show.
 
 import { BrowserAgents } from "./host.js";
-import { seat } from "./seat.js";
 
 const $ = (id) => document.getElementById(id);
 
 // mountAgents wires the dialog and starts the page's agent host. t(key, vars) translates;
-// system(key, vars, tone) writes a line in the radio log. It returns { agents, render }.
-export function mountAgents({ t, system, server, side, canAct }) {
+// system(key, vars, tone) writes a line in the radio log. seat() gives the seat the page
+// holds in the lobby's match right now, or null. It returns { agents, render }.
+export function mountAgents({ t, system, server, side, seat, canAct }) {
   const provider = (id) => (id ? t(`provider.${id}`) : "");
   const agents = new BrowserAgents({
     server,
     side,
-    seat: seat(),
+    seat,
     canAct,
     say: (what, vars = {}, tone = "") => system(`agents.${what}`, { provider: provider(vars.provider), reason: vars.code ? t(`trouble.${vars.code}`) : "" }, tone),
     onChange: () => render(),

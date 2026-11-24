@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Throttle, Usage, wanted } from "./policy.js";
-import { seat } from "./seat.js";
+import { playerToken } from "./seat.js";
 import { WorkerAgent } from "./worker-agent.js";
 
 const store = (init = {}) => {
@@ -13,14 +13,14 @@ const store = (init = {}) => {
   return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v), data };
 };
 
-test("seat: the address wins, then what the lobby saved, and a token is made once and kept", () => {
+test("player token: asked from the relay once, then kept by the browser", async () => {
   const kept = store();
-  const first = seat({ query: new URLSearchParams(""), store: kept });
-  assert.equal(first.room, "main");
-  assert.match(first.token, /^[0-9a-f]{36}$/);
-  assert.deepEqual(seat({ query: new URLSearchParams(""), store: kept }), first, "the same browser keeps its seat");
-  assert.deepEqual(seat({ query: new URLSearchParams("room=ALPHA&token=given"), store: kept }), { room: "ALPHA", token: "given" });
-  assert.deepEqual(seat({ query: new URLSearchParams(""), store: store({ "callsign.room": "BRAVO", "callsign.token": "saved" }) }), { room: "BRAVO", token: "saved" });
+  let asked = 0;
+  const ask = async () => `p1.token-${++asked}`;
+  assert.equal(await playerToken({ store: kept, ask }), "p1.token-1");
+  assert.equal(await playerToken({ store: kept, ask }), "p1.token-1", "the same browser keeps its token, and so its key");
+  assert.equal(asked, 1);
+  await assert.rejects(playerToken({ store: store(), ask: async () => Promise.reject(new Error("no relay")) }), /no relay/);
 });
 
 test("who thinks: this browser only with a key or the demo brain, never as a spectator or while hidden", () => {
@@ -31,6 +31,8 @@ test("who thinks: this browser only with a key or the demo brain, never as a spe
   assert.equal(wanted({ canAct: true, demo: true, key: { set: false }, hiddenLong: false }), "scripted");
   assert.equal(wanted({ canAct: false, demo: true, key, hiddenLong: false }), null);
   assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: true }), null);
+  assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: false, seated: false }), null, "a key thinks only for a seat in a lobby match");
+  assert.equal(wanted({ canAct: true, demo: true, key, hiddenLong: false, seated: false }), "scripted", "the demo brain needs no seat");
 });
 
 test("usage: counts thoughts and tokens per match", () => {

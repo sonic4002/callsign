@@ -1,24 +1,19 @@
-// Which seat this browser sits in: the room it plays in and the token that proves the
-// seat to the model relay. This one function is the seam to the lobby: when rooms and
-// seat tokens are issued by the game server, they are handed over here and nothing else
-// in the agent code changes.
-//
-// Until then: the room is "main" unless the address says ?room=…, and the token is a
-// random one made in this browser and kept in its storage, so a key set on the relay
-// stays with this browser. ?token=… in the address wins, for a seat given out by link.
+// Who this browser is to the model relay: a player token the relay made, kept in this
+// browser so that a key stored on the relay stays with it from one match to the next.
+// The seat in a match (its room code and seat token) comes from the lobby, not from here.
 
-const random = () => {
-  const bytes = new Uint8Array(18);
-  (globalThis.crypto ?? {}).getRandomValues?.(bytes) ?? bytes.forEach((_, i) => (bytes[i] = Math.floor(Math.random() * 256)));
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-};
+const KEY = "callsign.player";
 
-export function seat({ query = new URLSearchParams(globalThis.location?.search ?? ""), store = globalThis.localStorage } = {}) {
-  const room = query.get("room") || store?.getItem("callsign.room") || "main";
-  let token = query.get("token") || store?.getItem("callsign.token");
-  if (!token) {
-    token = random();
-    store?.setItem("callsign.token", token);
-  }
-  return { room, token };
+// playerToken returns the kept token, or asks the relay for one (`ask`, newPlayer of
+// agents/brain-relay.mjs) and keeps it. It throws what `ask` throws when there is no relay.
+export async function playerToken({ store = globalThis.localStorage, ask }) {
+  const kept = store?.getItem(KEY);
+  if (kept) return kept;
+  const token = await ask();
+  store?.setItem(KEY, token);
+  return token;
 }
+
+// forgetPlayer drops a token the relay no longer takes (its signing key changed), so the
+// next call gets a new one.
+export const forgetPlayer = (store = globalThis.localStorage) => store?.removeItem(KEY);

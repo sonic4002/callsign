@@ -1,26 +1,31 @@
 // The player's own agents, in the player's own browser: Anvil and a leader for every
-// squad, each in a Web Worker. The Workers think through the model relay with the seat
-// token; the key itself lives on the relay and is never in this page after it is saved.
+// squad, each in a Web Worker. The Workers think through the model relay with the player
+// token and the seat token; the key itself lives on the relay and is never in this page
+// after it is saved.
 //
 // This browser runs the agents only when it has a reason to: the relay holds a key for
 // this seat, or the player chose the demo brain. Otherwise the side is left to whoever
 // the server has (the agents on the server machine). The game server makes sure that
 // only one host runs a side at a time; this one outranks the server's.
 
-import { needsPlayer, relayKeys } from "/agents/brain-relay.mjs";
+import { needsPlayer, newPlayer, relayKeys } from "/agents/brain-relay.mjs";
 import { Host, RANK_BROWSER } from "/agents/host.mjs";
 
 import { HIDDEN_LIMIT_MS, Throttle, Usage, wanted } from "./policy.js";
+import { forgetPlayer, playerToken } from "./seat.js";
 import { WorkerAgent } from "./worker-agent.js";
 
 const RELAY = "/relay/v1";
 
 export class BrowserAgents {
+  // seat() gives the seat this page holds right now, from the lobby: { room, token }, with
+  // an empty room for the open room of a server without seats, or null for none.
   // say(what, vars, tone) writes a line for the player; onChange() redraws whatever shows
   // this object's state.
   constructor({ server, side, seat, canAct, say = () => {}, onChange = () => {} }) {
     Object.assign(this, { server, side, seat, canAct, say, onChange });
-    this.keys = relayKeys({ base: RELAY, token: seat.token });
+    this.player = null; // this browser's token on the relay, once it has one
+    this.sat = ""; // the seat the running host joined with
     this.key = { provider: "", set: false, hint: "" };
     this.relayUp = null; // null until the relay has been asked
     this.demo = localStorage.getItem("callsign.agents") === "demo";
@@ -46,22 +51,33 @@ export class BrowserAgents {
   // agents to match.
   async refresh() {
     try {
-      this.key = await this.keys.get();
+      this.key = await (await this.#keys()).get();
       this.relayUp = true;
     } catch (err) {
+      if (err.code === "not_your_seat" && this.player) {
+        // The relay no longer takes this browser's token; the next look gets a new one.
+        forgetPlayer();
+        this.player = null;
+      }
       this.key = { provider: "", set: false, hint: "" };
       this.relayUp = err.code !== "unreachable" && err.code !== "bad_request";
     }
     await this.sync();
   }
 
+  // #keys is the player's key on the relay, under this browser's player token.
+  async #keys() {
+    this.player ??= await playerToken({ ask: () => newPlayer({ base: RELAY }) });
+    return relayKeys({ base: RELAY, token: this.player });
+  }
+
   async saveKey(provider, key) {
-    this.key = await this.keys.set(provider, key);
+    this.key = await (await this.#keys()).set(provider, key);
     await this.sync(true);
   }
 
   async removeKey() {
-    this.key = await this.keys.remove();
+    this.key = await (await this.#keys()).remove();
     await this.sync();
   }
 
@@ -80,8 +96,12 @@ export class BrowserAgents {
   // sync brings what runs here in line with what should. `restart` forces new Workers,
   // for a key that changed under a running host.
   async sync(restart = false) {
-    const want = wanted({ canAct: this.canAct(), demo: this.demo, key: this.key, hiddenLong: this.hiddenLong });
-    if (want === this.mode && !restart) return this.onChange();
+    const seat = this.seat();
+    const sat = seat ? `${seat.room}/${seat.token ?? ""}` : "";
+    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo, key: this.key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player) });
+    // A host joined for another seat is of no use: a new match means a new host.
+    if (want === this.mode && sat === this.sat && !restart) return this.onChange();
+    this.sat = sat;
     this.#stop();
     this.mode = want;
     if (want) await this.#start(want);
@@ -90,7 +110,8 @@ export class BrowserAgents {
   }
 
   async #start(mode) {
-    const brain = mode === "relay" ? { kind: "relay", base: RELAY, room: this.seat.room, token: this.seat.token } : { kind: "scripted" };
+    const seat = this.seat();
+    const brain = mode === "relay" ? { kind: "relay", base: RELAY, room: seat.room, token: this.player, seat: seat.token } : { kind: "scripted" };
     const hooks = {
       log: (text) => console.debug(`[agents] ${text}`),
       usage: (usage, model) => {
@@ -104,7 +125,9 @@ export class BrowserAgents {
       side: this.side,
       rank: RANK_BROWSER,
       brain: { name: mode },
-      join: this.seat.room === "main" ? {} : { room: this.seat.room },
+      // The seat token is what lets this browser run its own side's agents, and what
+      // makes the game server rank it above the agents run on the server machine.
+      join: seat.room ? { room: seat.room, token: seat.token } : {},
       log: hooks.log,
       spawn: (options) => new WorkerAgent(options, brain, hooks),
     });
