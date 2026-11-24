@@ -98,8 +98,14 @@ function drawFrame(ctx, entry, part, anim, index, row) {
 const spots = [[0, 0], [-8, -4], [8, 3], [-1, -9]];
 const spotsFor = (members) => spots.slice(0, Math.min(members, spots.length)).sort((a, b) => a[1] - b[1]);
 
+// lift raises what flies to its height above its place on the ground, with a slow bob.
+// The shadow is drawn before this, so it stays on the ground.
+function lift(ctx, entry, o, i = 0) {
+  if (entry.altitude) ctx.translate(0, -entry.altitude * METRE + Math.sin(o.time * 2.3 + o.seed + i * 1.9) * 1.2);
+}
+
 function animatedInfantry(ctx, entry, o) {
-  const down = o.action === "cover" || o.nerve === "pinned";
+  const down = !entry.altitude && (o.action === "cover" || o.nerve === "pinned");
   const engaged = o.sinceShot < 0.35 || (o.action === "fire" && !o.moving);
   const file = spotsFor(o.members);
   for (const [i, [ox, oy]] of file.entries()) {
@@ -115,10 +121,13 @@ function animatedInfantry(ctx, entry, o) {
     } else if (o.moving) {
       anim = "walk";
       index = Math.floor(o.time * (entry.fps?.walk ?? 10) + o.seed * 3 + i * 3) % entry.anims.walk[1];
+    } else if (entry.anims.idle[1] > 1) {
+      index = Math.floor(o.time * (entry.fps?.idle ?? 8) + i) % entry.anims.idle[1]; // rotors keep turning
     }
     ctx.save();
-    ctx.translate(ox, oy);
-    shadow(ctx, 5.5, 2.6);
+    ctx.translate(ox * (entry.altitude ? 1.5 : 1), oy * (entry.altitude ? 1.5 : 1));
+    shadow(ctx, 5.5, 2.6, entry.altitude ? 0.2 : 0.32);
+    lift(ctx, entry, o, i);
     drawFrame(ctx, entry, entry, anim, index, rowOf(entry, turn));
     ctx.restore();
   }
@@ -137,12 +146,15 @@ function animatedVehicle(ctx, entry, o) {
   const naval = o.cls === "naval";
   const row = rowOf(entry, o.turn);
   if (naval) wake(ctx, o.turn, o.moving);
-  else shadow(ctx, 26, 11);
+  else shadow(ctx, 26, 11, entry.altitude ? 0.22 : 0.32);
   ctx.save();
-  // A boat rides the swell; an engine under way shakes its hull.
-  ctx.translate(0, naval ? Math.sin(o.time * 2 + o.seed) * 0.8 : o.moving ? Math.sin(o.time * 38 + o.seed) * 0.35 : 0);
-  drawFrame(ctx, entry, entry, "idle", 0, row);
+  // A boat rides the swell; an engine under way shakes its hull; an aircraft hangs in the air.
+  if (entry.altitude) lift(ctx, entry, o);
+  else ctx.translate(0, naval ? Math.sin(o.time * 2 + o.seed) * 0.8 : o.moving ? Math.sin(o.time * 38 + o.seed) * 0.35 : 0);
+  const idle = entry.anims.idle[1];
+  drawFrame(ctx, entry, entry, "idle", idle > 1 ? Math.floor(o.time * (entry.fps?.idle ?? 12)) % idle : 0, row);
   const top = entry.turret;
+  if (!top) return ctx.restore();
   // The weapon sits on its pivot along the hull, and keeps pointing at what it last shot at.
   const heading = (row * TAU) / entry.facings;
   const along = top.pivot * METRE * Math.SQRT1_2;
@@ -156,7 +168,7 @@ function animatedVehicle(ctx, entry, o) {
 export const hasAnimation = (unit) => Boolean(sprites.units[unit]?.anims);
 
 // How long what is left of a unit stays on the field, in seconds.
-export const casualtySeconds = (unit, cls) => (!hasAnimation(unit) ? 0 : cls === "infantry" ? 7 : cls === "naval" ? 1.8 : 12);
+export const casualtySeconds = (unit, cls) => (!hasAnimation(unit) ? 0 : sprites.units[unit].per === "member" ? 7 : cls === "naval" ? 1.8 : 12);
 
 // drawCasualty draws a soldier falling, a burnt-out vehicle or a boat going down. `age`
 // is the time since it happened, in seconds.
@@ -167,7 +179,7 @@ export function drawCasualty(ctx, { unit, cls, turn, age }) {
   const row = rowOf(entry, turn);
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, cls === "naval" ? left * 3 : left / 2));
-  if (cls === "infantry") drawFrame(ctx, entry, entry, "die", Math.floor(age * (entry.fps?.die ?? 9)), row);
+  if (entry.per === "member") drawFrame(ctx, entry, entry, "die", Math.floor(age * (entry.fps?.die ?? 9)), row);
   else if (cls === "naval") drawFrame(ctx, entry, entry, "sink", Math.floor(age * 2.2), row);
   else {
     shadow(ctx, 26, 11);
@@ -309,10 +321,21 @@ const unitHeight = { infantry: 26, vehicle: 34, naval: 36 };
 
 // drawUnit draws one fireteam. `turn` is its direction of travel on screen, `aim` the
 // direction of its last shot, `sinceShot` the seconds since then and `shots` their count.
+// aircraft is the code-drawn stand-in for anything that flies: a small drone, or a
+// helicopter with its rotor turning.
+function aircraft(ctx, look, small, time) {
+  const k = small ? 0.35 : 1;
+  const sweep = Math.cos(time * 30) * 26 * k;
+  poly(ctx, look.hull ?? "#7d8f9c", [-24 * k, -3 * k], [14 * k, -6 * k], [22 * k, 0], [12 * k, 5 * k], [-8 * k, 4 * k]);
+  if (!small) line(ctx, look.dark ?? "#39454f", 3, -22, -2, -40, -7);
+  line(ctx, "rgba(20,24,28,0.75)", small ? 1 : 2, -sweep, -9 * k, sweep, -9 * k);
+}
+
 export function drawUnit(ctx, o) {
   const { unit, cls, faction, members, moving, firing, time, turn, seed } = o;
   const entry = sprites.units[unit];
-  if (entry?.anims) return (cls === "infantry" ? animatedInfantry : animatedVehicle)(ctx, entry, o);
+  // A sheet drawn once per member is a squad of small figures, on foot or in the air.
+  if (entry?.anims) return (entry.per === "member" ? animatedInfantry : animatedVehicle)(ctx, entry, o);
   if (entry) {
     shadow(ctx, cls === "infantry" ? 9 : 20);
     drawSprite(ctx, entry, unitHeight[cls] ?? 28, turn);
@@ -320,6 +343,20 @@ export function drawUnit(ctx, o) {
   }
   const look = looks[faction] ?? looks.aegis;
   const flip = Math.cos(turn) < 0 ? -1 : 1;
+  if (cls === "air") {
+    // No sheet for it: a plain machine in the air, with its shadow on the ground below.
+    const many = members > 1;
+    for (const [ox, oy] of many ? spotsFor(members) : [[0, 0]]) {
+      ctx.save();
+      ctx.translate(ox * 1.5, oy * 1.5);
+      shadow(ctx, many ? 5 : 22, many ? 2.4 : 9, 0.2);
+      ctx.translate(0, (many ? -22 : -44) + Math.sin(time * 2.3 + seed + ox) * 1.2);
+      ctx.scale(flip, 1);
+      aircraft(ctx, look, many, time);
+      ctx.restore();
+    }
+    return;
+  }
   if (cls === "infantry") {
     // One figure per soldier, standing in a loose file.
     for (const [i, [ox, oy]] of spotsFor(members).entries()) {
