@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { callsFor, compactStatus, renderWake } from "../agent.mjs";
 import { claudeBrain, models } from "../brain-claude.mjs";
-import { scriptedBrain } from "../brain-scripted.mjs";
+import { ruleBrain } from "../brain-rule.mjs";
 import { makeBrain } from "../main.mjs";
 import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 import { leaderTools, leaderToolsFor, normalize, operatorTools } from "../tools.mjs";
@@ -96,7 +96,7 @@ const leader = { role: "squad", side: 0, squad: 2, tier: 1, station: viper2, lan
 const call = (body, extra = {}) => ({ from: hammer, to: [viper2], lang: "en", body, end: "over", points: [], prowords: [], ...extra });
 
 test("scripted leader: order, act, then Wilco, in the caller's language", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const wake = (c) => ({ items: [{ kind: "radio", msg: c }], call: c, status: null });
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold Foxtrot", { points: ["F"] })) }), [
     ["hold", { place: "F" }],
@@ -121,7 +121,7 @@ test("scripted leader: order, act, then Wilco, in the caller's language", async 
 });
 
 test("scripted leader: Negative with the reason, Say again, radio check, and silence", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const wake = (c) => ({ items: [{ kind: "radio", msg: c }], call: c, status: null });
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold Sierra", { points: ["S"] })) }, { hold: "that squad cannot reach that point" }), [
     ["hold", { place: "S" }],
@@ -134,12 +134,12 @@ test("scripted leader: Negative with the reason, Say again, radio check, and sil
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold Foxtrot", { from: { key: "infantry-1", en: "Viper 1" }, points: ["F"] })) }), []);
   // Events are reported to whoever gave the current order.
   const pinned = { items: [{ kind: "event", event: { kind: "pinned", point: "G" } }], call: null, status: null };
-  assert.deepEqual(await think(brain, { agent: { ...leader, commander: "Anvil" }, wake: pinned }), [["radio", { to: ["Anvil"], body: "Pinned at Golf, request support", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: { ...leader, commander: "Anvil" }, wake: pinned }), [["radio", { to: ["Anvil"], body: "Heavy fire at Golf, we are pinned", end: "over" }]]);
   assert.deepEqual(await think(brain, { agent: { ...leader, lang: "he" }, wake: pinned }), [["radio", { to: ["Hammer"], body: "מרותקים בגימל, מבקש סיוע", end: "over" }]]);
 });
 
 test("scripted operator: relays tasks, buys, reports", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const anvil = { role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
   const status = {
     faction: "aegis",
@@ -172,7 +172,7 @@ test("scripted operator: relays tasks, buys, reports", async () => {
     ["buy", { unit: "", upgrade: "Viper 2" }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
-  assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Upgrade Viper 9")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Upgrade Viper 9")) }), [["radio", { to: ["Hammer"], body: "Say again: upgrade what?", end: "over" }]]);
   assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("What's the status?")) }), [["radio", { to: ["Hammer"], body: "3 squads, 300 gold, holding A B", end: "over" }]]);
   // A squad's Wilco must not start a conversation.
   assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Wilco", { from: viper2, end: "out" })) }), []);
@@ -207,14 +207,14 @@ test("claude brain: model and effort by tier, fallback where the model has one, 
   }
 });
 
-test("makeBrain: scripted without a usable key, and never a downgrade when Claude was asked for by name", async () => {
-  assert.equal((await makeBrain({})).name, "scripted");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "" })).name, "scripted");
+test("makeBrain: the rule brain without a usable key, and never a downgrade when Claude was asked for by name", async () => {
+  assert.equal((await makeBrain({})).name, "rule");
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "" })).name, "rule");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "claude" })).name, "claude");
   // A subscription token is not an API key: it selects the Claude Code brain.
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_BRAIN: "subscription" })).name, "subscription");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_CLAUDE_BIN: "/no/such/claude" })).name, "scripted");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "scripted" })).name, "scripted");
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_CLAUDE_BIN: "/no/such/claude" })).name, "rule");
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "scripted" })).name, "rule");
   await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "claude" }), /needs CALLSIGN_ANTHROPIC_KEY/);
   await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "gpt" }), /unknown CALLSIGN_BRAIN/);
 });
@@ -247,7 +247,7 @@ test("subscription brain: actions become tool calls, and it thinks again only on
 });
 
 test("scripted operator: acts on orders only until Hammer hands it the fight, and stops when command is taken back", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const anvil = { role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
   const status = (mode, extra = {}) => ({
     faction: "aegis",
@@ -315,7 +315,7 @@ test("command tool: the operator's own switch keeps a false `buy`", () => {
 });
 
 test("scripted operator: buys haulers, sends them to a field, and reports one in trouble", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   // The last station to call Anvil was a squad; a hauler in trouble is still reported to Hammer.
   const anvil = (lang) => ({ role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang, commander: "Viper 1" });
   const status = (faction) => ({ faction, gold: 600, points: [], squads: [], haulers: [] });
@@ -343,7 +343,7 @@ test("scripted operator: buys haulers, sends them to a field, and reports one in
     ["haul", { field: "auto", hauler: 0 }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
-  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Haulers to the field")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Haulers to the field")) }), [["radio", { to: ["Hammer"], body: "Say again: haulers to where?", end: "over" }]]);
   assert.deepEqual(await think(brain, { agent: anvil("en"), wake: wake(call("Haulers to Golf", { points: ["G"] })) }, { haul: 'no such gold field: "G"' }), [
     ["haul", { field: "G", hauler: 0 }],
     ["radio", { to: ["Hammer"], body: 'Negative, no such gold field: "G"', end: "over" }],
@@ -356,7 +356,7 @@ test("scripted operator: buys haulers, sends them to a field, and reports one in
 });
 
 test("scripted leader: escorting the haulers means holding the field they work", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const status = (haulers) => ({ you: {}, friends: [], contacts: [], points: [], haulers });
   const wake = (c, haulers) => ({ items: [{ kind: "radio", msg: c }], call: c, status: status(haulers) });
   const hold = (point) => [

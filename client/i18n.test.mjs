@@ -111,7 +111,7 @@ test("the calls the page writes are proper procedure in both languages", async (
 // The buttons are only useful if the agents understand what they write. The scripted
 // brains are the strictest readers, so every call is run through them.
 test("the scripted operator and squad leaders understand the calls the page writes, and the calls for what the panel does directly", async () => {
-  const { scriptedBrain } = await import("../agents/brain-scripted.mjs");
+  const { ruleBrain } = await import("../agents/brain-rule.mjs");
   const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   const hammer = { key: "player", en: rules.callsigns.player.en };
   for (const [lang, strings] of [["en", { ...en, ...radio.en }], ["he", { ...he, ...radio.he }]]) {
@@ -120,7 +120,7 @@ test("the scripted operator and squad leaders understand the calls the page writ
     const body = (text) => text.slice(text.indexOf(from) + from.length).replace(/^[\s,.]+/, "").replace(new RegExp(`[\\s,.]*${rules.radio.over[lang]}[\\s.]*$`), "");
     const think = async (role, callBody, extra = {}) => {
       const msg = { from: hammer, lang, body: callBody, end: "over", prowords: [], points: [], ...extra };
-      const res = await scriptedBrain().think({
+      const res = await ruleBrain().think({
         rules,
         agent: { role, side: 0, station: { key: role === "anvil" ? "operator" : "infantry-2" }, lang },
         messages: [{ role: "user", content: "wake" }],

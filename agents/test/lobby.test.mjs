@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { scriptedBrain } from "../brain-scripted.mjs";
+import { ruleBrain } from "../brain-rule.mjs";
 import { Director } from "../main.mjs";
 
 const bin = process.env.CALLSIGN_BIN;
@@ -71,7 +71,7 @@ test("two commanders share a room: each has its own agents and hears only its ow
   const east = commander(t, host, made.room, 1, sat.token);
   await eventually("both greetings", () => west.lobby() && east.lobby());
 
-  const director = new Director({ server: `ws://${host}/ws`, key, brainFor: async () => scriptedBrain(), log: () => {} });
+  const director = new Director({ server: `ws://${host}/ws`, key, brainFor: async () => ruleBrain(), log: () => {} });
   t.after(() => director.stop());
   await director.sync();
   assert.deepEqual([...director.hosts.keys()].sort(), [`${made.room}:0`, `${made.room}:1`]);

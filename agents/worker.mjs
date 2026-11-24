@@ -3,7 +3,7 @@
 // in small messages. The Worker holds the player and seat tokens, never the player's key.
 //
 //   page → worker   { type: "start", server, side, role, squad, join, standByMs,
-//                     brain: { kind: "relay", base, room, token, seat } | { kind: "scripted" } }
+//                     brain: { kind: "relay", base, room, token, seat } | { kind: "rule" } }
 //                   { type: "stop" }
 //   worker → page   { type: "joined", station }      on the net
 //                   { type: "log", text }
@@ -13,13 +13,13 @@
 
 import { Agent } from "./agent.mjs";
 import { RelayError, relayBrain } from "./brain-relay.mjs";
-import { scriptedBrain } from "./brain-scripted.mjs";
+import { ruleBrain } from "./brain-rule.mjs";
 
 const post = (message) => self.postMessage(message);
 let agent = null;
 
 function makeBrain(spec) {
-  if (spec.kind === "scripted") return scriptedBrain();
+  if (spec.kind === "rule" || spec.kind === "scripted") return ruleBrain();
   if (spec.kind === "relay") {
     return relayBrain({ base: spec.base, room: spec.room, token: spec.token, seat: spec.seat, onUsage: (usage, model, provider) => post({ type: "usage", usage, model, provider }) });
   }

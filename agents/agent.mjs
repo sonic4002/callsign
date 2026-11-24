@@ -95,6 +95,9 @@ export class Agent {
     this.over = hello.state.over;
     this.traffic = hello.log.slice(-8).map((m) => m.text);
     this.netLang = hello.log.findLast((m) => m.from.key === "player")?.lang; // a squad joining mid-match learns it too
+    // What the match's host chose for the brains that need no key: the operator's
+    // initiative (1 to 3), and whether squads take orders through the fast decision model.
+    this.level = hello.lobby?.anvil || undefined;
     if (this.role === "squad") {
       const mine = hello.state.squads.find((s) => s.id === this.squad);
       this.tier = mine.tier;
@@ -119,7 +122,7 @@ export class Agent {
 
   // The model the brain means to use for the next thought, when it chooses one itself.
   #planned() {
-    return this.brain?.plan?.({ role: this.role, tier: this.tier }) ?? null;
+    return this.brain?.plan?.({ role: this.role, tier: this.tier, level: this.level }) ?? null;
   }
 
   #onFrame(frame) {
@@ -223,7 +226,7 @@ export class Agent {
         if (turn > 0) this.tele.thinking(null);
         const began = Date.now();
         const res = await this.brain.think({
-          agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander, unit: this.unit },
+          agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander, unit: this.unit, ...(this.role === "anvil" && this.level ? { level: this.level } : {}) },
           system: this.system,
           tools: this.tools,
           messages: this.history,

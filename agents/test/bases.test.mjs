@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 import { compactStatus } from "../agent.mjs";
 import { compactStructures, namedStructure, placeOf, wantedStructure } from "../bases.mjs";
-import { scriptedBrain, spotOf } from "../brain-scripted.mjs";
+import { ruleBrain, spotOf } from "../brain-rule.mjs";
 import { operatorTools } from "../tools.mjs";
 import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 
@@ -20,7 +20,7 @@ const call = (body, extra = {}) => ({ from: hammer, to: [anvil.station], lang: "
 
 // think drives the scripted brain through one wake, every tool succeeding unless `fail` names it.
 async function think(ctx, fail = {}) {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const messages = [{ role: "user", content: "wake" }];
   const calls = [];
   for (let i = 0; i < 6; i++) {
@@ -142,7 +142,7 @@ test("scripted operator: a structure goes on the spot the call names; cancel and
     wilco,
   ]);
   assert.deepEqual(await one("New squads rally at home"), [["rally", { place: "home", structure: "" }], wilco]);
-  assert.deepEqual(await one("New squads rally"), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  assert.deepEqual(await one("New squads rally"), [["radio", { to: ["Hammer"], body: "Say again: rally where?", end: "over" }]]);
 });
 
 test("the operator is told about placing, lines, cancelling and rally points", () => {

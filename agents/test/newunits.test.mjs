@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { wantedUnit } from "../brain-scripted.mjs";
+import { wantedUnit } from "../brain-rule.mjs";
 import { leaderPrompt, operatorPrompt, unitFacts } from "../prompts.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));

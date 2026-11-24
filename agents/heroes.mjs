@@ -118,57 +118,9 @@ export function describeHeroEvent(e, who) {
 export const heroLeaderEvents = ["fortified", "charge_planted", "crushed"];
 export const heroOperatorEvents = ["hero_fell"];
 
-// ---- the scripted brain ----
+// ---- the rule brain ----
 
-export const digVerb = /\b(dig in|digs? in|fortify|entrench)\b|התבצר|התבצרו|להתבצר|התחפר|התחפרו/;
-const plantVerb = /\b(plant|demolish|demolition|blow( up)?|charge)\b|הנח|הניחו|מטען|פוצץ|פוצצו|לפוצץ/;
-const seizeVerb = /\b(seize|hijack|take over)\b|השתלט|השתלטו|להשתלט|חטוף|חטפו/;
-const hqWords = /\b(headquarters|hq|command post)\b|מפקדה|מפקדת/;
 const heroWords = /\bheroe?s?\b|גיבור/;
-
-const lines = {
-  wilco: { en: "Wilco", he: "רות, יבוצע" },
-  sayAgain: { en: "Say again", he: "אמור שנית" },
-  noVehicle: { en: "no enemy vehicle in sight", he: "אין רכב אויב בטווח ראייה" },
-  dug: { en: (p) => `Dug in near ${p}`, he: (p) => `התבצרנו ליד ${p}` },
-  planted: { en: (p, n) => `Charge set near ${p}, ${n} seconds`, he: (p, n) => `מטען הונח ליד ${p}, ${n} שניות` },
-  crushed: { en: (p) => `Armour is running us down near ${p}, request support`, he: (p) => `שריון דורס אותנו ליד ${p}, מבקש סיוע` },
-};
-
-// heroEventLine is what a scripted leader reports for one of the new events, or null.
-export function heroEventLine(e, rules, lang) {
-  const point = rules.map.points.find((p) => p.id === e.point)?.callsign[lang] ?? e.point;
-  if (e.kind === "fortified") return lines.dug[lang](point);
-  if (e.kind === "charge_planted") return lines.planted[lang](point, e.count);
-  if (e.kind === "crushed") return lines.crushed[lang](point);
-  return null;
-}
-
-// heroOrder reads a call to a squad leader for one of the new orders and returns the
-// steps to take, or null when the call is none of them.
-// `theirs` is an enemy structure the call names, `radio` builds a transmission.
-export function heroOrder({ agent, call, wake, rules, theirs, back, orElse, radio }) {
-  const lang = call.lang;
-  const text = call.body.toLowerCase();
-  const unit = agent.unit ?? {};
-  const wilco = radio(back, lines.wilco[lang], "out");
-  if (digVerb.test(text) && canDig(unit)) return [{ name: "fortify", input: {}, orElse }, wilco];
-  if (unit.chargeDamage && plantVerb.test(text)) {
-    const bridge = (call.landmarks ?? []).find((id) => (rules.map.bridges ?? []).some((b) => b.id === id));
-    const enemyHQ = rules.map.points.find((p) => p.kind === "hq" && p.owner !== agent.side)?.id;
-    const hq = hqWords.test(text) || call.points?.includes(enemyHQ) ? enemyHQ : undefined;
-    const place = theirs?.id ?? bridge ?? hq;
-    if (!place) return [radio(back, lines.sayAgain[lang], "over")]; // a charge on what?
-    return [{ name: "plant", input: { place }, orElse }, wilco];
-  }
-  if (unit.seizeRadius && seizeVerb.test(text)) {
-    const named = Number(new RegExp(`(?:${rules.callsigns.contact.en}|${rules.callsigns.contact.he})\\s*#?(\\d+)`, "i").exec(call.body)?.[1] ?? 0);
-    const contact = named || (wake.status?.contacts ?? []).find((c) => c.class === "vehicle")?.id || 0;
-    if (!contact) return [radio(back, `${lang === "he" ? "שלילי" : "Negative"}, ${lines.noVehicle[lang]}`, "over")];
-    return [{ name: "seize", input: { contact }, orElse }, wilco];
-  }
-  return null;
-}
 
 // heroUnit reads a buy call for the hero: the word itself, or the hero's callsign.
 export function heroUnit(text, units, rules) {
@@ -177,13 +129,4 @@ export function heroUnit(text, units, rules) {
   if (!hero) return undefined;
   const cs = callsign(rules, hero[1]);
   return heroWords.test(low) || low.includes(cs.en.toLowerCase()) || low.includes(cs.he) ? hero[0] : undefined;
-}
-
-// digRelay is the scripted operator passing "everyone dig in" to its infantry.
-export function digRelay({ call, wake, rules, back, radio }) {
-  if (!digVerb.test(call.body.toLowerCase())) return null;
-  const lang = call.lang;
-  const fit = (wake.status?.squads ?? []).filter((s) => canDig(unitAnywhere(rules, s.unit))).map((s) => s.callsign.en);
-  if (fit.length === 0) return null;
-  return [radio(fit, call.body, "over"), radio(back, lines.wilco[lang], "out")];
 }

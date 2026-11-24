@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { compactStatus, renderWake } from "../agent.mjs";
-import { scriptedBrain, wantedUnit } from "../brain-scripted.mjs";
+import { ruleBrain, wantedUnit } from "../brain-rule.mjs";
 import { describeHeroEvent, heroUnit, unitAnywhere } from "../heroes.mjs";
 import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 import { leaderToolsFor } from "../tools.mjs";
@@ -95,7 +95,7 @@ test("a buy call names the hero by its name, the word, or its callsign", () => {
 });
 
 test("scripted leaders dig in, plant and seize when told to, in both languages", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const viper = { role: "squad", side: 0, squad: 2, tier: 1, station: { key: "infantry-2", en: "Viper 2", he: "צפע 2" }, lang: "en", unit: aegis.units.commandos };
   assert.deepEqual(await think(brain, { agent: viper, wake: wake(call("Dig in")) }), [
     ["fortify", {}],
@@ -105,9 +105,9 @@ test("scripted leaders dig in, plant and seize when told to, in both languages",
     ["fortify", {}],
     ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
   ]);
-  // A tank told to dig in does not: the order means nothing to it.
+  // A tank told to dig in does not, and says why.
   const rhino = { ...viper, station: { key: "vehicle-1", en: "Rhino 1", he: "קרנף 1" }, unit: aegis.units.tank };
-  assert.deepEqual(await think(brain, { agent: rhino, wake: wake(call("Dig in")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: rhino, wake: wake(call("Dig in")) }), [["radio", { to: ["Hammer"], body: "Negative, this squad cannot dig in", end: "over" }]]);
 
   const ghost = { ...viper, station: { key: "ghost-1", en: "Ghost 1", he: "רפאים 1" }, unit: aegis.units.sentinel };
   const status = { structures: [{ id: "s8", kind: "chopShop", name: "Chop shop", role: "works", side: 1, x: 1510, y: 650, hp: 1 }], contacts: [] };
@@ -123,7 +123,7 @@ test("scripted leaders dig in, plant and seize when told to, in both languages",
     ["plant", { place: "Z" }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
-  assert.deepEqual(await think(brain, { agent: ghost, wake: wake(call("Plant a charge")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: ghost, wake: wake(call("Plant a charge")) }), [["radio", { to: ["Hammer"], body: "Say again: set a charge on what?", end: "over" }]]);
 
   const raven = { ...viper, side: 1, station: { key: "raven-1", en: "Raven 1", he: "עורב 1" }, unit: ashfall.units.oracle };
   const seen = { contacts: [{ id: 4, class: "infantry" }, { id: 9, class: "vehicle" }] };
@@ -141,7 +141,7 @@ test("scripted leaders dig in, plant and seize when told to, in both languages",
 });
 
 test("the scripted operator buys the hero and passes on an order to dig in", async () => {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const anvil = { role: "anvil", side: 0, squad: 0, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
   const status = {
     faction: "aegis",

@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 
-import { scriptedBrain } from "./brain-scripted.mjs";
+import { ruleBrain } from "./brain-rule.mjs";
 
 const providers = new Set(["anthropic", "openrouter", "gemini", "openai"]);
 const status = { bad_request: 400, not_your_seat: 401, bad_key: 401, no_key: 409, rate_limited: 429, provider_error: 502 };
@@ -67,7 +67,7 @@ function ctxFrom(body, rules, key) {
 //   relay.keys                    player token → { provider, hint }
 //   relay.seats                   the X-Callsign-Seat header of every thought
 export function fakeRelay({ rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8")), tokens = null } = {}) {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const sent = new Map(); // tool_use id → the block as the brain made it (with its fallback)
   const keys = new Map();
   const calls = [];

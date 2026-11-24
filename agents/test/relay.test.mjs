@@ -12,7 +12,7 @@ import { Agent } from "../agent.mjs";
 import { RelayError, newPlayer, relayBrain, relayKeys } from "../brain-relay.mjs";
 import { fakeRelay } from "../fake-relay.mjs";
 import { Host, RANK_BROWSER, RANK_SERVER } from "../host.mjs";
-import { scriptedBrain } from "../brain-scripted.mjs";
+import { ruleBrain } from "../brain-rule.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
 rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
@@ -199,7 +199,7 @@ test("a browser-ranked host on the relay takes the side from the server's agents
   const base = await relay.up();
   t.after(() => relay.close());
 
-  const node = new Host({ server, side: 0, brain: scriptedBrain(), rank: RANK_SERVER, log: () => {} });
+  const node = new Host({ server, side: 0, brain: ruleBrain(), rank: RANK_SERVER, log: () => {} });
   await node.start();
   t.after(() => node.stop());
   await eventually("the server-side agents", () => node.agents.size === 3 && node.ready);
