@@ -10,7 +10,7 @@
   "language": "עברית",
   "restart": "Restart",
   "gold": "Gold",
-  "income": "per second",
+  "income": "a minute",
   "timeLeft": "Time left",
   "points": "Points held",
   "hqOurs": "Our HQ",
@@ -223,5 +223,17 @@
   "lobby.hostKey": "Host password",
   "lobby.hostOnly": "Type the host password above to make a match. If a friend invited you, use their join code below instead.",
   "lobby.guessing": "Too many wrong join codes. Wait a minute and try again.",
-  "lobby.hostAbout": "This game is open to the internet, so only its host can start a match. Type the host password once; this browser remembers it. A friend who was sent a link does not need it."
+  "lobby.hostAbout": "This game is open to the internet, so only its host can start a match. Type the host password once; this browser remembers it. A friend who was sent a link does not need it.",
+  "class.hauler": "hauler",
+  "haulers": "Gold haulers",
+  "haulersNone": "No haulers. Gold comes in only from the headquarters.",
+  "haul.out": "Driving to the {point} field",
+  "haul.loading": "Loading at {point}",
+  "haul.returning": "Bringing gold home",
+  "haul.unloading": "Unloading",
+  "haul.fleeing": "Under fire, running home",
+  "haul.waiting": "Waiting: no safe field with gold",
+  "call.haul": "{to}, this is {from}. Haulers to the {point} field. Over.",
+  "event.hauler_attacked": "A gold hauler is under attack near {point}.",
+  "event.hauler_lost": "A gold hauler was destroyed near {point}."
 }

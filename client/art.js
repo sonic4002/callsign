@@ -7,6 +7,8 @@
 // All drawings are made around the origin, standing on it, facing south-east (right and
 // toward the viewer). The caller translates, scales and flips.
 
+import { drawVent, haulerShape } from "./gold.js";
+
 const TAU = Math.PI * 2;
 
 // ---- generated sprites ----
@@ -318,7 +320,7 @@ function boat(ctx, look, small) {
   ctx.restore();
 }
 
-const unitHeight = { infantry: 26, vehicle: 34, naval: 36 };
+const unitHeight = { infantry: 26, vehicle: 34, naval: 36, hauler: 36 };
 
 // drawUnit draws one fireteam. `turn` is its direction of travel on screen, `aim` the
 // direction of its last shot, `sinceShot` the seconds since then and `shots` their count.
@@ -344,6 +346,15 @@ export function drawUnit(ctx, o) {
   }
   const look = looks[faction] ?? looks.aegis;
   const flip = Math.cos(turn) < 0 ? -1 : 1;
+  if (cls === "hauler") {
+    // No sheet for it: a truck, or a tracked crawler for Aegis, with its load in the bed.
+    shadow(ctx, 26, 10);
+    ctx.save();
+    ctx.scale(flip, 1);
+    haulerShape(ctx, look, { tracked: faction !== "ashfall", load: o.load ?? 0, moving, time });
+    ctx.restore();
+    return;
+  }
   if (cls === "air") {
     // No sheet for it: a plain machine in the air, with its shadow on the ground below.
     const many = members > 1;
@@ -475,7 +486,7 @@ function flagPost(ctx, color, time) {
   poly(ctx, color, 0, -44, 20, -40 + wave, 20, -28 + wave, 0, -30);
 }
 
-const buildingHeight = { hq_aegis: 96, hq_ashfall: 80, landRig: 84, seaRig: 80, point: 52 };
+const buildingHeight = { hq_aegis: 96, hq_ashfall: 80, landRig: 84, seaRig: 80, point: 52, gusher: 34 };
 buildingHeight.hq_aegis_ruin = buildingHeight.hq_aegis; // a ruin fills the frame of the building it was
 buildingHeight.hq_ashfall_ruin = buildingHeight.hq_ashfall;
 const drawn = { hq_aegis: hqAegis, hq_ashfall: hqAshfall, landRig, seaRig, point: flagPost, hq_aegis_ruin: (ctx) => rubble(ctx, "#59636b", "#8b97a0"), hq_ashfall_ruin: (ctx) => rubble(ctx, "#6b5a45", "#8a6a4a") };
@@ -504,12 +515,13 @@ export function drawBuilding(ctx, kind, color, time) {
   if (entry) {
     shadow(ctx, 30, 13, 0.3);
     drawSprite(ctx, entry, buildingHeight[kind] ?? 70, 0);
-    if (kind.endsWith("_ruin")) return; // nobody flies a flag over a ruin
+    if (kind.endsWith("_ruin") || kind === "gusher") return; // nobody flies a flag over a ruin, or owns a gusher
     // A generated building carries no team colour, so it gets a pennant beside it.
     line(ctx, "#d8dcd6", 1.6, -26, 4, -26, -30);
     pennant(ctx, -26, -30, color, time);
     return;
   }
+  if (kind === "gusher") return drawVent(ctx);
   drawn[kind]?.(ctx, color, time);
 }
 

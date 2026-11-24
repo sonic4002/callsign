@@ -9,6 +9,7 @@ import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, s
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
+import { haulerRows } from "./gold.js";
 import { Speech } from "./speech/speech.js";
 import { attachGestures, fingers } from "./touch.js";
 import { tidy } from "./voice/normalize.js";
@@ -466,7 +467,10 @@ function renderSidebar() {
   const mine = state.squads.filter((sq) => sq.side === side);
   const deploying = (state.deploying ?? []).filter((d) => d.side === side);
   const cap = rules.match.populationCap;
-  const pop = mine.length + deploying.length; // a squad on its way already holds its place
+  // A squad on its way already holds its place. Haulers have a cap of their own.
+  const pop = mine.length + deploying.filter((d) => d.class !== "hauler").length;
+  const haulers = haulerRows(state, rules, side);
+  const haulerCount = haulers.length + deploying.filter((d) => d.class === "hauler").length;
   $("pop").textContent = `${pop}/${cap}`;
   const canAct = Boolean(me) && !state.over;
 
@@ -480,12 +484,40 @@ function renderSidebar() {
     $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
   }
   const units = Object.entries(rules.factions[faction]?.units ?? {});
-  const buildKey = JSON.stringify([lang, faction, canAct, pop >= cap, units.map(([, u]) => state.gold >= u.cost)]);
+  const room = (u) => (u.class === "hauler" ? haulerCount < rules.match.haulerCap : pop < cap);
+  const buildKey = JSON.stringify([lang, faction, canAct, units.map(([, u]) => room(u) && state.gold >= u.cost)]);
   if (buildKey !== drawn.build) {
     drawn.build = buildKey;
-    $("build").replaceChildren(...units.map(([id, u]) => buildButton(id, u, canAct && pop < cap && state.gold >= u.cost)));
+    $("build").replaceChildren(...units.map(([id, u]) => buildButton(id, u, canAct && room(u) && state.gold >= u.cost)));
   }
+  renderHaulers(haulers, haulerCount);
   renderDeploying(deploying);
+}
+
+// renderHaulers lists the side's gold haulers: what each is doing and how full it is. The
+// rows are rebuilt when a hauler changes what it does; the load bars move every frame.
+function renderHaulers(haulers, count) {
+  const any = count > 0 || (state.haulers ?? []).length > 0 || (rules.gushers ?? []).length > 0;
+  $("haulers-title").hidden = $("haulers").hidden = !any || !me;
+  if (!any || !me) return;
+  $("hauler-count").textContent = `${count}/${rules.match.haulerCap}`;
+  const key = JSON.stringify([lang, haulers.map((h) => [h.id, h.state, h.point])]);
+  if (key !== drawn.haulers) {
+    drawn.haulers = key;
+    const rows = haulers.map((h) => {
+      const li = el("li", h.state === "haul.fleeing" ? "fleeing" : "");
+      li.dataset.hauler = h.id;
+      const bar = el("i", "load");
+      bar.append(el("b"));
+      li.append(el("strong", "", h.callsign[lang]), el("span", "what", t(h.state, { point: h.point ? pointName(h.point) : "" })), bar);
+      return li;
+    });
+    $("haulers").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("haulersNone"))]));
+  }
+  for (const h of haulers) {
+    const bar = $("haulers").querySelector(`[data-hauler="${h.id}"] .load b`);
+    if (bar) bar.style.inlineSize = `${Math.round(h.load * 100)}%`;
+  }
 }
 
 const secondsLeft = (d) => Math.ceil(d.ticksLeft / rules.tickRate);
@@ -642,8 +674,15 @@ function mapClick(ev) {
     const mine = state.squads.find((sq) => sq.id === scene.selected);
     return draft(mine ? call("attack", { to: mine.callsign[lang], point: name }) : $("text").value + name);
   }
-  if (!hit.point) return;
   const squad = state.squads.find((sq) => sq.id === scene.selected);
+  // A gold field with no squad selected: the call that sends the haulers there.
+  if (hit.gusher && !squad) return draft(call("haul", { to: anvil(), point: pointName(hit.gusher.point) }));
+  if (!hit.point) {
+    // A field away from any point, with a squad selected: the orders go to the point it is named after.
+    const named = hit.gusher && rules.map.points.find((p) => p.id === hit.gusher.point);
+    if (!named) return;
+    hit.point = named;
+  }
   if (!squad) return draft($("text").value + hit.point.callsign[lang]);
   const menu = $("orders");
   menu.dataset.point = hit.point.id;

@@ -36,6 +36,8 @@ export const kinds = {
   hmg: { pri: 2, gap: 110, seconds: 0.75 },
   autocannon: { pri: 2, gap: 120, seconds: 0.9 },
   splash: { pri: 2, gap: 120, seconds: 1.0 },
+  coins: { pri: 1, gap: 400, seconds: 0.7 },
+  gush: { pri: 0, gap: 1500, seconds: 1.6 },
   cannon: { pri: 3, gap: 90, seconds: 1.9 },
   boomS: { pri: 3, gap: 90, seconds: 1.3 },
   boomM: { pri: 4, gap: 150, seconds: 3.0 },
@@ -224,6 +226,22 @@ const recipes = {
     }
     burst(ctx, out, at + 0.2, 4.8, { type: "lowpass", f0: 280, f1: 60, q: 0.4, gain: 0.42, attack: 0.15 });
     crackle(ctx, out, at, 3.2, 26, 0.24);
+  },
+  // Gold tipped out of a hauler: a rattle of small bright rings.
+  coins(ctx, out, at) {
+    for (let i = 0; i < 9; i++) {
+      const when = at + i * 0.045 + Math.random() * 0.02;
+      const f = rand(2600, 5200);
+      burst(ctx, out, when, 0.09, { f0: f, q: 9, gain: 0.32 });
+      burst(ctx, out, when, 0.03, { type: "highpass", f0: 6000, gain: 0.12 });
+    }
+    burst(ctx, out, at, 0.5, { type: "lowpass", f0: 700, f1: 240, gain: 0.12, attack: 0.03 });
+  },
+  // A gusher: a rush of grit thrown up, with a faint glitter in it.
+  gush(ctx, out, at) {
+    burst(ctx, out, at, 1.5, { f0: 520, f1: 1500, q: 0.6, gain: 0.16, attack: 0.35 });
+    burst(ctx, out, at + 0.2, 1.1, { type: "highpass", f0: 5200, gain: 0.035, attack: 0.3 });
+    for (let i = 0; i < 4; i++) burst(ctx, out, at + 0.5 + i * 0.17 + Math.random() * 0.08, 0.06, { f0: rand(3400, 5600), q: 10, gain: 0.07 });
   },
   // Water thrown up and falling back.
   splash(ctx, out, at) {

@@ -184,3 +184,10 @@ test("openers: a callsign the audio supports is taken as the first word, a poor 
   assert.equal(await make(3).transcribe(audio, { openers }), "viper two");
   assert.equal(await make(-12).transcribe(audio, { openers }), "zebra two");
 });
+
+test("gold is not a map point: a call for a gold truck keeps its words", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  assert.equal(relaxed("סדן, קנה משאית זהב", { lang: "he", rules }), "סדן, קנה משאית זהב");
+  assert.equal(relaxed("סדן, המשאיות לשדה כרמל", { lang: "he", rules }), "סדן, המשאיות לשדה כרמל");
+  assert.equal(relaxed("Anvil, haulers to the gold field at kilo", { lang: "en", rules }), "Anvil, haulers to the gold field at Kilo");
+});

@@ -19,10 +19,11 @@ const classes = [...new Set(Object.values(rules.factions).flatMap((f) => Object.
 
 // Keys built at run time, as `prefix.${value}`, and the values they can take.
 const dynamic = {
-  "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded"],
+  "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded", "hauler_attacked", "hauler_lost"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer"],
   "order.": ["none", "move", "hold", "attack"],
-  "call.": ["hold", "move", "attack", "buy", "upgrade"],
+  "call.": ["hold", "move", "attack", "buy", "upgrade", "haul"],
+  "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
   "class.": classes,
   "side.": ["0", "1"],
@@ -105,6 +106,13 @@ test("the scripted operator and squad leaders understand the calls the page writ
         const use = await think("anvil", body(text), { status: { faction, squads: [], points: [], gold: 999 } });
         assert.deepEqual([use?.name, use?.input.unit], ["buy", id], `${lang}: "${text}" should buy ${id}`);
       }
+    }
+    // The call a tap on a gold field writes sends the haulers there.
+    for (const g of rules.gushers) {
+      const named = rules.map.points.find((p) => p.id === g.point);
+      const text = fill(strings["call.haul"], { to: rules.callsigns.operator[lang], from, point: named.callsign[lang] });
+      const use = await think("anvil", body(text), { points: [g.point], status: { faction: "aegis", squads: [], points: [], gold: 0 } });
+      assert.deepEqual([use?.name, use?.input.field], ["haul", g.point], `${lang}: "${text}" should send the haulers to ${g.point}`);
     }
     const point = rules.map.points.find((p) => p.id === "F");
     for (const verb of ["hold", "move", "attack"]) {

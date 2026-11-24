@@ -267,3 +267,13 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #lobby-host legend { color: var(--brass); }
 #lobby-host p { margin: 0 0 .5rem; font-size: .8rem; text-align: start; }
 #lobby-host input { inline-size: 100%; padding: .5rem .6rem; font: inherit; color: inherit; background: #10161a; border: 1px solid var(--brass); }
+
+/* ---- gold haulers ---- */
+#haulers-title { margin-block-start: .7rem; }
+#haulers { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+#haulers li { display: grid; grid-template-columns: auto 1fr auto; gap: .5rem; align-items: center; padding: .25rem .5rem; font-size: .78rem; background: #151b1f; border: 1px solid var(--edge); border-inline-start: 3px solid #e6b84a; }
+#haulers li.fleeing { border-inline-start-color: var(--warn); }
+#haulers .what { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#haulers .load { inline-size: 3.2rem; block-size: 5px; background: #0a0f11; border: 1px solid var(--edge); }
+#haulers .load b { display: block; block-size: 100%; background: #e6b84a; }
+#haulers li.empty { display: block; color: var(--muted); border-inline-start-color: var(--edge); }
