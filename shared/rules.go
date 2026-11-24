@@ -56,7 +56,7 @@ type Tier struct {
 type Unit struct {
 	Name          Text    `json:"name"`
 	Class         string  `json:"class"`  // infantry, vehicle, naval, air
-	Domain        string  `json:"domain"` // land, sea
+	Domain        string  `json:"domain"` // land, sea, air (air moves over both)
 	Cost          int     `json:"cost"`
 	DeploySeconds float64 `json:"deploySeconds"` // from the purchase until the squad stands at the HQ
 	Teams         int     `json:"teams"`
@@ -70,6 +70,23 @@ type Unit struct {
 	CooldownTicks int     `json:"cooldownTicks"`
 	Accuracy      float64 `json:"accuracy"`
 	NerveResist   float64 `json:"nerveResist"` // multiplier on stress gained; lower shakes less
+	// MinRange is how close a target may be: an indirect-fire weapon cannot hit inside it.
+	MinRange float64 `json:"minRange,omitempty"`
+	// Pierce is the share of the target's armor this weapon ignores (0 none, 1 all).
+	Pierce float64 `json:"pierce,omitempty"`
+	// Vs scales damage by the target's class, or "hq" for a headquarters. A target not
+	// listed takes full damage; one at 0 cannot be engaged at all.
+	Vs map[string]float64 `json:"vs,omitempty"`
+	// NoCapture marks a unit that cannot hold ground, whatever its class.
+	NoCapture bool `json:"noCapture,omitempty"`
+}
+
+// Against is the damage multiplier of this unit's weapon on a target class, or on "hq".
+func (u *Unit) Against(class string) float64 {
+	if v, ok := u.Vs[class]; ok {
+		return v
+	}
+	return 1
 }
 
 type Faction struct {
@@ -88,7 +105,8 @@ type Rules struct {
 		CaptureSeconds float64 `json:"captureSeconds"`
 		CaptureRadius  float64 `json:"captureRadius"`
 		HoldRadius     float64 `json:"holdRadius"`
-		PointSight     float64 `json:"pointSight"` // how far a side sees from a point it holds
+		PointSight     float64 `json:"pointSight"`    // how far a side sees from a point it holds
+		RevealSeconds  float64 `json:"revealSeconds"` // how long firing gives a team away to the enemy
 	} `json:"match"`
 	HQ struct {
 		HP    float64 `json:"hp"`
@@ -200,11 +218,19 @@ func (r *Rules) check() error {
 			if _, ok := r.Callsigns.Classes[u.Class]; !ok {
 				return fmt.Errorf("unit %s has unknown class %q", id, u.Class)
 			}
-			if u.Domain != "land" && u.Domain != "sea" {
+			if u.Domain != "land" && u.Domain != "sea" && u.Domain != "air" {
 				return fmt.Errorf("unit %s has unknown domain %q", id, u.Domain)
 			}
 			if u.DeploySeconds < 0 {
 				return fmt.Errorf("unit %s has a negative deploy time", id)
+			}
+			if u.MinRange < 0 || u.MinRange >= u.Range || u.Pierce < 0 || u.Pierce > 1 {
+				return fmt.Errorf("unit %s has a bad minRange or pierce", id)
+			}
+			for class, v := range u.Vs {
+				if _, ok := r.Callsigns.Classes[class]; (!ok && class != "hq") || v < 0 {
+					return fmt.Errorf("unit %s: bad vs entry %q", id, class)
+				}
 			}
 			if u.Teams <= 0 || u.Members <= 0 || u.HP <= 0 || u.CooldownTicks <= 0 || u.Speed <= 0 {
 				return fmt.Errorf("unit %s has a non-positive stat", id)

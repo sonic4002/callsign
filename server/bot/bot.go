@@ -27,60 +27,97 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	var cmds []sim.Command
 	enemyHQ := p.R.HQPoint(1 - p.Side).ID
 	plan := p.infantryPlan()
-	infantry, naval, vehicles := 0, 0, 0
-	for _, sq := range snap.Squads {
-		want := sim.Command{Side: p.Side, Squad: sq.ID}
-		switch sq.Class {
-		case "naval":
+	// The line units are the cheapest of each class; anything dearer is a specialist.
+	line := map[string]string{}
+	for _, class := range []string{"infantry", "vehicle", "naval", "air"} {
+		line[class], _ = p.unitOf(snap.Faction, class)
+	}
+	infantry, naval, vehicles, air, special := 0, 0, 0, 0, 0
+	count := func(class, unit string) {
+		switch {
+		case class == "air":
+			air++
+		case unit != line[class]:
+			special++
+		case class == "naval":
 			naval++
-			want.Kind, want.Point = sim.CmdHold, p.seaRig()
-		case "vehicle":
+		case class == "vehicle":
 			vehicles++
-			want.Kind, want.Point = sim.CmdAttack, enemyHQ
 		default:
-			if infantry < len(plan) {
-				want.Kind, want.Point = sim.CmdHold, plan[infantry]
-			} else {
-				want.Kind, want.Point = sim.CmdAttack, enemyHQ
-			}
 			infantry++
 		}
-		if want.Point != "" && (sq.Order.Kind != want.Kind || sq.Order.Point != want.Point) {
+	}
+	for _, sq := range snap.Squads {
+		want := sim.Command{Side: p.Side, Squad: sq.ID}
+		switch {
+		case sq.Class == "naval":
+			want.Kind, want.Point = sim.CmdHold, p.seaRig()
+		case sq.Class == "infantry" && sq.Unit == line["infantry"] && infantry < len(plan):
+			want.Kind, want.Point = sim.CmdHold, plan[infantry]
+		case sq.Class == "air":
+			// Aircraft are the reserve: they hunt the enemy squad nearest to home that
+			// they can hurt, and wait over the forward point when none is in sight.
+			want.Kind, want.Point = sim.CmdHold, plan[min(1, len(plan)-1)]
+			if c := p.prey(snap, sq.Unit); c != 0 {
+				want = sim.Command{Side: p.Side, Squad: sq.ID, Kind: sim.CmdAttack, Contact: c}
+			}
+		default:
+			// Armour, specialists and spare infantry press the enemy headquarters.
+			want.Kind, want.Point = sim.CmdAttack, enemyHQ
+		}
+		count(sq.Class, sq.Unit)
+		if want.Contact != 0 {
+			if sq.Order.Kind != want.Kind || sq.Order.Contact != want.Contact {
+				cmds = append(cmds, want)
+			}
+		} else if want.Point != "" && (sq.Order.Kind != want.Kind || sq.Order.Point != want.Point) {
 			cmds = append(cmds, want)
 		}
 	}
 
 	// Squads on their way count as already there, or the bot would buy them twice.
 	for _, d := range snap.Deploying {
-		switch d.Class {
-		case "naval":
-			naval++
-		case "vehicle":
-			vehicles++
-		default:
-			infantry++
-		}
+		count(d.Class, d.Unit)
 	}
 	if len(snap.Squads)+len(snap.Deploying) >= p.R.Match.PopulationCap {
 		return cmds
 	}
-	buy := ""
+	buy := line["infantry"]
 	switch {
 	case p.Style == Rush:
-		buy = "infantry"
 	case naval == 0:
-		buy = "naval"
+		buy = line["naval"]
 	case infantry < 5:
-		buy = "infantry"
 	case vehicles < 2:
-		buy = "vehicle"
-	default:
-		buy = "infantry"
+		buy = line["vehicle"]
+	case air == 0 && line["air"] != "":
+		buy = line["air"]
+	case special < 2:
+		if id := p.specialist(snap.Faction, line); id != "" {
+			buy = id
+		}
 	}
-	if id, u := p.unitOf(snap.Faction, buy); id != "" && snap.Gold >= u.Cost {
-		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
+	if u, ok := p.R.Factions[snap.Faction].Units[buy]; ok && snap.Gold >= u.Cost {
+		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: buy})
 	}
 	return cmds
+}
+
+// prey picks the enemy squad in sight nearest to this side's headquarters that a unit's
+// weapon can hurt, or 0. The lowest id breaks a tie.
+func (p *Player) prey(snap sim.Snapshot, unit string) int {
+	u := p.R.Factions[snap.Faction].Units[unit]
+	hq := p.R.HQPoint(p.Side)
+	best, bd := 0, math.MaxFloat64
+	for _, c := range snap.Contacts {
+		if u.Against(c.Class) == 0 {
+			continue
+		}
+		if d := math.Hypot(c.X-hq.X, c.Y-hq.Y); d < bd {
+			best, bd = c.ID, d
+		}
+	}
+	return best
 }
 
 // infantryPlan lists the points the first infantry squads hold, in order.
@@ -111,19 +148,35 @@ func (p *Player) nearest(kind string, n int) string {
 
 func (p *Player) seaRig() string { return p.nearest("seaRig", 0) }
 
-// unitOf finds the faction's unit of a class. Unit ids are sorted so the pick never
-// depends on map order.
+// unitOf finds the faction's line unit of a class: the cheapest one. Unit ids are sorted
+// so the pick never depends on map order.
 func (p *Player) unitOf(faction, class string) (string, shared.Unit) {
 	units := p.R.Factions[faction].Units
+	best := ""
+	for _, id := range sortedIDs(units) {
+		if units[id].Class == class && (best == "" || units[id].Cost < units[best].Cost) {
+			best = id
+		}
+	}
+	return best, units[best]
+}
+
+// specialist finds the faction's first unit that is not the line unit of its class.
+func (p *Player) specialist(faction string, line map[string]string) string {
+	units := p.R.Factions[faction].Units
+	for _, id := range sortedIDs(units) {
+		if line[units[id].Class] != id {
+			return id
+		}
+	}
+	return ""
+}
+
+func sortedIDs(units map[string]shared.Unit) []string {
 	ids := make([]string, 0, len(units))
 	for id := range units {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	for _, id := range ids {
-		if units[id].Class == class {
-			return id, units[id]
-		}
-	}
-	return "", shared.Unit{}
+	return ids
 }

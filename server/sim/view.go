@@ -226,6 +226,7 @@ func (s *Sim) Hash() uint64 {
 			f(t.Stress)
 			put(uint64(t.Members))
 			put(uint64(t.Cooldown))
+			put(uint64(int64(t.lastFire)))
 		}
 	}
 	return h.Sum64()
