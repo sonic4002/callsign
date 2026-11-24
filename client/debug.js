@@ -1919,7 +1919,7 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // For tests and screenshots: skip the lobby. A commander gets a match against the
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
-  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "" });
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "", fast: query.has("fast"), anvil: Number(query.get("anvil")) || 0 });
 } else if (query.has("learn") && role !== "spectator") {
   startLesson(); // ?learn goes straight into the first lesson
 }
