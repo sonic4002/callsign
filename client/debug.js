@@ -541,6 +541,7 @@ function talk() {
     wasMuted = music.muted; // the music would be heard as speech
     music.setMuted(true);
   }
+  speech.key(true); // keyed up: the set cannot receive
   voice.start(lang);
 }
 
@@ -553,6 +554,7 @@ function callsigns(spoke) {
 }
 
 async function talkEnd() {
+  speech.key(false);
   if (wasMuted !== null) music.setMuted(wasMuted);
   wasMuted = null;
   if (!voice.held) return;

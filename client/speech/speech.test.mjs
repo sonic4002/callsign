@@ -102,3 +102,8 @@ test("queue: what is said to the player is kept and heard before chatter between
   assert.equal(q.next(12_600).text, "newest chatter");
   assert.equal(q.next(12_700), null);
 });
+
+test("the pronunciation table pins the rank סמל to samal, not semel", () => {
+  const table = JSON.parse(readFileSync(new URL("../../tts/pronounce.json", import.meta.url), "utf8"));
+  assert.equal(table.he["סמל"].ipa, "samˈal");
+});
