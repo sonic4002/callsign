@@ -1737,13 +1737,13 @@
       "style": "scenery",
       "height": 120,
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        21,
+        22,
+        23,
+        24
       ],
-      "subject": "a thicket of dense dry thorn bushes with three small acacia trees with flat crowns standing in it",
-      "keep": 14
+      "subject": "three small acacia trees with flat crowns standing close together among a few low thorn bushes, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 23
     },
     {
       "id": "rocks_1",
@@ -1751,13 +1751,13 @@
       "style": "scenery",
       "height": 72,
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        21,
+        22,
+        23,
+        24
       ],
-      "subject": "an outcrop of five large weathered sand-coloured boulders heaped together",
-      "keep": 11
+      "subject": "an outcrop of large rounded weathered sandstone boulders heaped together, rough natural rock with cracks and worn edges, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 24
     },
     {
       "id": "rocks_2",
@@ -2389,6 +2389,160 @@
       ],
       "subject": "the roof has fallen in, the walls are cracked, broken open and blackened with soot, and heaps of rubble, broken stone and splintered timber lie inside the footprint, with nothing rising above the broken walls",
       "keep": 23
+    },
+    {
+      "id": "tree_1",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 96,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small olive tree with a twisted dark trunk and a round grey-green crown, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 12
+    },
+    {
+      "id": "tree_2",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 96,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small acacia tree with a thin dark trunk and a flat wide dusty green crown, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "tree_3",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 96,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small scrubby desert tree with a short crooked trunk and dense dark green leaves, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "tree_4",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 64,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single low dry thorn bush, dusty olive green leaves and bare brown twigs, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "tree_5",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 96,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small narrow dark green cypress tree, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "stone_1",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 48,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small weathered sand-coloured boulder with cracks, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 12
+    },
+    {
+      "id": "stone_2",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 48,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "two small grey rough rocks lying together, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "stone_3",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 48,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a small heap of three pale broken stones, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "crag_1",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 128,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small steep jagged rock crag of grey-brown stone with sharp ridges and ledges, its foot a ragged scatter of scree, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "crag_2",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 128,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "one single small steep rock pinnacle of grey-brown stone with a little snow on its tip, its foot a ragged scatter of scree, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 11
+    },
+    {
+      "id": "crag_3",
+      "kind": "landmark",
+      "style": "scenery",
+      "height": 128,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a small ridge of two low jagged grey-brown rock teeth, its foot a ragged scatter of scree, standing alone with no ground, no soil, no platform and no base under it",
+      "keep": 13
     }
   ]
 }

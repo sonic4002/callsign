@@ -1,7 +1,7 @@
 // The battlefield: terrain baked once, then every frame the points, buildings, fireteams,
 // gunfire and labels, sorted by depth. It draws only what the server sent this side.
 
-import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawSegment, drawUnit, hasAnimation, sprites } from "./art.js";
+import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawScatter, drawSegment, drawUnit, hasAnimation, sprites } from "./art.js";
 import { drawFence, drawStructure } from "./bases-art.js";
 import { structureAt, structureDef } from "./bases.js";
 import { drawRadarOff } from "./power.js";
@@ -578,7 +578,10 @@ export class Scene {
     }
     const tile = (name) => (sprites.terrain[name] ? g.createPattern(sprites.terrain[name], "repeat") : null);
     paintGround(g, rules, rand, { water: tile("sea"), ice: tile("ice"), mountain: tile("mountain") });
-    for (const s of scenery(rules, rand)) drawScenery(g, s, ...toIso(s.x, s.y));
+    for (const s of scenery(rules, rand)) {
+      const [ix, iy] = toIso(s.x, s.y);
+      if (!drawScatter(g, s, ix, iy)) drawScenery(g, s, ix, iy);
+    }
 
     this.layer = layer;
     // Glints on open water, wherever the map has any.

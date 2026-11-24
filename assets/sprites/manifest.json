@@ -3361,7 +3361,7 @@
     "grove_3": {
       "image": "landmarks/grove_3.png",
       "size": [
-        136,
+        120,
         120
       ],
       "anchor": [
@@ -3373,7 +3373,7 @@
     "rocks_1": {
       "image": "landmarks/rocks_1.png",
       "size": [
-        74,
+        93,
         72
       ],
       "anchor": [
@@ -3453,6 +3453,138 @@
         0.8
       ],
       "height": 46
+    },
+    "tree_1": {
+      "image": "landmarks/tree_1.png",
+      "size": [
+        86,
+        96
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 37
+    },
+    "tree_2": {
+      "image": "landmarks/tree_2.png",
+      "size": [
+        92,
+        96
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 37
+    },
+    "tree_3": {
+      "image": "landmarks/tree_3.png",
+      "size": [
+        80,
+        96
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 37
+    },
+    "tree_4": {
+      "image": "landmarks/tree_4.png",
+      "size": [
+        69,
+        64
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 25
+    },
+    "tree_5": {
+      "image": "landmarks/tree_5.png",
+      "size": [
+        47,
+        96
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 37
+    },
+    "stone_1": {
+      "image": "landmarks/stone_1.png",
+      "size": [
+        55,
+        48
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 18
+    },
+    "stone_2": {
+      "image": "landmarks/stone_2.png",
+      "size": [
+        76,
+        48
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 18
+    },
+    "stone_3": {
+      "image": "landmarks/stone_3.png",
+      "size": [
+        50,
+        48
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 18
+    },
+    "crag_1": {
+      "image": "landmarks/crag_1.png",
+      "size": [
+        140,
+        128
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 49
+    },
+    "crag_2": {
+      "image": "landmarks/crag_2.png",
+      "size": [
+        132,
+        128
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 49
+    },
+    "crag_3": {
+      "image": "landmarks/crag_3.png",
+      "size": [
+        145,
+        128
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 49
     }
   },
   "terrain": {
@@ -3774,6 +3906,23 @@
       "gold_field_1",
       "gold_field_2",
       "gold_field_3"
+    ],
+    "tree": [
+      "tree_1",
+      "tree_2",
+      "tree_3",
+      "tree_4",
+      "tree_5"
+    ],
+    "stone": [
+      "stone_1",
+      "stone_2",
+      "stone_3"
+    ],
+    "crag": [
+      "crag_1",
+      "crag_2",
+      "crag_3"
     ]
   },
   "portraits": {
