@@ -222,3 +222,29 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #build button.requested { animation: requested 1.1s ease-in-out infinite; }
 @keyframes requested { 50% { border-color: var(--brass); box-shadow: inset 0 0 0 1px #c9a44c88, inset 0 0 14px #c9a44c33; } }
 @media (prefers-reduced-motion: reduce) { #build button.requested { animation: none; border-color: var(--brass); } }
+
+/* ---- lobby ---- */
+#overlay .card { max-block-size: 94vh; overflow: auto; }
+#overlay form, #lobby-room { margin-block-start: 1rem; text-align: start; font-size: .9rem; }
+#overlay fieldset { border: 1px solid var(--edge-hi); margin: 0 0 .6rem; padding: .4rem .7rem .5rem; display: grid; gap: .25rem; }
+#overlay legend { padding: 0 .3rem; color: var(--muted); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+#overlay form label { display: block; cursor: pointer; }
+#overlay form select, #overlay input[type="text"] { font: inherit; color: inherit; background: #10161a; border: 1px solid var(--edge-hi); padding: .25rem .4rem; }
+#overlay form select { margin-inline-start: .4rem; }
+#lobby-watch { margin-block-start: .4rem; color: var(--muted); }
+#lobby-join { display: flex; align-items: end; gap: .5rem; padding-block-start: .9rem; border-block-start: 1px solid var(--edge-hi); }
+#lobby-join label { flex: 1; color: var(--muted); }
+#lobby-join-code { display: block; inline-size: 100%; margin-block-start: .2rem; text-transform: uppercase; letter-spacing: .3em; font-weight: 700; }
+#lobby-code { font-size: 1.7rem; letter-spacing: .3em; color: var(--brass); }
+#lobby-share { display: flex; gap: .4rem; }
+#lobby-link { flex: 1; min-inline-size: 0; }
+#lobby-seats { list-style: none; margin: .7rem 0 0; padding: 0; display: grid; gap: .3rem; }
+#lobby-seats li { display: flex; gap: .5rem; align-items: baseline; padding: .4rem .6rem; background: #10161a; border: 1px solid var(--edge-hi); border-inline-start: 3px solid var(--edge-hi); }
+#lobby-seats li.mine { border-inline-start-color: var(--brass); }
+#lobby-seats li.ready .status { color: var(--mine); }
+#lobby-seats .who { color: var(--brass); font-size: .78rem; }
+#lobby-seats .status { margin-inline-start: auto; color: var(--muted); }
+#lobby-note { font-size: .74rem; line-height: 1.45; }
+#lobby-error { color: var(--warn) !important; font-weight: 700; }
+#overlay [hidden] { display: none !important; }
+#lobby-note code { white-space: nowrap; unicode-bidi: isolate; direction: ltr; color: var(--brass); }

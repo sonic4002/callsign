@@ -4,6 +4,7 @@
 // Nerve shows in what the troops do; the "show nerve" switch is a debugging aid.
 
 import { drawUnit, loadSprites } from "./art.js";
+import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
@@ -21,6 +22,10 @@ const el = (tag, cls, text) => {
 const query = new URLSearchParams(location.search);
 const side = query.get("side") === "1" ? 1 : 0;
 const role = query.get("role") === "spectator" ? "spectator" : "hammer";
+// ?room=<code> is the match this page is in. The seat this browser holds there is kept
+// by the browser, so a reload sits back down in it.
+let room = (query.get("room") ?? "").trim().toUpperCase();
+let seat = room ? savedSeat(room) : null;
 document.body.classList.add(`side-${side}`);
 
 // ---- language ----
@@ -75,7 +80,12 @@ let me = null; // this connection's station
 let faction = "";
 let entries = []; // radio log lines, kept as data so a language switch can redraw them
 let ws = null;
-let started = false; // the player pressed Start
+let lobby = null; // the room's seats and phase, as the server last told this connection
+let offer = null; // what the server offers before a match exists: factions, a scripted enemy
+let found = null; // a room looked up by its code, before this browser holds a seat in it
+let baseRules = null; // the rules, for names in the lobby before any greeting
+let lobbyError = null; // () => text: why the last lobby step failed, in the page language
+let lobbyBusy = false; // a lobby request is on its way
 const drawn = { roster: "", build: "" }; // what the sidebar lists show now
 
 const scene = new Scene($("map"), $("radar-map"), { lang: () => lang, showNerve: () => $("nerve").checked, side });
@@ -95,12 +105,35 @@ const open = () => ws?.readyState === WebSocket.OPEN;
 
 function connect() {
   system("connecting");
-  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?side=${side}&role=${role}`);
+  const params = new URLSearchParams({ side, role });
+  if (room) params.set("room", room);
+  if (seat) params.set("token", seat.token);
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?${params}`);
   ws.addEventListener("message", (ev) => onFrame(JSON.parse(ev.data)));
-  ws.addEventListener("close", () => {
+  ws.addEventListener("close", (ev) => {
+    if (ev.code === 1008) return turnedAway(ev.reason); // refused: knocking again will not help
     system("disconnected", {}, "warn");
     setTimeout(connect, 1000);
   });
+}
+
+// The server would not let this page into the room, and said why.
+function turnedAway(reason) {
+  ws = null;
+  lobby = null;
+  if (/no such match/.test(reason)) {
+    lobbyError = () => t("lobby.noRoom");
+  } else if (/hold that seat/.test(reason)) {
+    // The seat is someone else's now, or the token was for an older match with this code.
+    forgetSeat(room);
+    seat = null;
+    lookUp();
+  } else if (/spectators/.test(reason)) {
+    lobbyError = () => t("lobby.noWatching");
+  } else {
+    lobbyError = () => t("lobby.failed", { reason });
+  }
+  renderOverlay();
 }
 
 function onFrame(frame) {
@@ -110,6 +143,9 @@ function onFrame(frame) {
       state = frame.state;
       me = frame.station ?? null;
       faction = frame.faction;
+      lobby = frame.lobby ?? null;
+      lobbyError = null;
+      readyUp();
       entries = frame.log.map((m) => ({ kind: "radio", message: m }));
       system(me ? "matchStarted" : "spectating", { faction });
       scene.setRules(rules);
@@ -121,6 +157,15 @@ function onFrame(frame) {
       state = frame.state;
       scene.setState(state);
       break;
+    case "lobby": {
+      const other = lobby?.seats[1 - side];
+      lobby = frame.lobby;
+      const now = lobby.seats[1 - side];
+      // The other commander leaving or returning mid-match is news; their squads fight on.
+      if (me && lobby.phase === "playing" && other?.taken && other.online !== now.online) system(now.online ? "lobby.back" : "lobby.left", {}, "warn");
+      readyUp();
+      break;
+    }
     case "radio":
       entries.push({ kind: "radio", message: frame.message });
       // Anvil turning a purchase down ends the wait for it.
@@ -607,17 +652,53 @@ for (const button of document.querySelectorAll("#orders button")) {
 
 // ---- menus ----
 
-// The overlay is the start screen before the match and the result screen after it.
+// The overlay is the lobby before the match and the result screen after it.
+//
+// Without ?room it offers to make a match or to join one by its code. With a room it
+// shows the seats: to someone without a seat, the free one to take; to the two
+// commanders, who is ready. Against the scripted enemy there is nobody to wait for, so
+// the match starts on the one press that made it.
+const inRoom = () => Boolean(ws) && lobby !== null;
+const factionName = (id) => (rules ?? baseRules)?.factions[id]?.name[lang] ?? id ?? "";
+const chosen = (name) => new FormData($("lobby-new")).get(name);
+
 function renderOverlay() {
-  const over = Boolean(state?.over);
-  $("overlay").hidden = started && !over;
+  const over = inRoom() && Boolean(state?.over);
+  const playing = inRoom() && !over && (role === "spectator" || lobby.phase === "playing");
+  $("overlay").hidden = playing;
   $("overlay-title").textContent = over ? t(state.winner === -1 ? "over.draw" : state.winner === side ? "over.won" : "over.lost") : t("title");
   $("overlay-line").textContent = over ? t(`over.${state.reason}`) : t("tagline");
-  const factionName = rules?.factions[faction]?.name[lang];
-  $("overlay-side").textContent = t(`side.${side}`) + (factionName ? ` · ${factionName}` : "");
-  $("start").textContent = over ? t("playAgain") : role === "spectator" ? t("watch") : t("start");
-  $("start").hidden = over && !me; // a spectator cannot restart
-  music.setMode(!started || over ? "menu" : "battle");
+  $("overlay-side").hidden = !inRoom() || !me;
+  $("overlay-side").textContent = t(`side.${side}`) + (faction ? ` · ${factionName(faction)}` : "");
+
+  const making = !room && role !== "spectator";
+  $("lobby-new").hidden = $("lobby-join").hidden = !making;
+  const sides = offer?.factions ?? Object.keys(baseRules?.factions ?? {});
+  $("lobby-side-0").textContent = `${t("side.0")} · ${factionName(sides[0])}`;
+  $("lobby-side-1").textContent = `${t("side.1")} · ${factionName(sides[1])}`;
+  $("lobby-watch").hidden = chosen("opponent") !== "friend";
+  for (const option of $("lobby-length").options) option.textContent = t("lobby.minutes", { minutes: option.value / 60 });
+
+  const view = lobby ?? found?.lobby ?? null;
+  const withFriend = Boolean(room) && view?.opponent === "friend" && !over;
+  $("lobby-room").hidden = !withFriend;
+  if (withFriend) renderSeats(view);
+
+  let label = "";
+  if (over) label = me ? t("playAgain") : "";
+  else if (making) label = chosen("opponent") === "friend" ? t("lobby.create") : t("start");
+  else if (!room) label = inRoom() ? "" : t("watch"); // a spectator of the open room
+  else if (inRoom()) label = me && withFriend ? (lobby.seats[side].ready ? t("lobby.unready") : t("lobby.ready")) : "";
+  else if (found) label = freeSeat(found.lobby) ? t("lobby.take", { faction: factionName(freeSeat(found.lobby).faction) }) : found.lobby.watch ? t("watch") : "";
+  $("start").hidden = !label;
+  $("start").textContent = label;
+  $("start").disabled = lobbyBusy;
+  $("lobby-leave").hidden = !room;
+  // Someone who followed a link to a match with no seat left is told so.
+  const notice = lobbyError?.() ?? (room && !inRoom() && found && !freeSeat(found.lobby) && !withFriend ? t("lobby.full") : "");
+  $("lobby-error").hidden = !notice;
+  $("lobby-error").textContent = notice;
+  music.setMode(playing ? "battle" : "menu");
 
   $("credits").hidden = !music.available;
   $("credits-list").replaceChildren(
@@ -625,17 +706,114 @@ function renderOverlay() {
   );
 }
 
+// renderSeats shows a match between two people while it waits: its code, the link to
+// send, and who sits where.
+function renderSeats(view) {
+  $("lobby-code").textContent = room;
+  $("lobby-link").value = shareLink(room, offer?.share);
+  $("lobby-copy").textContent = t("lobby.copy");
+  $("lobby-seats").replaceChildren(
+    ...view.seats.map((s) => {
+      const status = s.bot ? t("lobby.seatBot") : !s.taken ? t("lobby.seatFree") : !s.online ? t("lobby.seatOffline") : s.ready ? t("lobby.seatReady") : t("lobby.seatWaiting");
+      const mine = Boolean(me) && s.side === side;
+      const li = el("li", [`side-${s.side}`, mine ? "mine" : "", s.ready ? "ready" : ""].filter(Boolean).join(" "));
+      li.append(el("strong", "", `${t(`side.${s.side}`)} · ${factionName(s.faction)}`), el("span", "who", mine ? t("lobby.seatYou") : ""), el("span", "status", status));
+      return li;
+    }),
+  );
+  const both = view.seats.every((s) => s.taken);
+  const full = !inRoom() && found && !freeSeat(found.lobby);
+  $("lobby-status").textContent = full ? t("lobby.full") : !both ? t("lobby.waitFriend") : view.phase === "lobby" ? t("lobby.waitReady") : "";
+  // Said plainly, where the code is shown: what a match on the local network does not protect.
+  $("lobby-note").textContent = t("lobby.unprotected");
+  if (onlyThisMachine() && !offer?.share) {
+    // The command is set apart so that it reads left to right and stays on one line.
+    const [before, after] = t("lobby.localOnly", { command: "\n" }).split("\n");
+    $("lobby-note").append(` ${before}`, el("code", "", "make play-lan"), after);
+  }
+}
+
+// Against the scripted enemy nobody else has to agree: the commander is ready on arrival.
+function readyUp() {
+  if (me && open() && lobby?.room && lobby.opponent !== "friend" && lobby.phase === "lobby" && !lobby.seats[side].ready) {
+    ws.send(JSON.stringify({ type: "ready", ready: true }));
+  }
+}
+
+// lobbyStep runs one request of the lobby and says, in the page language, why it failed.
+async function lobbyStep(step) {
+  if (lobbyBusy) return;
+  lobbyBusy = true;
+  lobbyError = null;
+  renderOverlay();
+  try {
+    await step();
+  } catch (err) {
+    const reason = err.message;
+    lobbyError = err.status === 404 ? () => t("lobby.noRoom") : err.status === 409 ? () => t("lobby.full") : err.status === 503 ? () => t("lobby.busy") : () => t("lobby.failed", { reason });
+  }
+  lobbyBusy = false;
+  renderOverlay();
+}
+
+// sitDown takes the seat the server gave and goes to the match. The page is built around
+// its side, so a seat on the other side loads the page again there; the saved seat lets
+// that page walk straight in.
+function sitDown(got) {
+  saveSeat(got.room, got);
+  if (got.side !== side) return location.assign(pageFor({ room: got.room, side: got.side }));
+  room = got.room;
+  seat = savedSeat(room);
+  found = null;
+  history.replaceState(null, "", pageFor({ room, side }));
+  connect();
+}
+
+const makeMatch = (options) => lobbyStep(async () => sitDown(await createRoom(options)));
+const takeFreeSeat = () => lobbyStep(async () => sitDown(await takeSeat(room)));
+
+// lookUp reads a room this browser has no seat in, to offer the free one.
+async function lookUp() {
+  await lobbyStep(async () => {
+    found = null;
+    found = await roomInfo(room);
+  });
+}
+
 $("start").addEventListener("click", () => {
   music.unlock();
-  if (state?.over) return open() && ws.send(JSON.stringify({ type: "restart" }));
-  begin();
+  if (inRoom() && state?.over) return open() && ws.send(JSON.stringify({ type: "restart" }));
+  if (!room && role === "spectator") return begin();
+  if (!room) return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && chosen("opponent") === "friend" });
+  if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
+  if (found && freeSeat(found.lobby)) return takeFreeSeat();
+  if (found?.lobby.watch) location.assign(pageFor({ room, role: "spectator" }));
 });
 
+$("lobby-new").addEventListener("change", renderOverlay);
+$("lobby-new").addEventListener("submit", (ev) => ev.preventDefault());
+$("lobby-join").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const code = $("lobby-join-code").value.trim().toUpperCase();
+  if (code) location.assign(pageFor({ room: code }));
+});
+$("lobby-copy").addEventListener("click", async () => {
+  $("lobby-link").select();
+  // The clipboard needs a secure context; on plain http the link is left selected to copy by hand.
+  if (await navigator.clipboard?.writeText($("lobby-link").value).then(() => true, () => false)) $("lobby-copy").textContent = t("lobby.copied");
+});
+// Leaving gives a seat back while the match has not started, then returns to the first screen.
+$("lobby-leave").addEventListener("click", () => {
+  if (inRoom() && me && open() && lobby.phase === "lobby") ws.send(JSON.stringify({ type: "leave" }));
+  if (room && (!lobby || lobby.phase === "lobby")) forgetSeat(room);
+  location.assign(pageFor({}));
+});
+
+// begin connects without a lobby: a spectator of the open room, as before there were rooms.
 function begin() {
-  if (started) return;
-  started = true;
-  renderOverlay();
+  if (ws) return;
   connect();
+  renderOverlay();
 }
 
 // ---- music ----
@@ -666,13 +844,39 @@ function frame(now) {
 applyLanguage();
 // The battlefield is drawn behind the start screen before any match exists.
 try {
-  scene.setRules(await (await fetch("/shared/rules.json")).json());
+  baseRules = await (await fetch("/shared/rules.json")).json();
+  scene.setRules(baseRules);
 } catch {
   // The greeting brings the rules anyway.
 }
 scene.resize();
 requestAnimationFrame(frame);
-if (query.has("autostart")) begin(); // for tests and screenshots: skip the start screen
+
+// What the lobby can offer, and the match lengths to choose from.
+offer = await serverInfo().catch(() => null);
+const usual = offer?.length ?? baseRules?.match.lengthSeconds ?? 600;
+for (const seconds of [...new Set([300, 600, 900, usual])].sort((a, b) => a - b)) {
+  const option = el("option");
+  option.value = seconds;
+  option.selected = seconds === usual;
+  $("lobby-length").append(option);
+}
+$("lobby-new").elements.side.value = String(side);
+
+if (room && seat && role !== "spectator" && seat.side !== side) {
+  location.replace(pageFor({ room, side: seat.side })); // the seat held here is on the other side
+} else if (room && (seat || role === "spectator")) {
+  connect(); // back in the seat after a reload, or watching
+} else if (room) {
+  await lookUp(); // a friend's link: show the match and the free seat
+  if (query.has("autostart") && found && freeSeat(found.lobby)) takeFreeSeat();
+} else if (query.has("autostart")) {
+  // For tests and screenshots: skip the lobby. A commander gets a match against the
+  // scripted enemy on the side in the address; a spectator watches the open room.
+  if (role === "spectator") begin();
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true });
+}
+renderOverlay();
 
 // For debugging from the console.
 window.callsign = { scene, music, sideColor };

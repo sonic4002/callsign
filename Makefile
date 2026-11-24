@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
+.PHONY: image test play play-lan stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -15,13 +15,26 @@ test:
 	$(DOCKER) --network none $(IMAGE) sh -c 'go vet ./... && go test ./... && \
 		go build -o /tmp/callsign ./server/cmd/callsign && CALLSIGN_BIN=/tmp/callsign node --test'
 
+# A fresh secret for each run, shared by the game server and its agent host.
+AGENT_KEY = $(shell head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# This machine's address on the local network, for play-lan.
+LAN_IP ?= $(shell ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+
 # Start the game server and the agents, then open http://localhost:8080
 # The image and the build-cache volume are made here if they are missing; nothing else is fetched.
 play:
 	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
 	@docker volume create callsign-gocache >/dev/null
 	@mkdir -p assets/voice-cache
-	CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) up
+	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) up
+
+# The same, opened to the local network so a friend can join from another machine.
+# Read docs/FRIEND-MATCH.md first: there is no encryption and no accounts.
+play-lan:
+	@test -n "$(LAN_IP)" || { echo "could not find this machine's network address; set LAN_IP=..."; exit 1; }
+	@echo "Your friend opens  http://$(LAN_IP):8080  and types the join code from your lobby."
+	@echo "Anyone on this network who has that code can join the free seat. Nothing is encrypted."
+	CALLSIGN_BIND=0.0.0.0 CALLSIGN_SHARE=http://$(LAN_IP):8080 $(MAKE) play
 
 stop:
 	docker compose --profile voice down

@@ -1,5 +1,5 @@
-# make play: the game server and one side's agents, both from the callsign-dev image.
-# Open http://localhost:8080 and transmit as Hammer.
+# make play: the game server and the agent host, both from the callsign-dev image.
+# Open http://localhost:8080, make a match in the lobby and transmit as Hammer.
 services:
   server:
     image: callsign-dev
@@ -8,13 +8,18 @@ services:
     working_dir: /src
     environment:
       HOME: /tmp
+      # The secret the agent host shows the server. `make play` makes a new one each run;
+      # empty leaves the server trusting every agent, which is only safe on this machine.
+      CALLSIGN_AGENT_KEY: "${CALLSIGN_AGENT_KEY:-}"
+      CALLSIGN_SHARE: "${CALLSIGN_SHARE:-}" # set by `make play-lan`: the address a friend opens
     volumes:
       - .:/src:ro
       - callsign-gocache:/gocache
     # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
     command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}", "-tts=http://tts:5002"]
     ports:
-      - "127.0.0.1:8080:8080" # this machine only: Phase 0 has no accounts
+      # This machine only, unless `make play-lan` opens it to the network (docs/FRIEND-MATCH.md).
+      - "${CALLSIGN_BIND:-127.0.0.1}:8080:8080"
 
   agents:
     image: callsign-dev
@@ -25,6 +30,7 @@ services:
     environment:
       HOME: /tmp
       CALLSIGN_SERVER: ws://server:8080/ws
+      CALLSIGN_AGENT_KEY: "${CALLSIGN_AGENT_KEY:-}"
     volumes:
       - .:/src:ro
     command: node agents/main.mjs
