@@ -209,3 +209,51 @@ func TestSquadsAreSentAtStructuresAndOnlyEngineersCapture(t *testing.T) {
 	}
 	tool(t, rm, anvil, ToolBuy, `{"unit":"technical"}`)
 }
+
+// Building is spending: the operator builds on Hammer's order, or on its own only while
+// it holds the purse, and then the net tells Hammer what was started.
+func TestBuildingFollowsThePurse(t *testing.T) {
+	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	ticks(rm, 30)
+	build := func() (map[string]any, error) {
+		out, err := rm.Tool(anvil, ToolBuild, json.RawMessage(`{"structure":"vehicleWorks"}`))
+		m, _ := out.(map[string]any)
+		return m, err
+	}
+	if _, err := build(); !errors.Is(err, ErrNotOrdered) {
+		t.Fatalf("an unordered build: err = %v, want ErrNotOrdered", err)
+	}
+	// An unordered hauler is refused the same way.
+	if _, err := rm.Tool(anvil, ToolBuy, json.RawMessage(`{"unit":"crawler"}`)); !errors.Is(err, ErrNotOrdered) {
+		t.Fatalf("an unordered hauler: err = %v, want ErrNotOrdered", err)
+	}
+	if _, err := rm.Say(hammer, "Anvil, you may buy as you see fit"); err != nil {
+		t.Fatal(err)
+	}
+	before := len(rm.Log(0))
+	out, err := build()
+	if err != nil || out["announced"] != true {
+		t.Fatalf("a build on the purse: %v %v", out, err)
+	}
+	log := rm.Log(0)
+	if len(log) != before+1 || !strings.Contains(log[len(log)-1].Text, "Building Vehicle Works for") || log[len(log)-1].From.Key != "operator" {
+		t.Fatalf("the net did not announce the build: %+v", log[len(log)-1])
+	}
+	// An ordered build is not announced: Hammer asked for it.
+	if _, err := rm.Say(hammer, "Anvil, stop buying"); err != nil {
+		t.Fatal(err)
+	}
+	ticks(rm, 20)
+	if _, err := rm.Say(hammer, "Anvil, build a dockyard"); err != nil {
+		t.Fatal(err)
+	}
+	out2, err := rm.Tool(anvil, ToolBuild, json.RawMessage(`{"structure":"dockyard"}`))
+	if m, _ := out2.(map[string]any); err != nil || m["announced"] != false {
+		t.Fatalf("an ordered build: %v %v", out2, err)
+	}
+}

@@ -315,6 +315,7 @@
     },
     "ownPurchase": {
       "bought": { "en": "Bought {unit} for {cost} gold, {squad} is deploying", "he": "נקנה {unit} ב-{cost} זהב, {squad} בדרך" },
+      "built": { "en": "Building {unit} for {cost} gold", "he": "מתחיל לבנות {unit} ב-{cost} זהב" },
       "upgraded": { "en": "Upgraded {squad} to {tier} for {cost} gold", "he": "{squad} שודרג לדרגת {tier} ב-{cost} זהב" }
     },
     "signOff": {

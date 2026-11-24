@@ -7,6 +7,7 @@ import (
 
 	"callsign/server/radio"
 	"callsign/server/sim"
+	"callsign/shared"
 )
 
 // Who has the initiative on a side.
@@ -162,8 +163,7 @@ func (rm *Room) mayBuy(side int) (own bool, err error) {
 }
 
 func (rm *Room) announce(side int, kind string, sq *sim.Squad, cost int) {
-	from, to := radio.Station{Kind: radio.Operator}, radio.Station{Kind: radio.Player}
-	lang := rm.lang[side][to.Key()]
+	lang := rm.lang[side][radio.Station{Kind: radio.Player}.Key()]
 	if lang != "he" {
 		lang = "en"
 	}
@@ -181,6 +181,22 @@ func (rm *Room) announce(side int, kind string, sq *sim.Squad, cost int) {
 	}
 	body := strings.NewReplacer("{unit}", unit, "{squad}", callsign, "{cost}", strconv.Itoa(cost), "{tier}", tier).
 		Replace(rm.r.Radio.OwnPurchase[kind].In(lang))
+	rm.tellHammer(side, lang, body)
+}
+
+// announceBuilt tells Hammer about a structure the operator started on its own.
+func (rm *Room) announceBuilt(side int, name shared.Text, cost int) {
+	lang := rm.lang[side][radio.Station{Kind: radio.Player}.Key()]
+	if lang != "he" {
+		lang = "en"
+	}
+	body := strings.NewReplacer("{unit}", name.In(lang), "{cost}", strconv.Itoa(cost)).Replace(rm.r.Radio.OwnPurchase["built"].In(lang))
+	rm.tellHammer(side, lang, body)
+}
+
+// tellHammer puts a line from the operator to Hammer on the net, in the net's language.
+func (rm *Room) tellHammer(side int, lang, body string) {
+	from, to := radio.Station{Kind: radio.Operator}, radio.Station{Kind: radio.Player}
 	text, err := rm.net.Compose(lang, from, []radio.Station{to}, body, radio.Out)
 	if err != nil {
 		return

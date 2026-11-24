@@ -119,12 +119,34 @@ function ownMoves({ wake, rules, agent }) {
   const moves = [];
   const units = Object.entries(rules.factions[s.faction ?? ""]?.units ?? {});
   const fielded = s.squads.length + (s.deploying?.length ?? 0);
-  if (s.command.buy && fielded < Math.min(rules.match.populationCap, 8)) {
+  if (s.command.buy) {
+    // With the purse the operator spends the way the scripted enemy does: the economy
+    // first, then what its next unit needs, then the unit. One purchase a wake; the net
+    // announces whatever it buys or builds on its own, so nothing is said here.
+    const base = compactStructures(s, agent.side).filter((st) => st.whose === "yours");
+    const stands = (role) => base.some((st) => st.role === role && !st.building);
+    const rising = base.some((st) => st.building && !["defence", "fence"].includes(st.role));
+    const defs = rules.factions[s.faction ?? ""]?.structures ?? {};
+    const cost = (role) => Object.values(defs).find((d) => d.role === role)?.cost ?? Infinity;
+    const raise = (role) => {
+      const [id, def] = Object.entries(defs).find(([, d]) => d.role === role) ?? [];
+      const missing = (def?.requires ?? []).find((need) => !stands(need));
+      if (missing) return raise(missing);
+      if (id && !rising && s.gold >= cost(role)) moves.push({ name: "build", input: { structure: id, place: "", place2: "" } });
+    };
+    const hauler = units.find(([, u]) => u.class === "hauler");
+    const haulers = (s.haulers ?? []).filter((h) => h.side === agent.side).length + (s.deploying ?? []).filter((q) => q.class === "hauler").length;
     const infantry = [...s.squads, ...(s.deploying ?? [])].filter((q) => q.class === "infantry").length;
     const cls = infantry < 4 ? "infantry" : "vehicle";
-    const pick = units.filter(([, u]) => u.class === cls).sort((a, b) => a[1].cost - b[1].cost)[0];
-    // The net announces a purchase made on the operator's own, so nothing is said here.
-    if (pick && s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
+    const pick = units.filter(([, u]) => u.class === cls && !u.captureSeconds).sort((a, b) => a[1].cost - b[1].cost)[0];
+    if (!stands("barracks")) raise("barracks");
+    else if (!stands("refinery")) raise("refinery");
+    else if (hauler && haulers < Math.min(2, rules.match.haulerCap ?? 0)) {
+      if (s.gold >= hauler[1].cost) moves.push({ name: "buy", input: { unit: hauler[0], upgrade: "" } });
+    } else if (pick && fielded < Math.min(rules.match.populationCap, 8)) {
+      if (pick[1].requires && !stands(pick[1].requires)) raise(pick[1].requires);
+      else if (s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
+    }
   }
   if (!fight) return moves; // the purse without the fight: it buys, and tasks nobody
   const mine = (p) => s.points.find((q) => q.id === p.id)?.owner === agent.side;

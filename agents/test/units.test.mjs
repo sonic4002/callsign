@@ -257,6 +257,12 @@ test("scripted operator: acts on orders only until Hammer hands it the fight, an
       { callsign: { en: "Viper 2" }, class: "infantry", unit: "commandos", x: 150, y: 480, order: { kind: "hold", point: "D" } },
     ],
     deploying: [],
+    // A standing base and a working economy, so the next thing to spend on is a squad.
+    structures: [
+      { id: "s1", kind: "barracks", role: "barracks", side: 0, yours: true, hp: 1, building: 1 },
+      { id: "s2", kind: "refinery", role: "refinery", side: 0, yours: true, hp: 1, building: 1 },
+    ],
+    haulers: [{ id: 1001, side: 0 }, { id: 1002, side: 0 }],
     ...extra,
   });
   const heard = (mode, extra) => ({ items: [{ kind: "heard", msg: call("Wilco", { from: viper2, end: "out" }) }], call: null, status: status(mode, extra) });
@@ -277,6 +283,13 @@ test("scripted operator: acts on orders only until Hammer hands it the fight, an
   ]);
   // Told not to spend: it still tasks squads but buys nothing.
   assert.deepEqual(await think(brain, { agent: anvil, wake: heard("fight", { command: { mode: "fight", buy: false } }) }), [["radio", { to: ["Viper 1"], body: "Hold Bravo", end: "over" }]]);
+  // The purse is spent on the economy and the base before squads: a lost refinery is put
+  // back, a missing hauler replaced, and a unit's structure built before the unit.
+  const own = async (extra) => (await think(brain, { agent: anvil, wake: heard("orders", { command: { mode: "orders", buy: true }, ...extra }) }))[0];
+  assert.deepEqual(await own({ structures: [{ id: "s1", kind: "barracks", role: "barracks", side: 0, yours: true, hp: 1, building: 1 }] }), ["build", { structure: "refinery", place: "", place2: "" }]);
+  assert.deepEqual(await own({ haulers: [{ id: 1001, side: 0 }] }), ["buy", { unit: "crawler", upgrade: "" }]);
+  const four = [1, 2, 3, 4].map((n) => ({ callsign: { en: `Viper ${n}` }, class: "infantry", unit: "commandos", x: 150, y: 480, order: { kind: "hold", point: "D" } }));
+  assert.deepEqual(await own({ squads: four }), ["build", { structure: "vehicleWorks", place: "", place2: "" }]);
   // Hammer takes command back: one Wilco and nothing more, now or on later traffic.
   const take = call("I have command", { to: [anvil.station] });
   assert.deepEqual(await think(brain, { agent: anvil, wake: { items: [{ kind: "radio", msg: take }], call: take, status: status("orders") } }), [["radio", { to: ["Hammer"], body: "Wilco", end: "out" }]]);
@@ -370,8 +383,9 @@ test("status and prompts: the operator is told about haulers, fields and income 
   assert.deepEqual(status.enemyHaulersSeen, [{ contact: 1002, x: 900, y: 300, inSight: false }]);
   assert.deepEqual(status.goldFields, [{ field: "B", full: 0.5, inSight: true }]);
   const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
-  assert.match(prompt, /haulers drive out, load, and bring it home/);
-  assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold; an unarmed gold hauler/);
+  assert.match(prompt, /haulers drive out, load, and bring it home to your refinery/);
+  assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold, needs a Refinery; an unarmed gold hauler/);
+  assert.match(prompt, /on your own you build only while command\.buy is true/);
   assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);
   assert.doesNotMatch(prompt, /oil rigs; there are/);
 });

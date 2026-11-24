@@ -18,13 +18,13 @@ const (
 	ToolRepair  = "repair"
 )
 
-// mayActAlone is the one check for "may the operator do this without being told to?".
-// The operator's two modes (on orders / running the fight) are built in another branch,
-// which refuses an unordered buy; building follows the same rule through this function.
-// Until the two meet it lets everything through.
-func (rm *Room) mayActAlone(side int, what string) error {
-	_, _ = side, what
-	return nil
+// mayActAlone is the one check for "may the operator spend without being told to?".
+// Building follows the purse exactly as buying does (command.go): an order from Hammer
+// just now, or a standing permission. `own` reports that nobody asked for this one, so
+// the net must tell Hammer about it.
+func (rm *Room) mayActAlone(side int, what string) (own bool, err error) {
+	_ = what
+	return rm.mayBuy(side)
 }
 
 // sideWords are the ways to name a side of one's own base, in both languages.
@@ -140,12 +140,13 @@ func (rm *Room) toolBuild(side int, a toolArgs) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", sim.ErrNoStructure, a.Structure)
 	}
-	if err := rm.mayActAlone(side, ToolBuild); err != nil {
+	own, err := rm.mayActAlone(side, ToolBuild)
+	if err != nil {
 		return nil, err
 	}
+	before := rm.sim.Gold(side)
 	hq := rm.r.HQPoint(side)
 	cmd := sim.Command{Side: side, Kind: sim.CmdBuild, Structure: key}
-	var err error
 	if cmd.Place, err = rm.place(side, a.Place, false, hq.X, hq.Y); err != nil {
 		return nil, err
 	}
@@ -157,7 +158,11 @@ func (rm *Room) toolBuild(side int, a toolArgs) (any, error) {
 		return nil, err
 	}
 	def := st.Def()
+	if own {
+		rm.announceBuilt(side, def.Name, before-rm.sim.Gold(side))
+	}
 	return map[string]any{
+		"announced": own,
 		"structure": st.PlaceID(), "kind": st.Kind, "name": def.Name.En, "near": rm.near(st.X, st.Y),
 		"buildSeconds": float64(st.BuildTicks) / float64(rm.r.TickRate), "gold": rm.sim.Gold(side),
 	}, nil
