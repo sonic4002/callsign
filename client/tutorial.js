@@ -83,7 +83,7 @@ export class Coach {
     this.render(c);
   }
 
-  // #with adds what the steps need to know about this map.
+  // #with adds what the steps need to know about this map: the point of the home gold field.
   #with(c) {
     return { ...c, rig: nearest(c.rules, c.side, "landRig") };
   }
@@ -160,6 +160,7 @@ export class Coach {
       firstId,
       first: point(firstId),
       firstName: rules.map.points.find((p) => p.id === firstId)?.callsign[lang] ?? firstId,
+      rig: point(c.rig), // the gold field by the base, which the lesson's enemy comes for
       anvil: rules.callsigns.operator[lang],
       unit: line?.name[lang] ?? "",
       target: `${rules.callsigns.contact[lang]} ${contact?.id ?? 3}`,
