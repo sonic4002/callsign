@@ -115,7 +115,8 @@ art-units:
 # look at before it goes in: art-sheet.png in this directory.
 art-sheet:
 	$(ART) --network none -w /src callsign-art sh -c 'python art/sheet.py scene art-sheet.png && \
-		python art/sheet.py stages art-stages.png && python art/sheet.py leaving art-leaving.png'
+		python art/sheet.py stages art-stages.png && python art/sheet.py leaving art-leaving.png && \
+		python art/sheet.py powered art-powered.png'
 
 # ---- radio voices: the squads' replies spoken aloud (tts/, client/speech/) ----
 TTS := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v $(CURDIR):/src
