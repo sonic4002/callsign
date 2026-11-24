@@ -62,12 +62,12 @@ function mapTable(rules, side) {
             : `control point, ${canTake(rules, "point")} squads can capture it`;
     return `- ${p.id}: ${p.callsign.en} / ${p.callsign.he} ("${p.name.en}", "${p.name.he}") at x=${p.x}, y=${p.y}: ${what}`;
   });
+  // What each kind of landmark is, said once: a big map has a hundred of them, and a line
+  // of explanation on every one would double the length of this table.
   const kinds = rules.landmarkKinds ?? {};
-  const landmarks = (rules.map.landmarks ?? []).map((l) => {
-    const k = kinds[l.kind] ?? {};
-    const what = k.garrison ? `${l.kind}: infantry can go inside, room for ${k.garrison} fireteams` : `${l.kind}: cover`;
-    return `- ${l.id}: ${l.name.en} / ${l.name.he} (${what})`;
-  });
+  const onMap = [...new Set((rules.map.landmarks ?? []).map((l) => l.kind))];
+  const kindLines = onMap.map((kind) => (kinds[kind]?.garrison ? `${kind}: infantry can go inside, room for ${kinds[kind].garrison} fireteams` : `${kind}: cover`));
+  const landmarks = (rules.map.landmarks ?? []).map((l) => `- ${l.id}: ${l.name.en} / ${l.name.he}`);
   const bridges = (rules.map.bridges ?? []).map((b) => `- ${b.id}: ${b.name.en} / ${b.name.he}`);
   return [
     `The map is "${rules.map.name?.en ?? "the map"}", ${rules.map.width} wide and ${rules.map.height} tall; x grows east, y grows south, distances are in metres.`,
@@ -77,6 +77,7 @@ function mapTable(rules, side) {
     ...(landmarks.length
       ? [
           "Landmarks. Each has an id and a name, and an order can go to it by either. A fireteam standing still behind one is harder to hit; infantry inside a building are harder still to hit and are seen only from close by or once they fire, but heavy weapons bring a building down. Your status lists the buildings that are held, damaged or fallen.",
+          `The kind is the middle word of an id (${kindLines.join("; ")}).`,
           ...landmarks,
         ]
       : []),
