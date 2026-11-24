@@ -169,6 +169,7 @@ function connect() {
   ws.addEventListener("close", (ev) => {
     if (ev.code === 1008) return turnedAway(ev.reason); // refused: knocking again will not help
     document.body.classList.add("no-server"); // the page says so until the server is back
+    speech.silence(); // radio still waiting to be spoken is about a net that is gone
     system("disconnected", {}, "warn");
     setTimeout(connect, 1000);
   });
