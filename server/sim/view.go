@@ -20,9 +20,11 @@ type TeamView struct {
 }
 
 type OrderView struct {
-	Kind    string `json:"kind"`
-	Point   string `json:"point,omitempty"`
-	Contact int    `json:"contact,omitempty"`
+	Kind    string  `json:"kind"`
+	Point   string  `json:"point,omitempty"`
+	Contact int     `json:"contact,omitempty"`
+	Place   string  `json:"place,omitempty"`   // a structure id, when the order is on one
+	Capture float64 `json:"capture,omitempty"` // an engineer squad's takeover, 0…1
 }
 
 type SquadView struct {
@@ -86,9 +88,13 @@ type Snapshot struct {
 	Squads    []SquadView   `json:"squads"`
 	Deploying []DeployView  `json:"deploying"` // own squads bought and on their way, oldest first
 	Contacts  []ContactView `json:"contacts"`
-	Over      bool          `json:"over"`
-	Winner    int           `json:"winner"`
-	Reason    string        `json:"reason,omitempty"`
+	// Structures are this side's own and the other side's as last seen. ForeignUnits are
+	// the other factions' units this side can buy through structures it has captured.
+	Structures   []StructureView `json:"structures"`
+	ForeignUnits []string        `json:"foreignUnits,omitempty"`
+	Over         bool            `json:"over"`
+	Winner       int             `json:"winner"`
+	Reason       string          `json:"reason,omitempty"`
 }
 
 // Snapshot is the match as one side may see it. Enemy squads appear only as contacts,
@@ -129,6 +135,10 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		cols, rows := s.fogSize()
 		snap.Fog = &FogView{Cell: FogCell, Cols: cols, Rows: rows, Seen: append([]byte{}, s.Sides[side].explored...)}
 	}
+	snap.Structures = s.structureViews(side)
+	if side != Spectator {
+		snap.ForeignUnits = s.ForeignUnits(side)
+	}
 	for _, sq := range s.Squads {
 		if sq.Deploying() && (side == Spectator || sq.Side == side) {
 			snap.Deploying = append(snap.Deploying, DeployView{
@@ -155,7 +165,7 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 		ID: sq.ID, Side: sq.Side, Callsign: s.Callsign(sq), Unit: sq.Unit, Class: sq.unit.Class,
 		Tier: sq.Tier, X: round1(x), Y: round1(y), Near: s.nearestPoint(x, y),
 		Alive: alive, Full: full,
-		Order:    OrderView{Kind: sq.Order.Kind, Point: sq.Order.Point, Contact: sq.Order.Contact},
+		Order:    OrderView{Kind: sq.Order.Kind, Point: sq.Order.Point, Contact: sq.Order.Contact, Place: sq.Order.Place, Capture: s.CaptureProgress(sq)},
 		Contacts: append([]int{}, sq.Contacts...),
 	}
 	for i := range sq.Teams {
@@ -229,5 +239,6 @@ func (s *Sim) Hash() uint64 {
 			put(uint64(int64(t.lastFire)))
 		}
 	}
+	s.hashStructures(put, f)
 	return h.Sum64()
 }

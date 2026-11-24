@@ -6,7 +6,8 @@ import "math"
 type plan struct {
 	act    string
 	target *teamRef
-	hq     bool // fire at the enemy headquarters
+	hq     bool       // fire at the enemy headquarters
+	st     *Structure // fire at this structure
 	x, y   float64
 }
 
@@ -53,6 +54,9 @@ func (s *Sim) trackContacts() {
 func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	sq, t, u := tr.sq, tr.t, tr.u
 	order := sq.Order.Kind
+	if order == OrderCapture || order == OrderRepair {
+		order = OrderMove // engineers walk to their work and do not stop to fight
+	}
 	nerve := s.Nerve(t)
 
 	var target, wanted, closest *teamRef
@@ -101,9 +105,14 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 		target, targetD = wanted, wantedD
 	}
 	enemyHQ := s.R.HQPoint(1 - sq.Side)
-	hq := target == nil && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
+	// A squad sent at a structure shoots that structure, not the headquarters behind it.
+	hq := target == nil && sq.Order.Structure == 0 && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
 		dist(t.X, t.Y, enemyHQ.X, enemyHQ.Y) <= u.Range
-	canFire := target != nil || hq
+	var structure *Structure
+	if target == nil && !hq {
+		structure = s.structureTarget(tr, order)
+	}
+	canFire := target != nil || hq || structure != nil
 
 	var destX, destY float64
 	needMove := false
@@ -154,9 +163,10 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if canFire {
 		v := 0.55 + b(order == OrderHold || order == OrderAttack, 0.3) + b(order == OrderNone, 0.2) -
 			b(order == OrderMove, 0.1) + b(target != nil && targetD <= u.Range/2, 0.15) -
-			b(shaken, 0.15) - b(pinned, 0.9)
+			b(shaken, 0.15) - b(pinned, 0.9) +
+			b(structure != nil && structure.ID == t.blocked, 0.6) // a fence in the way is shot down
 		if v > score {
-			best, score = plan{act: ActFire, target: target, hq: hq}, v
+			best, score = plan{act: ActFire, target: target, hq: hq, st: structure}, v
 		}
 	}
 	if needMove {

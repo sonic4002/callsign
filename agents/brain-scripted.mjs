@@ -2,6 +2,9 @@
 // and answers in procedure, in Hebrew or English. Tests run on it, and so does a match
 // started without an API key. It answers in the same shape the Claude brain does.
 
+import { buildVerb, captureVerb, namedStructure, placeOf, wantedStructure } from "./bases.mjs";
+import { compactStructures } from "./bases.mjs";
+
 const verbs = [
   ["attack", /\b(attack|assault|destroy|hit)\b|תקוף|תקפו|לתקוף|השמד/],
   ["move", /\b(move|go|advance|head)\b|נוע|נועו|זוז|זוזו|התקדם/],
@@ -36,7 +39,17 @@ function leaderPlan({ agent, wake, rules }) {
   const lang = call.lang;
   const back = [call.from.en];
   if (call.prowords?.includes("radioCheck")) return [radio(back, say.fiveByFive[lang], "out")];
+  const orElse = (why) => radio(back, `${say.negative[lang]}, ${why}`, "over");
+  // An enemy structure named in the call: engineers take it over, anyone else attacks it.
+  const structures = compactStructures(wake.status ?? {}, agent.side);
+  const theirs = namedStructure(call.body, structures, { enemy: true });
+  if (theirs && captureVerb.test(call.body.toLowerCase()) && agent.unit?.captureSeconds > 0) {
+    return [{ name: "capture", input: { place: theirs.id }, orElse }, radio(back, say.wilco[lang], "out")];
+  }
   const verb = verbOf(call.body);
+  if (theirs && verb === "attack") {
+    return [{ name: "attack", input: { point: theirs.id, contact: 0 }, orElse }, radio(back, say.wilco[lang], "out")];
+  }
   const point = call.points?.[0];
   if (!verb || (!point && verb === "move")) return [radio(back, say.sayAgain[lang], "over")];
   // "Attack" with no target: the nearest enemy in sight, or else the enemy headquarters.
@@ -127,7 +140,16 @@ function operatorPlan(ctx) {
     if (!squad) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
-  if (/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
+  // Building: a structure named with a word for building, or a defence or a fence asked
+  // for by itself ("a gun at Delta", "fence the north side").
+  const structures = rules.factions[wake.status?.faction ?? ""]?.structures ?? {};
+  const wanted = wantedStructure(text, structures);
+  const fixed = wanted && ["defence", "fence"].includes(structures[wanted].role);
+  if (wanted && (buildVerb.test(text) || (fixed && !verbOf(text)))) {
+    const input = { structure: wanted, place: fixed ? placeOf(text, call.points) : "", place2: "" };
+    return [{ name: "build", input, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
+  if (/\b(buy|purchase|build)\b|קנה|קנו|רכוש|בנה/.test(text)) {
     const unit = wantedUnit(text, rules.factions[wake.status?.faction ?? ""]?.units ?? {});
     if (!unit) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit, upgrade: "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];

@@ -41,15 +41,33 @@ export const leaderTools = [
   tool("hold", "Send your squad to a point to defend it. The squad fights anything that comes in range.", {
     point: point('Where to hold. Use "here" to hold the ground you are on.'),
   }),
-  tool("attack", "Advance and engage. Give a point to attack toward it, or a contact id to hunt that enemy squad. Fill one and leave the other empty.", {
-    point: { type: "string", description: 'Point to attack toward, or "" when attacking a contact.' },
+  tool("attack", "Advance and engage. Give a point to attack toward it, an enemy structure's id to destroy it, or a contact id to hunt that enemy squad. Fill one and leave the other empty.", {
+    point: { type: "string", description: 'Point to attack toward, or an enemy structure id from your status such as "s7", or "" when attacking a contact.' },
     contact: { type: "integer", description: "Enemy squad id from your status, or 0 when attacking a point." },
   }),
 ];
 
+// Engineer squads have two tools of their own.
+const engineerTools = [
+  tool("capture", "Take over an enemy base structure. Your squad walks to it and, after a few seconds beside it without being shot at, the structure is your side's and the squad stays inside it for good.", {
+    place: { type: "string", description: 'The enemy structure: its id from your status, such as "s7".' },
+  }),
+  tool("repair", "Mend a broken bridge, so that ground units can cross again.", {
+    place: { type: "string", description: "The bridge: its id from your status." },
+  }),
+];
+
+// leaderToolsFor is the tool set of a squad's leader: the engineers' extra two for engineers.
+export const leaderToolsFor = (unit) => (unit?.captureSeconds > 0 ? [...leaderTools, ...engineerTools] : leaderTools);
+
 export const operatorTools = [
   radio,
   report,
+  tool("build", "Spend gold to start a structure. Base structures take their own place by your headquarters; a defence or a fence takes a place.", {
+    structure: { type: "string", description: 'Structure id from your list, for example "vehicleWorks".' },
+    place: { type: "string", description: 'For a defence or a fence: a point you hold, a structure of yours by id, or a side of your base such as "base:front" or "base:north". "" for a base structure, or to use the front of your base.' },
+    place2: { type: "string", description: 'Only for a fence that runs from `place` toward a second place; otherwise "".' },
+  }),
   tool("buy", "Spend gold. Fill `unit` to raise a new squad, or `upgrade` to raise a squad's brain tier. Fill one and leave the other empty.", {
     unit: { type: "string", description: 'Unit id to buy, or "".' },
     upgrade: { type: "string", description: 'Callsign of the squad to upgrade, for example "Viper 2", or "".' },

@@ -14,7 +14,9 @@ var rules = shared.MustLoad()
 
 func newSim(t *testing.T, seed uint64) *sim.Sim {
 	t.Helper()
-	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}})
+	// Every base structure stands, so these tests can buy any unit at once. The build
+	// tree itself is tested in structures_test.go, on a match that starts as a real one does.
+	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}, FullBase: true})
 	if err != nil {
 		t.Fatal(err)
 	}

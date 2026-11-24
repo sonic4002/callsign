@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"callsign/server/radio"
 	"callsign/server/sim"
@@ -21,8 +22,8 @@ const (
 
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
-	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack},
-	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand},
+	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair},
+	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild},
 }
 
 // names accepts "Hammer" as well as ["Viper 1", "Viper 2"].
@@ -48,6 +49,11 @@ type toolArgs struct {
 	Lang    string `json:"lang"`
 	Mode    string `json:"mode"` // command: "orders" or "fight", empty to read it
 	MayBuy  *bool  `json:"buy"`  // command: whether the operator may spend on its own
+	// Bases (build.go): what to build, and where an order or a structure goes when it is
+	// not a plain point.
+	Structure string `json:"structure"`
+	Place     string `json:"place"`
+	Place2    string `json:"place2"`
 }
 
 // Tool runs one game tool for a client and returns its result.
@@ -77,22 +83,39 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		return rm.toolBuy(side, a)
 	case ToolCommand:
 		return rm.toolCommand(side, a)
+	case ToolBuild:
+		return rm.toolBuild(side, a)
+	case ToolCapture, ToolRepair:
+		return rm.toolEngineer(c, name, a)
 	}
 
 	// move, hold, attack: always the caller's own squad.
 	cmd := sim.Command{Side: side, Kind: name, Squad: c.ID.Squad, Contact: a.Contact}
+	if a.Point == "" {
+		a.Point = a.Place
+	}
 	if a.Point != "" {
 		id, ok := rm.net.ResolvePoint(a.Point)
-		if !ok {
-			return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, a.Point)
+		if ok {
+			cmd.Point = id
+		} else {
+			// Not a point: a structure, by id or by name (build.go).
+			var x, y float64
+			if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
+				x, y = sq.Center()
+			}
+			place, err := rm.place(side, a.Point, name == ToolAttack, x, y)
+			if err != nil || strings.HasPrefix(place, "base:") {
+				return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, a.Point)
+			}
+			cmd.Place = place
 		}
-		cmd.Point = id
 	}
 	sq, err := rm.sim.Apply(cmd)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"order": sq.Order.Kind, "point": sq.Order.Point, "contact": sq.Order.Contact}, nil
+	return map[string]any{"order": sq.Order.Kind, "point": sq.Order.Point, "contact": sq.Order.Contact, "place": sq.Order.Place}, nil
 }
 
 func (rm *Room) toolRadio(c *Client, a toolArgs) (any, error) {
@@ -160,7 +183,7 @@ func (rm *Room) toolReport(c *Client) (any, error) {
 		Order    sim.OrderView `json:"order"`
 		Alive    int           `json:"alive"`
 	}
-	out := map[string]any{"timeLeft": snap.TimeLeft, "points": snap.Points, "contacts": snap.Contacts}
+	out := map[string]any{"timeLeft": snap.TimeLeft, "points": snap.Points, "contacts": snap.Contacts, "structures": rm.structureBriefs(snap)}
 	friends := []friend{}
 	for _, sq := range snap.Squads {
 		if sq.ID == c.ID.Squad {

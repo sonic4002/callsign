@@ -41,6 +41,9 @@ type Config struct {
 	Seed          uint64
 	Factions      [2]string
 	LengthSeconds int // 0 uses the rules default
+	// FullBase starts both sides with every base structure standing, so that every unit
+	// can be bought from the first second. Tests of other things use it.
+	FullBase bool
 }
 
 type Side struct {
@@ -64,6 +67,11 @@ type Order struct {
 	X, Y    float64
 	Tick    int
 	arrived bool
+	// Structure is the structure an attack or capture order is on (structures.go);
+	// Place is the place id the order named when it was not a plain point.
+	Structure int
+	Place     string
+	work      int // ticks an engineer squad has spent on its capture
 }
 
 type Team struct {
@@ -76,6 +84,7 @@ type Team struct {
 	Spotted  bool // seen by the other side this tick
 	lastShot int  // tick this team was last shot at
 	lastFire int  // tick this team last fired; firing gives it away for a while
+	blocked  int  // id of the fence that stopped this team's last step, or 0
 
 	// scratch for the tick being resolved
 	dmg     float64
@@ -120,9 +129,11 @@ type Sim struct {
 	Sides  [2]Side
 	Squads []*Squad // every squad ever raised, in id order; dead ones stay with Alive false
 	Points []PointState
-	Over   bool
-	Winner int
-	Reason string
+	// Structures is everything either side has built, in id order; ruins stay.
+	Structures []*Structure
+	Over       bool
+	Winner     int
+	Reason     string
 
 	rng         *rand.Rand
 	events      []Event
@@ -165,6 +176,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 			s.field(s.raise(side, u))
 		}
 	}
+	s.initStructures(cfg.FullBase)
 	s.initFog()
 	return s, nil
 }
@@ -241,7 +253,7 @@ func (s *Sim) Nerve(t *Team) string {
 
 // raise creates a squad with its id and callsign number, not yet on the field.
 func (s *Sim) raise(side int, unitID string) *Squad {
-	u := s.R.Factions[s.Sides[side].Faction].Units[unitID]
+	u, _ := s.unitFor(side, unitID)
 	sd := &s.Sides[side]
 	sd.nextNum[u.Class]++
 	sq := &Squad{
@@ -379,10 +391,12 @@ func (s *Sim) Step() []Event {
 		s.Sides[side].goldUnit += int64(s.Income(side))
 	}
 	s.deploy()
+	s.construct()
 
 	live := s.liveTeams()
 	s.spot(live)
 	s.trackContacts()
+	s.trackStructures()
 	for _, tr := range live {
 		tr.plan = s.decide(tr, live)
 	}
@@ -392,9 +406,12 @@ func (s *Sim) Step() []Event {
 	for _, tr := range live {
 		s.fire(tr)
 	}
+	s.defencesFire(live)
 	s.resolveDamage(live)
+	s.resolveStructures()
 	s.recover(live)
 	s.capture(live)
+	s.engineers()
 	s.squadEvents(live)
 	s.observe()
 	s.checkEnd()
@@ -445,12 +462,16 @@ func (s *Sim) move(tr *teamRef) {
 		speed *= 0.15
 	}
 	d := dist(t.X, t.Y, p.x, p.y)
-	if d <= speed {
-		t.X, t.Y = p.x, p.y
+	nx, ny := p.x, p.y
+	if d > speed {
+		nx, ny = t.X+(p.x-t.X)/d*speed, t.Y+(p.y-t.Y)/d*speed
+	}
+	// A hostile fence in the way stops a ground team where it stands.
+	if st := s.fenceStops(tr, nx, ny); st != nil {
+		t.blocked = st.ID
 		return
 	}
-	t.X += (p.x - t.X) / d * speed
-	t.Y += (p.y - t.Y) / d * speed
+	t.X, t.Y, t.blocked = nx, ny, 0
 }
 
 func (s *Sim) fire(tr *teamRef) {
@@ -466,6 +487,10 @@ func (s *Sim) fire(tr *teamRef) {
 	t.Cooldown = tr.u.CooldownTicks
 	if nerve == Shaken {
 		t.Cooldown = tr.u.CooldownTicks * 8 / 5
+	}
+	if tr.plan.st != nil {
+		s.fireAtStructure(tr, tr.plan.st)
+		return
 	}
 	if tr.plan.hq {
 		enemy := &s.Sides[1-tr.sq.Side]

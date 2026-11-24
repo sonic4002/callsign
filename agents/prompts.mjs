@@ -1,3 +1,5 @@
+import { leaderBases, operatorBases } from "./bases.mjs";
+
 // System prompts for the operator and the squad leaders. Each faction ships its own
 // doctrine, so the same model plays Aegis and Ashfall differently.
 
@@ -19,6 +21,7 @@ export function unitFacts(u, rules) {
   if (u.minRange) facts.push(`fires far (${u.range}) but cannot hit anything closer than ${u.minRange}, and needs another squad to see the target; keep it back and screened`);
   if (u.range < 100) facts.push("must close to point-blank range to strike");
   if (u.noCapture) facts.push("cannot capture or hold points");
+  if (u.captureSeconds) facts.push("engineers: they take over enemy base structures and mend bridges, and fight poorly");
   return facts.join("; ");
 }
 
@@ -71,6 +74,8 @@ ${wakes}
 
 On an order: first act with move, hold or attack, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
 
+${leaderBases(unit)}
+
 ${procedure}
 
 ${mapTable(rules, side)}
@@ -79,8 +84,9 @@ ${doctrine[faction] ?? ""}`;
 }
 
 export function operatorPrompt({ rules, side, faction }) {
+  const needs = (u) => Object.values(rules.factions[faction].structures ?? {}).find((s) => s.role === u.requires)?.name.en;
   const units = Object.entries(rules.factions[faction].units)
-    .map(([id, u]) => `- ${id}: ${u.name.en} (${u.name.he}), ${u.class}, ${u.cost} gold${unitFacts(u, rules) ? `; ${unitFacts(u, rules)}` : ""}`)
+    .map(([id, u]) => `- ${id}: ${u.name.en} (${u.name.he}), ${u.class}, ${u.cost} gold${needs(u) ? `, needs a ${needs(u)}` : ""}${unitFacts(u, rules) ? `; ${unitFacts(u, rules)}` : ""}`)
     .join("\n");
   const tiers = rules.tiers
     .filter((t) => t.upgradeCost > 0)
@@ -109,6 +115,8 @@ On a call from Hammer: task the squads that fit, then answer Hammer. Tell Hammer
 Purchases. Gold comes from oil rigs; there are at most ${rules.match.populationCap} squads per side. Units you can buy:
 ${units}
 A squad's brain can be upgraded: ${tiers}. A bought squad takes a few seconds to deploy (the buy result gives deploySeconds, and your status lists squads still deploying): it counts toward the cap at once, but it cannot be ordered or upgraded until it is in the field, so do not buy the same thing twice and task it once it has arrived. Buy when Hammer asks, and confirm the cost; buy on your own only while command.buy is true. If the purchase is refused, tell Hammer why.
+
+${operatorBases(rules, faction)}
 
 ${procedure}
 

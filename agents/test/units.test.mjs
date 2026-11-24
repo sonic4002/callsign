@@ -7,17 +7,20 @@ import { claudeBrain, models } from "../brain-claude.mjs";
 import { scriptedBrain } from "../brain-scripted.mjs";
 import { makeBrain } from "../main.mjs";
 import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
-import { leaderTools, normalize, operatorTools } from "../tools.mjs";
+import { leaderTools, leaderToolsFor, normalize, operatorTools } from "../tools.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
 const viper2 = { key: "infantry-2", en: "Viper 2", he: "צפע 2", squad: 2 };
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 
-test("the game tools are exactly the six in the design, buy for the operator only", () => {
+test("the game tools: the six in the design, build for the operator, capture and repair for engineers only", () => {
   const names = (tools) => tools.map((t) => t.name).sort();
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
-  assert.deepEqual(names(operatorTools), ["buy", "command", "radio", "report"]);
-  for (const t of [...leaderTools, ...operatorTools]) {
+  assert.deepEqual(names(operatorTools), ["build", "buy", "command", "radio", "report"]);
+  const { units } = rules.factions.aegis;
+  assert.deepEqual(names(leaderToolsFor(units.commandos)), names(leaderTools));
+  assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "hold", "move", "radio", "repair", "report"]);
+  for (const t of [...leaderToolsFor(units.engineers), ...operatorTools]) {
     assert.equal(t.strict, true);
     assert.equal(t.input_schema.additionalProperties, false);
     assert.deepEqual(t.input_schema.required, Object.keys(t.input_schema.properties));

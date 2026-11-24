@@ -164,7 +164,8 @@ const clientDir = fileURLToPath(new URL("../../client", import.meta.url));
 
 async function startServer(t) {
   const port = 20000 + Math.floor(Math.random() * 20000);
-  const proc = spawn(bin, ["-addr", `127.0.0.1:${port}`, "-bot", "", "-speed", "20", "-client", clientDir]);
+  // A full base: this test is about who runs the agents, not about the build tree.
+  const proc = spawn(bin, ["-addr", `127.0.0.1:${port}`, "-bot", "", "-speed", "20", "-client", clientDir, "-full-base"]);
   t.after(() => proc.kill());
   await new Promise((resolve, reject) => {
     proc.stderr.on("data", (d) => String(d).includes("listening") && resolve());

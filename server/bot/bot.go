@@ -32,7 +32,7 @@ type Player struct {
 	Style string
 	R     *shared.Rules
 
-	lastBuy int // tick of the last purchase, for the styles that pace themselves
+	lastBuy int // tick of the last purchase or structure, for the styles that pace themselves
 
 	// Released lets the lesson's enemy move. The page sets it when the lesson reaches the
 	// fight; until then that enemy does nothing at all.
@@ -112,6 +112,13 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	if paced && (len(snap.Squads)+len(snap.Deploying) >= slow.squads || (p.lastBuy > 0 && snap.Tick-p.lastBuy < slow.buyEvery*p.R.TickRate)) {
 		return cmds
 	}
+	// What the base needs whatever is bought next (base.go).
+	if step := p.upkeep(snap, vehicles); step.build != nil {
+		p.lastBuy = snap.Tick + 1
+		return append(cmds, *step.build)
+	} else if step.wait {
+		return cmds
+	}
 	buy := line["infantry"]
 	switch {
 	case p.Style == Rush:
@@ -127,7 +134,19 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 			buy = id
 		}
 	}
-	if u, ok := p.R.Factions[snap.Faction].Units[buy]; ok && snap.Gold >= u.Cost {
+	u, ok := p.R.Factions[snap.Faction].Units[buy]
+	if !ok {
+		return cmds
+	}
+	// The wanted unit needs a structure that does not stand: build it, or save for it.
+	if !p.canBuy(snap, buy) {
+		if step := p.raise(snap, u.Requires, 0); step.build != nil {
+			p.lastBuy = snap.Tick + 1
+			cmds = append(cmds, *step.build)
+		}
+		return cmds
+	}
+	if snap.Gold >= u.Cost {
 		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: buy})
 		p.lastBuy = snap.Tick + 1
 	}
@@ -185,7 +204,7 @@ func (p *Player) unitOf(faction, class string) (string, shared.Unit) {
 	units := p.R.Factions[faction].Units
 	best := ""
 	for _, id := range sortedIDs(units) {
-		if units[id].Class == class && (best == "" || units[id].Cost < units[best].Cost) {
+		if units[id].Class == class && !units[id].Engineer() && (best == "" || units[id].Cost < units[best].Cost) {
 			best = id
 		}
 	}
@@ -196,7 +215,7 @@ func (p *Player) unitOf(faction, class string) (string, shared.Unit) {
 func (p *Player) specialist(faction string, line map[string]string) string {
 	units := p.R.Factions[faction].Units
 	for _, id := range sortedIDs(units) {
-		if line[units[id].Class] != id {
+		if u := units[id]; line[u.Class] != id && !u.Engineer() {
 			return id
 		}
 	}

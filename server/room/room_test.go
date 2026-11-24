@@ -26,6 +26,7 @@ func newRoom(t *testing.T, cfg Config) *Room {
 	if cfg.Seed == 0 {
 		cfg.Seed = 1
 	}
+	cfg.FullBase = true // these tests are about other things; build_test.go starts a real base
 	rm, err := New(rules, cfg)
 	if err != nil {
 		t.Fatal(err)

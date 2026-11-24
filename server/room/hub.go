@@ -25,6 +25,7 @@ type HubConfig struct {
 	Seed          uint64        // the first room's seed; each later room gets the next one
 	Factions      [2]string     // side 0 and side 1
 	LengthSeconds int           // default match length, 0 for the rules default
+	FullBase      bool          // every match starts with every base structure standing
 	Bot           string        // style of the scripted enemy, "" to play without one
 	Interval      time.Duration // real time per simulation tick
 	AgentKey      string        // see Config.AgentKey; "" also keeps the open room of Phase 0
@@ -85,7 +86,7 @@ func NewHub(ctx context.Context, r *shared.Rules, cfg HubConfig) (*Hub, error) {
 		// The trusting mode of a server only this machine can reach: /ws with no room
 		// lands here and anyone may command a side, which tests and scripts rely on.
 		rm, err := New(r, Config{
-			Seed: cfg.Seed, Factions: cfg.Factions, LengthSeconds: cfg.LengthSeconds,
+			Seed: cfg.Seed, Factions: cfg.Factions, LengthSeconds: cfg.LengthSeconds, FullBase: cfg.FullBase,
 			Bots: [2]string{"", cfg.Bot}, Opponent: OpponentBot, Watch: true,
 		})
 		if err != nil {
@@ -207,7 +208,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 		length, o.Watch = lessonSeconds, false // nobody is hurried, and nobody watches
 	}
 	cfg := Config{
-		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
+		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
 	}
 	if lesson {
