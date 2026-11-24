@@ -12,7 +12,7 @@ const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.
 rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const { aegis, ashfall } = rules.factions;
 
-test("the scripted operator reads which unit a buy call names, in both languages", () => {
+test("the rule-brain operator reads which unit a buy call names, in both languages", () => {
   assert.equal(wantedUnit("buy an attack helicopter", aegis.units), "helicopter");
   assert.equal(wantedUnit("קנה מסוק קרב", aegis.units), "helicopter");
   assert.equal(wantedUnit("buy a rocket launcher", aegis.units), "rocketLauncher");

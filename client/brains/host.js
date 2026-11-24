@@ -4,7 +4,7 @@
 // after it is saved.
 //
 // This browser runs the agents only when it has a reason to: the relay holds a key for
-// this seat, or the player chose the demo brain. Otherwise the side is left to whoever
+// this seat, or the player chose to run the rule brain here. Otherwise the side is left to whoever
 // the server has (the agents on the server machine). The game server makes sure that
 // only one host runs a side at a time; this one outranks the server's.
 

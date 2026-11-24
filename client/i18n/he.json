@@ -55,7 +55,7 @@
   "event.squad_lost": "{squad} הושמדה ליד {point}.",
   "event.enemy_destroyed": "כיתת אויב הושמדה ליד {point}.",
   "event.hq_under_attack": "המפקדה שלנו מותקפת.",
-  "event.upgraded": "{squad} היא עכשיו {name}: היא חושבת עם מודל חזק יותר.",
+  "event.upgraded": "{squad} היא עכשיו {name}: המפקד שלה חושב רחוק יותר.",
   "over.won": "ניצחון",
   "over.lost": "תבוסה",
   "over.draw": "תיקו",

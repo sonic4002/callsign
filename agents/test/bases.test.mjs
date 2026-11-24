@@ -1,5 +1,5 @@
 // Bases as the agents see them: which structure a call names, where it should go, what
-// the scripted brain does about it, and what the prompts say.
+// the rule brain does about it, and what the prompts say.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -18,7 +18,7 @@ const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 const anvil = { role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
 const call = (body, extra = {}) => ({ from: hammer, to: [anvil.station], lang: "en", body, end: "over", points: [], prowords: [], ...extra });
 
-// think drives the scripted brain through one wake, every tool succeeding unless `fail` names it.
+// think drives the rule brain through one wake, every tool succeeding unless `fail` names it.
 async function think(ctx, fail = {}) {
   const brain = ruleBrain();
   const messages = [{ role: "user", content: "wake" }];
@@ -81,7 +81,7 @@ test("a place is a named point or a side of the base", () => {
   assert.equal(placeOf("build a gun", []), "");
 });
 
-test("scripted operator: builds what Hammer names, and says why when it cannot", async () => {
+test("rule-brain operator: builds what Hammer names, and says why when it cannot", async () => {
   const status = { faction: "aegis", gold: 900, points: [], squads: [] };
   const wake = (c) => ({ items: [{ kind: "radio", msg: c }], call: c, status });
   const wilco = ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }];
@@ -101,7 +101,7 @@ test("scripted operator: builds what Hammer names, and says why when it cannot",
   assert.deepEqual((await think({ agent: anvil, wake: wake(call("Build a tank")) }))[0], ["buy", { unit: "tank", upgrade: "" }]);
 });
 
-test("scripted operator: a structure goes on the spot the call names; cancel and rally", async () => {
+test("rule-brain operator: a structure goes on the spot the call names; cancel and rally", async () => {
   const structures = [{ id: "s2", name: "Barracks", role: "barracks", yours: true, near: "A", x: 90, y: 310, hp: 1 }];
   const status = { faction: "aegis", gold: 900, points: [], squads: [], structures };
   const wake = (c) => ({ items: [{ kind: "radio", msg: c }], call: c, status });
@@ -154,7 +154,7 @@ test("the operator is told about placing, lines, cancelling and rally points", (
   assert.ok(names.includes("cancel") && names.includes("rally"));
 });
 
-test("scripted leaders: attack an enemy structure by name; only engineers take one over", async () => {
+test("rule-brain leaders: attack an enemy structure by name; only engineers take one over", async () => {
   const station = { key: "infantry-2", en: "Viper 2", he: "צפע 2", squad: 2 };
   const structures = [
     { id: "s2", name: "Barracks", role: "barracks", yours: true, near: "A", x: 90, y: 310, hp: 1 },

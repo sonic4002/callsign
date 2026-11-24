@@ -60,7 +60,7 @@ type Config struct {
 	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the
-	// learner's own browser with the scripted brain, never by this machine's agents, so a
+	// learner's own browser with the rule brain, never by this machine's agents, so a
 	// lesson costs the host nothing and anyone may start one.
 	Tutorial bool
 }

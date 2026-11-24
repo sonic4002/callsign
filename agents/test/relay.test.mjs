@@ -1,6 +1,6 @@
 // The browser path without a browser: the relay brain, the host's lifecycle, and the
 // rule that only one host runs a side. The model relay is the fake one (fake-relay.mjs),
-// which answers with the scripted brain; the game server is the real one.
+// which answers with the rule brain; the game server is the real one.
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";

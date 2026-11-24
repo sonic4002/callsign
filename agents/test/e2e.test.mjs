@@ -1,5 +1,5 @@
 // End to end: the real game server, real WebSockets, the real agent loop. Only the model
-// is replaced, by the scripted brain or by a fake Anthropic client.
+// is replaced, by the rule brain or by a fake Anthropic client.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -93,7 +93,7 @@ class Hammer {
 
 const squadIn = (frame, id) => frame.type === "state" && frame.state.squads.find((s) => s.id === id);
 
-test("Hammer's orders reach scripted squads over the net, in both languages", { skip }, async (t) => {
+test("Hammer's orders reach rule-brain squads over the net, in both languages", { skip }, async (t) => {
   const server = await startServer(t);
   const host = new Host({ server, side: 0, brain: ruleBrain(), log: () => {} });
   await host.start();
@@ -300,7 +300,7 @@ test("a squad goes to a place Hammer describes, takes cover there, and asks when
 });
 
 // The calls the page writes when a structure is placed, a unit cancelled and a rally
-// point set, said to scripted agents on a real server: the spot the ghost showed is where
+// point set, said to rule-brain agents on a real server: the spot the ghost showed is where
 // the structure stands, and the lines, the refund and the rally order are the server's.
 test("placing a structure, a production line, a cancel and a rally point, end to end", { skip }, async (t) => {
   const { canPlace, spotAt, spotWords, tint } = await import("../../client/placement.js");

@@ -23,7 +23,7 @@ test("player token: asked from the relay once, then kept by the browser", async 
   await assert.rejects(playerToken({ store: store(), ask: async () => Promise.reject(new Error("no relay")) }), /no relay/);
 });
 
-test("who thinks: this browser only with a key or the demo brain, never as a spectator or while hidden", () => {
+test("who thinks: this browser only with a key or the rule brain run here, never as a spectator or while hidden", () => {
   const key = { set: true, provider: "anthropic", hint: "abcd" };
   assert.equal(wanted({ canAct: true, demo: false, key: { set: false }, hiddenLong: false }), null, "no key: the server's agents keep the side");
   assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: false }), "relay");

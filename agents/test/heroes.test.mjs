@@ -1,5 +1,5 @@
 // Heroes, digging in, crushing and ranks: what the agents are told, which tools each
-// leader has, and how the scripted brain reads the orders in both languages.
+// leader has, and how the rule brain reads the orders in both languages.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -94,7 +94,7 @@ test("a buy call names the hero by its name, the word, or its callsign", () => {
   assert.equal(heroUnit("buy a tank", aegis.units, rules), undefined);
 });
 
-test("scripted leaders dig in, plant and seize when told to, in both languages", async () => {
+test("rule-brain leaders dig in, plant and seize when told to, in both languages", async () => {
   const brain = ruleBrain();
   const viper = { role: "squad", side: 0, squad: 2, tier: 1, station: { key: "infantry-2", en: "Viper 2", he: "צפע 2" }, lang: "en", unit: aegis.units.commandos };
   assert.deepEqual(await think(brain, { agent: viper, wake: wake(call("Dig in")) }), [
@@ -140,7 +140,7 @@ test("scripted leaders dig in, plant and seize when told to, in both languages",
   ]);
 });
 
-test("the scripted operator buys the hero and passes on an order to dig in", async () => {
+test("the rule-brain operator buys the hero and passes on an order to dig in", async () => {
   const brain = ruleBrain();
   const anvil = { role: "anvil", side: 0, squad: 0, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
   const status = {

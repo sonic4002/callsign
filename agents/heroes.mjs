@@ -1,5 +1,5 @@
 // What the agents know about heroes, digging in, crushing and earned ranks: the words for
-// the prompts, what the new events mean, and how the scripted brain reads the orders.
+// the prompts, what the new events mean, and how the rule brain reads the orders.
 // It runs in Node and in a Web Worker alike, like the rest of the agent core.
 
 // unitAnywhere finds a unit by id in whichever army has it: a side may hold a squad that

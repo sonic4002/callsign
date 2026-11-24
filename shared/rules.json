@@ -797,7 +797,7 @@
       "contact": { "en": ["Contact near {place}", "Contact, {target} near {place}", "Eyes on {target} near {place}"], "he": ["מגע ליד {place}", "מגע, {target} ליד {place}", "מזהה את {target} ליד {place}"] },
       "pinned": { "en": ["Pinned at {place}, request support", "Pinned down at {place}, need support", "Heavy fire at {place}, we are pinned"], "he": ["מרותקים {b_place}, מבקש סיוע", "אנחנו מרותקים {b_place}, צריך סיוע", "אש כבדה {b_place}, אנחנו מרותקים"] },
       "arrived": { "en": ["In position at {place}", "Reached {place}, in position", "At {place}, holding"], "he": ["בעמדה {b_place}", "הגענו {l_place}, בעמדה", "אנחנו {b_place}, מחזיקים"] },
-      "losses": { "en": ["Taking losses at {place}", "Lost a team at {place}, {count} left", "Casualties at {place}, {count} teams left"], "he": ["נפגעים {b_place}", "איבדנו חוליה {b_place}, נשארו {count}", "יש נפגעים {b_place}, נשארו {count} חוליות"] },
+      "losses": { "en": ["Taking losses at {place}", "Lost a team at {place}, {count} left", "Casualties at {place}, {count} left"], "he": ["נפגעים {b_place}", "איבדנו חוליה {b_place}, נשארו {count}", "יש נפגעים {b_place}, נשארו {count}"] },
       "garrisoned": { "en": ["Inside {place}", "We are inside {place}"], "he": ["בתוך {place}", "אנחנו בתוך {place}"] },
       "fortified": { "en": ["Dug in near {place}"], "he": ["התבצרנו ליד {place}"] },
       "planted": { "en": ["Charge set near {place}, {count} seconds"], "he": ["מטען הונח ליד {place}, {count} שניות"] },

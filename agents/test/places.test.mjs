@@ -64,7 +64,7 @@ test("prompts list the map's landmarks and bridges in both languages, and say ho
   for (const p of large.map.points) assert.ok(big.includes(p.callsign.en) && big.includes(p.callsign.he), p.id);
 });
 
-test("scripted leader: goes to a described landmark, asks when the words fit several", async () => {
+test("rule-brain leader: goes to a described landmark, asks when the words fit several", async () => {
   const brain = ruleBrain();
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Take cover in the bunker at Delta", { points: ["D"], landmarks: ["D-bunker-1"] })) }), [
     ["hold", { place: "D-bunker-1" }],
@@ -91,7 +91,7 @@ test("scripted leader: goes to a described landmark, asks when the words fit sev
   ]);
 });
 
-test("scripted leader: a spot off a point, repair, and plain cover", async () => {
+test("rule-brain leader: a spot off a point, repair, and plain cover", async () => {
   const brain = ruleBrain();
   // The server reads the direction and the distance from the words.
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold 200 metres north of Foxtrot", { points: ["F"] })) }), [
@@ -113,8 +113,8 @@ test("scripted leader: a spot off a point, repair, and plain cover", async () =>
   assert.deepEqual(await think(brain, { agent: { ...leader, commander: "Hammer" }, wake: inside }), [
     ["radio", { to: ["Hammer"], body: "Inside the bunker north of Delta", end: "over" }],
   ]);
-  assert.deepEqual(await think(brain, { agent: { ...leader, lang: "he", commander: "Hammer" }, wake: inside }), [
-    ["radio", { to: ["Hammer"], body: "אנחנו בתוך הבונקר מצפון לדוד", end: "over" }],
+  assert.deepEqual(await think(ruleBrain(), { agent: { ...leader, lang: "he", commander: "Hammer" }, wake: inside }), [
+    ["radio", { to: ["Hammer"], body: "בתוך הבונקר מצפון לדוד", end: "over" }],
   ]);
 });
 

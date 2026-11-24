@@ -56,7 +56,7 @@ export function speaker(rules, lang, agent, mem, status) {
 }
 
 // fresh is the memory a leader keeps between wakes.
-export const fresh = () => ({ said: {}, order: null, fellBack: false, askedAt: null, rangedAt: null, next: null });
+export const fresh = () => ({ there: false, said: {}, order: null, fellBack: false, askedAt: null, rangedAt: null, next: null });
 
 // levelOf is a squad's initiative: its brain tier, 1 to 3.
 export const levelOf = (agent) => Math.max(1, Math.min(3, Number(agent.level ?? agent.tier) || 1));
@@ -98,7 +98,7 @@ export function carryOut(intent, ctx, mem) {
   }
 
   // A new order: what the leader decided on its own under the last one is forgotten.
-  Object.assign(mem, { order: intent, fellBack: false, next: null });
+  Object.assign(mem, { order: intent, fellBack: false, next: null, there: false });
   const negative = (why) => [radio(back, say("negative", { reason: why }), "over")];
   const act = (step, ack = say("wilco"), orElse = negative) => [{ ...step, orElse }, radio(back, ack, "out")];
 
@@ -165,8 +165,12 @@ export function leaderEvent(ctx, mem) {
     crushed: () => say("crushed", { place: pointName(rules, e.point, lang) }),
   }[e.kind];
   if (!line) return [];
-  const tell = (body = line()) => radio(to, body, "over");
-  if (level < 2 || !you) return [tell()];
+  // Going inside a building and arriving are one piece of news: whichever comes second is not said.
+  const arrival = e.kind === "arrived" || e.kind === "garrisoned";
+  const twice = arrival && mem.there && !mem.next?.arrive;
+  if (arrival) mem.there = true;
+  const tell = (body) => (twice && body === undefined ? [] : [radio(to, body ?? line(), "over")]).flat();
+  if (level < 2 || !you) return tell();
 
   const teams = (you.teams ?? []).filter((t) => t.members === undefined || t.members > 0);
   const inside = teams.some((t) => t.in);
@@ -188,7 +192,7 @@ export function leaderEvent(ctx, mem) {
     const home = close && retreat(status, rules, side, you);
     if (home && mem.rangedAt !== status.timeLeft) {
       mem.rangedAt = status.timeLeft;
-      return [{ name: "move", input: { place: home } }, tell(say("keepingRange", { place: where }))];
+      return [{ name: "move", input: { place: home } }, ...tell(say("keepingRange", { place: where }))];
     }
   }
   // Level 2: shaken men are pulled back, once for each order they were given.
@@ -197,7 +201,7 @@ export function leaderEvent(ctx, mem) {
     if (home && home !== order.point) {
       mem.fellBack = true;
       mem.next = null;
-      return [{ name: "move", input: { place: home } }, tell(say("fallingBack", { place: home }, true))];
+      return [{ name: "move", input: { place: home } }, ...tell(say("fallingBack", { place: home }, true))];
     }
   }
   if (e.kind === "contact") {
@@ -205,24 +209,24 @@ export function leaderEvent(ctx, mem) {
     const theirs = seen.reduce((n, c) => n + (c.teams?.length ?? 1), 0);
     if (level >= 3 && theirs > teams.length && seen.length > 1 && (mem.askedAt === null || mem.askedAt - status.timeLeft >= 45)) {
       mem.askedAt = status.timeLeft;
-      return [tell(say("requestSupport", { place: where, count: seen.length }, true))];
+      return tell(say("requestSupport", { place: where, count: seen.length }, true));
     }
     // A squad with nothing to do goes for an enemy it can hurt.
     const prey = seen.filter((c) => (unit.vs?.[c.class] ?? 1) > 0).sort((a, b) => dist(a, you) - dist(b, you) || a.id - b.id)[0];
-    if (order.kind === "none" && prey && unit.damage !== 0 && !unit.captureSeconds) return [{ name: "attack", input: { place: "", contact: prey.id } }, tell(say("engaging", { target: prey.id, place: where }))];
+    if (order.kind === "none" && prey && unit.damage !== 0 && !unit.captureSeconds) return [{ name: "attack", input: { place: "", contact: prey.id } }, ...tell(say("engaging", { target: prey.id, place: where }))];
     // One that is holding gets into the cover beside it, when that does not give up its post.
     if (order.kind === "hold" && !covered && unit.class === "infantry") {
       const post = rules.map.points.find((p) => p.id === order.point);
       const near = nearestCover(status, rules, { within: 110 });
-      if (near && (!post || dist(near, post) <= rules.match.captureRadius - 6)) return [{ name: "hold", input: { place: near.id } }, tell()];
+      if (near && (!post || dist(near, post) <= rules.match.captureRadius - 6)) return [{ name: "hold", input: { place: near.id } }, ...tell()];
     }
   }
   // Arrived after a move: nobody stands in the open when there is cover at hand.
   if (e.kind === "arrived" && mem.order?.kind === "move" && !mem.order.leave && !covered && unit.class === "infantry" && !e.place && !e.structure) {
     const near = nearestCover(status, rules, { within: 110 });
-    if (near) return [{ name: "hold", input: { place: near.id } }, tell(say("arrived", { place: near.id }, true))];
+    if (near) return [{ name: "hold", input: { place: near.id } }, ...tell(say("arrived", { place: near.id }, true))];
   }
-  return [tell()];
+  return tell();
 }
 
 // retreat is where a squad falls back to: the nearest point its side holds that is nearer

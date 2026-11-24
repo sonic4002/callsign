@@ -93,7 +93,7 @@ test("no user-facing text is written into the page itself", () => {
 });
 
 // The sidebar's buttons write radio calls. They must come out in proper procedure, and
-// in words the scripted operator and squad leaders understand, in both languages.
+// in words the rule-brain operator and squad leaders understand, in both languages.
 test("the calls the page writes are proper procedure in both languages", async () => {
   const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   for (const [lang, strings] of [["en", en], ["he", he]]) {
@@ -110,7 +110,7 @@ test("the calls the page writes are proper procedure in both languages", async (
 
 // The buttons are only useful if the agents understand what they write. The scripted
 // brains are the strictest readers, so every call is run through them.
-test("the scripted operator and squad leaders understand the calls the page writes, and the calls for what the panel does directly", async () => {
+test("the rule-brain operator and squad leaders understand the calls the page writes, and the calls for what the panel does directly", async () => {
   const { ruleBrain } = await import("../agents/brain-rule.mjs");
   const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   const hammer = { key: "player", en: rules.callsigns.player.en };

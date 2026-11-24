@@ -101,6 +101,17 @@ function countIn(text, rules) {
   return 1;
 }
 
+// callsignIn reads a squad's callsign out of a call, in English, whether or not such a
+// squad is in the field: "Viper 3", "צפע 3".
+function callsignIn(text, rules) {
+  for (const t of Object.values(rules.callsigns.classes)) {
+    const m = new RegExp(`(?:${t.en.toLowerCase()}|${t.he})[\\s\\-#]*([^\\s,.:;!?]+)`).exec(text);
+    const n = m ? numberOf(m[1]) : 0;
+    if (n) return `${t.en} ${n}`;
+  }
+  return "";
+}
+
 // pointsIn finds the map points a part of a call names, in the order said.
 function pointsIn(text, ids, rules) {
   const low = text.toLowerCase();
@@ -313,8 +324,11 @@ function clause(text, ctx, part, mem) {
 
   if (upgradeVerb.test(text)) {
     const squad = squads.find((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));
-    if (!squad) return unclear("sayAgainWhat", { verb: "verb.upgrade" });
-    return { steps: [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }] };
+    // A callsign that is not in the field (lost, or still on its way) goes to the game as
+    // said, and its refusal goes back to Hammer: better than asking what was meant.
+    const said = squad?.callsign.en ?? callsignIn(text, rules);
+    if (!said) return unclear("sayAgainWhat", { verb: "verb.upgrade" });
+    return { steps: [{ name: "buy", input: { unit: "", upgrade: said }, orElse: negative }] };
   }
   // "Cancel the tank", "בטל את הטנק": the last one of that kind leaves its line.
   if (cancelVerb.test(text) && !(sellVerb.test(text) && namedStructure(text, known, { enemy: false }))) {

@@ -4,7 +4,7 @@
 
 export class WorkerAgent {
   // options are what Host hands every agent; brain is what the Worker should think with:
-  // { kind: "relay", base, room, token } or { kind: "scripted" }. hooks: log(text),
+  // { kind: "relay", base, room, token }, { kind: "jev", ... } or { kind: "rule" }. hooks: log(text),
   // usage(usage, model, provider), trouble(code, message, agent).
   constructor(options, brain, hooks = {}, { Worker = globalThis.Worker, script = "/agents/worker.mjs" } = {}) {
     Object.assign(this, { options, brain, hooks, Worker, script });

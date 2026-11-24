@@ -55,7 +55,7 @@
   "event.squad_lost": "{squad} was destroyed near {point}.",
   "event.enemy_destroyed": "An enemy squad was destroyed near {point}.",
   "event.hq_under_attack": "Our headquarters is under attack.",
-  "event.upgraded": "{squad} is now a {name}: it thinks with a stronger model.",
+  "event.upgraded": "{squad} is now a {name}: its leader thinks further ahead.",
   "over.won": "Victory",
   "over.lost": "Defeat",
   "over.draw": "Draw",
