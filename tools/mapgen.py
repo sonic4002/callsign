@@ -511,15 +511,15 @@ def medium():
 def large():
     """Mountain Passes: a range down the middle and a river with a lake across the south.
     Four ways through: over the glacier round the north end of the range, the narrow
-    middle pass, the wide pass with the town, and over the river bridges and round the
-    south shore of the lake. Boats sail the river and the lake from one base to the other."""
+    middle pass, the wide gap with the town and the point south of it, and over the river
+    bridges and round the south shore of the lake. Boats sail the river and the lake from one base to the other."""
     m = Map("large", ("Mountain Passes", "מעברי ההרים"), 130, 80, minutes=25, pace=2)
     m.cells(61, 0, 65, 57, "M")              # the central range
     for y, rx, ry in ((440, 230, 200), (700, 190, 150), (1260, 240, 190), (1470, 200, 140), (2060, 230, 150), (2200, 170, 100)):
         m.oval(2600, y, rx, ry, "M")         # its shoulders
     m.oval(2600, 0, 540, 250, "I")           # the glacier round its north end
     m.cells(59, 21, 65, 27, "L")             # the middle pass
-    m.cells(59, 40, 65, 48, "L")             # the wide pass with the town
+    m.cells(59, 40, 65, 57, "L")             # the wide gap with the town, open down to the river
     m.cells(0, 57, 65, 60, "W")              # the river
     m.cells(18, 56, 38, 59, "W")             # it swings north between the bridges
     m.cells(18, 59, 38, 60, "L")
@@ -544,7 +544,7 @@ def large():
     m.point("N", "point", 2600, 120, ("Glacier", "הקרחון"), ["the glacier", "glacier", "the north pass", "north pass", "הקרחון", "קרחון", "המעבר הצפוני"])
     m.point("G", "point", 2600, 960, ("Middle pass", "המעבר האמצעי"), ["the middle pass", "middle pass", "המעבר האמצעי"])
     m.point("F", "point", 2600, 1760, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה"])
-    m.point("V", "point", 2600, 3040, ("South shore", "החוף הדרומי"), ["the south shore", "south shore", "החוף הדרומי"])
+    m.point("V", "point", 2600, 2140, ("South gap", "הפרצה הדרומית"), ["the south gap", "south gap", "הפרצה הדרומית"])
     m.point("S", "seaRig", 2600, 2600, ("Lake rig", "אסדת האגם"), ["the lake rig", "lake rig", "the sea rig", "sea rig", "אסדת האגם", "האסדה הימית"])
     m.bridge("bridge-far-west", ("the far west bridge", "הגשר המערבי הרחוק"), (560, 2280), (560, 2400),
              mirrored=("bridge-far-east", ("the far east bridge", "הגשר המזרחי הרחוק")))
