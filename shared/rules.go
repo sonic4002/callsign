@@ -276,7 +276,10 @@ type Rules struct {
 		// ("take"), and how the net announces a purchase the operator made on its own.
 		Command     map[string]Words `json:"command"`
 		OwnPurchase map[string]Text  `json:"ownPurchase"`
-		Prowords    map[string]Words `json:"prowords"`
+		// SpelledOut lists, per English point callsign, how it gets written in Hebrew
+		// letters by mistake ("דלתא" for Delta); the net puts the Hebrew callsign instead.
+		SpelledOut map[string][]string `json:"spelledOut"`
+		Prowords   map[string]Words    `json:"prowords"`
 	} `json:"radio"`
 }
 

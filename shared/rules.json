@@ -636,6 +636,12 @@
       "lost": { "en": "We have been defeated", "he": "הובסנו" },
       "draw": { "en": "The fight is over. Neither side won", "he": "הקרב הסתיים. אין מנצח" }
     },
+    "spelledOut": {
+      "Alpha": ["אלפא", "אלפה"], "Bravo": ["בראבו", "ברבו"], "Golf": ["גולף"], "Delta": ["דלתא", "דלתה"],
+      "Hotel": ["הוטל"], "Foxtrot": ["פוקסטרוט", "פוקסטרות"], "Kilo": ["קילו"], "Sierra": ["סיירה", "סיארה"],
+      "Zulu": ["זולו"], "Lima": ["לימה"], "Mike": ["מייק"], "November": ["נובמבר"], "Tango": ["טנגו"],
+      "Yankee": ["יאנקי", "ינקי"], "Victor": ["ויקטור"]
+    },
     "prowords": {
       "wilco": { "en": ["wilco"], "he": ["רות, יבוצע", "רות יבוצע"] },
       "roger": { "en": ["roger"], "he": ["רות"] },
