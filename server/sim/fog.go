@@ -101,7 +101,7 @@ func (s *Sim) postSees(side int, x, y float64) bool {
 			return true
 		}
 	}
-	return false
+	return s.structureSees(side, x, y)
 }
 
 // observe updates what each side has explored and what it remembers of the points and
@@ -127,6 +127,7 @@ func (s *Sim) observe() {
 				}
 			}
 		}
+		s.observeStructures(side)
 		for i := range s.Points {
 			p, m := &s.Points[i], &sd.points[i]
 			m.Visible = s.InSight(side, p.X, p.Y)

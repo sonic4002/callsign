@@ -33,6 +33,7 @@ func main() {
 	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
 	agents := flag.String("agents", "agents", "directory of the agent runtime, whose browser modules are served read-only at /agents/")
 	relay := flag.String("relay", "", "address of the model relay, passed on at /relay/; empty for none")
+	fullBase := flag.Bool("full-base", false, "start every match with every base structure standing, so that any unit can be bought at once")
 	hostKey := flag.String("host-key", os.Getenv("CALLSIGN_HOST_KEY"), "password needed to make a match, for a server that strangers can reach; empty for none")
 	agentKey := flag.String("agent-key", os.Getenv("CALLSIGN_AGENT_KEY"), "secret this server's agent host and model relay show; with it set, commanders need seat tokens and the open room of Phase 0 is gone")
 	share := flag.String("share", os.Getenv("CALLSIGN_SHARE"), "address other machines reach this server at, for the link a player sends a friend, e.g. http://192.168.1.20:8080")
@@ -51,7 +52,7 @@ func main() {
 	hub, err := room.NewHub(ctx, rules, room.HubConfig{
 		Seed: *seed, Factions: [2]string{*west, *east}, LengthSeconds: *length, Bot: *enemy,
 		Interval: time.Second / time.Duration(rules.TickRate**speed),
-		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey,
+		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey, FullBase: *fullBase,
 	})
 	if err != nil {
 		log.Fatal(err)

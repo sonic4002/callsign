@@ -25,6 +25,7 @@ type HubConfig struct {
 	Seed          uint64        // the first room's seed; each later room gets the next one
 	Factions      [2]string     // side 0 and side 1
 	LengthSeconds int           // default match length, 0 for the rules default
+	FullBase      bool          // every match starts with every base structure standing
 	Bot           string        // style of the scripted enemy, "" to play without one
 	Interval      time.Duration // real time per simulation tick
 	AgentKey      string        // see Config.AgentKey; "" also keeps the open room of Phase 0
@@ -51,7 +52,7 @@ const guessesPerMinute = 40
 // Hub holds every room on the server. Each room is its own match with its own seed,
 // clock and radio nets; nothing is shared between them but the rules.
 type Hub struct {
-	mu    sync.Mutex
+	mu sync.Mutex
 
 	guessFrom time.Time // start of the minute wrong join codes are being counted in
 	guesses   int
@@ -85,7 +86,7 @@ func NewHub(ctx context.Context, r *shared.Rules, cfg HubConfig) (*Hub, error) {
 		// The trusting mode of a server only this machine can reach: /ws with no room
 		// lands here and anyone may command a side, which tests and scripts rely on.
 		rm, err := New(r, Config{
-			Seed: cfg.Seed, Factions: cfg.Factions, LengthSeconds: cfg.LengthSeconds,
+			Seed: cfg.Seed, Factions: cfg.Factions, LengthSeconds: cfg.LengthSeconds, FullBase: cfg.FullBase,
 			Bots: [2]string{"", cfg.Bot}, Opponent: OpponentBot, Watch: true,
 		})
 		if err != nil {
@@ -156,7 +157,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 		length = h.cfg.LengthSeconds
 	}
 	cfg := Config{
-		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
+		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey,
 	}
 	if o.Opponent == OpponentBot && h.cfg.Bot != "" {
@@ -355,7 +356,7 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"level":    h.usualBot(), // the one the lobby starts on
 		"length":   length,
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
-		"open":     h.open != nil, // the open room of a server without an agent key
+		"open":     h.open != nil,       // the open room of a server without an agent key
 		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
 	})
 }

@@ -38,6 +38,7 @@ type Config struct {
 	LengthSeconds int       // 0 uses the rules default
 	Bots          [2]string // scripted player style per side, "" for none
 	AutoStart     bool      // start the clock at once instead of when the first Hammer joins
+	FullBase      bool      // both sides start with every base structure standing
 
 	// A room made in the lobby (see lobby.go). Code is what players type to find it.
 	// With Seats on, a Hammer needs the token of a seat and the match starts when every
@@ -113,6 +114,7 @@ func New(r *shared.Rules, cfg Config) (*Room, error) {
 func (rm *Room) reset() error {
 	s, err := sim.New(rm.r, sim.Config{
 		Seed: rm.cfg.Seed + uint64(rm.match), Factions: rm.cfg.Factions, LengthSeconds: rm.cfg.LengthSeconds,
+		FullBase: rm.cfg.FullBase,
 	})
 	if err != nil {
 		return err

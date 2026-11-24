@@ -32,8 +32,12 @@ type Event struct {
 	Contact int    `json:"contact,omitempty"` // enemy squad id
 	Point   string `json:"point,omitempty"`   // nearest map point
 	Count   int    `json:"count,omitempty"`
-	Winner  *int   `json:"winner,omitempty"`
-	Reason  string `json:"reason,omitempty"`
+	// Structure is the id of the structure a structure event is about, with its kind in
+	// Unit; Owner is whose it was (lost) or is now (captured).
+	Structure string `json:"structure,omitempty"`
+	Owner     *int   `json:"owner,omitempty"`
+	Winner    *int   `json:"winner,omitempty"`
+	Reason    string `json:"reason,omitempty"`
 }
 
 func (s *Sim) emit(e Event) { s.events = append(s.events, e) }
@@ -55,6 +59,12 @@ type Command struct {
 	Point   string `json:"point,omitempty"`
 	Contact int    `json:"contact,omitempty"`
 	Unit    string `json:"unit,omitempty"`
+	// Place is where a move, hold, attack, capture or repair goes when it is not a plain
+	// point, and where a defence or a fence is built; Place2 is a fence's far end.
+	// Structure is what to build: a structure id of the side's faction, or a role.
+	Place     string `json:"place,omitempty"`
+	Place2    string `json:"place2,omitempty"`
+	Structure string `json:"structure,omitempty"`
 }
 
 var (
@@ -86,6 +96,13 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return s.buy(c)
 	case CmdUpgrade:
 		return s.upgrade(c)
+	case CmdCapture:
+		return s.captureOrder(c)
+	case CmdRepair:
+		return s.repairOrder(c)
+	case CmdBuild:
+		_, err := s.build(c)
+		return nil, err
 	}
 	return nil, ErrBadCommand
 }
@@ -104,6 +121,8 @@ func (s *Sim) order(c Command) (*Squad, error) {
 		}
 		o.Contact = enemy.ID
 		o.X, o.Y = enemy.Center()
+	case c.Place != "":
+		return s.orderPlace(c, sq)
 	case c.Point != "":
 		p := s.pointState(c.Point)
 		if p == nil {
@@ -152,9 +171,10 @@ func (s *Sim) spend(side, gold int) error {
 }
 
 func (s *Sim) buy(c Command) (*Squad, error) {
-	u, ok := s.R.Factions[s.Sides[c.Side].Faction].Units[c.Unit]
-	if !ok {
-		return nil, ErrNoUnit
+	// The build tree: the unit must be one this side can field, and what it needs must stand.
+	u, err := s.mayBuy(c.Side, c.Unit)
+	if err != nil {
+		return nil, err
 	}
 	// A squad on its way already holds its place under the cap.
 	if s.Population(c.Side) >= s.R.Match.PopulationCap {

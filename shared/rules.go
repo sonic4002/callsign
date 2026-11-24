@@ -79,7 +79,16 @@ type Unit struct {
 	Vs map[string]float64 `json:"vs,omitempty"`
 	// NoCapture marks a unit that cannot hold ground, whatever its class.
 	NoCapture bool `json:"noCapture,omitempty"`
+	// Requires is the role of the structure a side must have standing to buy this unit.
+	Requires string `json:"requires,omitempty"`
+	// Engineers: how fast they mend, and how long they need beside an enemy structure to
+	// take it over. A unit with CaptureSeconds is an engineer.
+	RepairPerSecond float64 `json:"repairPerSecond,omitempty"`
+	CaptureSeconds  float64 `json:"captureSeconds,omitempty"`
 }
+
+// Engineer reports whether squads of this unit can take over structures.
+func (u Unit) Engineer() bool { return u.CaptureSeconds > 0 }
 
 // Against is the damage multiplier of this unit's weapon on a target class, or on "hq".
 func (u *Unit) Against(class string) float64 {
@@ -90,9 +99,10 @@ func (u *Unit) Against(class string) float64 {
 }
 
 type Faction struct {
-	Name       Text            `json:"name"`
-	StartUnits []string        `json:"startUnits"`
-	Units      map[string]Unit `json:"units"`
+	Name       Text                 `json:"name"`
+	StartUnits []string             `json:"startUnits"`
+	Units      map[string]Unit      `json:"units"`
+	Structures map[string]Structure `json:"structures"`
 }
 
 type Rules struct {
@@ -107,6 +117,12 @@ type Rules struct {
 		HoldRadius     float64 `json:"holdRadius"`
 		PointSight     float64 `json:"pointSight"`    // how far a side sees from a point it holds
 		RevealSeconds  float64 `json:"revealSeconds"` // how long firing gives a team away to the enemy
+		// Bases (structures.go): the roles every side starts with besides its headquarters,
+		// how far from its own ground a side may place a defence or a fence, and how many.
+		StartStructures []string `json:"startStructures"`
+		BuildRadius     float64  `json:"buildRadius"`
+		DefenceCap      int      `json:"defenceCap"`
+		FenceRuns       int      `json:"fenceRuns"`
 	} `json:"match"`
 	HQ struct {
 		HP    float64 `json:"hp"`
@@ -228,13 +244,16 @@ func (r *Rules) check() error {
 				return fmt.Errorf("unit %s has a bad minRange or pierce", id)
 			}
 			for class, v := range u.Vs {
-				if _, ok := r.Callsigns.Classes[class]; (!ok && class != "hq") || v < 0 {
+				if _, ok := r.Callsigns.Classes[class]; (!ok && class != "hq" && class != TargetStructure && class != TargetFence) || v < 0 {
 					return fmt.Errorf("unit %s: bad vs entry %q", id, class)
 				}
 			}
 			if u.Teams <= 0 || u.Members <= 0 || u.HP <= 0 || u.CooldownTicks <= 0 || u.Speed <= 0 {
 				return fmt.Errorf("unit %s has a non-positive stat", id)
 			}
+		}
+		if err := r.checkStructures(name, &f); err != nil {
+			return err
 		}
 	}
 	return nil
