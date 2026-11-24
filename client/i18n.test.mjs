@@ -15,16 +15,20 @@ const script = [...readdirSync(new URL(".", import.meta.url)), ...readdirSync(ne
   .map(read)
   .join("\n");
 const rules = JSON.parse(read("../shared/rules.json"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const classes = [...new Set(Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.class)))];
 
 // Keys built at run time, as `prefix.${value}`, and the values they can take.
 const dynamic = {
   "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded", "hauler_attacked", "hauler_lost",
-    "structure_started", "structure_built", "structure_attacked", "structure_lost", "structure_lost_theirs", "structure_captured", "structure_taken"],
+    "structure_started", "structure_built", "structure_attacked", "structure_lost", "structure_lost_theirs", "structure_captured", "structure_taken",
+    "garrisoned", "building_fell", "bridge_under_attack", "bridge_fell", "bridge_repaired"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer"],
-  "order.": ["none", "move", "hold", "attack"],
-  "call.": ["hold", "move", "attack", "buy", "upgrade", "give", "take", "grant", "revoke", "build", "buildAt", "attackStructure", "capture", "haul"],
+  "order.": ["none", "move", "hold", "attack", "repair"],
+  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "build", "buildAt", "attackStructure", "capture", "haul"],
   "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],
+  "bearing.": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
   "class.": classes,
   "side.": ["0", "1"],
@@ -113,7 +117,7 @@ test("the scripted operator and squad leaders understand the calls the page writ
       }
     }
     // The call a tap on a gold field writes sends the haulers there.
-    for (const g of rules.gushers) {
+    for (const g of rules.map.gushers) {
       const named = rules.map.points.find((p) => p.id === g.point);
       const text = fill(strings["call.haul"], { to: rules.callsigns.operator[lang], from, point: named.callsign[lang] });
       const use = await think("anvil", body(text), { points: [g.point], status: { faction: "aegis", squads: [], points: [], gold: 0 } });
@@ -123,7 +127,7 @@ test("the scripted operator and squad leaders understand the calls the page writ
     for (const verb of ["hold", "move", "attack"]) {
       const text = fill(strings[`call.${verb}`], { to: rules.callsigns.classes.infantry[lang] + " 2", from, point: point.callsign[lang] });
       const use = await think("squad", body(text), { points: ["F"] });
-      assert.deepEqual([use?.name, use?.input.point], [verb, "F"], `${lang}: "${text}" should ${verb} F`);
+      assert.deepEqual([use?.name, use?.input.place], [verb, "F"], `${lang}: "${text}" should ${verb} F`);
     }
   }
 });

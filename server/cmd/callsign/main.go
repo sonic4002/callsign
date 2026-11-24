@@ -63,7 +63,13 @@ func main() {
 	hub.Routes(mux)
 	mux.HandleFunc("/shared/rules.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write(shared.RulesJSON)
+		// Every map is in the file; "map" is the default one, for the page before it is in a room.
+		b, err := shared.JSONFor(shared.DefaultMap)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write(b)
 	})
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*assets))))
 	if *tts != "" {

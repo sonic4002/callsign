@@ -25,10 +25,8 @@ const (
 const (
 	CmdBuild   = "build"
 	CmdCapture = "capture"
-	CmdRepair  = "repair"
 
 	OrderCapture = "capture"
-	OrderRepair  = "repair"
 )
 
 var (
@@ -39,10 +37,10 @@ var (
 	ErrTooFar         = errors.New("too far from your own ground")
 	ErrNoRoom         = errors.New("no room to build there")
 	ErrTooMany        = errors.New("you have as many as you can hold")
-	ErrBadPlace       = errors.New("no such place")
+	ErrBadPlace       = ErrNoPlace
 	ErrNotEngineers   = errors.New("only an engineer squad can do that")
 	ErrNotCapturable  = errors.New("that cannot be taken over")
-	ErrNoBridge       = errors.New("there is no bridge there to repair")
+	ErrNoBridge       = ErrNotBridge
 )
 
 // structMemory is a structure as one side last saw it.
@@ -90,38 +88,14 @@ func (st *Structure) Standing() bool { return !st.Ruin && st.BuildTicks == 0 }
 // Def is the rules entry of the structure.
 func (st *Structure) Def() *shared.Structure { return st.def }
 
-// Place is where an order sends a squad or puts a structure. Workstream 1 owns the full
-// resolver (landmarks, offsets from points); this one knows points, structures and the
-// sides of a base.
-type Place struct {
-	X, Y      float64
-	Point     string     // set when the place is a map point
-	Structure *Structure // set when the place is a structure
-	Base      string     // "north", "south", "east", "west" when the place is a side of the base
-}
-
-// ResolvePlace turns a place string into a position and a target for one side. It knows
-// "A" (a point id), "s7" (a structure the side owns or has seen) and "base:north" and
-// the like (a side of that side's own base; "front" faces the enemy, "rear" the map edge).
-func (s *Sim) ResolvePlace(side int, place string) (Place, error) {
-	place = strings.TrimSpace(place)
-	if p := s.pointState(place); p != nil {
-		return Place{X: p.X, Y: p.Y, Point: p.ID}, nil
-	}
-	if strings.HasPrefix(place, "base:") {
-		dir := s.baseSide(side, strings.TrimPrefix(place, "base:"))
-		if dir == "" {
-			return Place{}, fmt.Errorf("%w: %q", ErrBadPlace, place)
-		}
-		hq := s.R.HQPoint(side)
-		return Place{X: hq.X, Y: hq.Y, Base: dir}, nil
-	}
-	if n, err := strconv.Atoi(strings.TrimPrefix(place, "s")); err == nil && strings.HasPrefix(place, "s") {
-		if st := s.structure(n); st != nil && !st.Gone && (st.Side == side || st.seen[side].Known) {
-			return Place{X: st.X, Y: st.Y, Structure: st}, nil
+// structurePlace is the finder that makes structures places: "s7" is structure 7.
+func (s *Sim) structurePlace(id string) (Place, bool) {
+	if n, err := strconv.Atoi(strings.TrimPrefix(id, "s")); err == nil && strings.HasPrefix(id, "s") {
+		if st := s.structure(n); st != nil && !st.Gone {
+			return Place{Kind: PlaceStructure, ID: st.PlaceID(), X: st.X, Y: st.Y, Structure: st}, true
 		}
 	}
-	return Place{}, fmt.Errorf("%w: %q", ErrBadPlace, place)
+	return Place{}, false
 }
 
 // baseSide turns front and rear into compass sides for a side of the map.
@@ -165,7 +139,31 @@ const dockSlot = -2
 
 func (s *Sim) dockPosition(side int) (x, y float64) {
 	hq := s.R.HQPoint(side)
-	return hq.X + s.inward(side)*60, s.R.Map.WaterY - 45
+	return s.shoreNear(hq.X+s.inward(side)*60, hq.Y)
+}
+
+// shoreNear is the land nearest to (x, y) that has open water beside it: where a
+// dockyard can stand. The search is by cell, nearest first, the lowest row and column
+// breaking a tie.
+func (s *Sim) shoreNear(x, y float64) (float64, float64) {
+	m := &s.R.Map
+	bx, by, bd := x, y, math.MaxFloat64
+	for r := 0; r < len(m.Terrain); r++ {
+		for c := 0; c < len(m.Terrain[r]); c++ {
+			cx, cy := (float64(c)+0.5)*m.Cell, (float64(r)+0.5)*m.Cell
+			if m.TerrainAt(cx, cy) != 'L' || !s.Walkable(cx, cy) {
+				continue
+			}
+			wet := false
+			for _, d := range [][2]float64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				wet = wet || s.Sailable(cx+d[0]*m.Cell, cy+d[1]*m.Cell)
+			}
+			if d := dist(x, y, cx, cy); wet && d < bd {
+				bx, by, bd = cx, cy, d
+			}
+		}
+	}
+	return bx, by
 }
 
 func (s *Sim) structure(id int) *Structure {
@@ -305,12 +303,12 @@ func (s *Sim) freeSlot(side int, role string) int {
 		if role != shared.RoleRefinery {
 			return i
 		}
-		for g := range s.R.Gushers {
-			if d := dist(x, y, s.R.Gushers[g].X, s.R.Gushers[g].Y); d < bd {
+		for g := range s.R.Map.Gushers {
+			if d := dist(x, y, s.R.Map.Gushers[g].X, s.R.Map.Gushers[g].Y); d < bd {
 				best, bd = i, d
 			}
 		}
-		if len(s.R.Gushers) == 0 {
+		if len(s.R.Map.Gushers) == 0 {
 			return i
 		}
 	}
@@ -418,8 +416,13 @@ func (s *Sim) towardEnemy(side int, x, y float64) (float64, float64) {
 	return (e.X - x) / d, (e.Y - y) / d
 }
 
+// onLand reports whether something can be built at (x, y): open land, clear of the map
+// edge, of water, ice and mountains, and of the map's own buildings.
 func (s *Sim) onLand(x, y, margin float64) bool {
-	return x >= margin && x <= s.R.Map.Width-margin && y >= margin && y <= s.R.Map.WaterY-margin
+	if x < margin || x > s.R.Map.Width-margin || y < margin || y > s.R.Map.Height-margin {
+		return false
+	}
+	return s.R.Map.TerrainAt(x, y) == 'L' && s.Walkable(x, y)
 }
 
 // clear reports whether a structure of a footprint fits at (x, y).
@@ -454,7 +457,7 @@ func (s *Sim) buildDefence(c Command, kind string, def *shared.Structure) (*Stru
 	if place == "" {
 		place = "base:front"
 	}
-	pl, err := s.ResolvePlace(c.Side, place)
+	pl, err := s.resolveFor(c.Side, place)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +523,7 @@ func (s *Sim) buildFence(c Command, kind string, def *shared.Structure) (*Struct
 	if place == "" {
 		place = "base:front"
 	}
-	pl, err := s.ResolvePlace(c.Side, place)
+	pl, err := s.resolveFor(c.Side, place)
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +531,7 @@ func (s *Sim) buildFence(c Command, kind string, def *shared.Structure) (*Struct
 	var ax, ay, bx, by float64
 	switch {
 	case c.Place2 != "":
-		to, err := s.ResolvePlace(c.Side, c.Place2)
+		to, err := s.resolveFor(c.Side, c.Place2)
 		if err != nil {
 			return nil, err
 		}
@@ -909,37 +912,33 @@ func (s *Sim) trackStructures() {
 }
 
 // orderPlace is move, hold and attack on a place that is not a plain map point.
-func (s *Sim) orderPlace(c Command, sq *Squad) (*Squad, error) {
-	pl, err := s.ResolvePlace(c.Side, c.Place)
-	if err != nil {
-		return nil, err
-	}
-	if pl.Point != "" {
-		c.Point, c.Place = pl.Point, ""
-		return s.order(c)
-	}
+// orderStructure is an order whose place is a structure: attack it, or stand beside it.
+func (s *Sim) orderStructure(c Command, sq *Squad, pl Place) (*Squad, error) {
 	if sq.unit.Domain == "sea" {
 		return nil, fmt.Errorf("%w: %s is a sea unit", ErrUnreachable, sq.unit.Name.En)
 	}
-	o := Order{Kind: c.Kind, Tick: s.Tick, X: pl.X, Y: pl.Y, Place: c.Place}
-	if st := pl.Structure; st != nil {
-		o.Place = st.PlaceID()
-		switch {
-		case c.Kind == CmdAttack && st.Side != c.Side && !st.Ruin:
-			if sq.unit.Against(st.def.TargetClass()) == 0 {
-				return nil, fmt.Errorf("%w: %s cannot hurt a structure", ErrUnreachable, sq.unit.Name.En)
-			}
-			o.Structure = st.ID
-		case c.Kind == CmdAttack && st.Side != c.Side:
-			// It has fallen since this side last saw it: the squad goes to where it stood
-			// and finds that out for itself.
-		case c.Kind == CmdAttack:
-			return nil, fmt.Errorf("%w: nothing to attack at %s", ErrBadPlace, c.Place)
-		default:
-			// Stand beside it, on the side the enemy comes from.
-			dx, dy := s.towardEnemy(c.Side, st.X, st.Y)
-			o.X, o.Y = st.X+dx*(st.def.Footprint+35), st.Y+dy*(st.def.Footprint+35)
+	st := pl.Structure
+	o := Order{Kind: c.Kind, Tick: s.Tick, X: pl.X, Y: pl.Y, Place: st.PlaceID()}
+	switch {
+	case c.Kind == CmdRepair:
+		return nil, ErrNoBridge // mending structures comes with the third wave
+	case c.Kind == CmdAttack && st.Side != c.Side && !st.Ruin:
+		if sq.unit.Against(st.def.TargetClass()) == 0 {
+			return nil, fmt.Errorf("%w: %s cannot hurt a structure", ErrUnreachable, sq.unit.Name.En)
 		}
+		o.Structure = st.ID
+	case c.Kind == CmdAttack && st.Side != c.Side:
+		// It has fallen since this side last saw it: the squad goes to where it stood
+		// and finds that out for itself.
+	case c.Kind == CmdAttack:
+		return nil, fmt.Errorf("%w: nothing to attack at %s", ErrBadPlace, st.PlaceID())
+	default:
+		// Stand beside it, on the side the enemy comes from.
+		dx, dy := s.towardEnemy(c.Side, st.X, st.Y)
+		o.X, o.Y = st.X+dx*(st.def.Footprint+35), st.Y+dy*(st.def.Footprint+35)
+	}
+	if sq.unit.Domain == "land" {
+		o.X, o.Y = s.nav.snapXY(navGround, o.X, o.Y)
 	}
 	sq.Order = o
 	return sq, nil
@@ -954,7 +953,7 @@ func (s *Sim) captureOrder(c Command) (*Squad, error) {
 	if !sq.unit.Engineer() {
 		return nil, ErrNotEngineers
 	}
-	pl, err := s.ResolvePlace(c.Side, c.Place)
+	pl, err := s.resolveFor(c.Side, c.Place)
 	if err != nil {
 		return nil, err
 	}
@@ -967,19 +966,6 @@ func (s *Sim) captureOrder(c Command) (*Squad, error) {
 	}
 	sq.Order = Order{Kind: OrderCapture, Tick: s.Tick, X: st.X, Y: st.Y, Structure: st.ID, Place: st.PlaceID()}
 	return sq, nil
-}
-
-// repairOrder is the engineers' other job. Bridges belong to workstream 1, which
-// replaces this stand-in; structures are not repaired (the spec leaves that out).
-func (s *Sim) repairOrder(c Command) (*Squad, error) {
-	sq := s.Squad(c.Squad)
-	if sq == nil || sq.Side != c.Side {
-		return nil, ErrNoSquad
-	}
-	if !sq.unit.Engineer() {
-		return nil, ErrNotEngineers
-	}
-	return nil, ErrNoBridge
 }
 
 // engineers counts the time capturing squads have spent beside their structure, and

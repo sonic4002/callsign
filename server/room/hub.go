@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -109,6 +110,8 @@ type Options struct {
 	Bot           string // how hard the scripted enemy presses, "" for the server's usual
 	Speed         string // how fast the match's clock runs, "" for normal (see Speeds)
 	Purse         bool   // the operators may buy on their own from the start
+	Map           string // the map id, "" for the default
+	StartGold     int    // gold each side starts with, 0 for the rules default
 }
 
 // Speed is a pace a match can be played at. It changes only how much real time one tick
@@ -143,11 +146,20 @@ func tickEvery(base time.Duration, speed string) time.Duration {
 	return time.Duration(float64(base) / f)
 }
 
+// The gold a match may start with, as the lobby offers it. None is below what a
+// refinery costs, since the match opens by building one.
+var StartGolds = []int{1000, 2500, 5000, 10000}
+
 // A lesson lasts as long as its learner needs, within what a match may; and only so many
 // run at once, since anyone can start one.
 const (
 	lessonSeconds = 1800
 	maxLessons    = 8
+
+	// The limits on a starting gold typed in the lobby: enough for the refinery every
+	// match opens with, and not absurd.
+	MinStartGold = 400
+	MaxStartGold = 20000
 )
 
 // BotLevels are the scripted enemies a player may choose in the lobby, easiest first.
@@ -194,6 +206,12 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if _, ok := speedFactor(o.Speed); !ok {
 		return nil, 0, "", errors.New("the match speed is relaxed, normal or fast")
 	}
+	if _, ok := h.r.Maps[o.Map]; o.Map != "" && !ok {
+		return nil, 0, "", errors.New("there is no such map")
+	}
+	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
+		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
+	}
 	if o.Side == -1 {
 		var b [1]byte
 		if _, err := rand.Read(b[:]); err != nil {
@@ -207,9 +225,11 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	}
 	if lesson {
 		length, o.Watch = lessonSeconds, false // nobody is hurried, and nobody watches
+		o.Map = ""                             // the lesson is written for the small map
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase, Base: h.cfg.Base,
+		Map: o.Map, StartGold: o.StartGold,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
 	}
 	if lesson {
@@ -408,6 +428,17 @@ func (h *Hub) share(code string) string {
 	return strings.TrimRight(h.cfg.Share, "/") + "/?room=" + code
 }
 
+// mapList is the maps as the lobby lists them. The drawing of each is made by the page
+// from the rules file, which holds every map.
+func (h *Hub) mapList() []map[string]any {
+	out := []map[string]any{}
+	for _, id := range h.r.MapIDs() {
+		m := h.r.Maps[id]
+		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points)})
+	}
+	return out
+}
+
 // getServer tells the lobby what it can offer before any room exists.
 func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 	length := h.cfg.LengthSeconds
@@ -422,6 +453,11 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"length":   length,
 		"speeds":   Speeds,      // the paces on offer, slowest first
 		"speed":    SpeedNormal, // the one the lobby starts on
+		"maps":     h.mapList(), // the maps on offer, smallest first
+		"gold":     h.r.Match.StartGold,
+		"golds":    StartGolds, // what the lobby offers; a typed number may be minGold…maxGold
+		"minGold":  MinStartGold,
+		"maxGold":  MaxStartGold,
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
 		"open":     h.open != nil,       // the open room of a server without an agent key
 		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
@@ -437,6 +473,8 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Bot      string `json:"bot"`
 		Speed    string `json:"speed"`
 		Purse    bool   `json:"purse"`
+		Map      string `json:"map"`
+		Gold     int    `json:"startGold"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -449,7 +487,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.Gold}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

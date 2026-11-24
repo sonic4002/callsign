@@ -36,6 +36,8 @@ type Config struct {
 	Seed          uint64
 	Factions      [2]string
 	LengthSeconds int       // 0 uses the rules default
+	Map           string    // the map to play on, "" for the default
+	StartGold     int       // gold each side starts with, 0 for the rules default
 	Bots          [2]string // scripted player style per side, "" for none
 	AutoStart     bool      // start the clock at once instead of when the first Hammer joins
 	FullBase      bool      // both sides start with every base structure standing
@@ -50,10 +52,7 @@ type Config struct {
 	Watch    bool   // spectators, who see both sides, are let in
 	Speed    string // the pace the room is played at, for the lobby to show; "" is normal
 	Purse    bool   // the operators may buy on their own from the first second (a lobby option)
-	// StartGold is what each side starts with; 0 uses the rules default. The lobby's
-	// control for it comes with the map options.
-	StartGold int
-	AgentKey  string // what an agent must show to join when it holds no seat token; "" lets any agent in
+	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the
 	// learner's own browser with the scripted brain, never by this machine's agents, so a
@@ -81,7 +80,9 @@ type Message struct {
 	End      string   `json:"end,omitempty"`
 	Prowords []string `json:"prowords,omitempty"`
 	Points   []string `json:"points,omitempty"`
-	Final    bool     `json:"final,omitempty"` // the operator's sign-off when the match ends
+	// Landmarks are the landmarks and bridges the body names, by id.
+	Landmarks []string `json:"landmarks,omitempty"`
+	Final     bool     `json:"final,omitempty"` // the operator's sign-off when the match ends
 }
 
 // Client is one connection. Out carries the JSON frames to write to it; it is closed
@@ -95,28 +96,39 @@ type Client struct {
 }
 
 type Room struct {
-	mu      sync.Mutex
-	r       *shared.Rules
-	net     *radio.Net
-	cfg     Config
-	sim     *sim.Sim
-	match   int
-	started bool
-	seq     int
-	logs    [2][]Message
-	lang    [2]map[string]string // language last used toward each station
-	cmd     [2]command           // who has the initiative on each side: Hammer or the operator
-	bots    [2]*bot.Player
-	clients map[*Client]struct{}
-	host    [2]*Client // the agent host running each side's agents, if any
-	joins   int
-	seats   [2]seat
-	quiet   time.Time // since when no person has been connected; zero while one is
-	closed  bool
+	mu        sync.Mutex
+	r         *shared.Rules
+	rulesJSON []byte // the rules as clients read them, with this room's map as "map"
+	net       *radio.Net
+	cfg       Config
+	sim       *sim.Sim
+	match     int
+	started   bool
+	seq       int
+	logs      [2][]Message
+	lang      [2]map[string]string // language last used toward each station
+	cmd       [2]command           // who has the initiative on each side: Hammer or the operator
+	bots      [2]*bot.Player
+	clients   map[*Client]struct{}
+	host      [2]*Client // the agent host running each side's agents, if any
+	joins     int
+	seats     [2]seat
+	quiet     time.Time // since when no person has been connected; zero while one is
+	closed    bool
 }
 
 func New(r *shared.Rules, cfg Config) (*Room, error) {
-	rm := &Room{r: r, net: radio.NewNet(r), cfg: cfg, clients: map[*Client]struct{}{}, quiet: time.Now()}
+	// The room plays on one map: its copy of the rules, its radio net and what it sends
+	// its clients all know that map as "the map".
+	r, err := r.ForMap(cfg.Map)
+	if err != nil {
+		return nil, err
+	}
+	rulesJSON, err := shared.JSONFor(r.Map.ID)
+	if err != nil {
+		return nil, err
+	}
+	rm := &Room{r: r, rulesJSON: rulesJSON, net: radio.NewNet(r), cfg: cfg, clients: map[*Client]struct{}{}, quiet: time.Now()}
 	if err := rm.reset(); err != nil {
 		return nil, err
 	}
@@ -304,7 +316,7 @@ func (rm *Room) hello(c *Client) []byte {
 	h := map[string]any{
 		"type": "hello", "match": rm.match, "side": side, "role": c.ID.Role,
 		"faction": rm.sim.Sides[side].Faction,
-		"rules":   json.RawMessage(shared.RulesJSON),
+		"rules":   json.RawMessage(rm.rulesJSON),
 		"state":   rm.sim.Snapshot(view),
 		"log":     append([]Message{}, rm.logs[side]...),
 		"lobby":   rm.lobby(),
@@ -508,7 +520,7 @@ func (rm *Room) transmit(side int, from radio.Station, p radio.Parsed, text stri
 	}
 	m := Message{
 		Tick: rm.sim.Tick, From: rm.name(from, side), Lang: p.Lang, Text: text,
-		Body: p.Body, End: p.End, Prowords: p.Prowords, Points: p.Points,
+		Body: p.Body, End: p.End, Prowords: p.Prowords, Points: p.Points, Landmarks: p.Landmarks,
 	}
 	for _, st := range p.To {
 		if st.Kind == radio.Squad && rm.squadOf(side, st) == nil {

@@ -12,6 +12,7 @@ import { Tokenizer } from "./tokenizer.js";
 
 const read = (name) => readFileSync(new URL(name, import.meta.url));
 const rules = JSON.parse(read("../../shared/rules.json"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const manifest = JSON.parse(read("models.json"));
 
 // What the recognisers really wrote for spoken calls (three voices), and the call it must become.
@@ -134,6 +135,7 @@ test("the Hebrew model transcribes the test recording word for word", { skip }, 
 
 test("relaxed: a callsign that only sounds right is respelled when its number follows", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   assert.equal(relaxed("צבע 1 תפוס את דוד", { lang: "he", rules }), "צפע 1 תפוס את דוד");
   assert.equal(relaxed("צבע אחת תקוף", { lang: "he", rules }), "צפע 1 תקוף");
   assert.equal(relaxed("vapour two attack gulf", { lang: "en", rules }), "Viper 2 attack Golf");
@@ -144,6 +146,7 @@ test("relaxed: a callsign that only sounds right is respelled when its number fo
 
 test("a named enemy squad keeps its name and gets a digit", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   assert.equal(relaxed("viper one attack target three", { lang: "en", rules }), "Viper 1 attack Target 3");
   assert.equal(relaxed("צפע 1 תקוף את מטרה שלוש", { lang: "he", rules }), "צפע 1 תקוף את מטרה 3");
 });
@@ -190,6 +193,7 @@ test("openers: a callsign the audio supports is taken as the first word, a poor 
 // call: "צפע" is not the point "זאב", "כיתת" is not "דוד", "Militia cell" is not Kilo.
 test("tidy leaves the calls the page writes alone, typed or spoken", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   const cs = rules.callsigns;
   const words = (text) => text.split(/[\s,.:;!?]+/).filter(Boolean).join(" ");
   for (const lang of ["he", "en"]) {
@@ -213,6 +217,7 @@ test("tidy leaves the calls the page writes alone, typed or spoken", () => {
 
 test("a callsign inside the message is never respelled as a map point", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   assert.equal(tidy("סדן, שדרג את צפע 1", { lang: "he", rules }), "סדן, שדרג את צפע 1");
   assert.equal(tidy("סדן, כאן פטיש, שדרג את צפע 1 לדרגת המוח הבאה, עבור.", { lang: "he", rules }), "סדן, כאן פטיש, שדרג את צפע 1 לדרגת המוח הבאה, עבור.");
   assert.equal(tidy("Anvil, upgrade Viper 1", { lang: "en", rules }), "Anvil, upgrade Viper 1");
@@ -222,6 +227,7 @@ test("a callsign inside the message is never respelled as a map point", () => {
 
 test("gold is not a map point: a call for a gold truck keeps its words", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   assert.equal(relaxed("סדן, קנה משאית זהב", { lang: "he", rules }), "סדן, קנה משאית זהב");
   assert.equal(relaxed("סדן, המשאיות לשדה כרמל", { lang: "he", rules }), "סדן, המשאיות לשדה כרמל");
   assert.equal(relaxed("Anvil, haulers to the gold field at kilo", { lang: "en", rules }), "Anvil, haulers to the gold field at Kilo");

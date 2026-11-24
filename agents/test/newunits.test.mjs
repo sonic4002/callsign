@@ -9,6 +9,7 @@ import { wantedUnit } from "../brain-scripted.mjs";
 import { leaderPrompt, operatorPrompt, unitFacts } from "../prompts.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const { aegis, ashfall } = rules.factions;
 
 test("the scripted operator reads which unit a buy call names, in both languages", () => {

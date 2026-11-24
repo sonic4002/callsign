@@ -148,3 +148,15 @@ relay:
 # no key is needed and nothing leaves this machine.
 relay-test:
 	$(DOCKER) --network none $(IMAGE) go test -race -count=1 ./relay/... ./shared/...
+
+# How even the two factions are on each map: 200 scripted games per map, 100 seeds from
+# each end. Takes several minutes. SEEDS sets how many seeds each pairing plays.
+.PHONY: balance
+SEEDS ?= 100
+balance:
+	$(DOCKER) --network none -e CALLSIGN_BALANCE=$(SEEDS) $(IMAGE) go test ./server/sim -run TestFactionsAreRoughlyEvenOnEveryMap -v -timeout 60m
+
+# Rewrite the maps in shared/rules.json from tools/mapgen.py; `python3 tools/mapgen.py --show` draws them as text.
+.PHONY: maps
+maps:
+	python3 tools/mapgen.py

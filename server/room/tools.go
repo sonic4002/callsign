@@ -19,7 +19,11 @@ const (
 	ToolReport = "report"
 	ToolBuy    = "buy"
 	ToolHaul   = "haul"
+	ToolRepair = "repair"
 )
+
+// ErrWhichPlace is returned when the words for a place fit more than one landmark.
+var ErrWhichPlace = errors.New("which one")
 
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
@@ -50,8 +54,9 @@ type toolArgs struct {
 	Lang    string `json:"lang"`
 	Mode    string `json:"mode"` // command: "orders" or "fight", empty to read it
 	MayBuy  *bool  `json:"buy"`  // command: whether the operator may spend on its own
-	// Bases (build.go): what to build, and where an order or a structure goes when it is
-	// not a plain point.
+	// Place is where an order or a structure goes: a point, a landmark, a bridge or a
+	// structure by id or name, "<bearing> of <point> [<metres>]", or a side of the base.
+	// Structure is what to build (build.go).
 	Structure string `json:"structure"`
 	Place     string `json:"place"`
 	Place2    string `json:"place2"`
@@ -94,25 +99,26 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		return rm.toolHaul(side, a)
 	}
 
-	// move, hold, attack: always the caller's own squad.
+	// move, hold, attack, repair: always the caller's own squad.
 	cmd := sim.Command{Side: side, Kind: name, Squad: c.ID.Squad, Contact: a.Contact}
-	if a.Point == "" {
-		a.Point = a.Place
+	where := a.Place
+	if where == "" {
+		where = a.Point
 	}
-	if a.Point != "" {
-		id, ok := rm.net.ResolvePoint(a.Point)
-		if ok {
-			cmd.Point = id
-		} else {
-			// Not a point: a structure, by id or by name (build.go).
-			var x, y float64
-			if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
-				x, y = sq.Center()
-			}
-			place, err := rm.place(side, a.Point, name == ToolAttack, x, y)
-			if err != nil || strings.HasPrefix(place, "base:") {
-				return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, a.Point)
-			}
+	if where != "" && !(name == ToolHold && strings.EqualFold(strings.TrimSpace(where), "here")) {
+		// One resolver for every kind of place: a point, a landmark, a bridge, a structure
+		// by id or by name, or a bearing from a point (build.go).
+		var x, y float64
+		if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
+			x, y = sq.Center()
+		}
+		place, err := rm.place(side, where, name == ToolAttack, x, y)
+		switch {
+		case errors.Is(err, ErrWhichPlace):
+			return nil, err
+		case err != nil || strings.HasPrefix(place, "base:"):
+			return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, where)
+		default:
 			cmd.Place = place
 		}
 	}
@@ -197,6 +203,10 @@ func (rm *Room) toolReport(c *Client) (any, error) {
 		}
 	}
 	out["haulers"] = haulers
+	if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
+		// The ground: cover, buildings and bridges in sight and around the points.
+		out["landmarks"] = rm.sim.LandmarksNear(sq)
+	}
 	friends := []friend{}
 	for _, sq := range snap.Squads {
 		if sq.ID == c.ID.Squad {
@@ -265,7 +275,7 @@ func (rm *Room) toolHaul(side int, a toolArgs) (any, error) {
 			}
 		}
 		field = ""
-		for _, g := range rm.r.Gushers {
+		for _, g := range rm.r.Map.Gushers {
 			if ok && g.Point == id {
 				field = g.ID
 			}

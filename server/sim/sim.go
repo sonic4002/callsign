@@ -18,6 +18,7 @@ const (
 	OrderMove   = "move"
 	OrderHold   = "hold"
 	OrderAttack = "attack"
+	OrderRepair = "repair" // stand at a bridge and mend it; fought like a hold
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 	ActAdvance  = "advance"
 	ActCover    = "cover"
 	ActFallBack = "fallback"
+	ActRepair   = "repair"
 )
 
 const (
@@ -70,20 +72,26 @@ type Side struct {
 	earned     [incomeWindow]int64
 	earnedAt   int
 	earnedSecs int
+	lands      []landmarkMemory
+	bridges    []bridgeMemory
 }
 
 type Order struct {
 	Kind    string
 	Point   string // map point id, if the order names one
 	Contact int    // enemy squad id, for attack orders on a contact
+	// Place is the written form of where the order sends the squad, when it named a
+	// place: a point, a landmark, a bridge, a structure or an offset from a point.
+	Place   string
 	X, Y    float64
 	Tick    int
 	arrived bool
-	// Structure is the structure an attack or capture order is on (structures.go);
-	// Place is the place id the order named when it was not a plain point.
+	// Structure is the structure an attack or capture order is on (structures.go).
 	Structure int
-	Place     string
 	work      int // ticks an engineer squad has spent on its capture
+
+	landmark int // index+1 of the landmark named, 0 for none
+	bridge   int // index+1 of the bridge named, 0 for none
 }
 
 type Team struct {
@@ -97,6 +105,19 @@ type Team struct {
 	lastShot int  // tick this team was last shot at
 	lastFire int  // tick this team last fired; firing gives it away for a while
 	blocked  int  // id of the fence that stopped this team's last step, or 0
+
+	// In is the id of the building the team is inside, "" when it is in the open.
+	In string
+	// Cover is the multiplier on hits the team takes from the cover it is in; 1 for none.
+	Cover float64
+
+	// The way to where the team is going, when it cannot walk there in a straight line.
+	path     [][2]float64
+	pathGoal int
+	pathVer  int
+	pathMode int
+	pathTick int
+	atPost   bool // standing where its orders put it
 
 	// scratch for the tick being resolved
 	dmg     float64
@@ -147,11 +168,18 @@ type Sim struct {
 	// Structures is everything either side has built, in id order; ruins stay.
 	Structures []*Structure
 	Fields     []FieldState // the gold lying around each gusher, in rules order
-	Over       bool
-	Winner     int
-	Reason     string
+	// Bridges and Landmarks are the map's own, with what has happened to them.
+	Bridges   []BridgeState
+	Landmarks []LandmarkState
+	// Places lets other parts of the game make their own things nameable in orders.
+	Places []PlaceFinder
+	Over   bool
+	Winner int
+	Reason string
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
+	nav             *nav
+	landIdx         map[string]int // landmark id → index
 	rng             *rand.Rand
 	events          []Event
 	lengthTicks     int
@@ -176,6 +204,13 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		p := &r.Map.Points[i]
 		s.Points = append(s.Points, PointState{Point: p, Owner: p.Owner, CapSide: NoSide})
 	}
+	s.initBridges()
+	s.initNav()
+	s.initLandmarks()
+	gold := cfg.StartGold
+	if gold <= 0 {
+		gold = r.Match.StartGold
+	}
 	for side := 0; side < 2; side++ {
 		f, ok := r.Factions[cfg.Factions[side]]
 		if !ok {
@@ -184,7 +219,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		s.Sides[side] = Side{
 			ID:       side,
 			Faction:  cfg.Factions[side],
-			goldUnit: int64(r.Match.StartGold) * int64(r.TickRate),
+			goldUnit: int64(gold) * int64(r.TickRate),
 			HQHP:     r.HQ.HP,
 			nextNum:  map[string]int{},
 			hqAlarm:  never,
@@ -199,6 +234,8 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		startGold = r.Match.StartGold
 	}
 	s.initHaul(startGold)
+	// What is built or lies on the ground can be named in an order like the map's own places.
+	s.Places = append(s.Places, s.structurePlace, s.fieldPlace)
 	s.initFog()
 	return s, nil
 }
@@ -314,14 +351,16 @@ func (s *Sim) field(sq *Squad) {
 	slot := float64((sq.Num - 1) % 4)
 	cx, cy := hq.X+inward*70, hq.Y-90+slot*60
 	if u.Domain == "sea" {
-		cx, cy = hq.X+inward*slot*50, s.R.Map.WaterY+60
+		// Boats put in at the water nearest the headquarters, strung out along it.
+		cx, cy = s.nav.snapXY(navWater, hq.X, hq.Y)
+		cx, cy = s.nav.snapXY(navWater, cx+inward*slot*50, cy+40)
 	}
 	for i := 0; i < u.Teams; i++ {
 		ox, oy := formation(i, u.Teams, side)
 		x, y := s.clamp(u.Domain, cx+ox, cy+oy)
 		sq.Teams = append(sq.Teams, Team{
 			X: x, Y: y, HP: u.HP * float64(u.Members), Members: u.Members,
-			Action: ActIdle, lastShot: never, lastFire: never,
+			Action: ActIdle, lastShot: never, lastFire: never, Cover: 1,
 		})
 	}
 	sq.Alive, sq.DeployTicks = true, 0
@@ -360,19 +399,19 @@ func formation(i, n, side int) (float64, float64) {
 	return x, y
 }
 
-// clamp keeps a position on the map and inside the unit's domain.
+// clamp keeps a position on the map and on terrain the unit's domain can be on: the
+// nearest water for a boat, the nearest walkable ground for a land unit.
 func (s *Sim) clamp(domain string, x, y float64) (float64, float64) {
 	const edge = 10
 	x = math.Max(edge, math.Min(s.R.Map.Width-edge, x))
+	y = math.Max(edge, math.Min(s.R.Map.Height-edge, y))
 	switch domain {
 	case "air":
-		y = math.Max(edge, math.Min(s.R.Map.Height-edge, y))
+		return x, y
 	case "sea":
-		y = math.Max(s.R.Map.WaterY+edge, math.Min(s.R.Map.Height-edge, y))
-	default:
-		y = math.Max(edge, math.Min(s.R.Map.WaterY-edge, y))
+		return s.nav.snapXY(navWater, x, y)
 	}
-	return x, y
+	return s.nav.snapXY(navGround, x, y)
 }
 
 func (s *Sim) pointState(id string) *PointState {
@@ -395,7 +434,10 @@ func (s *Sim) nearestPoint(x, y float64) string {
 	return best
 }
 
-func dist(ax, ay, bx, by float64) float64 { return math.Hypot(ax-bx, ay-by) }
+func dist(ax, ay, bx, by float64) float64 {
+	dx, dy := ax-bx, ay-by
+	return math.Sqrt(dx*dx + dy*dy)
+}
 
 // teamRef is one living team with its squad and stats, valid for one tick.
 type teamRef struct {
@@ -430,26 +472,35 @@ func (s *Sim) Step() []Event {
 	s.construct()
 
 	live := s.liveTeams()
+	s.countGarrisons()
 	s.spot(live)
 	s.trackContacts()
 	s.trackStructures()
+	s.trackObjects()
 	for _, tr := range live {
 		tr.plan = s.decide(tr, live)
 	}
 	for _, tr := range live {
 		s.move(tr)
 	}
+	s.enterBuildings(live)
 	for _, tr := range live {
 		s.fire(tr)
 	}
 	s.defencesFire(live)
 	s.resolveDamage(live)
 	s.resolveStructures()
+	s.resolveBuildings(live)
+	s.resolveBridges(live)
+	s.repairBridges(live)
+	s.trackObjects()
+	s.noteCover(live)
 	s.recover(live)
 	s.capture(live)
 	s.engineers()
 	s.haulWork()
 	s.squadEvents(live)
+	s.countGarrisons()
 	s.observe()
 	s.checkEnd()
 	s.Tick++
@@ -471,10 +522,13 @@ func (s *Sim) spot(live []*teamRef) {
 	for _, tr := range live {
 		enemy := 1 - tr.sq.Side
 		// A team that has just fired is seen wherever it is: the shot gives it away.
-		tr.t.Spotted = s.postSees(enemy, tr.t.X, tr.t.Y) ||
-			float64(s.Tick-tr.t.lastFire) <= s.R.Match.RevealSeconds*float64(s.R.TickRate)
+		fired := float64(s.Tick-tr.t.lastFire) <= s.R.Match.RevealSeconds*float64(s.R.TickRate)
+		// Inside a building a team is seen only from close by, or once it has fired.
+		hidden := tr.t.In != "" && !fired
+		tr.t.Spotted = fired || (!hidden && s.postSees(enemy, tr.t.X, tr.t.Y))
 		for _, o := range live {
-			if o.sq.Side != enemy || dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y) > o.u.Sight {
+			d := dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y)
+			if o.sq.Side != enemy || d > o.u.Sight || (hidden && d > s.R.Match.GarrisonSight) {
 				continue
 			}
 			tr.t.Spotted = true
@@ -488,10 +542,19 @@ func (s *Sim) spot(live []*teamRef) {
 func (s *Sim) move(tr *teamRef) {
 	t, p := tr.t, tr.plan
 	t.Action = p.act
-	if p.act != ActAdvance && p.act != ActFallBack {
+	if (p.act != ActAdvance && p.act != ActFallBack) || t.In != "" {
 		return
 	}
 	speed := tr.u.Speed * s.dt
+	if tr.u.Domain == "land" && s.bridgeAt(t.X, t.Y) == nil {
+		speed *= s.R.TerrainKinds[string(s.R.Map.TerrainAt(t.X, t.Y))].Speed
+	}
+	// Around water, mountains and whatever has been built: head for the next corner.
+	x, y, ok := s.steer(tr, p.x, p.y)
+	if !ok {
+		return
+	}
+	p.x, p.y = x, y
 	switch s.Nerve(t) {
 	case Shaken:
 		speed *= 0.6
@@ -529,6 +592,17 @@ func (s *Sim) fire(tr *teamRef) {
 		s.fireAtStructure(tr, tr.plan.st)
 		return
 	}
+	if o := tr.plan.obj; o != nil {
+		// A bridge or a building: every round lands, and how hard depends on the weapon.
+		dmg := tr.u.Damage * tr.u.Against("structure") * float64(t.Members)
+		if o.bridge > 0 {
+			s.Bridges[o.bridge-1].dmg += dmg
+			s.Bridges[o.bridge-1].by[tr.sq.Side] = true
+		} else {
+			s.Landmarks[o.landmark-1].dmg += dmg
+		}
+		return
+	}
 	if tr.plan.hq {
 		enemy := &s.Sides[1-tr.sq.Side]
 		enemy.HQHP -= tr.u.Damage * tr.u.Against("hq") * float64(t.Members)
@@ -545,6 +619,13 @@ func (s *Sim) fire(tr *teamRef) {
 	}
 	if tgt.plan.act == ActCover {
 		chance *= 0.5
+	}
+	chance *= s.coverAgainst(tgt, t.X, t.Y)
+	if tgt.t.In != "" {
+		// Rounds fired at a garrison hit its walls too.
+		if i, l := s.landmarkByID(tgt.t.In); l != nil {
+			s.Landmarks[i].dmg += tr.u.Damage * tr.u.Against("structure") * float64(t.Members) * s.R.Match.GarrisonDamageShare
+		}
 	}
 	// Accuracy falls off over the last 40% of the weapon's range.
 	if far := dist(t.X, t.Y, tgt.t.X, tgt.t.Y) / tr.u.Range; far > 0.6 {
@@ -717,7 +798,7 @@ func (s *Sim) squadEvents(live []*teamRef) {
 			if s.Nerve(t) == Pinned {
 				pinned = true
 			}
-			if dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > s.R.Match.HoldRadius {
+			if dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > s.R.Match.HoldRadius && t.In == "" && !t.atPost {
 				arrived = false
 			}
 		}

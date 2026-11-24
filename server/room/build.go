@@ -15,7 +15,6 @@ import (
 const (
 	ToolBuild   = "build"
 	ToolCapture = "capture"
-	ToolRepair  = "repair"
 )
 
 // mayActAlone is the one check for "may the operator spend without being told to?".
@@ -40,23 +39,34 @@ var sideWords = []struct {
 	{"rear", []string{"rear", "back", "behind", "עורף", "אחורי", "מאחור"}},
 }
 
-// place turns what an agent wrote for a place into what the simulation resolves: a
-// point id, a structure id, or "base:<side>". Workstream 1 replaces this with the full
-// resolver (landmarks and offsets); points and structures keep working as here.
+// place turns what an agent wrote for a place into the written form the simulation's one
+// resolver reads: a point id, a landmark or bridge id, a structure id, "<bearing> of
+// <point> [<metres>]", or "base:<side>". Exact ids come first, then a structure named in
+// words, then the map's own names, then a side of one's own base. When the words fit
+// several landmarks the error is ErrWhichPlace and names them.
 func (rm *Room) place(side int, text string, enemy bool, nearX, nearY float64) (string, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return "", nil
 	}
-	if id, ok := rm.net.ResolvePoint(text); ok {
-		return id, nil
-	}
-	if _, err := rm.sim.ResolvePlace(side, text); err == nil {
-		return text, nil
+	if pl, err := rm.sim.ResolveFor(side, text); err == nil {
+		return pl.ID, nil
 	}
 	low := strings.ToLower(text)
 	if id := rm.structureNamed(side, low, enemy, nearX, nearY); id != "" {
 		return id, nil
+	}
+	place, choices, ok := rm.net.ResolvePlace(text)
+	switch {
+	case ok:
+		return place, nil
+	case len(choices) > 1:
+		// The words fit more than one landmark: say which, so the squad can ask.
+		names := make([]string, len(choices))
+		for i, id := range choices {
+			names[i] = rm.net.PlaceName(id, "en") + " (" + id + ")"
+		}
+		return "", fmt.Errorf("%w: %q could be %s", ErrWhichPlace, text, strings.Join(names, " or "))
 	}
 	for _, w := range sideWords {
 		for _, word := range w.words {

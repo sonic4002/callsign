@@ -6,6 +6,7 @@ import { Queue } from "./queue.js";
 import { casts, filler, speakable, voiceFor } from "./text.js";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const table = JSON.parse(readFileSync(new URL("../../tts/pronounce.json", import.meta.url), "utf8"));
 
 test("speakable: Hebrew squad numbers are said as on the net, other numbers are left alone", () => {

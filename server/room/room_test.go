@@ -243,7 +243,7 @@ func TestRolesLimitTools(t *testing.T) {
 	}
 
 	// A squad leader's tools reach its own squad and nothing else.
-	tool(t, rm, viper1, ToolMove, `{"point":"the bridge"}`)
+	tool(t, rm, viper1, ToolMove, `{"point":"the ford"}`)
 	rm.View(func(s *sim.Sim) {
 		if s.Squad(1).Order.Point != "G" || s.Squad(2).Order.Kind != sim.OrderNone {
 			t.Fatalf("orders after Viper 1 moved: %+v / %+v", s.Squad(1).Order, s.Squad(2).Order)

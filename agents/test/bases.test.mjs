@@ -11,6 +11,7 @@ import { scriptedBrain } from "../brain-scripted.mjs";
 import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const { aegis, ashfall } = rules.factions;
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 const anvil = { role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
@@ -112,15 +113,15 @@ test("scripted leaders: attack an enemy structure by name; only engineers take o
   const commandos = { role: "squad", side: 0, squad: 2, tier: 1, station, lang: "en", unit: aegis.units.commandos };
   const engineers = { ...commandos, unit: aegis.units.engineers };
 
-  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Attack the enemy works")) }), [["attack", { point: "s9", contact: 0 }], wilco]);
+  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Attack the enemy works")) }), [["attack", { place: "s9", contact: 0 }], wilco]);
   assert.deepEqual(await think({ agent: commandos, wake: wake(call("תקפו את המוסך של האויב", { lang: "he" })) }), [
-    ["attack", { point: "s9", contact: 0 }],
+    ["attack", { place: "s9", contact: 0 }],
     ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
   ]);
-  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Destroy the gun nest")) }), [["attack", { point: "s11", contact: 0 }], wilco]);
+  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Destroy the gun nest")) }), [["attack", { place: "s11", contact: 0 }], wilco]);
   assert.deepEqual(await think({ agent: engineers, wake: wake(call("Take over the enemy works")) }), [["capture", { place: "s9" }], wilco]);
   // Commandos told to capture a point still hold it; a structure nobody has seen is not guessed at.
-  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Capture Foxtrot", { points: ["F"] })) }), [["hold", { point: "F" }], wilco]);
+  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Capture Foxtrot", { points: ["F"] })) }), [["hold", { place: "F" }], wilco]);
   assert.equal(namedStructure("attack the enemy airbase", compactStructures(status, 0), { enemy: true }), undefined);
 });
 

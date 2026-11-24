@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { STEPS, advance, answered, bought, canGoOn, engaged, holds, indexOf, nearest, ordered, released, upgraded, stands, hauling } from "./lesson.js";
 
 const rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const en = JSON.parse(readFileSync(new URL("i18n/en.json", import.meta.url), "utf8"));
 
 const squad = (id, more = {}) => ({ id, side: 0, tier: 1, order: { kind: "none" }, callsign: { en: `Viper ${id}`, he: `צפע ${id}` }, ...more });

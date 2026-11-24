@@ -6,6 +6,7 @@ import unittest
 from pronounce import TABLE, fix
 
 RULES = json.loads((pathlib.Path(__file__).parent.parent / "shared" / "rules.json").read_text(encoding="utf-8"))
+RULES.setdefault("map", RULES["maps"]["small"])  # the default map, as the server sends it
 
 
 class Pronounce(unittest.TestCase):

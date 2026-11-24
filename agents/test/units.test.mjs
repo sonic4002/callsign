@@ -10,6 +10,7 @@ import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 import { leaderTools, leaderToolsFor, normalize, operatorTools } from "../tools.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const viper2 = { key: "infantry-2", en: "Viper 2", he: "צפע 2", squad: 2 };
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 
@@ -28,10 +29,10 @@ test("the game tools: the six in the design, build and haul for the operator, ca
 });
 
 test("normalize drops the placeholders strict schemas force", () => {
-  assert.deepEqual(normalize("attack", { point: "", contact: 3 }), { contact: 3 });
-  assert.deepEqual(normalize("attack", { point: "Zulu", contact: 0 }), { point: "Zulu" });
-  assert.deepEqual(normalize("hold", { point: "here" }), {});
-  assert.deepEqual(normalize("hold", { point: "F" }), { point: "F" });
+  assert.deepEqual(normalize("attack", { place: "", contact: 3 }), { contact: 3 });
+  assert.deepEqual(normalize("attack", { place: "Zulu", contact: 0 }), { place: "Zulu" });
+  assert.deepEqual(normalize("hold", { place: "here" }), {});
+  assert.deepEqual(normalize("hold", { place: "F" }), { place: "F" });
   assert.deepEqual(normalize("buy", { unit: "tank", upgrade: "" }), { unit: "tank" });
   assert.deepEqual(normalize("report", {}), {});
 });
@@ -97,23 +98,23 @@ test("scripted leader: order, act, then Wilco, in the caller's language", async 
   const brain = scriptedBrain();
   const wake = (c) => ({ items: [{ kind: "radio", msg: c }], call: c, status: null });
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold Foxtrot", { points: ["F"] })) }), [
-    ["hold", { point: "F" }],
+    ["hold", { place: "F" }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("תחזיקו את פסל", { lang: "he", points: ["F"] })) }), [
-    ["hold", { point: "F" }],
+    ["hold", { place: "F" }],
     ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
   ]);
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Attack Zulu", { points: ["Z"] })) }), [
-    ["attack", { point: "Z", contact: 0 }],
+    ["attack", { place: "Z", contact: 0 }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Move to the bridge", { points: ["G"] })) }), [
-    ["move", { point: "G" }],
+    ["move", { place: "G" }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold")) }), [
-    ["hold", { point: "here" }],
+    ["hold", { place: "here" }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
 });
@@ -122,7 +123,7 @@ test("scripted leader: Negative with the reason, Say again, radio check, and sil
   const brain = scriptedBrain();
   const wake = (c) => ({ items: [{ kind: "radio", msg: c }], call: c, status: null });
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Hold Sierra", { points: ["S"] })) }, { hold: "that squad cannot reach that point" }), [
-    ["hold", { point: "S" }],
+    ["hold", { place: "S" }],
     ["radio", { to: ["Hammer"], body: "Negative, that squad cannot reach that point", end: "over" }],
   ]);
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Do the thing with the stuff")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
@@ -222,7 +223,7 @@ test("subscription brain: actions become tool calls, and it thinks again only on
   const runs = [];
   const exec = async (bin, args, input, env) => {
     runs.push({ args, input, env });
-    return { structured_output: { actions: [{ tool: "hold", input: { point: "F" } }, { tool: "radio", input: { to: ["Hammer"], body: "Wilco", end: "out" } }] } };
+    return { structured_output: { actions: [{ tool: "hold", input: { place: "F" } }, { tool: "radio", input: { to: ["Hammer"], body: "Wilco", end: "out" } }] } };
   };
   const brain = subscriptionBrain({ token: "sk-ant-oat01-x", exec });
   const ctx = { agent: { role: "squad", tier: 1 }, system: "You are Viper 2.", tools: leaderTools, messages: [{ role: "user", content: "Hammer: hold Foxtrot" }] };
@@ -358,14 +359,14 @@ test("scripted leader: escorting the haulers means holding the field they work",
   const status = (haulers) => ({ you: {}, friends: [], contacts: [], points: [], haulers });
   const wake = (c, haulers) => ({ items: [{ kind: "radio", msg: c }], call: c, status: status(haulers) });
   const hold = (point) => [
-    ["hold", { point }],
+    ["hold", { place: point }],
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ];
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Escort the haulers"), [{ id: 1001, state: "loading", field: "F" }]) }), hold("F"));
   // Nobody is out: the field nearest home.
   assert.deepEqual(await think(brain, { agent: leader, wake: wake(call("Escort the haulers"), [{ id: 1001, state: "waiting", field: "" }]) }), hold("B"));
   assert.deepEqual(await think(brain, { agent: { ...leader, lang: "he" }, wake: wake(call("לווה את המשאיות", { lang: "he" }), [{ id: 1001, state: "out", field: "B" }]) }), [
-    ["hold", { point: "B" }],
+    ["hold", { place: "B" }],
     ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
   ]);
   // A named point wins over the guess.

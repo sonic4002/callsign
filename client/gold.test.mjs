@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { fieldShare, flecks, ghosts, gusherAt, gusherOfPoint, haulerGroups, haulerRows, pickGusher, reach, unloaded } from "./gold.js";
 
 const rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url)));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const name = (n) => ({ en: `Hauler ${n}`, he: `מוביל ${n}` });
 const hauler = (id, side, extra = {}) => ({ id, side, callsign: name(id - 1000), unit: side ? "dumpTruck" : "crawler", state: "out", load: 0, field: "B", hp: 1, x: 300, y: 300, visible: true, ...extra });
 
@@ -37,7 +38,7 @@ test("the sidebar lists own haulers with the point of the field they work", () =
 });
 
 test("a field shrinks as it is emptied but never vanishes, and scatters the same nuggets every time", () => {
-  const g = rules.gushers[0];
+  const g = rules.map.gushers[0];
   assert.equal(reach(g, 1), g.fieldRadius);
   assert.ok(reach(g, 0) > 0 && reach(g, 0) < reach(g, 0.5) && reach(g, 0.5) < reach(g, 1));
   assert.equal(reach(g, 7), g.fieldRadius, "a share past 1 is clamped");
@@ -54,13 +55,17 @@ test("gushers are found by the point they stand on, by the point they are named 
   const b = rules.map.points.find((p) => p.id === "B");
   const f = rules.map.points.find((p) => p.id === "F");
   assert.equal(gusherAt(rules, b)?.id, "B");
-  assert.equal(gusherAt(rules, f), null, "the middle field lies off its point");
+  assert.equal(gusherAt(rules, f)?.id, "F", "the rich field stands on the town island");
+  // On the bigger maps each side's home field lies off the point it is named after.
+  const medium = { ...rules, map: rules.maps.medium };
+  assert.equal(gusherAt(medium, medium.map.points.find((p) => p.id === "A")), null);
+  assert.equal(gusherOfPoint(medium, "A")?.id, "A");
   assert.equal(gusherOfPoint(rules, "F")?.id, "F");
   assert.equal(gusherOfPoint(rules, "G"), null);
-  const mid = rules.gushers.find((g) => g.id === "F");
+  const mid = rules.map.gushers.find((g) => g.id === "F");
   assert.equal(pickGusher(rules, mid.x + 20, mid.y - 10)?.id, "F");
   assert.equal(pickGusher(rules, mid.x + mid.fieldRadius, mid.y), null);
-  for (const g of rules.gushers) assert.ok(rules.map.points.some((p) => p.id === g.point), `gusher ${g.id} is named after a real point`);
+  for (const g of rules.map.gushers) assert.ok(rules.map.points.some((p) => p.id === g.point), `gusher ${g.id} is named after a real point`);
 });
 
 test("gold has come home when a hauler stops unloading with an empty bed", () => {

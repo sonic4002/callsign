@@ -266,4 +266,11 @@ body.no-server #no-server {
 @media (max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px) {
   #build-tabs button { min-block-size: 44px; font-size: .85rem; }
   #structure-list { max-block-size: none; }
+  #lobby-map-cards { gap: .35rem; }
+  /* A card stacks its drawing, name and size, whatever the form does with other labels. */
+  #overlay form #lobby-map-cards label { display: grid; grid-template-columns: minmax(0, 1fr); gap: .2rem; min-block-size: 44px; padding: .25rem; }
+  #overlay form #lobby-map-cards input[type="radio"] { inline-size: 1px; block-size: 1px; }
+  #lobby-map-cards strong, #lobby-map-cards small { overflow-wrap: anywhere; }
+  #lobby-gold-other { min-block-size: 44px; font-size: 16px; }
+  #lobby-match canvas { inline-size: 6rem; }
 }

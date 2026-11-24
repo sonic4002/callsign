@@ -33,10 +33,10 @@ export function haulerGroups(state) {
 export const ghosts = (state) => (state.haulers ?? []).filter((h) => !h.visible && state.side >= 0 && h.side !== state.side);
 
 // gusherAt is the gusher standing on a map point, if any: there it replaces the point's building.
-export const gusherAt = (rules, p) => (rules.gushers ?? []).find((g) => g.x === p.x && g.y === p.y) ?? null;
+export const gusherAt = (rules, p) => (rules.map.gushers ?? []).find((g) => g.x === p.x && g.y === p.y) ?? null;
 
 // gusherOfPoint is the gusher named after a map point on the radio ("the Kilo field").
-export const gusherOfPoint = (rules, id) => (rules.gushers ?? []).find((g) => g.point === id) ?? null;
+export const gusherOfPoint = (rules, id) => (rules.map.gushers ?? []).find((g) => g.point === id) ?? null;
 
 // fieldShare is how full a field is, 0…1, as this side last saw it.
 export const fieldShare = (state, id) => (state.fields ?? []).find((f) => f.gusher === id)?.gold ?? 0;
@@ -47,7 +47,7 @@ export const reach = (gusher, share) => gusher.fieldRadius * (0.3 + 0.7 * Math.s
 
 // pickGusher is the gusher under a map position, or null.
 export function pickGusher(rules, wx, wy) {
-  return (rules.gushers ?? []).find((g) => Math.hypot(g.x - wx, g.y - wy) <= g.fieldRadius * 0.7) ?? null;
+  return (rules.map.gushers ?? []).find((g) => Math.hypot(g.x - wx, g.y - wy) <= g.fieldRadius * 0.7) ?? null;
 }
 
 // Each gusher scatters the same flecks every time: positions on a unit disc with a phase.
@@ -229,4 +229,4 @@ export function haulerRows(state, rules, side) {
     .map((h) => ({ id: h.id, callsign: h.callsign, state: `haul.${h.state}`, load: h.load, hp: h.hp, point: gusherPoint(rules, h.field), sentTo: gusherPoint(rules, h.assigned) }));
 }
 
-const gusherPoint = (rules, id) => (id ? (rules.gushers ?? []).find((g) => g.id === id)?.point ?? null : null);
+const gusherPoint = (rules, id) => (id ? (rules.map.gushers ?? []).find((g) => g.id === id)?.point ?? null : null);

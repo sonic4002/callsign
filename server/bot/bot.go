@@ -276,7 +276,7 @@ func (p *Player) strike(snap sim.Snapshot) string {
 func (p *Player) enemyField() string {
 	hq := p.R.HQPoint(1 - p.Side)
 	best, bd := "", math.MaxFloat64
-	for _, g := range p.R.Gushers {
+	for _, g := range p.R.Map.Gushers {
 		if d := math.Hypot(g.X-hq.X, g.Y-hq.Y); d < bd {
 			best, bd = g.Point, d
 		}

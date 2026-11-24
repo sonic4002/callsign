@@ -92,8 +92,8 @@ type haulerMemory struct {
 const incomeWindow = 60
 
 func (s *Sim) initHaul(startGold int) {
-	for i := range s.R.Gushers {
-		g := &s.R.Gushers[i]
+	for i := range s.R.Map.Gushers {
+		g := &s.R.Map.Gushers[i]
 		s.Fields = append(s.Fields, FieldState{Gusher: g, Gold: g.StartGold})
 	}
 	for side := range s.Sides {

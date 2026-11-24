@@ -246,8 +246,9 @@ func TestAFenceStopsGroundUnitsUntilItIsBreached(t *testing.T) {
 			fence = append(fence, st)
 		}
 	}
-	if len(fence) != wall.Segments || fence[0].Run == 0 || fence[0].AX != fence[0].BX {
-		t.Fatalf("a run on the front of a western base should be %d segments north to south: %+v", wall.Segments, fence)
+	// The run goes north to south; where a bunker of the map stands in its line it leaves a gap.
+	if len(fence) < wall.Segments-1 || len(fence) > wall.Segments || fence[0].Run == 0 || fence[0].AX != fence[0].BX {
+		t.Fatalf("a run on the front of a western base should be about %d segments north to south: %+v", wall.Segments, fence)
 	}
 	for _, sq := range s.Squads {
 		if sq.Side == 0 {
@@ -285,7 +286,7 @@ func TestAFenceStopsGroundUnitsUntilItIsBreached(t *testing.T) {
 			ruins++
 		}
 	}
-	if ruins == 0 || ruins == wall.Segments {
+	if ruins == 0 || ruins == len(fence) {
 		t.Fatalf("%d of %d segments fell; a breach is some, not none and not all", ruins, wall.Segments)
 	}
 	// Its owner's own squads were never stopped by it.

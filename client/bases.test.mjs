@@ -10,6 +10,7 @@ import { ofRole, stands, structureAt, structureCards, structureRows, unitDef, un
 
 const read = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 const rules = JSON.parse(read("../shared/rules.json"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const strings = { en: JSON.parse(read("i18n/en.json")), he: JSON.parse(read("i18n/he.json")) };
 const t = (lang, key, vars) => strings[lang][key].replace(/\{(\w+)\}/g, (_, name) => vars[name]);
 

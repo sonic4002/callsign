@@ -131,8 +131,8 @@ func TestFindPoints(t *testing.T) {
 		{"אנחנו בפסל", []string{"F"}},
 		{"נעים לגימל ומשם לכרמל", []string{"G", "K"}},
 		{"תחזיקו את Foxtrot", []string{"F"}},
-		{"Ambush anything crossing Golf, then fall back to the forest", []string{"G", "H"}},
-		{"Take the sea rig and the land rig", []string{"S", "B"}},
+		{"Ambush anything crossing Golf, then fall back to the farm", []string{"G", "H"}},
+		{"Take the sea rig and the west field", []string{"S", "B"}},
 		{"Contact, three vehicles north of Golf", []string{"G"}},
 		{"take a look around", nil}, // "a" is not point A
 		{"downtown is quiet", nil},

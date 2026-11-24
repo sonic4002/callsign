@@ -102,7 +102,7 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
 
   // An order the game refuses comes back as Negative with the game's reason.
   hammer.say("Viper 1, this is Hammer. Hold Sierra. Over.");
-  assert.match(await hammer.hears("Viper 1"), /^Hammer, this is Viper 1\. Negative, that squad cannot reach that point.* Over\.$/);
+  assert.match(await hammer.hears("Viper 1"), /^Hammer, this is Viper 1\. Negative, that squad cannot reach that place.* Over\.$/);
 
   // Procedure is enforced on the human too.
   hammer.say("Viper 1, this is Hammer. Hold Golf. Over and out.");
@@ -236,6 +236,40 @@ test("the agent loop feeds a model's tool calls to the game and the results back
   await eventually("the last model call", () => requests.length === 5);
   const refused = requests[3].messages.at(-1).content[0];
   assert.equal(refused.is_error, true);
-  assert.match(refused.content, /cannot reach that point/);
+  assert.match(refused.content, /cannot reach that place/);
   assert.equal(requests[2].messages.length, 5, "the second wake continues the same conversation");
+});
+
+test("a squad goes to a place Hammer describes, takes cover there, and asks when the words are unclear", { skip }, async (t) => {
+  const server = await startServer(t);
+  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  await host.start();
+  t.after(() => host.stop());
+  await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);
+  const hammer = await Hammer.join(t, server);
+
+  // A landmark by its description: the net tags it, the squad goes inside and says so.
+  hammer.say("Viper 2, take cover in the bunker at Delta");
+  assert.equal(await hammer.hears("Viper 2"), "Hammer, this is Viper 2. Wilco. Out.");
+  await hammer.next("Viper 2 ordered into the bunker", (f) => squadIn(f, 2)?.order.place === "D-bunker-1");
+  await hammer.next("Viper 2 going inside", (f) => f.type === "event" && f.event.kind === "garrisoned" && f.event.place === "D-bunker-1");
+  assert.equal(await hammer.hears("Viper 2"), "Hammer, this is Viper 2. Inside the bunker north of Delta. Over.");
+  const inside = await hammer.next("all three fireteams inside, in cover", (f) => {
+    const teams = squadIn(f, 2)?.teams ?? [];
+    return teams.length === 3 && teams.every((tm) => tm.in === "D-bunker-1" && tm.cover > 0 && tm.cover < 1);
+  });
+  assert.deepEqual(inside.state.landmarks.find((l) => l.id === "D-bunker-1").garrison, { side: 0, teams: 3 });
+
+  // The same in Hebrew, to a spot off a point.
+  hammer.say("צפע 1, החזיקו 150 מטר מצפון לדוד");
+  assert.equal(await hammer.hears("Viper 1"), "פטיש, כאן צפע 1, רות, יבוצע, סוף.");
+  await hammer.next("Viper 1 ordered north of Delta", (f) => squadIn(f, 1)?.order.place === "N of D 150");
+
+  // Words that fit several landmarks: the squad asks which, and keeps its order.
+  hammer.say("Viper 1, get into the house at Foxtrot");
+  assert.equal(
+    await hammer.hears("Viper 1"),
+    "Hammer, this is Viper 1. Say again, the house north of Foxtrot or the house west of Foxtrot or the house east of Foxtrot or the house south of Foxtrot. Over.",
+  );
+  assert.equal(squadIn(hammer.frames.findLast((f) => f.type === "state"), 1).order.place, "N of D 150");
 });
