@@ -78,6 +78,8 @@
         <button type="button" id="exit" data-i18n="exit"></button>
         <button type="button" id="settings-open" data-i18n-aria="settings">⚙</button>
       </div>
+      <!-- One lamp per AI agent of this side; a press opens the full view, as "AI" does. -->
+      <ul id="monitor-strip" data-i18n-aria="monitor.open"></ul>
     </header>
 
     <section id="treasury" class="panel">
@@ -110,11 +112,6 @@
       <ul id="haulers" hidden></ul>
     </section>
 
-    <!-- The side's AI agents at a glance; the whole view opens from here or from "AI". -->
-    <section id="monitor-panel" class="panel" hidden>
-      <h2 data-i18n="monitor.title"></h2>
-      <ul id="monitor-strip" data-i18n-aria="monitor.open"></ul>
-    </section>
 
     <section class="panel" data-sheet="build">
       <!-- One panel, two tabs: what to build with, and what to buy with it. -->
