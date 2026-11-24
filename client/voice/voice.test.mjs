@@ -225,6 +225,21 @@ test("a callsign inside the message is never respelled as a map point", () => {
   assert.equal(tidy("צפע 1 תקוף את קרמל", { lang: "he", rules }), "צפע 1 תקוף את כרמל");
 });
 
+test("on every map, the calls that hand over command and the words of procedure keep their words", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  const words = (text) => text.toLowerCase().split(/[\s,.:;!?]+/).filter(Boolean).join(" ");
+  for (const map of Object.values(rules.maps)) {
+    for (const lang of ["he", "en"]) {
+      const s = JSON.parse(readFileSync(new URL(`../i18n/${lang}.json`, import.meta.url), "utf8"));
+      const cs = rules.callsigns;
+      const said = [...Object.values(rules.radio.command), ...Object.values(rules.radio.prowords)].flatMap((w) => w[lang]);
+      const calls = ["give", "take", "grant", "revoke"].map((k) => s[`call.${k}`].replace("{to}", cs.operator[lang]).replace("{from}", cs.player[lang]));
+      for (const phrase of said) calls.push(`${cs.operator[lang]}, ${rules.radio.marker[lang]} ${cs.player[lang]}, ${phrase}, ${rules.radio.over[lang]}`, `${cs.operator[lang]} ${phrase}`);
+      for (const text of calls) assert.equal(words(tidy(text, { lang, rules: { ...rules, map } })), words(text), `${map.name.en}: ${text}`);
+    }
+  }
+});
+
 test("gold is not a map point: a call for a gold truck keeps its words", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
   rules.map ??= rules.maps.small; // the default map, as the server sends it to a page

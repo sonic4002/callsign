@@ -117,8 +117,13 @@ function placeNames(body, lang, rules) {
   // The same goes for the words of a unit's name ("Militia cell" is not Kilo).
   const cs = rules.callsigns;
   const units = Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.name));
+  // Nor are the words of procedure and of command: "Run the fight" is not "Lima the fight".
+  const radio = rules.radio;
+  const procedure = [radio.marker, radio.over, radio.out, ...Object.values(radio.prowords ?? {}), ...Object.values(radio.command ?? {})].flatMap((w) => w?.[lang] ?? []);
   const stations = new Set(
-    [cs.player, cs.operator, cs.allStations, cs.contact, ...Object.values(cs.classes), ...units].flatMap((name) => (name?.[lang] ?? "").toLowerCase().split(/\s+/)),
+    [...[cs.player, cs.operator, cs.allStations, cs.contact, ...Object.values(cs.classes), ...units].map((name) => name?.[lang] ?? ""), ...procedure].flatMap((name) =>
+      name.toLowerCase().split(/[\s,]+/),
+    ),
   );
   const known = (word) => notPlaces.has(word.toLowerCase()) || stations.has(word.toLowerCase());
   const match = (word) => {
