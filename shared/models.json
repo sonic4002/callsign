@@ -2,6 +2,7 @@
   "version": 1,
   "comment": "Brain tier to model, per provider. The relay reads this; nothing else chooses a model. Tiers 1 to 3 are squad brains (rules.json tiers), operator is Anvil. Numbers are starting points for balancing: keep one fixed model per tier per vendor and compare win rates.",
   "maxTokens": 4096,
+  "decision": { "typesafe": "jev-1.14.0" },
   "effort": { "1": "low", "2": "medium", "3": "high", "operator": "medium" },
   "providers": {
     "anthropic": {

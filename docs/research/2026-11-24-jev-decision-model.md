@@ -230,3 +230,25 @@ Use it for tier-1 squads, for taking orders, after two things: a larger test on 
 Do not use it for the operator or as the whole brain of the higher tiers: it cannot write or plan. It is worth trying as the first step of every tier (Jev decides the plain orders in a quarter of a second, the LLM gets only the calls Jev is unsure of), but that is a second step and was not tested.
 
 Reasons: the measured speed is about a sixteenth of the current thought; Hebrew worked as well as English on this sample; the failure seen was a request to say again, not a wrong move; the cost is negligible; the scripted brain already has the exact shape needed, so the change in the agent is small. Reasons for caution: the sample is small and home-made, the vendor publishes no language list, no latency figure, no rate limits and no uptime commitment, zero retention is enterprise-only, and the service is hosted in the United States.
+
+## 6. Built and measured (2026-11-24, after the owner's decision)
+
+The owner chose option 3 of section 4: the game pays, with one TypeSafe key held by the relay (`CALLSIGN_JEV_KEY`). What was built is in `agents/brain-jev.mjs` (the brain), `relay/decide.go` and `relay/provider/typesafe.go` (the route and the provider), and it follows section 4 with one change: the grammar of the rule brain (`agents/rule-grammar.mjs`) reads every call first, and only a call it cannot place goes to Jev.
+
+Measured on 150 orders to one squad (`agents/test/fixtures/orders.json`: 45 taught sentences, 60 loose paraphrases, 45 damaged the way a speech recogniser damages them; 85 English, 65 Hebrew), with 148 live decisions through the game server and the relay, model `jev-1.14.0`, threshold 0.67:
+
+| | right | asked "Say again" | acted wrongly |
+|---|---|---|---|
+| grammar alone | 138 (92%) | 12 | 0 |
+| Jev alone | 117 (78%) | 28 | 5 |
+| grammar, then Jev | 142 (95%) | 8 | 0 |
+
+By kind, grammar then Jev: taught 45 of 45, paraphrases 59 of 60, damaged 38 of 45. Jev alone at other thresholds: 0.5 gives 126 right and 16 wrong, 0.85 gives 103 right and 3 wrong; no threshold removes its wrong actions on this set. Grammar then Jev has no wrong action from 0.67 up, and 2 at 0.6.
+
+Latency of a decision as the browser sees it (page to game server to relay to TypeSafe and back, the seat check included): median 222 ms, nine in ten under 268 ms, worst 777 ms. Inside the relay the figures are one millisecond lower. A request held 34 options and about 1,680 input tokens, 0.007 US cents.
+
+What the numbers do and do not say:
+
+- The set was written by the author of the grammar, and four faults it showed in the grammar were then fixed, so the grammar's 92% is measured on sentences it was tuned on. Before those fixes it was 126 right and 9 wrong. Jev's figures are not tuned on anything.
+- Jev alone loses most of its misses to options that overlap: "Hold Foxtrot" came back 0.63 for holding Foxtrot and 0.30 for "stay where you are", under the threshold. The grammar takes those calls first, so the brain as shipped does not pay for it; a second question for the place (section 4, the alternative) would be the fix for the model alone.
+- The damaged orders are imitations of recogniser errors, not recordings. Recorded orders from real matches are still the right way to set the threshold.

@@ -20,6 +20,9 @@ type Models struct {
 	MaxTokens int                          `json:"maxTokens"` // cap on one answer, thinking included
 	Effort    map[string]string            `json:"effort"`    // tier → low, medium or high
 	Providers map[string]map[string]string `json:"providers"` // provider → tier → model id
+	// Decision is the decision model of each decision provider, pinned to a version: the
+	// fast brain's confidence threshold was tuned against that version and no other.
+	Decision map[string]string `json:"decision"`
 }
 
 // LoadModels parses the embedded models.json and checks that every provider covers every

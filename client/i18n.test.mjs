@@ -42,18 +42,18 @@ const dynamic = {
   "bearing.": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
   "side.": ["0", "1"],
-  "brains.": ["server", "relay", "demo", "standby"],
+  "brains.": ["server", "relay", "demo", "fast", "standby"],
   "lobby.about.": ["easy", "normal", "standard"],
   "lobby.speedAbout.": ["relaxed", "normal", "fast"],
   "lobby.speed.": ["relaxed", "normal", "fast"],
-  "agents.": ["relay", "demo", "server", "paused", "stopped", "skipped"],
+  "agents.": ["relay", "demo", "fast", "server", "paused", "stopped", "skipped"],
   "provider.": ["anthropic", "openrouter", "gemini", "openai"],
   "tut.": ["welcome", "select", "order", "answer", "orders", "cover", "power", "refinery", "fog", "barracks", "buy", "deploy", "upgrade", "enemy", "voice", "win"],
   "tutTouch.": ["select", "order", "power", "refinery", "buy", "upgrade", "enemy"],
   "monitor.state.": ["none", "idle", "thinking", "acting", "skipped", "stopped", "offline", "ended"],
   "monitor.woke.": ["call", "heard", "event"],
   "monitor.event.": ["contact", "pinned", "losses", "arrived", "squad_lost", "point_lost", "hq_under_attack", "other"],
-  "monitor.brain.": ["subscription", "claude", "relay", "scripted", "demo", "other"],
+  "monitor.brain.": ["subscription", "claude", "relay", "rule", "jev", "other"],
   "monitor.where.": ["server", "browser"],
   "monitor.reset.": ["match", "wakes", "tier", "unfinished"],
   "monitor.why.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "timeout", "stopped", "failed"],
@@ -93,7 +93,7 @@ test("no user-facing text is written into the page itself", () => {
 });
 
 // The sidebar's buttons write radio calls. They must come out in proper procedure, and
-// in words the scripted operator and squad leaders understand, in both languages.
+// in words the rule-brain operator and squad leaders understand, in both languages.
 test("the calls the page writes are proper procedure in both languages", async () => {
   const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   for (const [lang, strings] of [["en", en], ["he", he]]) {
@@ -110,8 +110,8 @@ test("the calls the page writes are proper procedure in both languages", async (
 
 // The buttons are only useful if the agents understand what they write. The scripted
 // brains are the strictest readers, so every call is run through them.
-test("the scripted operator and squad leaders understand the calls the page writes, and the calls for what the panel does directly", async () => {
-  const { scriptedBrain } = await import("../agents/brain-scripted.mjs");
+test("the rule-brain operator and squad leaders understand the calls the page writes, and the calls for what the panel does directly", async () => {
+  const { ruleBrain } = await import("../agents/brain-rule.mjs");
   const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   const hammer = { key: "player", en: rules.callsigns.player.en };
   for (const [lang, strings] of [["en", { ...en, ...radio.en }], ["he", { ...he, ...radio.he }]]) {
@@ -120,7 +120,7 @@ test("the scripted operator and squad leaders understand the calls the page writ
     const body = (text) => text.slice(text.indexOf(from) + from.length).replace(/^[\s,.]+/, "").replace(new RegExp(`[\\s,.]*${rules.radio.over[lang]}[\\s.]*$`), "");
     const think = async (role, callBody, extra = {}) => {
       const msg = { from: hammer, lang, body: callBody, end: "over", prowords: [], points: [], ...extra };
-      const res = await scriptedBrain().think({
+      const res = await ruleBrain().think({
         rules,
         agent: { role, side: 0, station: { key: role === "anvil" ? "operator" : "infantry-2" }, lang },
         messages: [{ role: "user", content: "wake" }],

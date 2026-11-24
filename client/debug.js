@@ -184,8 +184,9 @@ const brains = mountAgents({
   system,
   server: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
   side,
-  // In the first lesson the squads always think here, with the scripted brain (`lesson`).
-  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token, lesson: Boolean(lobby?.tutorial) } : null) : { room: "" }),
+  // In the first lesson the squads always think here, with the rule brain (`lesson`);
+  // `fast` is the host's choice of the fast brain for this match (brains/policy.js).
+  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token, lesson: Boolean(lobby?.tutorial), fast: Boolean(lobby?.fast) } : null) : { room: "" }),
   canAct: () => role === "hammer",
 });
 
@@ -1731,6 +1732,7 @@ $("start").addEventListener("click", () => {
     return makeMatch({
       opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"),
       speed: chosen("speed"), purse: chosen("purse") === "on",
+      anvil: Number(chosen("anvil")) || 3, fast: chosen("fast") === "on",
       map: chosen("map") ?? "", startGold: chosenGold(),
     });
   }

@@ -1,5 +1,5 @@
 // What the agents know about bases: the words for the prompts, the structures in a
-// status, and how the scripted brain reads a call about building or about a structure.
+// status, and how the rule brain reads a call about building or about a structure.
 // It runs in Node and in a Web Worker alike, like the rest of the agent core.
 
 import { leaderMend, leaderSiege, powerFact, powerWords, radarWords } from "./power.mjs";
@@ -59,7 +59,7 @@ export function compactStructures(status, side) {
     }));
 }
 
-// ---- the scripted brain ----
+// ---- the rule brain ----
 
 // Plain words for each role, in both languages, beside the structures' own names.
 const roleWords = {

@@ -34,6 +34,8 @@ func main() {
 	stt := flag.String("stt", "", "address of the listening service (stt/server.py), which transcribes spoken calls for seated commanders at /stt/; empty for none, and the page then recognises speech in the browser")
 	agents := flag.String("agents", "agents", "directory of the agent runtime, whose browser modules are served read-only at /agents/")
 	relay := flag.String("relay", "", "address of the model relay, passed on at /relay/; empty for none")
+	anvil := flag.Int("anvil-level", 3, "initiative of the rule-brain operator in a match that sets none: 1 orders only, 2 also the economy when it holds the purse, 3 also the fight when handed it")
+	fast := flag.Bool("fast-brain", false, "squads without a player's key take orders through the relay's fast decision model (needs the relay's CALLSIGN_JEV_KEY) unless a match says otherwise")
 	base := flag.String("base", "", `start every match with these base structures standing, by role ("refinery,barracks"); for tests of what comes after the opening`)
 	fullBase := flag.Bool("full-base", false, "start every match with every base structure standing, so that any unit can be bought at once")
 	hostKey := flag.String("host-key", os.Getenv("CALLSIGN_HOST_KEY"), "password needed to make a match, for a server that strangers can reach; empty for none")
@@ -55,6 +57,7 @@ func main() {
 		Seed: *seed, Factions: [2]string{*west, *east}, LengthSeconds: *length, Bot: *enemy,
 		Interval: time.Second / time.Duration(rules.TickRate**speed),
 		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey, FullBase: *fullBase, Base: roles(*base), Listen: *stt,
+		Anvil: *anvil, Fast: *fast,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -128,7 +131,7 @@ func main() {
 // in that directory is served: not the Node-only brains, the tests or the package files.
 var browserModules = map[string]bool{
 	"agent.mjs": true, "link.mjs": true, "tools.mjs": true, "prompts.mjs": true, "host.mjs": true,
-	"brain-relay.mjs": true, "brain-scripted.mjs": true, "worker.mjs": true, "bases.mjs": true, "power.mjs": true, "telemetry.mjs": true, "heroes.mjs": true,
+	"brain-relay.mjs": true, "brain-rule.mjs": true, "brain-jev.mjs": true, "rule-grammar.mjs": true, "rule-leader.mjs": true, "rule-operator.mjs": true, "rule-phrases.mjs": true, "worker.mjs": true, "bases.mjs": true, "power.mjs": true, "telemetry.mjs": true, "heroes.mjs": true,
 }
 
 func agentModules(dir string) http.Handler {

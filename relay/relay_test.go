@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -73,7 +74,7 @@ type rig struct {
 	logMu  sync.Mutex
 }
 
-func newRig(t *testing.T, limits Limits) *rig {
+func newRig(t *testing.T, limits Limits, with ...func(*Config)) *rig {
 	t.Helper()
 	rules, err := shared.Load()
 	if err != nil {
@@ -96,7 +97,7 @@ func newRig(t *testing.T, limits Limits) *rig {
 		r.brains[name] = &brain{name: name}
 		providers[name] = r.brains[name]
 	}
-	r.relay, err = New(Config{
+	cfg := Config{
 		Game: r.game, Keys: r.keys, TokenKey: TokenKey(master), Models: models, Rules: rules, Providers: providers, Limits: limits,
 		Origins: []string{"https://play.example"},
 		Logf: func(format string, args ...any) {
@@ -104,7 +105,11 @@ func newRig(t *testing.T, limits Limits) *rig {
 			defer r.logMu.Unlock()
 			fmt.Fprintf(r.logs, format+"\n", args...)
 		},
-	})
+	}
+	for _, change := range with {
+		change(&cfg)
+	}
+	r.relay, err = New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -710,7 +715,7 @@ func TestHTTPGame(t *testing.T) {
 		case "9":
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
-			w.Write([]byte(`{"tier":2}`))
+			w.Write([]byte(`{"tier":2,"seated":` + strconv.FormatBool(req.URL.Query().Get("room") == "ROOM1") + `}`))
 		}
 	}))
 	defer srv.Close()
@@ -722,6 +727,16 @@ func TestHTTPGame(t *testing.T) {
 	if got.Method != "GET" || got.URL.Path != "/internal/tier" || got.URL.RawQuery != "room=ROOM1&side=1&squad=3" ||
 		got.Header.Get("X-Callsign-Seat") != seatToken || got.Header.Get("Authorization") != "Bearer shared-secret" {
 		t.Fatalf("asked %s %s with %v", got.Method, got.URL, got.Header)
+	}
+	// Vouching is the same question, and a room without seats is not vouched for.
+	if err := g.Vouch(context.Background(), seatToken, "ROOM1", 1, 3); err != nil {
+		t.Fatalf("vouch for a seat: %v", err)
+	}
+	if err := g.Vouch(context.Background(), seatToken, "OPEN", 1, 3); err != ErrNotYourSeat {
+		t.Fatalf("vouch in a room without seats: %v", err)
+	}
+	if err := g.Vouch(context.Background(), seatToken, "ROOM1", 0, 7); err != ErrNotYourSeat {
+		t.Fatalf("vouch for somebody else's squad: %v", err)
 	}
 	for squad, want := range map[int]error{7: ErrNotYourSeat, 8: ErrNotYourSeat} {
 		if _, err := g.Tier(context.Background(), seatToken, "ROOM1", 0, squad); err != want {
