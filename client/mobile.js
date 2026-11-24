@@ -3,7 +3,7 @@
 // page language, and the service worker that keeps the page opening without a network.
 // The layout itself is mobile.css; nothing here touches the match.
 
-const PHONE = "(max-width: 700px), (max-height: 500px)"; // the same breakpoint as mobile.css
+const PHONE = "(max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px)"; // the same breakpoint as mobile.css
 const phone = matchMedia(PHONE);
 const root = document.documentElement;
 const $ = (id) => document.getElementById(id);

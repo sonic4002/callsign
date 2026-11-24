@@ -854,6 +854,28 @@ $("lobby-copy").addEventListener("click", async () => {
   if (await navigator.clipboard?.writeText($("lobby-link").value).then(() => true, () => false)) $("lobby-copy").textContent = t("lobby.copied");
 });
 // Leaving gives a seat back while the match has not started, then returns to the first screen.
+// Exit ends this browser's part in the match and goes back to the start screen. The first
+// press asks, the second within a few seconds does it. Squads keep their last orders; the
+// agents stand down shortly after, and an empty match is dropped by the server.
+let exitArmed = 0;
+$("exit").addEventListener("click", () => {
+  if (!inRoom()) return location.assign(pageFor({}));
+  if (performance.now() > exitArmed) {
+    exitArmed = performance.now() + 4000;
+    $("exit").textContent = t("exitSure");
+    $("exit").classList.add("warn");
+    setTimeout(() => {
+      $("exit").textContent = t("exit");
+      $("exit").classList.remove("warn");
+    }, 4000);
+    return;
+  }
+  if (open()) ws.send(JSON.stringify({ type: "leave" }));
+  if (room) forgetSeat(room);
+  speech.silence();
+  location.assign(pageFor({}));
+});
+
 $("lobby-leave").addEventListener("click", () => {
   if (inRoom() && me && open() && lobby.phase === "lobby") ws.send(JSON.stringify({ type: "leave" }));
   if (room && (!lobby || lobby.phase === "lobby")) forgetSeat(room);

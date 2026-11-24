@@ -223,5 +223,7 @@
   "lobby.hostKey": "Host password",
   "lobby.hostOnly": "Type the host password above to make a match. If a friend invited you, use their join code below instead.",
   "lobby.guessing": "Too many wrong join codes. Wait a minute and try again.",
-  "lobby.hostAbout": "This game is open to the internet, so only its host can start a match. Type the host password once; this browser remembers it. A friend who was sent a link does not need it."
+  "lobby.hostAbout": "This game is open to the internet, so only its host can start a match. Type the host password once; this browser remembers it. A friend who was sent a link does not need it.",
+  "exit": "Exit",
+  "exitSure": "Exit the match?"
 }

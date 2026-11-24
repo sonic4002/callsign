@@ -17,7 +17,7 @@ body.no-server #no-server {
 /* The microphone is not available on this address (see voice.insecure). */
 #ptt.no-voice { filter: grayscale(1); opacity: .6; }
 
-@media (max-width: 700px), (max-height: 500px) {
+@media (max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px) {
   :root {
     --strip: 46px; /* treasury */
     --send: 54px; /* the radio box */
@@ -200,7 +200,7 @@ body.no-server #no-server {
 }
 
 /* Fingers pinch; the two zoom buttons would only cover the map. */
-@media (pointer: coarse) and (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
+@media (pointer: coarse) and (max-width: 1100px), (pointer: coarse) and (max-height: 500px) {
   #zoom-in, #zoom-out { display: none; }
 }
 
@@ -243,4 +243,18 @@ body.no-server #no-server {
     border-block-start: 0; border-inline-start: 2px solid var(--brass-dim); padding-inline: 3px;
   }
   html[data-sheet="radio"] #log { padding-inline: .6rem; }
+}
+
+/* ---- a large touch screen (an unfolded phone, a small tablet): the phone layout, with the
+   talk button bigger and on the right, where the thumb of the holding hand is ---- */
+@media (pointer: coarse) and (min-width: 701px) and (max-width: 1100px) and (min-height: 501px) {
+  /* The button is on the physical right in both languages, so the room made for it is too. */
+  #dock { grid-template-columns: repeat(4, 1fr); padding-right: calc(env(safe-area-inset-right, 0px) + 124px); }
+  #dock button:nth-child(3) { grid-column: auto; }
+  #send { padding-right: calc(env(safe-area-inset-right, 0px) + 124px); }
+  #ptt {
+    left: auto; right: calc(env(safe-area-inset-right, 0px) + 14px); inset-block-end: calc(var(--safe-b) + 10px); transform: none;
+    inline-size: 96px; block-size: 96px; font-size: 2.6rem;
+  }
+  #ptt.live { transform: scale(1.1); }
 }
