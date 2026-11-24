@@ -18,7 +18,9 @@ services:
       - callsign-gocache:/gocache
     # CALLSIGN_BOT picks the scripted enemy: easy (default), normal, standard (relentless) or rush.
     # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
-    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-easy}", "-tts=http://tts:5002", "-relay=http://relay:8090"]
+    # CALLSIGN_FAST_BRAIN=true turns the fast brain (Jev) on for matches whose maker does not choose;
+    # CALLSIGN_ANVIL_LEVEL is the rule-brain operator's initiative there, 1 to 3.
+    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-easy}", "-tts=http://tts:5002", "-relay=http://relay:8090", "-fast-brain=${CALLSIGN_FAST_BRAIN:-false}", "-anvil-level=${CALLSIGN_ANVIL_LEVEL:-3}"]
     ports:
       # This machine only, unless `make play-lan` opens it to the network (docs/FRIEND-MATCH.md).
       - "${CALLSIGN_BIND:-127.0.0.1}:8080:8080"
@@ -33,6 +35,9 @@ services:
       HOME: /tmp
       CALLSIGN_SERVER: ws://server:8080/ws
       CALLSIGN_AGENT_KEY: "${CALLSIGN_AGENT_KEY:-}"
+      # The game's own key for the fast brain belongs to the relay alone: .env is read
+      # here for the agents' own settings, and this takes that one key back out.
+      CALLSIGN_JEV_KEY: ""
     volumes:
       - .:/src:ro
     command: node agents/main.mjs
@@ -74,7 +79,7 @@ services:
       - .:/src:ro
       - callsign-gocache:/gocache
       - ./.relay-data:/data
-    command: ["go", "run", "./relay/cmd/relay", "-addr=:8090", "-game=http://server:8080/internal/tier", "-data=/data"]
+    command: ["go", "run", "./relay/cmd/relay", "-addr=:8090", "-game=http://server:8080/internal/tier", "-data=/data", "-jev-daily-usd=${CALLSIGN_JEV_DAILY_USD:-2}"]
 
   # `make play-public`: a Cloudflare Tunnel carries https://<your name> to the game server.
   # Cloudflare ends the TLS; nothing is opened on the router. See docs/FRIEND-MATCH.md.
