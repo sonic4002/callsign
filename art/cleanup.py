@@ -92,6 +92,23 @@ code in `art/props.py`, with the same Blender set-up as the units. In the manife
 `landmarks/sandbags.png` is rendered by `make art-units` (art/props.py) like the units: a row
 for each of eight map headings the position faces, a column for each state in `states`.
 
+## Parts that turn, power and ownership
+
+`props/radar_dish.png` and `props/antenna_loop.png` are rendered by `make art-units`
+(art/props.py): one row of `frames` pictures, a full turn clockwise, each cropped to the
+same box so the mount stays put. A building's `spin` in the manifest names its part, where
+on the building's picture the mount sits (`at`, as fractions), the height the part is drawn
+at in the building's own units (`height`) and the seconds one turn takes (`period`).
+
+A structure with the power down has no picture of its own: the page darkens the lit one
+(client/art.js, `dimmed`), stops whatever turns and blinks a lamp at `lamp` (fractions of
+the picture). The buildings of no army (`tech_*`) carry `flag`, the foot of the staff on
+which the page draws the flag of whoever holds them. `icons/*.png` are the same pictures
+fitted to the build panel's button.
+
+The earned-rank marks and the panel's state icons are not pictures but shapes drawn in
+code (client/marks.js).
+
 ## Heroes
 
 The two hero sheets (`units/aegis_sentinel.png`, `units/ashfall_oracle.png`) are original
@@ -232,6 +249,21 @@ def soften_frame(rgba, margin=5):
     return rgba
 
 
+EXTRAS = ("spin", "flag", "lamp")
+ICON = (144, 96)  # twice the 72 by 48 the build panel draws a button's picture at
+
+
+def fit_icon(rgba):
+    """The picture scaled to fit the build panel's button, standing on its bottom edge."""
+    box = rgba.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox()
+    cut = rgba.crop(box)
+    k = min(ICON[0] / cut.width, ICON[1] / cut.height)
+    cut = cut.resize((max(1, round(cut.width * k)), max(1, round(cut.height * k))), Image.LANCZOS)
+    icon = Image.new("RGBA", ICON, (0, 0, 0, 0))
+    icon.alpha_composite(cut, ((ICON[0] - cut.width) // 2, ICON[1] - cut.height))
+    return icon
+
+
 def contact_sheet(entries, path):
     """One picture of the whole set: each sprite at game size and at 48 px, on mid grey."""
     cell_w, cell_h = 400, 330
@@ -264,7 +296,8 @@ def main():
     old = json.loads((OUT / "manifest.json").read_text()) if (OUT / "manifest.json").exists() else {}
     # What art/props.py renders into "landmarks" (the sandbags) is its own and is kept.
     manifest = {"units": old.get("units", {}), "buildings": {}, "landmarks": {k: v for k, v in old.get("landmarks", {}).items() if "ppm" in v},
-                "terrain": {}, "segments": old.get("segments", {}), "props": old.get("props", {}), "variants": {}, "portraits": {}}
+                "terrain": {}, "segments": old.get("segments", {}), "props": old.get("props", {}), "variants": {}, "portraits": {},
+                "icons": {}}
     by_id = {s["id"]: s for s in spec["sprites"]}
     credits = ["# Sprite credits", "", MODEL_NOTE, "| Sprite | Seed | Prompt |", "|---|---|---|"]
     sheet = []
@@ -326,9 +359,10 @@ def main():
             credit(rel, sprite)
             print(f"{rel}  {patch.width}x{patch.height} at {at}, and {lit_rel}")
             continue
-        if skip and (OUT / rel).exists() and sprite["id"] in old.get(group, {}):
+        key = sprite["id"].removeprefix("portrait_") if kind == "portrait" else sprite["id"]
+        if skip and (OUT / rel).exists() and key in old.get(group, {}):
             # Not asked for, or made on another machine: the picture stands as it is.
-            manifest[group][sprite["id"]] = old[group][sprite["id"]]
+            manifest[group][key] = old[group][key]
             credit(rel, sprite)
             sheet.append((sprite["id"], Image.open(OUT / rel)))
             print(f"{rel}  kept as it is")
@@ -378,6 +412,30 @@ def main():
             name, _, n = key.rpartition("_")
             if n.isdigit() and "ppm" not in manifest[group][key]:
                 manifest["variants"].setdefault(name, []).append(key)
+    # What the page needs to know about a picture beyond its size is written beside it in
+    # art/sprites.json and passed on as it is: `spin` (a part that turns, drawn over the
+    # building), `flag` (where the owner's flag stands on a building of no army) and `lamp`
+    # (where its warning lamp blinks when the power is low).
+    for sprite in kept:
+        entry = manifest[FOLDER[sprite["kind"]]].get(sprite["id"])
+        if isinstance(entry, dict):
+            for extra in EXTRAS:
+                if extra in sprite:
+                    entry[extra] = sprite[extra]
+                else:
+                    entry.pop(extra, None)
+    # A small picture of a structure for its button in the build panel.
+    (OUT / "icons").mkdir(parents=True, exist_ok=True)
+    for sprite in kept:
+        if not sprite.get("icon"):
+            continue
+        source = OUT / FOLDER[sprite["kind"]] / f"{sprite['id']}.png"
+        if not source.exists():
+            continue
+        rel = f"icons/{sprite['id']}.png"
+        icon = fit_icon(Image.open(source).convert("RGBA"))
+        icon.save(OUT / rel, optimize=True)
+        manifest["icons"][sprite["id"]] = {"image": rel, "size": [icon.width, icon.height]}
     for sprite in kept:
         # A building that has not been painted again keeps its old drawn height.
         entry = manifest[FOLDER[sprite["kind"]]].get(sprite["id"])

@@ -22,6 +22,9 @@ KEYS = {
         "ashfall_safehouse": "safehouse", "ashfall_chopShop": "chopShop", "ashfall_launchYard": "launchYard",
         "ashfall_boatShed": "boatShed", "ashfall_smelter": "smelter",
         "ashfall_gunNest": "gunNest", "ashfall_rocketNest": "rocketNest",
+        # the third wave: power and radar
+        "aegis_powerPlant": "powerPlant", "ashfall_generatorYard": "generatorYard",
+        "aegis_radar": "radar", "ashfall_listeningPost": "listeningPost",
     },
     "segments": {"aegis_wall": "barrierWall", "ashfall_fence": "wireFence"},
     "units": {
@@ -56,6 +59,10 @@ def move(root, entry, table):
         stages = entry.get("stages")
         if isinstance(stages, list):
             entry["stages"] = [renamed(k, table) if isinstance(k, str) else k for k in stages]
+        # Another key of the group named by a part that turns (the radar's bare mast).
+        spin = entry.get("spin")
+        if isinstance(spin, dict) and isinstance(spin.get("body"), str):
+            spin["body"] = renamed(spin["body"], table)
         for value in entry.values():
             move(root, value, table)
 
@@ -65,6 +72,7 @@ def main(root):
     with open(path, encoding="utf-8") as f:
         manifest = json.load(f)
     changed = 0
+    KEYS["icons"] = KEYS["buildings"]  # a build-panel picture carries its structure's key
     for group, table in KEYS.items():
         out = {}
         for key, entry in manifest.get(group, {}).items():
