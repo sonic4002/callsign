@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play play-lan play-public public-dns stop shell voice-models voice-test art-image art-models art art-units-image art-units art-sheet tts-image tts-models tts-test
+.PHONY: image test play play-lan play-public public-dns stop shell voice-models voice-test art-image art-models art art-units-image art-units art-sheet tts-image tts-models tts-test stt-image stt-models stt-test stt-quiet stt-eval
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -26,7 +26,8 @@ play:
 	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
 	@docker volume create callsign-gocache >/dev/null
 	@mkdir -p assets/voice-cache .relay-data
-	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) $(MORE_PROFILES) up $(UP_FLAGS)
+	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) CALLSIGN_STT=$(if $(LISTEN),http://stt:5003) \
+		docker compose $(VOICES) $(LISTEN) $(MORE_PROFILES) up $(UP_FLAGS)
 
 # The same, opened to the local network so a friend can join from another machine.
 # Read docs/FRIEND-MATCH.md first: there is no encryption and no accounts.
@@ -66,7 +67,7 @@ public-dns:
 	@CALLSIGN_PUBLIC_URL=$(PUBLIC_URL) sh tools/public-dns.sh
 
 stop:
-	docker compose --profile voice --profile public --profile https down
+	docker compose --profile voice --profile listen --profile public --profile https down
 
 shell:
 	$(DOCKER) -it $(IMAGE) bash
@@ -136,6 +137,42 @@ tts-models:
 # The pronunciation table's tests. No models and no network needed.
 tts-test:
 	$(TTS) --network none -w /src/tts callsign-tts python -m unittest test_pronounce
+
+# ---- listening: the players' spoken calls transcribed on this machine's GPU (stt/, client/voice/) ----
+# Optional. Without it, and on any machine without a GPU, the page recognises speech in the
+# browser (make voice-models). On a CPU the service is too slow to share: see stt/NOTICE.md.
+STT := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v $(CURDIR):/src
+
+# `make play` starts the listening service only when its image, its models and a GPU are
+# all here, and only then tells the game server to offer it to the page.
+LISTEN = $(shell docker image inspect callsign-stt >/dev/null 2>&1 && test -f assets/models/whisper-he/model.bin && test -f assets/models/whisper-en/model.bin \
+           && nvidia-smi >/dev/null 2>&1 && echo --profile listen)
+
+# Build the listening image. About 4.4 GB on disk; it stands alone (no art image needed).
+stt-image:
+	docker build -t callsign-stt -f stt/Dockerfile stt
+
+# Download the two speech-recognition models once into assets/models/whisper-he and
+# whisper-en. About 3.2 GB, from pinned revisions, checked by SHA-256.
+stt-models:
+	$(STT) callsign-stt python stt/fetch.py
+
+# The service's own tests: what it accepts and refuses. No models, no GPU, no network.
+stt-test:
+	$(STT) --network none -w /src/stt callsign-stt python -m unittest test_server
+
+# Silence, hiss, hum and clicks through the real models: every one must come back empty.
+stt-quiet:
+	$(DOCKER) --network none $(IMAGE) node stt/eval/hints.mjs >/dev/null
+	$(STT) --network none --device nvidia.com/gpu=all callsign-stt python stt/eval/run.py --quiet
+
+# Measure it: speak the calls in stt/eval/calls.json with the speech service (make play
+# must be running with voices), transcribe them here with and without hints, and score.
+stt-eval:
+	$(STT) --network host callsign-stt python stt/eval/make.py
+	$(DOCKER) --network none $(IMAGE) node stt/eval/hints.mjs >/dev/null
+	$(STT) --network none --device nvidia.com/gpu=all callsign-stt sh -c 'python stt/eval/run.py --name server-no-hints --mode none && python stt/eval/run.py --name server-hints --mode calls'
+	$(DOCKER) --network none $(IMAGE) node stt/eval/score.mjs
 
 # ---- model relay: the players' AI keys and their agents' AI calls (relay/) ----
 .PHONY: relay relay-test

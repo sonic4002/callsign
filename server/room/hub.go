@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,6 +36,7 @@ type HubConfig struct {
 	MaxRooms      int
 	Share         string // address other machines reach this server at, "" when unknown
 	HostKey       string // password needed to make a match, "" for none; joining one by its code never needs it
+	Listen        string // address of the listening service (stt/server.py), "" for none: see listen.go
 }
 
 // agentGrace is how long a side's agents stay after its commander's last connection
@@ -65,6 +67,9 @@ type Hub struct {
 	rooms map[string]*held
 	made  uint64
 	open  *Room // the room of Phase 0: no code, no seats; only without an agent key
+
+	listen http.Handler // passes recordings on to the listening service; nil without one
+	talk   *talkLimit   // how fast each address may send recordings
 }
 
 type held struct {
@@ -84,6 +89,13 @@ func NewHub(ctx context.Context, r *shared.Rules, cfg HubConfig) (*Hub, error) {
 		cfg.MaxRooms = 32
 	}
 	h := &Hub{r: r, cfg: cfg, ctx: ctx, rooms: map[string]*held{}}
+	if cfg.Listen != "" {
+		target, err := url.Parse(cfg.Listen)
+		if err != nil || target.Host == "" {
+			return nil, fmt.Errorf("the listening service's address must be a URL such as http://stt:5003, not %q", cfg.Listen)
+		}
+		h.listen, h.talk = h.listenHandler(target), newTalkLimit()
+	}
 	if cfg.AgentKey == "" {
 		// The trusting mode of a server only this machine can reach: /ws with no room
 		// lands here and anyone may command a side, which tests and scripts rely on.
@@ -397,6 +409,7 @@ func (h *Hub) AgentWork() []AgentWork {
 //	POST /api/rooms                make a match and take a seat: {opponent, side, length, watch, bot}
 //	GET  /api/rooms/{code}         a match's lobby
 //	POST /api/rooms/{code}/seat    take a seat in a match
+//	POST /stt/transcribe           a commander's spoken call, passed to the listening service (if any)
 //	GET  /internal/rooms           for the agent host: which sides need agents
 //	GET  /internal/tier            for the model relay: a squad's brain tier
 func (h *Hub) Routes(mux *http.ServeMux) {
@@ -405,6 +418,9 @@ func (h *Hub) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/rooms", h.postRoom)
 	mux.HandleFunc("GET /api/rooms/{code}", h.getRoom)
 	mux.HandleFunc("POST /api/rooms/{code}/seat", h.postSeat)
+	if h.listen != nil {
+		mux.Handle("POST /stt/transcribe", h.listen)
+	}
 	mux.HandleFunc("GET /internal/rooms", h.internal(h.getWork))
 	mux.HandleFunc("GET /internal/tier", h.internal(h.getTier))
 }
@@ -460,6 +476,7 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"share":      strings.TrimRight(h.cfg.Share, "/"),
 		"open":       h.open != nil,       // the open room of a server without an agent key
 		"locked":     h.cfg.HostKey != "", // making a match needs the host's password
+		"stt":        h.listen != nil,     // spoken calls can be transcribed here instead of in the browser
 	})
 }
 

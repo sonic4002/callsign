@@ -1,6 +1,9 @@
 # Voice input: what it is made of
 
-Push-to-talk speech recognition that runs in the player's browser. No audio leaves the device.
+Push-to-talk speech recognition that runs in the player's browser. With these recognisers no audio
+leaves the device. A game server that has its own listening service (`stt/`, see `stt/NOTICE.md`)
+is used first instead: the recording is then sent to that server, transcribed and not kept, and
+the recognisers here are the fallback.
 
 | Part | Source | Licence |
 |---|---|---|

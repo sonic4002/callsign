@@ -31,6 +31,7 @@ func main() {
 	assets := flag.String("assets", "assets", "directory of generated art and audio, served read-only at /assets/")
 	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
 	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
+	stt := flag.String("stt", "", "address of the listening service (stt/server.py), which transcribes spoken calls for seated commanders at /stt/; empty for none, and the page then recognises speech in the browser")
 	agents := flag.String("agents", "agents", "directory of the agent runtime, whose browser modules are served read-only at /agents/")
 	relay := flag.String("relay", "", "address of the model relay, passed on at /relay/; empty for none")
 	base := flag.String("base", "", `start every match with these base structures standing, by role ("refinery,barracks"); for tests of what comes after the opening`)
@@ -53,7 +54,7 @@ func main() {
 	hub, err := room.NewHub(ctx, rules, room.HubConfig{
 		Seed: *seed, Factions: [2]string{*west, *east}, LengthSeconds: *length, Bot: *enemy,
 		Interval: time.Second / time.Duration(rules.TickRate**speed),
-		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey, FullBase: *fullBase, Base: roles(*base),
+		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey, FullBase: *fullBase, Base: roles(*base), Listen: *stt,
 	})
 	if err != nil {
 		log.Fatal(err)

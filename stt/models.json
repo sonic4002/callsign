@@ -1,0 +1,28 @@
+{
+ "he": {
+  "dir": "assets/models/whisper-he",
+  "repo": "ivrit-ai/whisper-large-v3-turbo-ct2",
+  "revision": "72ad623a37947395efcc3933132353790e5a12f5",
+  "files": {
+   "model.bin": "db2a2265aa012c16c7db9edda3d699c99f984efdd3f2e22a72a8ce7e9720f3a2",
+   "config.json": "",
+   "preprocessor_config.json": "",
+   "tokenizer.json": "",
+   "vocabulary.json": "",
+   "README.md": ""
+  }
+ },
+ "en": {
+  "dir": "assets/models/whisper-en",
+  "repo": "dropbox-dash/faster-whisper-large-v3-turbo",
+  "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+  "files": {
+   "model.bin": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+   "config.json": "",
+   "preprocessor_config.json": "",
+   "tokenizer.json": "",
+   "vocabulary.json": "",
+   "README.md": ""
+  }
+ }
+}
