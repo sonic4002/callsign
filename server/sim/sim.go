@@ -158,6 +158,7 @@ type Squad struct {
 	Kills float64
 	Dug   int
 	dig   int        // ticks spent digging the position it was told to build
+	told  int        // tick its side was last told a vehicle is running its men down
 	hero  *heroState // set for a hero (hero.go)
 
 	unit        *shared.Unit

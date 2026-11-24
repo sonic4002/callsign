@@ -844,7 +844,7 @@ export class Scene {
     // Demolition charges burning down.
     for (const c of state.charges ?? []) {
       const [cx, cy] = cam.screen(c.x, c.y);
-      drawCharge(ctx, cx, cy - 26 * buildScale, c, performance.now(), sideColor[c.side]);
+      drawCharge(this.ctx, cx, cy - 26 * buildScale, c, performance.now(), sideColor[c.side]);
     }
     this.coachMark();
   }

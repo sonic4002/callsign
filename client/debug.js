@@ -294,7 +294,8 @@ function onFrame(frame) {
       return;
     case "state":
       state = frame.state;
-      withBuilt(rules, state); // sandbag positions built in the match are landmarks like any
+      // Sandbag positions built in the match are landmarks like any; the log names them once known.
+      if (withBuilt(rules, state)) renderLog();
       scene.setState(state);
       break;
     case "lobby": {

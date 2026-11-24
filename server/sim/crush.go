@@ -6,7 +6,7 @@ import "math"
 // man down as it passes. Men inside a building, behind standing sandbags or in a grove
 // are safe, and a fireteam that sees it coming steps aside when it is able to.
 
-// EvCrushed tells a side one of its fireteams lost a man under a vehicle.
+// EvCrushed tells a side a vehicle is running down the men of one of its squads.
 const EvCrushed = "crushed" // Squad, Contact: the vehicle squad, Point
 
 // safeFromCrush reports whether a fireteam is somewhere a vehicle cannot run it down.
@@ -85,7 +85,11 @@ func (s *Sim) crush(live []*teamRef) {
 			s.Sides[v.sq.Side].Destroyed += float64(o.u.Cost) / float64(max(1, o.u.Teams*o.u.Members))
 			f.shooter = append(f.shooter[:0], v.sq)
 			s.creditKill(o, 1)
-			s.emit(Event{Side: o.sq.Side, Kind: EvCrushed, Squad: o.sq.ID, Contact: v.sq.ID, Point: s.nearestPoint(f.X, f.Y)})
+			// Said once for a pass, not once for every man.
+			if again := 5 * s.R.TickRate; o.sq.told == 0 || s.Tick-o.sq.told >= again {
+				o.sq.told = s.Tick
+				s.emit(Event{Side: o.sq.Side, Kind: EvCrushed, Squad: o.sq.ID, Contact: v.sq.ID, Point: s.nearestPoint(f.X, f.Y)})
+			}
 			if f.Members <= 0 {
 				f.Members, f.HP = 0, 0
 				s.teamLost(o)

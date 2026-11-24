@@ -55,8 +55,8 @@
     "sandbagsFlat": { "word": { "en": "flattened sandbags", "he": "שקי חול הרוסים" }, "cover": 1, "coverRadius": 0 }
   },
   "ranks": [
-    { "id": "seasoned", "name": { "en": "Seasoned", "he": "מנוסה" }, "kills": 3, "accuracy": 1.05, "nerve": 0.92, "healPerSecond": 0 },
-    { "id": "elite", "name": { "en": "Elite", "he": "עילית" }, "kills": 6, "accuracy": 1.1, "nerve": 0.85, "healPerSecond": 0.006 }
+    { "id": "seasoned", "name": { "en": "Seasoned", "he": "מנוסה" }, "kills": 3, "accuracy": 1.04, "nerve": 0.94, "healPerSecond": 0 },
+    { "id": "elite", "name": { "en": "Elite", "he": "עילית" }, "kills": 6, "accuracy": 1.08, "nerve": 0.88, "healPerSecond": 0.004 }
   ],
   "bridgeRules": { "dangerShare": 0.35, "standShare": 0.5, "repairRadius": 70, "warnSeconds": 15 },
   "maps": {
@@ -525,7 +525,7 @@
           "requires": "barracks", "also": "works", "domain": "land", "cost": 500, "deploySeconds": 15,
           "teams": 1, "members": 1, "hp": 150, "armor": 0,
           "speed": 31, "range": 300, "sight": 320,
-          "damage": 60, "cooldownTicks": 20, "accuracy": 0.85, "nerveResist": 0.3,
+          "damage": 45, "cooldownTicks": 20, "accuracy": 0.85, "nerveResist": 0.3,
           "vs": { "vehicle": 0.12, "naval": 0.12, "air": 0.2, "hauler": 0.3, "hq": 0.05, "structure": 0.03, "fence": 0.1 },
           "stealth": 95, "charges": 2, "chargeDamage": 1200, "chargeVsHQ": 0.3, "fuseSeconds": 5, "plantSeconds": 3, "noCapture": true
         }
@@ -627,11 +627,11 @@
           "name": { "en": "Oracle", "he": "חוזה" },
           "class": "infantry", "callsign": "raven", "hero": true, "startTier": 2,
           "requires": "barracks", "also": "works", "domain": "land", "cost": 500, "deploySeconds": 15,
-          "teams": 1, "members": 1, "hp": 200, "armor": 0,
+          "teams": 1, "members": 1, "hp": 220, "armor": 0,
           "speed": 33, "range": 150, "sight": 280,
           "damage": 16, "cooldownTicks": 7, "accuracy": 0.6, "nerveResist": 0.3,
           "vs": { "air": 0.3, "hq": 0.05, "structure": 0.1, "fence": 0.3 },
-          "disguise": 85, "seizeRadius": 240, "seizeSeconds": 3, "dread": 0.14, "dreadRadius": 170, "noCapture": true
+          "disguise": 85, "seizeRadius": 240, "seizeSeconds": 3, "dread": 0.17, "dreadRadius": 185, "noCapture": true
         }
       }
     }

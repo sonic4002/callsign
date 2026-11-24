@@ -564,20 +564,26 @@ func TestATankRunsDownInfantryInTheOpenAndNotBehindSandbags(t *testing.T) {
 			militia.Teams[i].Cooldown = 100000
 		}
 		// The tank drives a line that passes the men within its tracks' width.
+		// One tank drives; the squad's guns stay silent, so that only its tracks can kill.
+		for i := range tank.Teams {
+			tank.Teams[i].Cooldown, tank.Teams[i].HP = 100000, 1e6
+		}
 		tank.Teams[0].X, tank.Teams[0].Y = mx-160, my+8
-		tank.Teams[0].Cooldown = 100000
-		tank.Teams[0].HP = 1e6
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: tank.ID, Place: "N of D 250"})
 		tank.Order.X, tank.Order.Y = mx+160, my+8
-		n := 0
+		before, told := members(militia), 0
 		for i := 0; i < 20*rules.TickRate; i++ {
 			for i := range militia.Teams {
 				militia.Teams[i].Stress = 1
 			}
-			n += len(events(s.Step(), sim.EvCrushed, 1))
+			told += len(events(s.Step(), sim.EvCrushed, 1))
 		}
 		if tx, _ := tank.Center(); tx < mx+60 {
 			t.Fatalf("the tank did not drive through: it is at x=%.0f, the men at %.0f", tx, mx)
+		}
+		n := before - members(militia)
+		if (n > 0) != (told > 0) || told > n {
+			t.Fatalf("%d men run down and %d events about it", n, told)
 		}
 		return n
 	}
@@ -603,20 +609,22 @@ func TestSteadyInfantryStepAsideAndATechnicalCrushesNobody(t *testing.T) {
 			foot.Teams[i].X, foot.Teams[i].Y = arenaX, arenaY
 			foot.Teams[i].Cooldown = 100000
 		}
+		for i := range v.Teams {
+			v.Teams[i].Cooldown, v.Teams[i].HP = 100000, 1e6
+		}
 		v.Teams[0].X, v.Teams[0].Y = arenaX-160, arenaY+6
-		v.Teams[0].Cooldown, v.Teams[0].HP = 100000, 1e6
 		must(t, s, sim.Command{Side: side, Kind: sim.CmdMove, Squad: v.ID, Place: "N of D 250"})
 		v.Order.X, v.Order.Y = arenaX+160, arenaY+6
-		n := 0
+		before := members(foot)
 		for i := 0; i < 20*rules.TickRate; i++ {
 			if pinned {
 				for i := range foot.Teams {
 					foot.Teams[i].Stress = 1
 				}
 			}
-			n += len(events(s.Step(), sim.EvCrushed, 1-side))
+			s.Step()
 		}
-		return n
+		return before - members(foot)
 	}
 	if n := pass("tank", 0, false); n != 0 {
 		t.Fatalf("steady infantry lost %d men under a tank they saw coming", n)

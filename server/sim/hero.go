@@ -544,6 +544,7 @@ func (s *Sim) hashHeroes(put func(uint64), f func(float64)) {
 		f(sq.Kills)
 		put(uint64(sq.Dug))
 		put(uint64(sq.dig))
+		put(uint64(sq.told))
 		if sq.hero != nil {
 			put(uint64(sq.hero.Charges))
 			put(uint64(sq.hero.work))
