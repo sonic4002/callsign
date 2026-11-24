@@ -158,6 +158,13 @@ func TestOnlyASeatOfALiveRoomDecides(t *testing.T) {
 	if o.count() != 0 {
 		t.Fatalf("%d refused requests reached the model", o.count())
 	}
+	// A room without seats (a server run with no agent key): a thought there is on the
+	// player's own key, but the game's key is spent for nobody the server cannot vouch for.
+	r.game.Open = true
+	if res := r.do("POST", "/relay/v1/decide", seatToken, order(1)); res.status != 403 || res.code() != codeNotYourSeat || o.count() != 0 {
+		t.Fatalf("a room without seats: %d %s", res.status, res.raw)
+	}
+	r.game.Open = false
 	// The game server down: nothing is decided on trust.
 	r.game.Err = context.DeadlineExceeded
 	if res := r.do("POST", "/relay/v1/decide", seatToken, order(1)); res.status != 503 || res.code() != codeProvider || o.count() != 0 {

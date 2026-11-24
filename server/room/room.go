@@ -55,8 +55,8 @@ type Config struct {
 	// The brains that need no key (agents/brain-rule.mjs, brain-jev.mjs) read these from
 	// the lobby view: the rule-brain operator's initiative, 1 to 3 (0 is 3), and whether
 	// squads take orders through the relay's fast decision model.
-	Anvil int
-	Fast  bool
+	Anvil    int
+	Fast     bool
 	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the

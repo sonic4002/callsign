@@ -236,11 +236,11 @@ func (s *spending) today() float64 {
 
 // decider holds the route's running state.
 type decider struct {
-	cfg    Decide
-	seats  *limiter
-	all    *bucket
-	spent  *spending
-	on     bool
+	cfg   Decide
+	seats *limiter
+	all   *bucket
+	spent *spending
+	on    bool
 }
 
 func newDecider(cfg Decide, models map[string]string) *decider {
@@ -319,7 +319,7 @@ func (r *Relay) decide(w http.ResponseWriter, req *http.Request, token, id strin
 		return
 	}
 	// The game server vouches for the seat: a live room, that side, a squad on it.
-	switch _, err := r.cfg.Game.Tier(ctx, held, in.Room, *in.Side, in.Squad); {
+	switch err := r.cfg.Game.Vouch(ctx, held, in.Room, *in.Side, in.Squad); {
 	case errors.Is(err, ErrNotYourSeat):
 		note("", nil, codeNotYourSeat)
 		r.fail(w, apiError{status: http.StatusForbidden, code: codeNotYourSeat, message: "this seat token does not command that squad"})

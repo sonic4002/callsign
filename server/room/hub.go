@@ -619,7 +619,9 @@ func (h *Hub) getTier(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such squad on that side"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tier": tier, "operator": squad == 0})
+	// `seated` tells the relay whether a seat token stood behind this answer: what is paid
+	// for with the game's own key is only ever done for a seat (relay/decide.go).
+	writeJSON(w, http.StatusOK, map[string]any{"tier": tier, "operator": squad == 0, "seated": rm.Seated()})
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {

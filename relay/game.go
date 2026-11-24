@@ -21,6 +21,10 @@ type Game interface {
 	// Tier returns the brain tier of a squad on a side the token holds. Squad 0 is the
 	// operator, whose tier is not used. ErrNotYourSeat means the game server said no.
 	Tier(ctx context.Context, token, room string, side, squad int) (int, error)
+	// Vouch is Tier for what the game itself pays for: it also fails with ErrNotYourSeat
+	// in a room that has no seats (the open room of a server with no agent key), where
+	// the game server lets anyone ask.
+	Vouch(ctx context.Context, token, room string, side, squad int) error
 }
 
 var ErrNotYourSeat = errors.New("that seat is not yours")
@@ -41,10 +45,23 @@ type HTTPGame struct {
 }
 
 func (g *HTTPGame) Tier(ctx context.Context, token, room string, side, squad int) (int, error) {
+	tier, _, err := g.ask(ctx, token, room, side, squad)
+	return tier, err
+}
+
+func (g *HTTPGame) Vouch(ctx context.Context, token, room string, side, squad int) error {
+	_, seated, err := g.ask(ctx, token, room, side, squad)
+	if err == nil && !seated {
+		return ErrNotYourSeat
+	}
+	return err
+}
+
+func (g *HTTPGame) ask(ctx context.Context, token, room string, side, squad int) (int, bool, error) {
 	q := url.Values{"room": {room}, "side": {strconv.Itoa(side)}, "squad": {strconv.Itoa(squad)}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.URL+"?"+q.Encode(), nil)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	req.Header.Set("X-Callsign-Seat", token)
 	if g.Secret != "" {
@@ -56,25 +73,26 @@ func (g *HTTPGame) Tier(ctx context.Context, token, room string, side, squad int
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return 0, errors.New("the game server could not be reached")
+		return 0, false, errors.New("the game server could not be reached")
 	}
 	defer res.Body.Close()
 	switch res.StatusCode {
 	case http.StatusOK:
 	case http.StatusForbidden, http.StatusNotFound:
-		return 0, ErrNotYourSeat
+		return 0, false, ErrNotYourSeat
 	case http.StatusUnauthorized:
-		return 0, errors.New("the game server refused the relay's agent key")
+		return 0, false, errors.New("the game server refused the relay's agent key")
 	default:
-		return 0, fmt.Errorf("the game server answered %d to the tier question", res.StatusCode)
+		return 0, false, fmt.Errorf("the game server answered %d to the tier question", res.StatusCode)
 	}
 	var out struct {
-		Tier int `json:"tier"`
+		Tier   int  `json:"tier"`
+		Seated bool `json:"seated"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, 4096)).Decode(&out); err != nil {
-		return 0, errors.New("the game server's tier answer was not understood")
+		return 0, false, errors.New("the game server's tier answer was not understood")
 	}
-	return out.Tier, nil
+	return out.Tier, out.Seated, nil
 }
 
 // FakeGame is a game server for tests: seats and tiers set by hand.
@@ -83,6 +101,7 @@ type FakeGame struct {
 	seats map[string]string // room/side → token
 	tiers map[string]int    // room/side/squad → tier
 	Err   error             // when set, every question fails with it
+	Open  bool              // the room has no seats: anyone may ask a tier, nobody is vouched for
 	Asked int
 }
 
@@ -111,7 +130,7 @@ func (f *FakeGame) Tier(_ context.Context, token, room string, side, squad int) 
 	if f.Err != nil {
 		return 0, f.Err
 	}
-	if held, ok := f.seats[fmt.Sprintf("%s/%d", room, side)]; !ok || held != token {
+	if held, ok := f.seats[fmt.Sprintf("%s/%d", room, side)]; !f.Open && (!ok || held != token) {
 		return 0, ErrNotYourSeat
 	}
 	if squad == 0 {
@@ -122,4 +141,16 @@ func (f *FakeGame) Tier(_ context.Context, token, room string, side, squad int) 
 		return 0, ErrNotYourSeat
 	}
 	return tier, nil
+}
+
+func (f *FakeGame) Vouch(ctx context.Context, token, room string, side, squad int) error {
+	if _, err := f.Tier(ctx, token, room, side, squad); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Open {
+		return ErrNotYourSeat
+	}
+	return nil
 }
