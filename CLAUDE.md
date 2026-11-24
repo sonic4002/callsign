@@ -10,7 +10,7 @@ Browser real-time strategy game where every squad is an AI agent, commanded by v
 - **Agents:** operator (callsign Anvil) and squad leaders run as Web Workers in the player's browser. They act only through game tools: `radio`, `move`, `hold`, `attack`, `report`, `buy` (operator only).
 - **Fireteams:** plain utility AI on the server, no LLM. One "nerve" value (steady / shaken / pinned) shown through behavior only. No fatigue.
 - **Open league:** the game also exposes an MCP endpoint with the same tools; any agent can join with its own model. Separate ladder, no tiers.
-- **Economy:** one resource, gold. Oil rigs on land and sea pump gold automatically; HQ well can't be captured. Superpowers unlock through the build tree plus gold, never by the clock.
+- **Economy** (changed 2026-11-24): one resource, gold. Haulers collect it from fields fed by gushers and unload at a refinery; the HQ keeps a small trickle and the sea rig stays a capturable source. Structures unlock units (the build tree). Superpowers unlock through the build tree plus gold, never by the clock. Spec: `docs/specs/2026-11-24-bases-harvest-maps.md`.
 - **Rules data:** unit stats, costs, build tree, tiers live in one shared JSON file (`shared/rules.json`) read by server and client.
 
 ## Language and radio
