@@ -187,3 +187,87 @@ Balance
 - The work is cut for parallel agents along these seams, each owning its files: (1) maps, terrain, bridges, pathing, landmarks, cover, garrisons, places and the lobby options; (2) structures, requirements, defences, fences, capture and engineers; (3) gushers, fields, haulers and income; (4) pictures for all of it. A final pass fits them together, teaches the scripted enemy the whole loop, balances all three maps, and refreshes the tutorial, Help and phone layout.
 - The refinery is a structure (owned by 2) that haulers unload at (owned by 3). Until the two are fitted together, hauler code treats "any own structure with role refinery, else the headquarters" as the drop-off through one function.
 - Matches get longer with a base to build; the lobby's length choices gain 15 and 20 minutes.
+
+---
+
+## Addendum 1 (2026-11-24, second wave): placing structures, units leaving their building, heroes, sandbags
+
+Requested by the owner while the first wave was being built. It is built after the first
+wave is fitted together, because every item stands on it. As above, every name, character
+and picture is original to Callsign.
+
+### What changes from the spec above
+
+- **Structures are placed by the player.** This replaces "structures placed for me in a
+  base layout" (story 10) and the fixed build slots. Choosing a structure shows its
+  footprint under the pointer or finger; the ground where it may go is tinted green: land
+  that is free, within the **build radius** of the headquarters or of any finished base
+  structure of that side (start with 260 map units from the headquarters and 180 from other
+  structures; tune by play). Anywhere else the footprint is red and cannot be confirmed.
+  Confirming writes and sends the radio call, with the spot said as an offset from the
+  nearest named Place ("Anvil, build a Vehicle Works 140 metres north-east of Alpha"), so
+  radio stays the only way to act and a spoken order with a described place works too.
+  The server checks the same rule and refuses a spot that is not allowed, with the reason.
+  The scripted enemy and Anvil (when it has the fight) choose spots with a simple
+  deterministic rule. Defences and fences are placed the same way, within their own radius.
+- **Structures go up visibly.** A structure under construction is animated from a bare
+  footing to the finished building over its build time (rising in stages with scaffolding,
+  cranes or tarps by faction, dust and sparks, a sound), not a progress bar alone.
+- **Units come out of the structure that makes them.** Infantry walk out of the barracks
+  door, vehicles roll out of the works, boats slide out of the dockyard, aircraft lift off
+  or taxi from the airbase, haulers leave the refinery. A deployment is tied to a standing
+  structure of the right role (the nearest to the headquarters when there are several);
+  the unit appears at its exit and moves to a rally spot beside it. When that structure
+  falls during a deployment the deployment is lost with it. The door or bay animates
+  (opening, a light, exhaust). Only a side with none of the starting structures left falls
+  back to the headquarters.
+- **Moving looks better.** Infantry walk cycles get proper stride, turn and stop frames and
+  fireteams keep a loose formation instead of a clump; vehicles get rolling tracks or
+  wheels, body sway, dust or wake, and turn through intermediate facings; aircraft bank;
+  everything eases in and out of motion.
+
+### New
+
+- **A hero for each army.** One exceptional soldier per side, alive one at a time, costly,
+  needing a barracks and one further structure, with a long deployment and its own
+  callsign class. Heroes are original characters with abilities the regular infantry lack,
+  different for each army:
+  - Aegis: **Sentinel** (callsign Ghost / רפאים): a lone marksman who outranges every
+    infantry weapon, stays unseen until close or until firing, and carries demolition
+    charges: ordered onto an enemy structure or bridge, the hero plants a charge that
+    destroys it after a short fuse.
+  - Ashfall: **Oracle** (callsign Raven / עורב): a lone infiltrator who walks as a neutral
+    figure the enemy does not shoot until close, takes over one enemy vehicle squad at a
+    time for as long as the hero lives and stays near it, and whose presence shakes the
+    nerve of enemy fireteams around it.
+  Each hero is a squad of one with a leader agent like any squad (it starts one brain tier
+  higher), shows its own portrait and health in the roster, and is announced on both nets
+  when it enters and when it falls. Balance target: a hero is worth about three infantry
+  squads when used well and is lost to a tank or a defence when used carelessly.
+- **Sandbags.** Any infantry squad can be told to fortify where it stands ("Viper 2, dig
+  in", "צפע 2, התבצרו"). After a few seconds unengaged and unmoving, a sandbag position
+  appears around the squad: a small landmark of kind `sandbags` that gives cover from the
+  front arc it was built facing (toward the nearest enemy or the nearest unowned point),
+  to whoever stands in it, and stays until destroyed by heavy weapons or driven over by a
+  vehicle. A squad can build a limited number per match. Sandbags are a Place that later
+  orders can name ("the sandbags east of Delta").
+
+### User stories added
+
+46. As a commander, I want to choose where a structure goes inside a green area around my base, so that I shape my own base.
+47. As a commander, I want the ground where I cannot build shown clearly, and a refusal that says why, so that I do not waste a call.
+48. As a commander, I want to watch a structure go up, so that the base feels alive and I can see what the enemy is building.
+49. As a commander, I want new units to come out of the building that made them, so that I see where my army comes from and the enemy can cut it off.
+50. As a commander, I want units to move with believable animation and formation, so that the battle reads at a glance.
+51. As a commander, I want one hero that is clearly different from my regular soldiers, so that I have a special piece to plan around.
+52. As a commander, I want the two armies' heroes to play differently, so that the factions differ at the top as well.
+53. As a commander, I want to be told on the radio when a hero takes the field or falls, mine or the enemy's, so that I can react.
+54. As a commander, I want to tell infantry to dig in with sandbags where they stand, so that I can hold open ground.
+55. As a commander, I want sandbags to protect only from the side they face, so that flanking still works.
+
+### Implementation and testing notes
+
+- Commands: `build` takes a Place offset as its spot; new `fortify` order for infantry; new `plant {place}` and `seize {contact}` orders for the heroes. Rules: `match.buildRadius`, a `hero` entry per faction, `sandbags` in `landmarkKinds`, a `rally` offset per structure role, and construction stages per structure.
+- Snapshot: structures carry their construction stage; deployments carry the structure they come from; squads carry `fortified` and heroes their ability state.
+- Tests stay at the same seams: placement rule and refusals, deployment from the right structure and its loss, hero abilities and their counters, sandbag arc and destruction, all through commands and snapshots; placement tinting and call writing as pure page functions.
+- Pictures: construction stages for every structure, doors and bays, the two heroes (sheets in the infantry form plus ability poses), sandbags, and the improved movement frames, through the same two pipelines.
