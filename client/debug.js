@@ -573,7 +573,7 @@ function buildButton(id, unit, enabled) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.translate(36, unit.class === "infantry" ? 38 : 36);
   g.scale(1.25, 1.25);
-  drawUnit(g, { unit: id, cls: unit.class, faction, members: Math.min(unit.members, 3), moving: false, firing: false, time: 0, turn: 0.4, seed: 0 });
+  drawUnit(g, { unit: id, cls: unit.class, faction, members: Math.min(unit.members, 3), moving: false, firing: false, time: 0, turn: 0.4, seed: 0, grounded: true });
   const count = el("span", "count");
   count.hidden = true;
   // The fill rises behind the picture while a squad of this unit deploys.

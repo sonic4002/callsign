@@ -14,7 +14,6 @@ const nerveColor = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
 const TAU = Math.PI * 2;
 const RES = 1.5; // terrain is baked at this many pixels per iso unit
 const MARGIN = 90;
-const roads = ["AB", "AD", "BG", "GK", "KZ", "DF", "FH", "HZ", "BF", "FK", "GF", "DH"];
 
 // A small seeded generator, so the terrain looks the same on every load.
 function rng(seed) {
@@ -355,23 +354,6 @@ export class Scene {
     g.fillStyle = "rgba(226,243,246,0.5)";
     path([[0, waterY], [W, waterY], [W, waterY + 7], [0, waterY + 7]]);
     g.fill();
-
-    // Dirt tracks between the points.
-    const at = (id) => points.find((p) => p.id === id);
-    g.lineCap = "round";
-    for (const [a, b] of roads.map((r) => [at(r[0]), at(r[1])])) {
-      if (!a || !b) continue;
-      const [ax, ay] = toIso(a.x, a.y);
-      const [bx, by] = toIso(b.x, b.y);
-      for (const [color, width] of [["rgba(74,64,44,0.5)", 15], ["rgba(150,134,96,0.6)", 10]]) {
-        g.strokeStyle = color;
-        g.lineWidth = width;
-        g.beginPath();
-        g.moveTo(ax, ay);
-        g.lineTo(bx, by);
-        g.stroke();
-      }
-    }
 
     // Props, drawn back to front. Each named place gets something that says what it is.
     const props = [];

@@ -101,6 +101,7 @@ const spotsFor = (members) => spots.slice(0, Math.min(members, spots.length)).so
 // lift raises what flies to its height above its place on the ground, with a slow bob.
 // The shadow is drawn before this, so it stays on the ground.
 function lift(ctx, entry, o, i = 0) {
+  if (o.grounded) return; // a picture of the unit, as on a build button: drawn where it stands
   if (entry.altitude) ctx.translate(0, -entry.altitude * METRE + Math.sin(o.time * 2.3 + o.seed + i * 1.9) * 1.2);
 }
 
