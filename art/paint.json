@@ -35,48 +35,161 @@
       "die": "a small quadcopter drone breaking apart as it falls"
     },
     "tank": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "the hull of a modern blue-grey main battle tank with dark tracks and road wheels, seen without its turret",
       "wreck": "the burnt-out blackened wreck of a main battle tank, scorched dark steel, no flames, no smoke",
-      "turret": { "grid": [2, 2], "subject": "the angular turret and long gun barrel of a modern blue-grey main battle tank, seen alone" }
+      "turret": {
+        "grid": [
+          2,
+          2
+        ],
+        "subject": "the angular turret and long gun barrel of a modern blue-grey main battle tank, seen alone"
+      }
     },
     "rocketLauncher": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "a blue-grey six-wheeled military rocket artillery truck with an armoured cab and a flat bed, seen without its launcher",
       "wreck": "the burnt-out blackened wreck of a military truck, scorched dark steel, no flames, no smoke",
-      "turret": { "grid": [1, 2], "subject": "a blue-grey box launcher of rocket tubes on its swivel mount, seen alone" }
+      "turret": {
+        "grid": [
+          1,
+          2
+        ],
+        "subject": "a blue-grey box launcher of rocket tubes on its swivel mount, seen alone"
+      }
     },
     "helicopter": {
-      "grid": [1, 1],
+      "grid": [
+        1,
+        1
+      ],
       "subject": "a blue-grey attack helicopter with a dark glass canopy, stub wings with rocket pods and a spinning rotor",
       "wreck": "the burnt-out blackened wreck of a crashed helicopter, scorched dark steel, no flames, no smoke",
-      "turret": { "grid": [2, 2], "subject": "a small dark chin gun turret of a helicopter, seen alone" }
+      "turret": {
+        "grid": [
+          2,
+          2
+        ],
+        "subject": "a small dark chin gun turret of a helicopter, seen alone"
+      }
     },
     "patrolBoat": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "a blue-grey naval patrol boat with a wheelhouse, dark windows, a radar mast and a grey deck, seen from above",
-      "turret": { "grid": [2, 2], "subject": "a small blue-grey naval deck gun with a short barrel, seen alone" }
+      "turret": {
+        "grid": [
+          2,
+          2
+        ],
+        "subject": "a small blue-grey naval deck gun with a short barrel, seen alone"
+      }
     },
     "crawler": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the bed is sometimes heaped with gold nuggets",
       "wreck": "the burnt-out blackened wreck of a six-wheeled hauler truck, scorched dark steel, no flames, no smoke"
     },
     "technical": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "a battered sand-coloured pickup truck with a dark windscreen, rust and dents, an open bed with a fighter sitting in it",
       "wreck": "the burnt-out blackened wreck of a pickup truck, scorched dark steel, no flames, no smoke",
-      "turret": { "grid": [2, 2], "subject": "a heavy machine gun on a post with a gunner in sand-coloured clothes and a tan head wrap standing behind it, seen alone" }
+      "turret": {
+        "grid": [
+          2,
+          2
+        ],
+        "subject": "a heavy machine gun on a post with a gunner in sand-coloured clothes and a tan head wrap standing behind it, seen alone"
+      }
     },
     "speedboat": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "a small open wooden motor boat with a brown hull, an outboard engine and two fighters in sand-coloured clothes sitting in it",
-      "turret": { "grid": [2, 2], "subject": "a heavy machine gun on a post with a gunner in sand-coloured clothes standing behind it, seen alone" }
+      "turret": {
+        "grid": [
+          2,
+          2
+        ],
+        "subject": "a heavy machine gun on a post with a gunner in sand-coloured clothes standing behind it, seen alone"
+      }
     },
     "dumpTruck": {
-      "grid": [1, 2],
+      "grid": [
+        1,
+        2
+      ],
       "subject": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the bed is sometimes heaped with gold nuggets",
       "wreck": "the burnt-out blackened wreck of a dump truck, scorched dark steel, no flames, no smoke"
+    }
+  },
+  "pieces": {
+    "barrierWall": {
+      "folder": "segments",
+      "grid": [
+        1,
+        1
+      ],
+      "edge": false,
+      "subject": "one section of a modern prefabricated blue-grey armoured barrier wall made of steel panels on a concrete footing",
+      "ruin": "one section of a blue-grey armoured barrier wall smashed down to broken stumps and rubble"
+    },
+    "wireFence": {
+      "folder": "segments",
+      "grid": [
+        1,
+        1
+      ],
+      "edge": false,
+      "subject": "one section of an improvised fence of rusty corrugated metal sheets, timber posts and barbed wire",
+      "ruin": "one section of an improvised fence of rusty metal and timber, torn down and lying flat in pieces"
+    },
+    "wall": {
+      "folder": "segments",
+      "grid": [
+        1,
+        1
+      ],
+      "edge": false,
+      "subject": "one section of a low dry-stone field wall of pale rough sandstone blocks"
+    },
+    "bridge": {
+      "folder": "segments",
+      "grid": [
+        1,
+        1
+      ],
+      "edge": false,
+      "subject": "one span of a concrete road bridge with a dark asphalt deck, pale lane marks, steel railings and grey concrete sides",
+      "broken": "one span of a concrete road bridge broken in the middle, the asphalt deck cracked and fallen in, bent railings"
+    },
+    "sandbags": {
+      "folder": "landmarks",
+      "frame": [
+        202,
+        117
+      ],
+      "grid": [
+        2,
+        2
+      ],
+      "subject": "a curved fighting position built of stacked tan burlap sandbags; some views show it knocked apart with torn bags and spilled sand"
     }
   }
 }

@@ -7,14 +7,17 @@ of its four steps, and what comes out has the same shape in the same place with 
 panel lines and painted light. The shape of every frame (its alpha) is still the render's
 own, so nothing is cut out by guesswork and no frame moves.
 
-    python art/paint.py                  every unit sheet in assets/raw/plain/units
-    python art/paint.py tank militia     only these
+    python art/paint.py                  every unit sheet and rendered piece in assets/raw/plain
+    python art/paint.py tank wireFence   only these units and pieces
     python art/paint.py --plain tank     no painting: the render with the outline only
 
-Reads   assets/raw/plain/units/*.png     the sheets as art/units.py rendered them
-        art/paint.json                   what each unit is, in words, for the model
+Reads   assets/raw/plain/**/*.png        the pictures as art/units.py and art/props.py rendered them
+        art/paint.json                   what each one is, in words, for the model
 Keeps   assets/raw/paint/<sheet>/*.png   every painted canvas; delete one to paint it again
-Writes  assets/sprites/units/*.png       the sheets the game loads (the manifest is unchanged)
+Writes  assets/sprites/**/*.png          the pictures the game loads (the manifest is unchanged)
+
+The walls, fences, bridge and sandbags of art/props.py are painted the same way ("pieces"
+in art/paint.json: every picture whose name starts with the piece's name).
 
 Frames that are one heading of one animation step always sit in the same place of the
 canvas and are painted from the same noise, so a walk does not flicker from frame to frame.
@@ -35,7 +38,7 @@ import generate as G
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-PLAIN = ROOT / "assets" / "raw" / "plain" / "units"
+PLAIN = ROOT / "assets" / "raw" / "plain"
 KEPT = ROOT / "assets" / "raw" / "paint"
 OUT = ROOT / "assets" / "sprites"
 
@@ -96,7 +99,7 @@ def layout(frames, grid):
     return zoom, out
 
 
-def finish(plain, painted, keep=0.0):
+def finish(plain, painted, keep=0.0, edge=True):
     """The painted colours inside the render's own shape, with a dark edge round it."""
     alpha = np.asarray(plain.getchannel("A"), dtype=np.float32) / 255
     solid = Image.fromarray(((alpha > 0.6) * 255).astype(np.uint8))
@@ -119,6 +122,11 @@ def finish(plain, painted, keep=0.0):
         gain = np.clip((soft(flat) + 6) / (soft(rgb) + 6), 0.5, 2.2)
         rgb = np.clip(rgb * (1 + (gain - 1) * keep), 0, 255)
     ink = np.array(OUTLINE, dtype=np.float32)
+    if not edge:  # a piece of a run: an edge would show as a seam where two pieces meet
+        return Image.fromarray(np.dstack([rgb, alpha * 255]).round().astype(np.uint8), "RGBA")
+    # What glows (a muzzle flash, a lamp) keeps its own bright edge.
+    lit = np.asarray(plain.convert("RGB"), dtype=np.float32)
+    inner = inner * ~((lit.max(axis=2) > 238) & (lit.min(axis=2) > 150))
     k = (inner * 0.8)[..., None]
     rgb = rgb * (1 - k) + ink * k
     a = np.maximum(alpha, outer * 0.8)
@@ -135,7 +143,7 @@ def save_small(image, path):
 def paint_sheet(name, part, words, style, seed, plain_only, comfy):
     """One sheet. `part` is its manifest entry (frame and anims); `words` its subject."""
     file = pathlib.Path(part["image"]).name
-    sheet = Image.open(PLAIN / file).convert("RGBA")
+    sheet = Image.open(PLAIN / part["image"]).convert("RGBA")
     grid_cells = cells_of(sheet, part["frame"])
     fw, fh = part["frame"]
     out = Image.new("RGBA", sheet.size, (0, 0, 0, 0))
@@ -177,7 +185,7 @@ def paint_sheet(name, part, words, style, seed, plain_only, comfy):
                 pad = (max(0, b[0] - 1), max(0, b[1] - 1), min(fw, b[2] + 1), min(fh, b[3] + 1))
                 base = Image.new("RGB", (pad[2] - pad[0], pad[3] - pad[1]), OUTLINE)
                 base.paste(colour, (b[0] - pad[0], b[1] - pad[1]))
-                out.alpha_composite(finish(frame.crop(pad), base, words.get("keep", KEEP) if painted else 0), (col * fw + pad[0], (first + i) * fh + pad[1]))
+                out.alpha_composite(finish(frame.crop(pad), base, words.get("keep", KEEP) if painted else 0, words.get("edge", True)), (col * fw + pad[0], (first + i) * fh + pad[1]))
     save_small(out, OUT / part["image"])
     print(f"{part['image']}  painted" if not plain_only else f"{part['image']}  outlined", flush=True)
 
@@ -197,12 +205,21 @@ def main():
         if not words:
             print(f"{name}: no words in art/paint.json, left as it is")
             continue
-        if not (PLAIN / pathlib.Path(entry["image"]).name).exists():
+        if not (PLAIN / entry["image"]).exists():
             print(f"{name}: no render in {PLAIN.relative_to(ROOT)} (run make art-units), left as it is")
             continue
         jobs.append((name, entry, words))
         if entry.get("turret"):
             jobs.append((name, entry["turret"], {**words, **words["turret"], "turret": None}))
+    # The rendered pieces: every picture of a piece is one frame, or a sheet of `frame`s.
+    for name, words in spec.get("pieces", {}).items():
+        if args.units and name not in args.units:
+            continue
+        for path in sorted((PLAIN / words["folder"]).glob(f"{name}*.png")):
+            image = f"{words['folder']}/{path.name}"
+            size = words.get("frame") or list(Image.open(path).size)
+            state = next((words[k] for k in ("ruin", "broken") if f"_{k}" in path.name and k in words), words["subject"])
+            jobs.append((name, {"image": image, "frame": size, "anims": {}}, {**words, "subject": state}))
     if not jobs:
         return
     comfy = None if args.plain else G.start_comfyui()

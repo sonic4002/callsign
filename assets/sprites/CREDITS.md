@@ -7,6 +7,13 @@ original low-poly models built in code in `art/units.py`: each is posed by turni
 joints, turned to eight headings under one light and rendered with Blender 4.2 (Cycles),
 https://www.blender.org. Blender is GPL software; the models and the pictures are ours.
 
+The rendered sheets are then painted by `make art-paint` (`art/paint.py`, words in
+`art/paint.json`): the image model named below (FLUX.2 [klein] 4B, Apache-2.0) redraws every
+frame over itself, starting from the render and keeping three of its four steps, so the
+shape and place of each frame stay the model's own; the frame's outline is cut from the
+render, not from the painting, and its colours are pulled back to the render's. The walls,
+fences, bridge and sandbags below are painted the same way. See docs/art/STYLE.md.
+
 ## Run pieces and gold
 
 The pieces that are laid end to end (`segments/*.png`: walls, fences, the bridge) and the

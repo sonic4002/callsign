@@ -22,7 +22,7 @@ import math
 import bpy  # isort: skip
 from PIL import Image, ImageDraw
 
-from units import AEGIS, ASHFALL, CHARRED, FACINGS, OUT, PPM, RAW, _object, aim_camera, ball, box, cyl, gold_heap, holdout, joint, mat, outlined, prism_y, save_small, setup_scene
+from units import AEGIS, ASHFALL, CHARRED, FACINGS, OUT, PLAIN, PPM, RAW, _object, aim_camera, ball, box, cyl, gold_heap, holdout, joint, mat, outlined, prism_y, save_small, setup_scene
 
 LENGTH = 4.0  # metres of run one piece covers
 OVERLAP = 0.06  # each piece runs this far past its ends, so no gap shows between two
@@ -327,6 +327,12 @@ def render(name, build, cell, centre, turn=0.0):
     return Image.open(path).convert("RGBA"), origin
 
 
+def keep_plain(image, rel):
+    """The picture as rendered, for art/paint.py to paint over (make art-paint)."""
+    (PLAIN / rel).parent.mkdir(parents=True, exist_ok=True)
+    image.save(PLAIN / rel)
+
+
 def trimmed(image, origin, rel, outline=False):
     if outline:
         image = outlined(image)
@@ -335,6 +341,7 @@ def trimmed(image, origin, rel, outline=False):
     cut = image.crop((left, top, right, bottom))
     (OUT / rel).parent.mkdir(parents=True, exist_ok=True)
     cut.save(OUT / rel, optimize=True)
+    keep_plain(cut, rel)
     print(f"{rel}  {cut.width}x{cut.height}")
     return {"image": rel, "size": [cut.width, cut.height], "anchor": [round((origin[0] - left) / cut.width, 4), round((origin[1] - top) / cut.height, 4)]}, cut
 
@@ -400,6 +407,7 @@ def main():
         rel = f"landmarks/{name}.png"
         (OUT / rel).parent.mkdir(parents=True, exist_ok=True)
         save_small(sheet, OUT / rel)
+        keep_plain(sheet, rel)
         print(f"{rel}  {sheet.width}x{sheet.height}, frame {w}x{h}")
         manifest["landmarks"][name] = {
             "image": rel, "frame": [w, h], "anchor": [round((origin[0] - left) / w, 4), round((origin[1] - top) / h, 4)],
@@ -427,6 +435,7 @@ def main():
         rel = f"props/{name}.png"
         (OUT / rel).parent.mkdir(parents=True, exist_ok=True)
         save_small(sheet, OUT / rel)
+        keep_plain(sheet, rel)
         print(f"{rel}  {sheet.width}x{sheet.height}, frame {w}x{h}")
         manifest["props"][name] = {"image": rel, "frame": [w, h], "frames": count, "anchor": [round((origin[0] - left) / w, 4), round((origin[1] - top) / h, 4)], "ppm": PPM}
         page.append((name, sheet))
