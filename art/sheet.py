@@ -116,7 +116,7 @@ def scene(out):
                 y = row(part, y, 215 if prefix.startswith("hq") or len(part) < 8 else 215, by_height)
     y = row([(k, e) for k, e in b.items() if not k.startswith(("hq_", "aegis_", "ashfall_"))], y, 215, by_height)
     y = row([(k, e) for k, e in m.get("landmarks", {}).items() if "size" in e], y + 60, 170, by_height)
-    y = row(list(m.get("props", {}).items()), y, 200, by_height)
+    y = row([(k, e) for k, e in m.get("props", {}).items() if "height" in e], y, 200, by_height)
 
     # Units at the page's scale, one heading each, beside the buildings.
     x = 110
