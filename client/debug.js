@@ -90,6 +90,7 @@ function switchLanguage() {
   lang = lang === "he" ? "en" : "he";
   localStorage.setItem("callsign.lang", lang);
   applyLanguage();
+  voice.prepare(lang); // the other language has its own speech model
 }
 $("lang").addEventListener("click", switchLanguage);
 $("overlay-lang").addEventListener("click", switchLanguage);
@@ -546,6 +547,10 @@ const voice = new Voice({
 });
 
 function renderVoice() {
+  // In the lobby the speech model is fetched ahead of the match; its progress shows there.
+  const fetching = voiceState === "loading";
+  $("lobby-voice").hidden = !fetching && !voice.ready.has(lang);
+  $("lobby-voice").textContent = fetching ? t("voice.loading", voiceDetail) : voice.ready.has(lang) ? t("voiceReady") : "";
   const status = $("voice-status");
   status.hidden = voiceState === "idle";
   status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
@@ -1219,6 +1224,9 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   startLesson(); // ?learn goes straight into the first lesson
 }
 renderOverlay();
+// The speech model for the page's language is fetched now, in the lobby, so the talk
+// button answers at once when the match starts.
+voice.prepare(lang);
 
 // For debugging from the console.
 window.callsign = { scene, music, sideColor };

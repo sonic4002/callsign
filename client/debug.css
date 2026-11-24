@@ -297,3 +297,4 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 }
 @keyframes booting { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #overlay.booting .card::after { animation: none; } }
+#lobby-voice { margin: .5rem 0 0; font-size: .78rem; color: var(--muted); }
