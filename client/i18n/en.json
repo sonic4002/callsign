@@ -205,7 +205,7 @@
   "lobby.waitFriend": "Waiting for your friend to take the other seat.",
   "lobby.waitReady": "The match starts when both commanders are ready.",
   "lobby.full": "Both seats in this match are taken.",
-  "lobby.noRoom": "There is no match with this code. It may have ended, or the server was restarted.",
+  "lobby.noRoom": "There is no match with the code {code} any more: it ended, or the server was restarted. Start a new match here, or type another code below.",
   "lobby.noWatching": "This match is not open to spectators.",
   "lobby.busy": "The server is running as many matches as it can. Try again in a while.",
   "lobby.failed": "That did not work: {reason}",
