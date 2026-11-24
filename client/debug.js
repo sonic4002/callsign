@@ -477,8 +477,12 @@ function noteBuy(text) {
   const structure = wantedStructure(low, rules.factions[faction]?.structures ?? {});
   if (structure) return void requested.set(`s:${structure}`, [...waiting(`s:${structure}`), performance.now() + REQUEST_TIMEOUT]);
   const units = Object.entries(rules.factions[faction]?.units ?? {});
-  const says = ([, u]) => [u.name.en, u.name.he].some((name) => name.toLowerCase().split(/\s+/).some((word) => word.length >= 3 && low.includes(word)));
-  const named = units.filter(says);
+  // The whole name first ("הנדסה קרבית"); a single word of it only when no unit is named in
+  // full, and then as a whole word: "קרבית" must not pick the "מסוק קרב".
+  const words = new Set(low.split(/[^\p{L}\p{N}"]+/u));
+  const full = units.filter(([, u]) => [u.name.en, u.name.he].some((name) => low.includes(name.toLowerCase())));
+  const says = ([, u]) => [u.name.en, u.name.he].some((name) => name.toLowerCase().split(/\s+/).some((word) => word.length >= 3 && words.has(word)));
+  const named = full.length ? full : units.filter(says);
   const hit = named.length ? named : units.filter(([, u]) => classWords[u.class]?.test(text));
   const until = performance.now() + REQUEST_TIMEOUT;
   for (const id of hit.length ? hit.map(([id]) => id) : ["*"]) requested.set(id, [...waiting(id), until]);
