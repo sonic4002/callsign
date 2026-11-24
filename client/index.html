@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest" id="manifest">
 <link rel="stylesheet" href="debug.css">
+<link rel="stylesheet" href="brains/monitor.css">
 <link rel="stylesheet" href="mobile.css">
 <link rel="stylesheet" href="tutorial.css">
 </head>
@@ -101,6 +102,12 @@
       <!-- Who has the initiative: the player, or Anvil. The button only transmits the call. -->
       <p id="command" hidden><span id="command-mode"></span> <button type="button" id="command-switch"></button> <button type="button" id="command-purse"></button></p>
       <ul id="roster"></ul>
+    </section>
+
+    <!-- The side's AI agents at a glance; the whole view opens from here or from "AI". -->
+    <section id="monitor-panel" class="panel" hidden>
+      <h2 data-i18n="monitor.title"></h2>
+      <ul id="monitor-strip" data-i18n-aria="monitor.open"></ul>
     </section>
 
     <section class="panel" data-sheet="build">
@@ -278,6 +285,16 @@
 <dialog id="brains">
   <form method="dialog">
     <h1 data-i18n="brains.title"></h1>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-brains-tab="live" data-i18n="monitor.tab.live"></button>
+      <button type="button" role="tab" data-brains-tab="key" data-i18n="monitor.tab.key"></button>
+    </div>
+    <section data-brains-pane="live">
+      <p id="monitor-side"></p>
+      <ul id="monitor-list"></ul>
+      <p class="fine" data-i18n="monitor.about"></p>
+    </section>
+    <section data-brains-pane="key" hidden>
     <p id="brains-status" aria-live="polite"></p>
     <fieldset>
       <legend data-i18n="brains.key"></legend>
@@ -303,6 +320,7 @@
     <label class="check"><input type="checkbox" id="brains-demo"> <span data-i18n="brains.demoChoice"></span></label>
     <h2 data-i18n="brains.usage"></h2>
     <p id="brains-usage"></p>
+    </section>
     <div class="row"><button type="submit" data-i18n="brains.close"></button></div>
   </form>
 </dialog>

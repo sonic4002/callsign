@@ -34,6 +34,13 @@ const dynamic = {
   "provider.": ["anthropic", "openrouter", "gemini", "openai"],
   "tut.": ["welcome", "select", "order", "answer", "orders", "capture", "fog", "buy", "deploy", "upgrade", "enemy", "voice", "win"],
   "tutTouch.": ["select", "order", "buy", "upgrade", "enemy"],
+  "monitor.state.": ["none", "idle", "thinking", "acting", "skipped", "stopped", "offline", "ended"],
+  "monitor.woke.": ["call", "heard", "event"],
+  "monitor.event.": ["contact", "pinned", "losses", "arrived", "squad_lost", "point_lost", "hq_under_attack", "other"],
+  "monitor.brain.": ["subscription", "claude", "relay", "scripted", "demo", "other"],
+  "monitor.where.": ["server", "browser"],
+  "monitor.reset.": ["match", "wakes", "tier", "unfinished"],
+  "monitor.why.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "timeout", "stopped", "failed"],
   "trouble.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "failed", "join"],
 };
 

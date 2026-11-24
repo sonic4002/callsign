@@ -3,6 +3,7 @@
 // it writes a radio call, in the page language, and the server routes it like any other.
 // Nerve shows in what the troops do; the "show nerve" switch is a debugging aid.
 
+import { Agents, mountMonitor } from "./brains/monitor.js";
 import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
@@ -58,6 +59,7 @@ function applyLanguage() {
   renderSidebar();
   renderOverlay();
   brains.render();
+  monitor.sync(true);
   renderTrack();
   coach.render();
 }
@@ -122,6 +124,29 @@ const brains = mountAgents({
   canAct: () => role === "hammer",
 });
 
+// The live view of this side's agents: model, context and state of each (brains/monitor.js).
+const watched = new Agents();
+const monitor = mountMonitor({
+  agents: watched,
+  list: $("monitor-list"),
+  strip: $("monitor-strip"),
+  side: $("monitor-side"),
+  t,
+  lang: () => lang,
+  tierName: (tier) => tierName(tier),
+  // Who should have an agent: the operator, and a leader for every squad of ours.
+  stations: () =>
+    !rules || !state || !me
+      ? []
+      : [{ squad: 0, callsign: rules.callsigns.operator, tier: 0 }, ...state.squads.filter((sq) => sq.side === side && sq.alive > 0).map((sq) => ({ squad: sq.id, callsign: sq.callsign, tier: sq.tier }))],
+  onOpen: () => brains.open("live"),
+});
+// A squad whose leader is thinking shows it in the roster.
+function markThinking() {
+  const busy = watched.thinking();
+  for (const li of $("roster").children) li.classList.toggle("thinking", busy.has(Number(li.dataset.squad)));
+}
+
 // The first lesson's coach (tutorial.js). It reads the match the way the player sees it.
 let enemyDown = false; // an enemy squad has been destroyed in this match
 const coach = new Coach({
@@ -184,6 +209,8 @@ function onFrame(frame) {
       upgrading.clear();
       promoted.clear();
       system(me ? "matchStarted" : "spectating", { faction });
+      watched.hello(frame.agents);
+      monitor.sync();
       brains.agents.newMatch(frame.match);
       brains.agents.sync(); // the seat may be a new one: a match just made or joined
       scene.setRules(rules);
@@ -193,6 +220,11 @@ function onFrame(frame) {
       enemyDown = false;
       coach.enter(room, lobby?.tutorial);
       break;
+    case "telemetry":
+      // What one of this side's agents says about itself (client/brains/monitor.js).
+      monitor.update(watched.frame(frame));
+      markThinking();
+      return;
     case "state":
       state = frame.state;
       scene.setState(state);
@@ -569,6 +601,8 @@ function renderSidebar() {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
     $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
+    monitor.sync();
+    markThinking();
   }
   const units = Object.entries(rules.factions[faction]?.units ?? {});
   const buildKey = JSON.stringify([lang, faction, canAct, pop >= cap, units.map(([, u]) => state.gold >= u.cost)]);
@@ -631,6 +665,7 @@ function orderText(sq) {
 function rosterRow(sq, canAct) {
   const unit = rules.factions[faction].units[sq.unit];
   const li = el("li", sq.id === scene.selected ? "selected" : "");
+  li.dataset.squad = sq.id;
   const name = el("span", "name", sq.callsign[lang]);
   name.append(el("span", "unit", unit.name[lang]));
   const pips = el("span", "pips");

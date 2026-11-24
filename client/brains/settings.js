@@ -36,12 +36,21 @@ export function mountAgents({ t, system, server, side, seat, canAct }) {
     $("brains-open").classList.toggle("live", agents.status === "relay" || agents.status === "demo");
   }
 
-  $("brains-open").addEventListener("click", () => {
+  // The dialog has two panes: the live view of the agents, and the player's own key.
+  function show(pane) {
+    for (const node of document.querySelectorAll("#brains [data-brains-pane]")) node.hidden = node.dataset.brainsPane !== pane;
+    for (const tab of document.querySelectorAll("#brains [data-brains-tab]")) tab.setAttribute("aria-selected", String(tab.dataset.brainsTab === pane));
+  }
+  for (const tab of document.querySelectorAll("#brains [data-brains-tab]")) tab.addEventListener("click", () => show(tab.dataset.brainsTab));
+
+  function open(pane = "live") {
     note = "";
     render();
-    $("brains").showModal();
+    show(pane);
+    if (!$("brains").open) $("brains").showModal();
     agents.refresh();
-  });
+  }
+  $("brains-open").addEventListener("click", () => open("live"));
   $("brains-save").addEventListener("click", async () => {
     const input = $("brains-input");
     const key = input.value.trim();
@@ -68,5 +77,5 @@ export function mountAgents({ t, system, server, side, seat, canAct }) {
   $("brains-demo").addEventListener("change", (ev) => agents.setDemo(ev.target.checked));
 
   agents.refresh();
-  return { agents, render };
+  return { agents, render, open };
 }
