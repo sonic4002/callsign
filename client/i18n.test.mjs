@@ -27,6 +27,7 @@ const dynamic = {
   "class.": classes,
   "side.": ["0", "1"],
   "brains.": ["server", "relay", "demo", "standby"],
+  "lobby.about.": ["easy", "normal", "standard"],
   "agents.": ["relay", "demo", "server", "paused", "stopped", "skipped"],
   "provider.": ["anthropic", "openrouter", "gemini", "openai"],
   "trouble.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "failed", "join"],

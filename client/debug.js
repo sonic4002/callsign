@@ -697,6 +697,8 @@ function renderOverlay() {
   $("lobby-watch").hidden = chosen("opponent") !== "friend";
   // How hard the scripted enemy presses is the player's choice, per match.
   $("lobby-level-row").hidden = chosen("opponent") !== "bot" || offer?.bot === false;
+  const level = chosen("bot") ?? "easy";
+  $("lobby-level-about").textContent = t(`lobby.about.${level}`);
   for (const option of $("lobby-length").options) option.textContent = t("lobby.minutes", { minutes: option.value / 60 });
 
   const view = lobby ?? found?.lobby ?? null;

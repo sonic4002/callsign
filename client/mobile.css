@@ -165,6 +165,34 @@ body.no-server #no-server {
   #help .examples li { grid-template-columns: 1fr; gap: .15rem; }
   #help .examples code { padding-block: .35rem; }
 
+  /* ---- the lobby: every choice a thumb can hit, the buttons within reach ---- */
+  #overlay { align-items: end; padding-block: var(--safe-t) var(--safe-b); padding-inline: var(--safe-s) var(--safe-e); }
+  #overlay .card { inline-size: 100%; max-block-size: calc(100dvh - var(--safe-t) - var(--safe-b)); padding-block-end: 1.2rem; }
+  #overlay form label, #lobby-watch { display: flex; align-items: center; gap: .55rem; min-block-size: 44px; }
+  #overlay form input[type="radio"], #overlay form input[type="checkbox"] { inline-size: 22px; block-size: 22px; flex: none; }
+  #overlay form select, #overlay input[type="text"] { min-block-size: 44px; font-size: 16px; min-inline-size: 0; flex: 1; }
+  #lobby-level-row, #overlay form > label { flex-wrap: wrap; }
+  #lobby-join { flex-wrap: wrap; }
+  #lobby-join label { display: block; min-block-size: 0; }
+  #lobby-join button, #lobby-copy { min-block-size: 44px; }
+  #lobby-share { flex-wrap: wrap; }
+  #lobby-seats li { min-block-size: 44px; align-items: center; }
+  /* The buttons that move the lobby on stay in view while the choices scroll. */
+  #overlay .row { position: sticky; inset-block-end: -1.2rem; margin-inline: -1.2rem; padding: .7rem 1.2rem; background: linear-gradient(#151b1f00, #151b1f 30%); }
+  #overlay .row button { flex: 1 1 auto; }
+
+  /* ---- who thinks for the squads: a full sheet, with the close button in reach ---- */
+  #brains {
+    inline-size: 100vw; max-inline-size: none; block-size: 100dvh; max-block-size: none; margin: 0; border: 0;
+    padding-block: calc(1rem + var(--safe-t)) calc(1rem + var(--safe-b)); padding-inline: max(1rem, var(--safe-s)) max(1rem, var(--safe-e));
+    overflow: auto;
+  }
+  #brains select, #brains input[type="password"] { min-block-size: 44px; font-size: 16px; inline-size: 100%; }
+  #brains label.check { display: flex; align-items: center; gap: .55rem; min-block-size: 44px; }
+  #brains input[type="checkbox"] { inline-size: 22px; block-size: 22px; flex: none; }
+  #brains .row { flex-wrap: wrap; }
+  #brains .row button { min-block-size: 48px; flex: 1 1 auto; }
+
   /* The on-screen keyboard is up: the radio box rides on top of it. */
   html.typing #send { inset-block-end: var(--kb); }
   html.typing #log { inset-block-end: calc(var(--kb) + var(--send)); }

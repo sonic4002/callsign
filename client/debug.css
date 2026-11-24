@@ -245,6 +245,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #overlay form select, #overlay input[type="text"] { font: inherit; color: inherit; background: #10161a; border: 1px solid var(--edge-hi); padding: .25rem .4rem; }
 #overlay form select { margin-inline-start: .4rem; }
 #lobby-watch { margin-block-start: .4rem; color: var(--muted); }
+#lobby-level-about { display: block; flex-basis: 100%; margin-block: .2rem .5rem; color: var(--muted); font-size: .78rem; }
 #lobby-join { display: flex; align-items: end; gap: .5rem; padding-block-start: .9rem; border-block-start: 1px solid var(--edge-hi); }
 #lobby-join label { flex: 1; color: var(--muted); }
 #lobby-join-code { display: block; inline-size: 100%; margin-block-start: .2rem; text-transform: uppercase; letter-spacing: .3em; font-weight: 700; }
