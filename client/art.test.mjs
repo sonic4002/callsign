@@ -253,7 +253,7 @@ test("marks: two ranks and six panel icons, each a well-formed picture unlike th
 
 test("manifest: the power and radar structures, the buildings of no army and their icons", () => {
   const b = manifest.buildings;
-  for (const key of ["aegis_powerPlant", "ashfall_generatorYard", "aegis_radar", "ashfall_listeningPost"]) {
+  for (const key of ["powerPlant", "generatorYard", "radar", "listeningPost"]) {
     assert.ok(b[key] && has(b[key].image), key);
     assert.equal(b[key].stages?.length, 4, `${key} goes up in four stages`);
     for (const state of [...b[key].stages, `${key}_ruin`, `${key}_site`]) {
@@ -262,7 +262,7 @@ test("manifest: the power and radar structures, the buildings of no army and the
     }
     assert.ok(b[key].lamp?.every((f) => f >= 0 && f <= 1), `${key} says where its warning lamp is`);
   }
-  for (const [key, prop] of [["aegis_radar", "radar_dish"], ["ashfall_listeningPost", "antenna_loop"]]) {
+  for (const [key, prop] of [["radar", "radar_dish"], ["listeningPost", "antenna_loop"]]) {
     const spin = b[key].spin;
     assert.equal(spin?.prop, prop);
     assert.ok(spin.at.every((f) => f >= 0 && f <= 1) && spin.height > 0 && spin.period > 0);
@@ -275,7 +275,7 @@ test("manifest: the power and radar structures, the buildings of no army and the
     assert.ok(b[key].flag?.every((f) => f >= 0 && f <= 1), `${key} says where its owner's flag stands`);
     assert.equal(b[key].stages, undefined, "nobody builds these");
   }
-  for (const key of ["aegis_powerPlant", "ashfall_generatorYard", "aegis_radar", "ashfall_listeningPost", "tech_goldworks", "tech_clinic", "tech_garage"]) {
+  for (const key of ["powerPlant", "generatorYard", "radar", "listeningPost", "tech_goldworks", "tech_clinic", "tech_garage"]) {
     assert.ok(manifest.icons?.[key] && has(manifest.icons[key].image), `${key} has no build-panel picture`);
     assert.deepEqual(manifest.icons[key].size, [144, 96]);
   }
