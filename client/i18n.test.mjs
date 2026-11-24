@@ -32,7 +32,7 @@ const dynamic = {
   "radar.": ["none", "rising", "dark"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer", "timer_hq", "timer_force"],
   "order.": ["none", "move", "hold", "attack", "repair", "fortify", "plant", "seize"],
-  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "buildSpot", "cancel", "rally", "rallyHome", "sell", "repairStructure", "mend", "fortify", "plant", "plantStructure", "seize"],
+  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "buildSpot", "cancel", "rally", "rallyHome", "rallyFrom", "rallyFromHome", "sell", "repairStructure", "mend", "fortify", "plant", "plantStructure", "seize"],
   "eventMany.": ["squad_spawned", "squad_lost", "enemy_destroyed", "structure_built"],
   "placer.why.": ["far", "ground", "shore", "room", "edge"],
   "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],
@@ -165,6 +165,25 @@ test("the scripted operator and squad leaders understand the calls the page writ
     assert.deepEqual([rally?.name, rally?.input.place], ["rally", "D"], `${lang}: the rally call`);
     const home = await think("anvil", body(fill(strings["call.rallyHome"], { to: rules.callsigns.operator[lang], from })), { status: { faction: "aegis", squads: [], points: [], gold: 0 } });
     assert.deepEqual([home?.name, home?.input.place], ["rally", "home"], `${lang}: the rally-home call`);
+    // The calls of a structure's own menu: where its squads gather (a point, a tech
+    // building, or back beside it), its sale and its repair. A second structure of the
+    // kind is told apart by its id in the call.
+    const site = rules.map.techBuildings[0];
+    const own = (id, kind, role) => ({ id, kind, role, faction: "aegis", side: 0, x: 1, y: 2, hp: 0.5, building: 1, name: rules.factions.aegis.structures[kind].name.en });
+    const base = { faction: "aegis", squads: [], points: [], gold: 0, structures: [own("s2", "barracks", "barracks"), own("s9", "barracks", "barracks"), own("s4", "vehicleWorks", "works"), { id: "s20", kind: site.kind, role: "tech", faction: "tech", side: -1, x: 3, y: 4, hp: 1, building: 1, site: site.name.en, siteHe: site.name.he }] };
+    const to = rules.callsigns.operator[lang];
+    const works = rules.factions.aegis.structures.vehicleWorks.name[lang];
+    const second = `${rules.factions.aegis.structures.barracks.name[lang]} s9`;
+    const from1 = await think("anvil", body(fill(strings["call.rallyFrom"], { to, from, structure: works, point: delta.callsign[lang] })), { points: ["D"], status: base });
+    assert.deepEqual([from1?.name, from1?.input.place, from1?.input.structure], ["rally", "D", "s4"], `${lang}: the works' rally call`);
+    const from2 = await think("anvil", body(fill(strings["call.rallyFrom"], { to, from, structure: second, point: site.name[lang] })), { status: base });
+    assert.deepEqual([from2?.name, from2?.input.place, from2?.input.structure], ["rally", "s20", "s9"], `${lang}: the second barracks rallies at a tech building`);
+    const from3 = await think("anvil", body(fill(strings["call.rallyFromHome"], { to, from, structure: works })), { status: base });
+    assert.deepEqual([from3?.name, from3?.input.place, from3?.input.structure], ["rally", "home", "s4"], `${lang}: the works' rally-home call`);
+    const sold = await think("anvil", body(fill(strings["call.sell"], { to, from, structure: second })), { status: base });
+    assert.deepEqual([sold?.name, sold?.input.place], ["sell", "s9"], `${lang}: the sale of the second barracks`);
+    const mended = await think("anvil", body(fill(strings["call.repairStructure"], { to, from, structure: works })), { status: base });
+    assert.deepEqual([mended?.name, mended?.input.place], ["repair", "s4"], `${lang}: the repair call`);
     const point = rules.map.points.find((p) => p.id === "F");
     for (const verb of ["hold", "move", "attack"]) {
       const text = fill(strings[`call.${verb}`], { to: rules.callsigns.classes.infantry[lang] + " 2", from, point: point.callsign[lang] });

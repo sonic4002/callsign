@@ -47,12 +47,16 @@ test("selling gives the rules' share back and repairing costs in proportion", ()
 test("what can be done with a structure of one's own", () => {
   const st = { side: 0, hp: 1, building: 1 };
   assert.deepEqual(structureActions(st, 0), ["sell"]);
-  assert.deepEqual(structureActions({ ...st, hp: 0.6 }, 0), ["sell", "repair"]);
-  assert.deepEqual(structureActions({ ...st, hp: 0.6 }, 0, { engineers: true }), ["sell", "repair", "mend"]);
-  assert.deepEqual(structureActions({ ...st, hp: 0.6, repairing: true }, 0, { engineers: true }), ["sell", "mend"]);
+  assert.deepEqual(structureActions({ ...st, hp: 0.6 }, 0), ["repair", "sell"]);
+  assert.deepEqual(structureActions({ ...st, hp: 0.6 }, 0, { engineers: true }), ["repair", "mend", "sell"]);
+  assert.deepEqual(structureActions({ ...st, hp: 0.6, repairing: true }, 0, { engineers: true }), ["mend", "sell"]);
   assert.deepEqual(structureActions({ ...st, hp: 0.6, building: 0.5 }, 0), ["sell"]);
   assert.deepEqual(structureActions({ ...st, side: 1, hp: 0.6 }, 0), []);
   assert.deepEqual(structureActions({ ...st, ruin: true }, 0), []);
+  // One that makes units: where they gather, and the last in its line taken back.
+  assert.deepEqual(structureActions(st, 0, { makes: true }), ["rally", "sell"]);
+  assert.deepEqual(structureActions({ ...st, hp: 0.5 }, 0, { makes: true, line: 2 }), ["rally", "cancel", "repair", "sell"]);
+  assert.deepEqual(structureActions({ ...st, building: 0.5 }, 0, { makes: true }), ["sell"], "not while it is going up");
 });
 
 test("a side may hold only so many power structures", () => {

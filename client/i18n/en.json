@@ -571,5 +571,10 @@
   "help.q.digIn": "How do sandbags work, and what do tanks do to infantry?",
   "help.a.digIn": "Tell an infantry squad to dig in (“Viper 2, dig in”), or pick the squad and tap it again for the Dig in button. After a few seconds standing still without being shot at, it builds a sandbag position facing the nearest enemy in sight, or the nearest point you do not hold. The position covers its men from that front only, so a flank still works, against you and for you. Heavy weapons knock sandbags down and a vehicle driving over them flattens them. Each squad can build two, and a position has a name you can send squads to. A tank that drives through infantry in the open runs them down, one man each pass; men inside a building, behind standing sandbags or in a grove are safe, and steady squads step out of the way.",
   "help.q.ranks": "What are the silver stars beside a squad?",
-  "help.a.ranks": "A rank the squad earned by what it destroyed: one star (Seasoned) at three times its own cost, a star over a bar (Elite) at six times. A ranked squad shoots straighter and keeps its nerve longer, and an Elite squad mends its wounds out of combat. This is apart from the brass chevrons of the brain tier, which you buy; a squad keeps its rank when you upgrade its brain."
+  "help.a.ranks": "A rank the squad earned by what it destroyed: one star (Seasoned) at three times its own cost, a star over a bar (Elite) at six times. A ranked squad shoots straighter and keeps its nerve longer, and an Elite squad mends its wounds out of combat. This is apart from the brass chevrons of the brain tier, which you buy; a squad keeps its rank when you upgrade its brain.",
+  "act.rally": "Rally point",
+  "act.cancel": "Cancel last",
+  "call.rallyFrom": "{to}, this is {from}. Squads from the {structure} rally at {point}. Over.",
+  "call.rallyFromHome": "{to}, this is {from}. Squads from the {structure} rally at home. Over.",
+  "placer.rallyFrom": "Where do squads from the {structure} gather?"
 }

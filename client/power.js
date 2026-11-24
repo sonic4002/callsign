@@ -45,13 +45,17 @@ export function sellValue(rules, def) {
 // repairCost is the gold it takes to make a structure whole from where it is now.
 export const repairCost = (rules, def, st) => Math.ceil(def.cost * (rules.match.repairCostShare ?? 0) * (1 - Math.max(0, Math.min(1, st.hp))));
 
-// structureActions is what the player can do with one of their own structures: sell it,
-// have it repaired for gold, or send the engineer squad they have selected in to mend it.
-// Each is a radio call; the page only writes and sends it.
-export function structureActions(st, side, { engineers = false } = {}) {
+// structureActions is what the player can do with one of their own structures, in the
+// order of the menu's buttons: send new units from it somewhere (a structure that makes
+// units), cancel the last unit waiting in its line, have it repaired for gold, send the
+// engineer squad they have selected in to mend it, or sell it. Each is a radio call; the
+// page only writes and sends it.
+//   makes: the structure makes units; line: how many it is making or has waiting
+export function structureActions(st, side, { engineers = false, makes = false, line = 0 } = {}) {
   if (!st || st.side !== side || st.ruin) return [];
-  const damaged = st.building >= 1 && st.hp < 0.999; // a finished structure can stand a hair under full
-  return ["sell", ...(damaged && !st.repairing ? ["repair"] : []), ...(damaged && engineers ? ["mend"] : [])];
+  const built = st.building >= 1;
+  const damaged = built && st.hp < 0.999; // a finished structure can stand a hair under full
+  return [...(built && makes ? ["rally"] : []), ...(line > 0 ? ["cancel"] : []), ...(damaged && !st.repairing ? ["repair"] : []), ...(damaged && engineers ? ["mend"] : []), "sell"];
 }
 
 // siegeReach is how far a unit reaches against structures.

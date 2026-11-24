@@ -150,7 +150,7 @@ const namesAUnit = (text, units) => Object.values(units).some((u) => text.includ
 // north and 60 metres east of Alpha"). The game turns the words into the place.
 const bearing = /north|south|east|west|צפונ|דרומ|מזרח|מערב/;
 export function spotOf(body) {
-  const at = body.search(/\d/);
+  const at = body.search(/\d+\s*(?:metres?|meters?|m\b|מטר|מ')/i); // a distance, not the number in a squad's or a structure's name
   if (at < 0) return undefined;
   const spot = body.slice(at).replace(/[.!\s]+$/, "");
   return bearing.test(spot.toLowerCase()) ? spot : undefined;
@@ -261,16 +261,19 @@ function operatorPlan(ctx) {
   }
   // "Cancel the tank", "בטל את הטנק": the last one of that kind leaves its line.
   const units = rules.factions[wake.status?.faction ?? ""]?.units ?? {};
-  if (cancelVerb.test(text)) {
+  if (cancelVerb.test(text) && !(sellVerb.test(text) && namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false }))) {
     const unit = /\b(last|that|it)\b|האחרון|האחרונה/.test(text) && !namesAUnit(text, units) ? "" : (wantedUnit(text, units) ?? "");
     return [{ name: "cancel", input: { unit }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   // "New squads rally at Delta", "כיתות חדשות מתכנסות בדוד": where new units gather.
   if (rallyVerb.test(text)) {
-    const home = /\b(home|beside|at the base|by the door)\b|ליד המבנה|בבית|בבסיס/.test(text);
-    const place = home ? "home" : (spotOf(call.body) ?? call.points?.[0]);
+    const home = /\b(home|beside|at the base|by the door)\b|ליד המבנה|הביתה|בבסיס/.test(text); // not "בבית": "בבית הבוחן" is a place
+    // Where: an exact spot, a tech building by its name on the map, a landmark, or a point.
+    const known = compactStructures(wake.status ?? {}, agent.side);
+    const tech = known.find((st) => st.site && (text.includes(st.site.toLowerCase()) || (st.siteHe && text.includes(st.siteHe))));
+    const place = home ? "home" : (spotOf(call.body) ?? tech?.id ?? call.landmarks?.[0] ?? call.points?.[0]);
     if (!place) return [radio(back, say.sayAgain[lang], "over")];
-    const from = namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false });
+    const from = namedStructure(text, known.filter((st) => st.role !== "tech"), { enemy: false });
     return [{ name: "rally", input: { place, structure: from?.id ?? "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (haulerWords.test(text) && !/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {

@@ -286,6 +286,4 @@ body.no-server #no-server {
   #power { display: flex; align-items: center; gap: .25rem; font-size: .72rem; white-space: nowrap; }
   #power[hidden] { display: none; }
   #power .label, #power .bar, #power .state { display: none; }
-  #structure-menu { padding: .6rem; gap: .5rem; }
-  #structure-menu button { min-block-size: 48px; font-size: 1rem; }
 }

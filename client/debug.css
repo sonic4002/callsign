@@ -422,7 +422,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #roster li.deploying .cancel { flex: none; inline-size: 1.6rem; block-size: 1.6rem; padding: 0; line-height: 1; font-size: 1rem; }
 /* ---- power, the radar and our own structures ---- */
 #power { grid-column: 1 / -1; display: grid; grid-template-columns: auto auto auto 1fr auto; align-items: center; gap: .4rem; font-size: .78rem; }
-#power[hidden], #structure-menu[hidden], #radar-off[hidden], #structure-menu button[hidden] { display: none; }
+#power[hidden], #radar-off[hidden] { display: none; }
 #power .icon { display: inline-flex; }
 #power .label { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 #power .figures { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brass); }
@@ -440,15 +440,15 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #structures .power.short { color: var(--warn); font-weight: 700; }
 #structure-list li.repairing .order { color: var(--brass); }
 #structure-list li.dark .name { color: var(--warn); }
-#structure-menu {
-  position: absolute; display: flex; flex-direction: column; gap: .35rem; padding: .5rem .6rem;
-  background: #10161af2; border: 1px solid var(--brass-dim); transform: translate(-50%, 12px); z-index: 3;
-}
-#structure-menu strong { font-size: .8rem; color: var(--brass); text-align: center; unicode-bidi: plaintext; }
-#structure-menu small { font-size: .7rem; color: var(--muted); text-align: center; }
-#structure-menu div { display: flex; gap: .35rem; }
-#structure-menu button { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
-#structure-menu .gold { color: var(--brass); font-variant-numeric: tabular-nums; }
+#orders div { flex-wrap: wrap; justify-content: center; max-inline-size: 21rem; }
+#orders button { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+#orders small { font-size: .7rem; color: var(--muted); text-align: center; }
+#orders small:empty { display: none; }
+#orders .gold { color: var(--brass); font-variant-numeric: tabular-nums; }
+#orders .gold:empty, #orders .icon:empty { display: none; }
+#orders-about[hidden] { display: none; }
+#placer-warn { font-size: .78rem; color: var(--warn); }
+#placer-warn[hidden] { display: none; }
 /* Heroes, earned ranks (heroes.js) */
 #roster li.hero { border-inline-start-color: #e6edf2; }
 #roster li.hero .portrait { float: inline-start; inline-size: 40px; block-size: 40px; margin-inline-end: .45rem; border: 1px solid #3a464d; border-radius: 3px; object-fit: cover; background: #10161a; }

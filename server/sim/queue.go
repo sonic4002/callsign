@@ -267,7 +267,9 @@ func (s *Sim) setRally(c Command) error {
 		if err != nil {
 			return err
 		}
-		if pl.Base != "" || (pl.Structure != nil && pl.Structure.Side != c.Side) {
+		// One's own structure or a tech building (a place on the map, whoever holds it);
+		// never the enemy's.
+		if pl.Base != "" || (pl.Structure != nil && pl.Structure.Side != c.Side && pl.Structure.def.Role != shared.RoleTech) {
 			return fmt.Errorf("%w: %q", ErrRallyNowhere, c.Place)
 		}
 		r = &rallyPoint{pl.ID, pl.X, pl.Y}

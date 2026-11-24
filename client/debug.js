@@ -1071,7 +1071,10 @@ function renderPlacer() {
   $("placer").hidden = !placing;
   if (!placing) return;
   const build = placing.mode === "build";
-  $("placer-title").textContent = build ? t("placer.title", { structure: placing.def.name[lang] }) : t("placer.rally");
+  const from = placing.structure ? saidStructure(placing.structure) : "";
+  $("placer-title").textContent = build ? t("placer.title", { structure: placing.def.name[lang] }) : from ? t("placer.rallyFrom", { structure: from }) : t("placer.rally");
+  // It may be placed all the same; the panel says what it will do to the base's power.
+  $("placer-warn").hidden = !(build && wouldRunShort(state, placing.def));
   const why = $("placer-why");
   // Why it cannot stand there, or the spot as the call will say it.
   if (!build) why.textContent = "";
@@ -1103,27 +1106,37 @@ function confirmPlacing() {
 $("placer-ok").addEventListener("click", confirmPlacing);
 $("placer-cancel").addEventListener("click", stopPlacing);
 $("placer-home").addEventListener("click", () => {
+  const from = placing?.structure;
   stopPlacing();
-  order(call("rallyHome", { to: anvil() }));
+  order(from ? call("rallyFromHome", { to: anvil(), structure: saidStructure(from) }) : call("rallyHome", { to: anvil() }));
 });
-$("rally-set").addEventListener("click", () => {
+// startRally asks where new squads gather: all of them, or those one structure makes.
+function startRally(structure = null) {
   hideOrders();
   scene.placing = null;
-  placing = { mode: "rally" };
+  placing = { mode: "rally", structure };
   renderPlacer();
-});
+}
+$("rally-set").addEventListener("click", () => startRally());
 addEventListener("keydown", (ev) => ev.key === "Escape" && placing && stopPlacing());
 // A press outside the map and the build panel puts the ghost away.
 addEventListener("pointerdown", (ev) => {
   if (placing && !ev.target.closest?.('#map-wrap, #placer, [data-sheet="build"]')) stopPlacing();
 });
 
-// placeRally sends the rally call for the named point under a tap, if there is one.
+// placeRally sends the rally call for what is under a tap: a named point, a tech building
+// or a landmark. A tap on open ground asks for nothing.
 function placeRally(wx, wy) {
-  const point = rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= rules.match.captureRadius * 1.15);
-  if (!point) return;
+  const [sx, sy] = scene.cam.screen(wx, wy);
+  const hit = scene.pick(sx, sy, side);
+  const near = rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= rules.match.captureRadius * 1.15);
+  const tech = hit.structure?.role === "tech" ? hit.structure : null;
+  const mark = hit.landmark ?? hit.bridge;
+  const name = tech ? structureName(tech) : mark ? placeName(mark.id) : (hit.point ?? near)?.callsign[lang];
+  if (!name) return;
+  const from = placing?.structure;
   stopPlacing();
-  order(call("rally", { to: anvil(), point: point.callsign[lang] }));
+  order(from ? call("rallyFrom", { to: anvil(), structure: saidStructure(from), point: name }) : call("rally", { to: anvil(), point: name }));
 }
 
 // renderRally says where new squads gather now, as the side's structures have it.
@@ -1230,7 +1243,7 @@ function mapClick(ev) {
   if (hit.squad) {
     // The squad already picked, tapped again: what it can do where it stands.
     if (hit.squad.id === scene.selected && canDigIn(unitDef(rules, hit.squad.unit))) {
-      return offerOrders(hit.squad, t("order.here"), ["fortify"], () => call("fortify", { to: hit.squad.callsign[lang] }), box, sx, sy);
+      return offerOrders({ title: `${hit.squad.callsign[lang]} → ${t("order.here")}`, actions: ["fortify"], say: () => call("fortify", { to: hit.squad.callsign[lang] }) }, box, sx, sy);
     }
     return select(hit.squad);
   }
@@ -1241,7 +1254,7 @@ function mapClick(ev) {
     if (!mine) return draft($("text").value + name);
     // With a squad picked, an enemy offers one action: attack it. A hero may seize a vehicle.
     const acts = heroOrders(rules, mine, { kind: "contact", cls: hit.contact.class }, ["attack"]);
-    return offerOrders(mine, name, acts, (action) => call(action, { to: mine.callsign[lang], point: name }), box, sx, sy);
+    return offerOrders({ title: `${mine.callsign[lang]} → ${name}`, actions: acts, say: (action) => call(action, { to: mine.callsign[lang], point: name }) }, box, sx, sy);
   }
   if (hit.structure) {
     // An enemy structure: engineers are sent to take it over, anyone else to attack it.
@@ -1253,7 +1266,7 @@ function mapClick(ev) {
     const actions = heroOrders(rules, mine, { kind: "structure" }, unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"]);
     const tech = st.role === "tech"; // not "the enemy's": it may be nobody's
     const say = (action) => (action === "plant" ? call("plantStructure", { to: mine.callsign[lang], structure: structureName(st) }) : call(`${action === "capture" ? "capture" : "attackStructure"}${tech ? "Tech" : ""}`, { to: mine.callsign[lang], structure: structureName(st) }));
-    return offerOrders(mine, structureName(st), actions, say, box, sx, sy);
+    return offerOrders({ title: `${mine.callsign[lang]} → ${structureName(st)}`, actions, say }, box, sx, sy);
   }
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (hit.gusher && !hit.landmark && !hit.bridge) {
@@ -1272,29 +1285,50 @@ function mapClick(ev) {
   if (!squad) return draft($("text").value + name);
   const said = kind === "point" ? name : placeName(place.id);
   const target = kind === "point" && place.kind === "hq" && place.owner !== side ? "enemyHQ" : kind;
-  offerOrders(squad, name, heroOrders(rules, squad, { kind: target }, ordersFor(kind)), (action) => call(action, { to: squad.callsign[lang], point: said }), box, sx, sy);
+  offerOrders({ title: `${squad.callsign[lang]} → ${name}`, actions: heroOrders(rules, squad, { kind: target }, ordersFor(kind)), say: (action) => call(action, { to: squad.callsign[lang], point: said }) }, box, sx, sy);
 }
 
-// offerOrders opens the small menu of actions for a squad and a place, an enemy or a
-// structure. `say(action)` writes the call for the action pressed, and pressing one
-// transmits it at once.
+// offerOrders opens the one small menu of the map: the orders for a squad at a place, an
+// enemy or a structure, or what can be done with one of the player's own structures.
+//   title, facts: what the menu is about; actions: the buttons to show, by name;
+//   gold: what a button costs or gives back, by action; say(action): the call to send.
+// Pressing a button transmits its call at once. `say` may instead start something that
+// needs one more choice (where a rally point goes) and return nothing.
 let orderCall = null;
-function offerOrders(squad, placeName, actions, say, box, sx, sy) {
+function offerOrders({ title, facts = "", actions, gold = {}, say }, box, sx, sy) {
   const menu = $("orders");
   orderCall = say;
-  $("orders-title").textContent = `${squad.callsign[lang]} → ${placeName}`;
-  for (const button of menu.querySelectorAll("button")) button.hidden = !actions.includes(button.dataset.order);
-  menu.style.left = `${Math.max(90, Math.min(box.width - 90, sx))}px`;
-  menu.style.top = `${Math.min(box.height - 90, sy)}px`;
+  $("orders-title").textContent = title;
+  $("orders-facts").textContent = facts;
+  for (const button of menu.querySelectorAll("button")) {
+    const act = button.dataset.order;
+    button.hidden = !actions.includes(act);
+    const icon = button.querySelector(".icon");
+    if (icon && !icon.firstChild) icon.innerHTML = iconSvg(act === "sell" ? "sell" : act === "rally" ? "rally" : "repair", 14);
+    const n = button.querySelector(".gold");
+    if (n) n.textContent = gold[act] ?? "";
+  }
+  // The reminder of what the three orders mean is shown with the three orders only.
+  $("orders-about").hidden = !["hold", "move", "attack"].every((a) => actions.includes(a));
+  menu.style.left = `${Math.max(110, Math.min(box.width - 110, sx))}px`;
+  menu.style.top = `${Math.max(8, Math.min(box.height - 130, sy))}px`;
   menu.hidden = false;
 }
 
 function hideOrders() {
   $("orders").hidden = true;
-  $("structure-menu").hidden = true;
 }
 
-// ---- our own structures: sell and repair ----
+for (const button of document.querySelectorAll("#orders button")) {
+  button.addEventListener("click", () => {
+    const say = orderCall;
+    hideOrders();
+    const text = me && !state?.over && say ? say(button.dataset.order) : null;
+    if (text) order(text);
+  });
+}
+
+// ---- our own structures: rally, cancel, repair and sell ----
 
 // saidStructure is how a call names one of our structures: by its name, and by its id as
 // well when the side has more than one of the kind.
@@ -1303,51 +1337,28 @@ function saidStructure(st) {
   return same.length > 1 ? `${structureName(st)} ${st.id}` : structureName(st);
 }
 
-// offerStructure opens the menu for one of the player's own structures. Its buttons only
-// write a radio call and send it: to Anvil to sell it or to pay for its repair, or to the
-// engineer squad that is selected to go in and mend it.
-let structureCall = null;
+// offerStructure opens the menu for one of the player's own structures: where the units
+// it makes gather, the last unit in its line taken back, its repair and its sale. With
+// an engineer squad selected it also offers to send them in to mend it.
 function offerStructure(st, squad, box, sx, sy) {
   const def = structureDef(rules, st);
-  const menu = $("structure-menu");
   const engineers = Boolean(squad && unitDef(rules, squad.unit)?.captureSeconds);
-  const actions = me && !state.over ? structureActions(st, side, { engineers }) : [];
+  const line = (state.deploying ?? []).filter((d) => d.side === side && d.from === st.id);
+  const makes = Object.values(rules.factions[faction]?.units ?? {}).some((u) => u.requires === st.role);
+  const actions = me && !state.over ? structureActions(st, side, { engineers, makes, line: line.length }) : [];
   if (!def || !actions.length) return draft($("text").value + structureName(st));
-  $("structure-menu-title").textContent = structureName(st);
-  const facts = [`${Math.round(st.hp * 100)}%`];
+  const facts = [st.building < 1 ? t("structure.rising", { percent: Math.round(st.building * 100) }) : `${Math.round(st.hp * 100)}%`];
   if (st.repairing) facts.push(t("structure.repairing"));
   if (st.dark) facts.push(t("structure.dark"));
-  $("structure-menu-facts").textContent = facts.join(" · ");
-  const gold = { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}`, mend: "" };
-  for (const button of menu.querySelectorAll("button")) {
-    const act = button.dataset.structureAct;
-    button.hidden = !actions.includes(act);
-    button.querySelector(".icon").innerHTML = iconSvg(act === "sell" ? "sell" : "repair", 14);
-    const n = button.querySelector(".gold");
-    if (n) n.textContent = gold[act];
-  }
-  structureCall = (act) =>
-    act === "mend" ? call("mend", { to: squad.callsign[lang], structure: saidStructure(st) }) : call(act === "sell" ? "sell" : "repairStructure", { to: anvil(), structure: saidStructure(st) });
-  menu.style.left = `${Math.max(110, Math.min(box.width - 110, sx))}px`;
-  menu.style.top = `${Math.min(box.height - 110, sy)}px`;
-  menu.hidden = false;
-}
-
-for (const button of document.querySelectorAll("#structure-menu button")) {
-  button.addEventListener("click", () => {
-    const say = structureCall;
-    hideOrders();
-    if (say) order(say(button.dataset.structureAct));
-  });
-}
-
-for (const button of document.querySelectorAll("#orders button")) {
-  button.addEventListener("click", () => {
-    const squad = state.squads.find((sq) => sq.id === scene.selected);
-    const say = orderCall;
-    hideOrders();
-    if (squad && say) order(say(button.dataset.order));
-  });
+  if (st.rally) facts.push(`${t("rally.label")} ${placeName(st.rally.place)}`);
+  const last = line.at(-1);
+  const say = (act) => {
+    if (act === "rally") return startRally(st);
+    if (act === "cancel") return call("cancel", { to: anvil(), unit: unitDef(rules, last.unit)?.name[lang] ?? last.unit });
+    if (act === "mend") return call("mend", { to: squad.callsign[lang], structure: saidStructure(st) });
+    return call(act === "sell" ? "sell" : "repairStructure", { to: anvil(), structure: saidStructure(st) });
+  };
+  offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
 }
 
 // ---- menus ----

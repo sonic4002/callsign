@@ -139,6 +139,9 @@ export function namedStructure(text, structures, { enemy }) {
   // the way an enemy structure is. A tech building named by its own word comes first,
   // so that "the service yard" is not read as the enemy's works.
   const theirs = (s) => (s.whose !== "yours") === enemy;
+  // Called by its id ("the Barracks s9"), it is that one and no other of its kind.
+  const byId = (structures ?? []).find((s) => theirs(s) && new RegExp(`(^|[^a-z0-9])${s.id}([^a-z0-9]|$)`).test(low));
+  if (byId) return byId;
   // Called by its own name on the map, it is that one and no other of its kind.
   const site = (structures ?? []).find((s) => theirs(s) && s.site && (low.includes(s.site.toLowerCase()) || (s.siteHe && low.includes(s.siteHe))));
   if (site) return site;

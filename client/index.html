@@ -47,6 +47,7 @@
       <div id="placer" hidden>
         <strong id="placer-title"></strong>
         <span id="placer-why" dir="auto"></span>
+        <span id="placer-warn" hidden data-i18n="structure.short"></span>
         <small id="placer-hint"></small>
         <div>
           <button type="button" class="primary" id="placer-ok" data-i18n="placer.ok"></button>
@@ -54,8 +55,11 @@
           <button type="button" id="placer-cancel" data-i18n="placer.cancel"></button>
         </div>
       </div>
+      <!-- The one small menu of the map: orders for a squad, or what to do with a structure
+           of the player's own. Every button writes a radio call and sends it at once. -->
       <div id="orders" hidden>
         <strong id="orders-title"></strong>
+        <small id="orders-facts" dir="auto"></small>
         <div>
           <button type="button" data-order="hold" data-i18n="act.hold"></button>
           <button type="button" data-order="move" data-i18n="act.move"></button>
@@ -65,18 +69,13 @@
           <button type="button" data-order="fortify" data-i18n="act.fortify" hidden></button>
           <button type="button" data-order="plant" data-i18n="act.plant" hidden></button>
           <button type="button" data-order="seize" data-i18n="act.seize" hidden></button>
+          <button type="button" data-order="rally" hidden><span class="icon"></span><span data-i18n="act.rally"></span></button>
+          <button type="button" data-order="cancel" hidden><span data-i18n="act.cancel"></span></button>
+          <button type="button" data-order="repair" hidden><span class="icon"></span><span data-i18n="act.repair"></span><bdi dir="ltr" class="gold"></bdi></button>
+          <button type="button" data-order="mend" hidden><span class="icon"></span><span data-i18n="act.mend"></span></button>
+          <button type="button" data-order="sell" hidden><span class="icon"></span><span data-i18n="act.sell"></span><bdi dir="ltr" class="gold"></bdi></button>
         </div>
         <small id="orders-about" data-i18n="orders.about"></small>
-      </div>
-      <!-- One of the player's own structures, tapped: each button sends a radio call. -->
-      <div id="structure-menu" hidden>
-        <strong id="structure-menu-title"></strong>
-        <small id="structure-menu-facts"></small>
-        <div>
-          <button type="button" data-structure-act="sell"><span class="icon"></span><span data-i18n="act.sell"></span><bdi dir="ltr" class="gold"></bdi></button>
-          <button type="button" data-structure-act="repair"><span class="icon"></span><span data-i18n="act.repair"></span><bdi dir="ltr" class="gold"></bdi></button>
-          <button type="button" data-structure-act="mend"><span class="icon"></span><span data-i18n="act.mend"></span></button>
-        </div>
       </div>
     </div>
     <section id="radio" class="panel">
