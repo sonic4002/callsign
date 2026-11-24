@@ -50,6 +50,9 @@ type Config struct {
 	Rules     *shared.Rules
 	Providers map[string]provider.Provider
 	Limits    Limits
+	// Decide is the decision route, paid for with the game's own key (decide.go). Left
+	// empty, the route answers that it is off.
+	Decide Decide
 	// Origins are the pages allowed to call the relay from another origin. A page served
 	// by the game server reaches the relay through it, on its own origin, and needs no entry.
 	Origins []string
@@ -61,6 +64,7 @@ type Config struct {
 type Relay struct {
 	cfg     Config
 	limits  *limiter
+	decider *decider
 	sleep   func(context.Context, time.Duration) error
 	newSeat struct {
 		sync.Mutex
@@ -97,7 +101,7 @@ func New(cfg Config) (*Relay, error) {
 	if cfg.Logf == nil {
 		cfg.Logf = log.Printf
 	}
-	r := &Relay{cfg: cfg, limits: newLimiter(cfg.Limits), sleep: sleepCtx}
+	r := &Relay{cfg: cfg, limits: newLimiter(cfg.Limits), sleep: sleepCtx, decider: newDecider(cfg.Decide, cfg.Models.Decision)}
 	r.newSeat.tokens = newKeysPerMinute
 	r.newSeat.seen = time.Now()
 	return r, nil
@@ -118,9 +122,10 @@ func (r *Relay) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/relay/v1/player", r.page(r.player, http.MethodPost))
 	mux.HandleFunc("/relay/v1/think", r.guard(r.think, http.MethodPost))
+	mux.HandleFunc("/relay/v1/decide", r.guard(r.decide, http.MethodPost))
 	mux.HandleFunc("/relay/v1/key", r.guard(r.key, http.MethodGet, http.MethodPut, http.MethodDelete))
 	mux.HandleFunc("/relay/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "providers": provider.Names})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "providers": provider.Names, "decide": r.decider.status()})
 	})
 	return mux
 }

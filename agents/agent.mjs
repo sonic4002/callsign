@@ -95,6 +95,9 @@ export class Agent {
     this.over = hello.state.over;
     this.traffic = hello.log.slice(-8).map((m) => m.text);
     this.netLang = hello.log.findLast((m) => m.from.key === "player")?.lang; // a squad joining mid-match learns it too
+    // What the match's host chose for the brains that need no key: the operator's
+    // initiative (1 to 3), and whether squads take orders through the fast decision model.
+    this.level = hello.lobby?.anvil || undefined;
     if (this.role === "squad") {
       const mine = hello.state.squads.find((s) => s.id === this.squad);
       this.tier = mine.tier;
@@ -107,6 +110,7 @@ export class Agent {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
     }
+    this.tele.r.brain = this.#brainName();
     this.tele.joined({ tier: this.tier, planned: this.#planned() });
     // A call made just before this station came on the net is answered now: a commander
     // who sits down and gives an order at once would otherwise be met with silence.
@@ -119,7 +123,12 @@ export class Agent {
 
   // The model the brain means to use for the next thought, when it chooses one itself.
   #planned() {
-    return this.brain?.plan?.({ role: this.role, tier: this.tier }) ?? null;
+    return this.brain?.plan?.({ role: this.role, tier: this.tier, level: this.level }) ?? null;
+  }
+
+  // Which brain thinks for this station: one brain may hand its squads to another by tier.
+  #brainName() {
+    return this.brain?.nameFor?.({ role: this.role, tier: this.tier }) ?? this.brain?.name ?? "";
   }
 
   #onFrame(frame) {
@@ -196,6 +205,7 @@ export class Agent {
       this.tier = status.you.tier;
       this.history = [];
       this.tele.reset("tier");
+      this.tele.r.brain = this.#brainName();
       this.tele.tier(this.tier, this.#planned());
     }
     const call = items.findLast((i) => i.kind === "radio")?.msg ?? null;
@@ -207,7 +217,7 @@ export class Agent {
 
     let answered = false;
     const timer =
-      call && this.brain.slow
+      call && (this.brain.slowFor?.({ role: this.role, tier: this.tier }) ?? this.brain.slow)
         ? setTimeout(() => {
             // Thinking takes a moment; say so, the way a real operator would.
             if (answered) return;
@@ -223,11 +233,11 @@ export class Agent {
         if (turn > 0) this.tele.thinking(null);
         const began = Date.now();
         const res = await this.brain.think({
-          agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander, unit: this.unit },
+          agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander, unit: this.unit, ...(this.role === "anvil" && this.level ? { level: this.level } : {}) },
           system: this.system,
           tools: this.tools,
           messages: this.history,
-          wake: { items, status, call },
+          wake: { items, status, call, traffic: this.traffic },
           rules: this.rules,
         });
         this.history.push({ role: "assistant", content: res.content });

@@ -672,6 +672,30 @@ export function drawLandmark(ctx, kind, id, fallen = false) {
   return true;
 }
 
+// What decorates open ground, and the pictures it wears: `variants` of these names.
+const scatterKinds = { tree: "tree", stone: "stone", peak: "crag" };
+const scatterTall = { tree: 30, stone: 13, peak: 40 };
+
+// drawScatter draws one piece of the ground's decoration (see scenery in terrain.js) from
+// a painted picture, with its foot on (x, y). Which picture of its kind it wears follows
+// from the piece itself, so it never changes. It returns false when there is no picture.
+export function drawScatter(g, s, x, y) {
+  const options = sprites.variants[scatterKinds[s.kind]];
+  if (!options?.length) return false;
+  const pick = Math.floor((s.k * 7.13 + (s.tint ? 0.5 : 0) + (s.tone ?? 0)) * options.length) % options.length;
+  const entry = sprites.landmarks[options[pick]];
+  if (!entry?.img) return false;
+  const tall = scatterTall[s.kind] * s.k;
+  const k = tall / entry.size[1];
+  const [w, anchor] = [entry.size[0] * k, entry.anchor ?? [0.5, 0.9]];
+  g.fillStyle = "rgba(0,0,0,0.24)";
+  g.beginPath();
+  g.ellipse(x + w * 0.08, y + 1, w * 0.42, w * 0.17, 0, 0, TAU);
+  g.fill();
+  g.drawImage(entry.img, x - anchor[0] * w, y - anchor[1] * tall, w, tall);
+  return true;
+}
+
 // drawProp draws a flat thing lying on the ground (a patch of gold), `width` screen pixels
 // wide, centred on its own anchor. It returns false when there is no picture for it.
 export function drawProp(ctx, key, width) {

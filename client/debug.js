@@ -25,6 +25,7 @@ import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
+import { hintCalls } from "./voice/hints.js";
 import { Voice } from "./voice/voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -183,8 +184,9 @@ const brains = mountAgents({
   system,
   server: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
   side,
-  // In the first lesson the squads always think here, with the scripted brain (`lesson`).
-  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token, lesson: Boolean(lobby?.tutorial) } : null) : { room: "" }),
+  // In the first lesson the squads always think here, with the rule brain (`lesson`);
+  // `fast` is the host's choice of the fast brain for this match (brains/policy.js).
+  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token, lesson: Boolean(lobby?.tutorial), fast: Boolean(lobby?.fast) } : null) : { room: "" }),
   canAct: () => role === "hammer",
 });
 
@@ -664,7 +666,8 @@ $("text").addEventListener("keydown", (ev) => {
 
 // ---- voice ----
 // Push-to-talk: hold the button, or the key left of 1, and speak a call. It is recognised
-// in this browser, tidied into procedure, and put in the box to check and send.
+// by the game server when it offers that (the recording is sent there and not kept), else
+// in this browser; then tidied into procedure, and put in the box to check and send.
 
 let voiceState = "idle";
 let voiceDetail = {};
@@ -675,6 +678,7 @@ const voice = new Voice({
     voiceDetail = detail;
     renderVoice();
   },
+  onLimit: () => talkEnd(), // the longest recording: it is sent as if the button were let go
 });
 
 function renderVoice() {
@@ -686,7 +690,7 @@ function renderVoice() {
   status.hidden = voiceState === "idle";
   status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
   status.className = ["unsupported", "insecure", "denied", "missing", "failed"].includes(voiceState) ? "warn" : "";
-  $("ptt").title = t("voiceHint");
+  $("ptt").title = t(voice.remote ? "voiceHint.server" : "voiceHint");
   $("ptt").classList.toggle("live", voiceState === "listening");
   $("ptt").classList.toggle("busy", ["asking", "loading", "working"].includes(voiceState));
 }
@@ -725,9 +729,9 @@ async function talkEnd() {
   } catch (err) {
     console.warn("callsign list failed", err);
   }
-  const text = await voice.stop(spoke, openers);
+  const text = await voice.stop(spoke, openers, rules ? hintCalls(rules, spoke) : "");
   if (!text || !rules) return;
-  let said = tidy(text, { lang: spoke, rules });
+  let said = tidy(text, { lang: spoke, rules, careful: voice.heardBy === "server" }); // the server spells well
   // Tap a squad, then speak: an order that names nobody goes to the squad that is selected.
   const picked = state?.squads.find((sq) => sq.id === scene.selected);
   const names = [...callsigns(spoke), rules.callsigns.player[spoke]].map((name) => name.toLowerCase());
@@ -1728,6 +1732,7 @@ $("start").addEventListener("click", () => {
     return makeMatch({
       opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"),
       speed: chosen("speed"), purse: chosen("purse") === "on",
+      anvil: Number(chosen("anvil")) || 3, fast: chosen("fast") === "on",
       map: chosen("map") ?? "", startGold: chosenGold(),
     });
   }
@@ -1823,6 +1828,11 @@ requestAnimationFrame(frame);
 
 // What the lobby can offer, and the match lengths to choose from.
 offer = await serverInfo().catch(() => null);
+// A server with a listening service transcribes the calls of a seated commander.
+if (offer?.stt) {
+  voice.useServer(() => (role !== "hammer" ? null : room ? seat && { room, side, token: seat.token } : { room: "", side }));
+  renderVoice(); // the talk button's hint says where the recording goes
+}
 // Starting gold: the server's amounts, or one the player types, kept for next time.
 const golds = offer?.startGolds ?? [];
 const [goldMin, goldMax] = offer?.goldLimits ?? [400, 20000];
@@ -1909,13 +1919,13 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // For tests and screenshots: skip the lobby. A commander gets a match against the
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
-  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "" });
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "", fast: query.has("fast"), anvil: Number(query.get("anvil")) || 0 });
 } else if (query.has("learn") && role !== "spectator") {
   startLesson(); // ?learn goes straight into the first lesson
 }
 renderOverlay();
 // The speech model for the page's language is fetched now, in the lobby, so the talk
-// button answers at once when the match starts.
+// button answers at once when the match starts. (Not when the server transcribes.)
 voice.prepare(lang);
 
 // For debugging from the console.

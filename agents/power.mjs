@@ -1,5 +1,5 @@
 // What the agents know about power, the radar, selling and repairing: words for the
-// prompts (the operator's own paragraphs are in prompts.mjs), and how the scripted brain reads a call about them. It runs in Node and in a
+// prompts (the operator's own paragraphs are in prompts.mjs), and how the rule brain reads a call about them. It runs in Node and in a
 // Web Worker alike, like the rest of the agent core.
 
 // powerFact is a structure's power as its line in the operator's list says it.
@@ -18,7 +18,7 @@ export function leaderSiege(unit) {
   return " An enemy defence outranges your squad: do not attack one alone, and say so when ordered to; a siege unit breaks it from beyond its reach, and it falls silent when the enemy is short of power.";
 }
 
-// ---- the scripted brain ----
+// ---- the rule brain ----
 
 export const sellVerb = /\b(sell|scrap|dismantle)\b|מכור|מכרו|למכור|פרק את/;
 export const mendVerb = /\b(repair|fix|mend)\b|תקן|תקנו|לתקן|שקם|שקמו/;

@@ -1,5 +1,7 @@
-// Push-to-talk on the page side: the microphone, the recording, and the worker that
-// turns it into text. Nothing leaves the browser.
+// Push-to-talk on the page side: the microphone, the recording, and what turns it into
+// text. That is the game server when it has a listening service (useServer): the
+// recording is sent there, transcribed and not kept. Without one, or when it does not
+// answer in time, it is the worker in this browser, and then nothing leaves the browser.
 //
 // States, reported through onState(state, detail):
 //   idle | asking (for the microphone) | loading { percent } | listening | working
@@ -7,10 +9,19 @@
 
 const RATE = 16000;
 const MIN_SECONDS = 0.4;
+const MAX_SECONDS = 15; // a call runs 4 to 6 seconds; the server takes no more than this
+const SERVER_WAIT = 6000; // ms to wait for the server before recognising here instead
+const SERVER_REST = 60000; // ms the server is left alone after it failed
 
 export class Voice {
-  constructor({ onState = () => {} } = {}) {
+  // onLimit is called when a recording reaches MAX_SECONDS and has been ended; the page
+  // then calls stop() as if the button had been released.
+  constructor({ onState = () => {}, onLimit = () => {} } = {}) {
     this.onState = onState;
+    this.onLimit = onLimit;
+    this.seat = null; // set by useServer
+    this.heardBy = ""; // who transcribed the last recording: "server" or "browser"
+    this.restUntil = 0;
     this.supported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder && window.Worker && (window.AudioContext || window.webkitAudioContext));
     this.worker = null;
     this.stream = null;
@@ -47,17 +58,31 @@ export class Voice {
     return this.worker;
   }
 
+  // useServer says that the game server transcribes (its /api/server offered "stt").
+  // seat() returns the seat this page holds, { room, side, token }, or null when it holds
+  // none. The models for this browser are then fetched only if the server lets us down.
+  useServer(seat) {
+    this.seat = seat;
+  }
+
+  get remote() {
+    return Boolean(this.seat);
+  }
+
   // prepare fetches the model for `lang` ahead of need (in the lobby, before the match),
   // so the first press of the talk button does not wait for a download. It asks for no
-  // microphone and says nothing when it cannot be done here.
+  // microphone and says nothing when it cannot be done here. With a server that
+  // transcribes there is nothing to fetch: the models are large for a phone.
   prepare(lang) {
+    if (this.remote) return;
     if (globalThis.isSecureContext === false || !this.supported || this.ready.has(lang) || this.held) return;
     if (navigator.connection?.saveData) return; // the player asked their browser to save data
     this.preparing = true;
     this.#worker().postMessage({ type: "load", lang });
   }
 
-  // start begins recording; the model for `lang` starts loading at the same moment.
+  // start begins recording; without a server the model for `lang` starts loading at the
+  // same moment.
   async start(lang) {
     // Browsers hand out the microphone only on https or localhost: a phone that opened the
     // game by its LAN address over plain http can do everything except talk.
@@ -65,7 +90,7 @@ export class Voice {
     if (!this.supported) return this.onState("unsupported");
     if (this.held) return;
     this.held = true;
-    this.#worker().postMessage({ type: "load", lang });
+    if (!this.remote) this.#worker().postMessage({ type: "load", lang });
     try {
       if (!this.stream?.active) {
         this.onState("asking");
@@ -85,33 +110,79 @@ export class Voice {
     recorder.start();
     this.recorder = recorder;
     this.onState("listening");
+    clearTimeout(this.limit);
+    this.limit = setTimeout(() => {
+      if (this.recorder !== recorder) return;
+      if (recorder.state !== "inactive") recorder.stop(); // the recording ends here whatever the page does
+      this.onLimit();
+    }, MAX_SECONDS * 1000);
   }
 
   // stop ends the recording and resolves with what was said ("" when nothing was).
-  // `openers` are the callsigns a call can start with; the recogniser listens for them.
-  async stop(lang, openers = []) {
+  // `openers` are the callsigns a call can start with; the recogniser in this browser
+  // listens for them. `hints` is the radio net's vocabulary as text (hints.js), for the server.
+  async stop(lang, openers = [], hints = "") {
     this.held = false;
+    clearTimeout(this.limit);
     const recorder = this.recorder;
     if (!recorder) return "";
     this.recorder = null;
-    recorder.stop();
+    if (recorder.state !== "inactive") recorder.stop();
     try {
-      const audio = await this.#samples(await recorder.done);
+      const audio = (await this.#samples(await recorder.done)).subarray(0, MAX_SECONDS * RATE);
       if (audio.length < MIN_SECONDS * RATE || !audio.some((v) => Math.abs(v) > 0.01)) {
         this.onState("nothing");
         return "";
       }
+      const seat = this.remote && Date.now() >= this.restUntil ? this.seat() : null;
+      if (seat) {
+        this.onState("working");
+        try {
+          const text = await this.#ask(seat, audio, lang, hints);
+          this.heardBy = "server";
+          this.onState(text ? "idle" : "nothing");
+          return text;
+        } catch (err) {
+          // Down, slow or refusing: recognise here, and do not make the next calls wait for it.
+          console.warn("the server did not transcribe; recognising in this browser", err);
+          if (err.status !== 429) this.restUntil = Date.now() + SERVER_REST;
+        }
+      }
+      this.heardBy = "browser";
       this.onState(this.ready.has(lang) ? "working" : "loading", { percent: 0 });
       const id = this.nextId++;
       const text = await new Promise((resolve, reject) => {
         this.pending.set(id, { resolve, reject });
-        this.worker.postMessage({ type: "transcribe", id, lang, audio, openers }, [audio.buffer]);
+        this.#worker().postMessage({ type: "transcribe", id, lang, audio, openers }, [audio.buffer]);
       }).finally(() => this.pending.delete(id));
       this.onState(text ? "idle" : "nothing");
       return text;
     } catch (err) {
       this.onState(err.state ?? "failed", { message: err.message });
       return "";
+    }
+  }
+
+  // ask sends the recording to the game server as 16-bit samples and resolves with its
+  // text. It rejects when the server refuses, fails or takes longer than SERVER_WAIT.
+  async #ask(seat, audio, lang, hints) {
+    const pcm = new Int16Array(audio.length);
+    for (let i = 0; i < audio.length; i++) pcm[i] = Math.max(-1, Math.min(1, audio[i])) * 32767;
+    const query = new URLSearchParams({ room: seat.room ?? "", side: seat.side, lang, hints });
+    const gone = new AbortController();
+    const timer = setTimeout(() => gone.abort(), SERVER_WAIT);
+    try {
+      const res = await fetch(`/stt/transcribe?${query}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream", "X-Callsign-Seat": seat.token ?? "" },
+        body: pcm,
+        signal: gone.signal,
+      });
+      if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+      const { text } = await res.json();
+      return typeof text === "string" ? text.trim() : "";
+    } finally {
+      clearTimeout(timer);
     }
   }
 

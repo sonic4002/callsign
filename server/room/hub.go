@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,6 +36,12 @@ type HubConfig struct {
 	MaxRooms      int
 	Share         string // address other machines reach this server at, "" when unknown
 	HostKey       string // password needed to make a match, "" for none; joining one by its code never needs it
+	Listen        string // address of the listening service (stt/server.py), "" for none: see listen.go
+	// What the brains that need no key do in a match whose maker did not choose: the
+	// rule-brain operator's initiative (1 to 3, 0 for 3), and whether squads take orders
+	// through the relay's fast decision model.
+	Anvil int
+	Fast  bool
 }
 
 // agentGrace is how long a side's agents stay after its commander's last connection
@@ -65,6 +72,9 @@ type Hub struct {
 	rooms map[string]*held
 	made  uint64
 	open  *Room // the room of Phase 0: no code, no seats; only without an agent key
+
+	listen http.Handler // passes recordings on to the listening service; nil without one
+	talk   *talkLimit   // how fast each address may send recordings
 }
 
 type held struct {
@@ -84,12 +94,19 @@ func NewHub(ctx context.Context, r *shared.Rules, cfg HubConfig) (*Hub, error) {
 		cfg.MaxRooms = 32
 	}
 	h := &Hub{r: r, cfg: cfg, ctx: ctx, rooms: map[string]*held{}}
+	if cfg.Listen != "" {
+		target, err := url.Parse(cfg.Listen)
+		if err != nil || target.Host == "" {
+			return nil, fmt.Errorf("the listening service's address must be a URL such as http://stt:5003, not %q", cfg.Listen)
+		}
+		h.listen, h.talk = h.listenHandler(target), newTalkLimit()
+	}
 	if cfg.AgentKey == "" {
 		// The trusting mode of a server only this machine can reach: /ws with no room
 		// lands here and anyone may command a side, which tests and scripts rely on.
 		rm, err := New(r, Config{
 			Seed: cfg.Seed, Factions: cfg.Factions, LengthSeconds: cfg.LengthSeconds, FullBase: cfg.FullBase, Base: cfg.Base,
-			Bots: [2]string{"", cfg.Bot}, Opponent: OpponentBot, Watch: true,
+			Bots: [2]string{"", cfg.Bot}, Opponent: OpponentBot, Watch: true, Anvil: cfg.Anvil,
 		})
 		if err != nil {
 			return nil, err
@@ -112,6 +129,8 @@ type Options struct {
 	Purse         bool   // the operators may buy on their own from the start
 	Map           string // the map id, "" for the default
 	StartGold     int    // gold each side starts with, 0 for the rules default
+	Anvil         int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
+	Fast          *bool  // squads take orders through the fast decision model; nil for the server's usual
 }
 
 // Speed is a pace a match can be played at. It changes only how much real time one tick
@@ -212,6 +231,16 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
 		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
 	}
+	if o.Anvil < 0 || o.Anvil > 3 {
+		return nil, 0, "", errors.New("the operator's initiative is 1, 2 or 3")
+	}
+	if o.Anvil == 0 {
+		o.Anvil = h.cfg.Anvil
+	}
+	fast := h.cfg.Fast
+	if o.Fast != nil {
+		fast = *o.Fast
+	}
 	if o.Side == -1 {
 		var b [1]byte
 		if _, err := rand.Read(b[:]); err != nil {
@@ -231,6 +260,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase, Base: h.cfg.Base,
 		Map: o.Map, StartGold: o.StartGold,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
+		Anvil: o.Anvil, Fast: fast && !lesson, // a lesson spends nothing
 	}
 	if lesson {
 		cfg.Bots[1-o.Side] = bot.Tutorial // also on a server started without a scripted enemy
@@ -397,6 +427,7 @@ func (h *Hub) AgentWork() []AgentWork {
 //	POST /api/rooms                make a match and take a seat: {opponent, side, length, watch, bot}
 //	GET  /api/rooms/{code}         a match's lobby
 //	POST /api/rooms/{code}/seat    take a seat in a match
+//	POST /stt/transcribe           a commander's spoken call, passed to the listening service (if any)
 //	GET  /internal/rooms           for the agent host: which sides need agents
 //	GET  /internal/tier            for the model relay: a squad's brain tier
 func (h *Hub) Routes(mux *http.ServeMux) {
@@ -405,6 +436,9 @@ func (h *Hub) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/rooms", h.postRoom)
 	mux.HandleFunc("GET /api/rooms/{code}", h.getRoom)
 	mux.HandleFunc("POST /api/rooms/{code}/seat", h.postSeat)
+	if h.listen != nil {
+		mux.Handle("POST /stt/transcribe", h.listen)
+	}
 	mux.HandleFunc("GET /internal/rooms", h.internal(h.getWork))
 	mux.HandleFunc("GET /internal/tier", h.internal(h.getTier))
 }
@@ -460,6 +494,7 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"share":      strings.TrimRight(h.cfg.Share, "/"),
 		"open":       h.open != nil,       // the open room of a server without an agent key
 		"locked":     h.cfg.HostKey != "", // making a match needs the host's password
+		"stt":        h.listen != nil,     // spoken calls can be transcribed here instead of in the browser
 	})
 }
 
@@ -474,6 +509,8 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Purse     bool   `json:"purse"`
 		Map       string `json:"map"`
 		StartGold int    `json:"startGold"`
+		Anvil     int    `json:"anvil"`
+		Fast      *bool  `json:"fast"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -486,7 +523,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, Anvil: in.Anvil, Fast: in.Fast}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}
@@ -599,7 +636,9 @@ func (h *Hub) getTier(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such squad on that side"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tier": tier, "operator": squad == 0})
+	// `seated` tells the relay whether a seat token stood behind this answer: what is paid
+	// for with the game's own key is only ever done for a seat (relay/decide.go).
+	writeJSON(w, http.StatusOK, map[string]any{"tier": tier, "operator": squad == 0, "seated": rm.Seated()})
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
