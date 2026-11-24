@@ -107,8 +107,9 @@ test("Hammer's orders reach rule-brain squads over the net, in both languages", 
   const held = await hammer.next("Viper 2 holding Foxtrot", (f) => squadIn(f, 2)?.order.point === "F");
   assert.equal(squadIn(held, 2).order.kind, "hold");
   assert.equal(squadIn(held, 1).order.kind, "none", "Viper 1 was not addressed");
+  // It says where it is once: going inside the house at its post and arriving are one piece of news.
+  assert.match(await hammer.hears("Viper 2"), /^Hammer, this is Viper 2\. Inside the house [\w-]+ of Foxtrot\. Over\.$/);
   await hammer.next("Viper 2 arriving at Foxtrot", (f) => f.type === "event" && f.event.kind === "arrived" && f.event.squad === 2 && f.event.point === "F");
-  assert.equal(await hammer.hears("Viper 2"), "Hammer, this is Viper 2. At Foxtrot, holding. Over.");
 
   // The same in Hebrew, to the other squad.
   hammer.say("צפע 1, כאן פטיש, תחזיקו את גימל, עבור.");
