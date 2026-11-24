@@ -149,6 +149,11 @@
     "marker": { "en": "this is", "he": "כאן" },
     "over": { "en": "Over", "he": "עבור" },
     "out": { "en": "Out", "he": "סוף" },
+    "signOff": {
+      "won": { "en": "Victory. The enemy is defeated", "he": "ניצחון. האויב הובס" },
+      "lost": { "en": "We have been defeated", "he": "הובסנו" },
+      "draw": { "en": "The fight is over. Neither side won", "he": "הקרב הסתיים. אין מנצח" }
+    },
     "prowords": {
       "wilco": { "en": ["wilco"], "he": ["רות, יבוצע", "רות יבוצע"] },
       "roger": { "en": ["roger"], "he": ["רות"] },

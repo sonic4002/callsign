@@ -365,6 +365,38 @@ func TestScriptedEnemyPlaysToTheEnd(t *testing.T) {
 	if _, err := rm.Tool(leader, ToolHold, nil); err == nil {
 		t.Fatal("an order was accepted after the match ended")
 	}
+	// The operator signs off once on each side, in that side's words for the result.
+	lost, won := rm.Log(0), rm.Log(1)
+	if m := lost[len(lost)-1]; !m.Final || m.From.Key != radio.Operator || m.Text != "Hammer, this is Anvil. We have been defeated. Out." {
+		t.Fatalf("the losing side's last message: %+v", m)
+	}
+	if m := won[len(won)-1]; !m.Final || !strings.Contains(m.Text, "Victory") {
+		t.Fatalf("the winning side's last message: %+v", m)
+	}
+	finals := 0
+	for _, m := range lost {
+		if m.Final {
+			finals++
+		}
+	}
+	if finals != 1 {
+		t.Fatalf("the sign-off was sent %d times", finals)
+	}
+}
+
+func TestSignOffFollowsTheCommandersLanguage(t *testing.T) {
+	rm := newRoom(t, Config{Bots: [2]string{"", "rush"}, AutoStart: true, LengthSeconds: 240})
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	if _, err := rm.Say(hammer, "צפע 1 תפוס את דוד"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 241*rules.TickRate; i++ {
+		rm.Tick()
+	}
+	log := rm.Log(0)
+	if m := log[len(log)-1]; m.Text != "פטיש, כאן סדן, הובסנו, סוף." || m.Lang != "he" {
+		t.Fatalf("sign-off = %q (%s)", m.Text, m.Lang)
+	}
 }
 
 func TestRestart(t *testing.T) {

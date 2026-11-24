@@ -58,6 +58,7 @@ type Message struct {
 	End      string   `json:"end,omitempty"`
 	Prowords []string `json:"prowords,omitempty"`
 	Points   []string `json:"points,omitempty"`
+	Final    bool     `json:"final,omitempty"` // the operator's sign-off when the match ends
 }
 
 // Client is one connection. Out carries the JSON frames to write to it; it is closed
@@ -158,8 +159,43 @@ func (rm *Room) Tick() {
 			}
 		}
 	}
+	if rm.sim.Over {
+		rm.signOff()
+	}
 	if rm.sim.Tick%2 == 0 || rm.sim.Over {
 		rm.broadcastState()
+	}
+}
+
+// signOff is the last transmission of a match: the operator tells its commander how the
+// fight ended. Clients drop whatever radio was still waiting and play only this.
+func (rm *Room) signOff() {
+	from, to := radio.Station{Kind: radio.Operator}, radio.Station{Kind: radio.Player}
+	for side := 0; side < 2; side++ {
+		lang := rm.lang[side][to.Key()]
+		if lang != "he" {
+			lang = "en"
+		}
+		result := "lost"
+		switch rm.sim.Winner {
+		case side:
+			result = "won"
+		case sim.NoSide:
+			result = "draw"
+		}
+		body := rm.r.Radio.SignOff[result].In(lang)
+		text, err := rm.net.Compose(lang, from, []radio.Station{to}, body, radio.Out)
+		if err != nil {
+			log.Printf("sign-off for side %d: %v", side, err)
+			continue
+		}
+		rm.seq++
+		m := Message{
+			Seq: rm.seq, Tick: rm.sim.Tick, From: rm.name(from, side), To: []Name{rm.name(to, side)},
+			Lang: lang, Text: text, Body: body, End: radio.Out, Final: true,
+		}
+		rm.logs[side] = append(rm.logs[side], m)
+		rm.broadcast(side, map[string]any{"type": "radio", "message": m})
 	}
 }
 

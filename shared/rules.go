@@ -126,6 +126,7 @@ type Rules struct {
 		Marker   Text             `json:"marker"`
 		Over     Text             `json:"over"`
 		Out      Text             `json:"out"`
+		SignOff  map[string]Text  `json:"signOff"` // the operator's last word: won, lost, draw
 		Prowords map[string]Words `json:"prowords"`
 	} `json:"radio"`
 }

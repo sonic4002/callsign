@@ -125,6 +125,8 @@ function onFrame(frame) {
       entries.push({ kind: "radio", message: frame.message });
       // Anvil turning a purchase down ends the wait for it.
       if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) buyAnswered();
+      // The sign-off ends the match: whatever radio was still waiting is dropped for it.
+      if (frame.message.final) speech.silence();
       speech.say(frame.message, { rules, faction });
       break;
     case "refused":
