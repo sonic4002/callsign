@@ -1,6 +1,6 @@
 #!/bin/sh
-# Points the game's public name at this home's address, behind Cloudflare's proxy, so that
-# Cloudflare serves https for it and the home address is not shown in DNS.
+# Points the game's public name at this home's address with a plain (not proxied) DNS
+# record, so that the Let's Encrypt certificate can be issued and served from this machine.
 #
 #   CALLSIGN_PUBLIC_URL   https://<name>, read from .env by the Makefile
 #   CALLSIGN_CF_TOKEN     a Cloudflare API token that may edit DNS in that zone
@@ -27,11 +27,11 @@ while [ -z "$zone" ] && [ "${rest#*.}" != "$rest" ]; do
 done
 [ -n "$zone" ] || { echo "this token sees no zone for $name" >&2; exit 1; }
 
-body="{\"type\":\"A\",\"name\":\"$name\",\"content\":\"$ip\",\"proxied\":true,\"ttl\":1,\"comment\":\"Callsign game\"}"
+body="{\"type\":\"A\",\"name\":\"$name\",\"content\":\"$ip\",\"proxied\":false,\"ttl\":1,\"comment\":\"Callsign game\"}"
 id=$(call "$api/zones/$zone/dns_records?type=A&name=$name" | field id)
 if [ -n "$id" ]; then out=$(call -X PUT "$api/zones/$zone/dns_records/$id" --data "$body"); else out=$(call -X POST "$api/zones/$zone/dns_records" --data "$body"); fi
 if [ -n "$(printf %s "$out" | field id)" ]; then
-  echo "$name now points at this home, behind Cloudflare's proxy."
+  echo "$name now points at this home."
 else
   echo "Cloudflare refused: $(printf %s "$out" | why). The token needs Zone > DNS > Edit for $rest." >&2
   exit 1

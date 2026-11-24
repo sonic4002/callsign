@@ -15,3 +15,6 @@ client/vendor/ort/
 
 # Model relay: the encrypted key store and its master key.
 .relay-data/
+
+# make play-public: the Let's Encrypt certificate and its account key.
+.caddy-data/

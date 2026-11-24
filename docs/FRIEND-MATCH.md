@@ -94,33 +94,33 @@ Not protected:
 
 ## Over the internet, with https
 
-`make play-public` puts the game on an https address of your own domain behind
-Cloudflare, which holds the certificate. With https the microphone works on phones and
-for your friend. Put the address in `.env` first:
+`make play-public` puts the game on an https address of your own domain. With https the
+microphone works on phones and for your friend. Put the address in `.env` first:
 
     CALLSIGN_PUBLIC_URL=https://callsign.<your domain>
 
-There are two ways for Cloudflare to reach the game.
+There are two ways for players to reach the game.
 
-**Through this home's address.** The name is a proxied DNS record that points at the home's
-public address; Cloudflare shows its own addresses in DNS, not the home's.
+**Through this home's address, with a Let's Encrypt certificate.**
 
-1. `CALLSIGN_CF_TOKEN=<token> make public-dns` creates or updates the record. The token
-   needs *Zone → DNS → Edit* on the domain. Run it again when the home address changes.
-2. The zone's SSL/TLS mode must be **Flexible**: Cloudflare then talks to the game over
-   plain http on port 80.
-3. `make play-public` asks the router, over UPnP, to pass port 80 to the game, and
-   `make stop` closes it again. If the router refuses, forward port 80 to this machine's
-   port 8080 by hand. Some providers block port 80; then use a tunnel.
+1. The name needs a plain DNS record (type A, **not proxied**: a grey cloud in Cloudflare)
+   that points at the home's public address. `CALLSIGN_CF_TOKEN=<token> make public-dns`
+   creates or updates it with a token that has *Zone → DNS → Edit*; or add it by hand.
+   Run it again when the home address changes.
+2. The router forwards port **443** to this machine.
+3. `make play-public` starts the game with an https front (Caddy) on port 443. It fetches
+   the certificate from Let's Encrypt on first start (a few seconds) and renews it on its
+   own; the certificate is kept in `.caddy-data/`.
 
-Anyone who knows the home address can also reach the game on port 80 directly, without
-https, for as long as it runs.
+The home's address is visible to anyone who looks the name up. Traffic is encrypted all
+the way to this machine.
 
 **Through a Cloudflare Tunnel.** The tunnel dials out from this machine, so nothing is
-opened on the router and the home address is never used. In the Cloudflare dashboard
-(Zero Trust → Networks → Tunnels) create a tunnel of type *Cloudflared*, add a public
-hostname for the name with service `http://server:8080`, and put the tunnel's token in
-`.env` as `CALLSIGN_TUNNEL_TOKEN`. `make play-public` uses the tunnel whenever that is set.
+opened on the router and the home address is never used; Cloudflare holds the
+certificate and can read the traffic. In the Cloudflare dashboard (Zero Trust → Networks
+→ Tunnels) create a tunnel of type *Cloudflared*, add a public hostname for the name with
+service `http://server:8080`, and put the tunnel's token in `.env` as
+`CALLSIGN_TUNNEL_TOKEN`. `make play-public` uses the tunnel whenever that is set.
 
 Either way `make play-public` prints the address and the **host password**. Open the
 address, choose a friend match, type the password once (the browser remembers it), and
@@ -131,6 +131,4 @@ What changes on a public address:
 - **Only the host makes matches.** Every match runs agents on this machine, so making one
   needs the host password. Joining a match by its code or link does not.
 - **Wrong join codes are slowed**: the server answers 40 a minute in total.
-- **Traffic is encrypted** between the players and Cloudflare. Cloudflare itself can read
-  it, and on the home-address way the last leg from Cloudflare to the home is not encrypted.
 - Still true: the join code is not a password. Whoever has the link can take the free seat.

@@ -1,0 +1,7 @@
+# make play-public, the home-address way: Caddy gets a Let's Encrypt certificate for the
+# game's name by answering on port 443 (the TLS-ALPN challenge), and passes https on to
+# the game server. The certificate is kept in .caddy-data and renewed on its own.
+{$CALLSIGN_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy server:8080
+}
