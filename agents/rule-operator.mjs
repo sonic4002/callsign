@@ -249,6 +249,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
   };
   const events = wake.items.filter((i) => i.kind === "event").map((i) => i.event);
   const busy = new Set(); // squads given a task in this wake
+  const boss = rules.callsigns.player.en; // what Anvil has to say about the fight goes to Hammer, whoever called last
 
   // The base under attack: the two nearest squads go to what is being hit (the
   // headquarters, or the point a structure stands by), unless two are there already.
@@ -263,7 +264,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     if (back.length && home < 2) {
       task(back, say("opHold", { place: name(where.id) }));
       back.forEach((sq) => busy.add(sq.callsign.en));
-      if (once("defending", 60)) moves.push(radio([agent.commander ?? "Hammer"], say("opDefending", { count: back.length }), "out"));
+      if (once("defending", 60)) moves.push(radio([boss], say("opDefending", { count: back.length }), "out"));
     }
   }
   // A hauler under attack: the nearest free squad guards its field.
@@ -276,11 +277,13 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     if (guard) {
       task([guard], say("opHold", { place: name(field) }));
       busy.add(guard.callsign.en);
-      if (once(`guard:${field}`, 60)) moves.push(radio([agent.commander ?? "Hammer"], say("opGuarding", { squad: guard.callsign[lang] ?? guard.callsign.en, place: name(field) }), "out"));
+      if (once(`guard:${field}`, 60)) moves.push(radio([boss], say("opGuarding", { squad: guard.callsign[lang] ?? guard.callsign.en, place: name(field) }), "out"));
     }
   }
-  // Points nobody holds: every squad without orders goes to the nearest one none of ours
-  // is on. A boat goes for the sea rig whoever holds it; nothing else can.
+  // Points nobody holds on our half of the map: every squad without orders goes to the
+  // nearest one none of ours is on. A boat goes for the sea rig whoever holds it; nothing
+  // else can. Ground on the enemy's half is not for one squad alone: see below.
+  const ours = (p) => !hq || !enemyHQ || dist(p, hq) <= dist(p, enemyHQ) + 1;
   const free = (id) => owner(id) !== side && owner(id) !== 1 - side;
   const taken = new Set(s.squads.map((q) => q.order?.point).filter(Boolean)); // one squad per point
   const idle = s.squads.filter((q) => q.order?.kind === "none" && !fresh(q) && !busy.has(q.callsign.en));
@@ -290,7 +293,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     const u = unitOf(sq);
     if (u.hero || u.captureSeconds) continue; // heroes and engineers wait for a task of their own
     const goal = rules.map.points
-      .filter((p) => p.kind !== "hq" && !taken.has(p.id) && (u.domain === "sea" ? p.kind === "seaRig" && owner(p.id) !== side : free(p.id) && (u.domain === "air" || p.kind !== "seaRig") && !u.noCapture))
+      .filter((p) => p.kind !== "hq" && !taken.has(p.id) && (u.domain === "sea" ? p.kind === "seaRig" && owner(p.id) !== side : free(p.id) && ours(p) && (u.domain === "air" || p.kind !== "seaRig") && !u.noCapture))
       .sort((a, b) => dist(a, sq) - dist(b, sq))[0];
     if (goal) {
       taken.add(goal.id);
@@ -298,16 +301,22 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
       busy.add(sq.callsign.en);
     } else if (sq.class !== "naval") waiting.push(sq);
   }
-  // Ground the enemy holds is not gone at one squad at a time. With nothing free left to
-  // take, the squads that can be spared mass at the point of ours nearest the enemy, and
-  // go together once three are there: at the nearest point the enemy holds, and when it
-  // holds none, at its headquarters.
+  // Ground the enemy holds, or that lies on its half, is not gone at one squad at a time.
+  // With nothing left to take near home, the squads that can be spared mass at the point
+  // of ours nearest the enemy and go together once three are there: at the nearest point
+  // that is not ours, and when every point is, at the enemy's headquarters. One squad
+  // stays on each point we hold.
   if (moves.length < 3 && enemyHQ && hq) {
     const fieldsWorked = new Set((s.haulers ?? []).filter((h) => h.side === side && h.field).map((h) => (rules.map.gushers ?? []).find((g) => g.id === h.field)?.point));
     const forward = rules.map.points.filter((p) => p.kind !== "seaRig" && p.kind !== "hq" && owner(p.id) === side).sort((a, b) => dist(a, enemyHQ) - dist(b, enemyHQ))[0] ?? hq;
-    const spare = land.filter((sq) => !busy.has(sq.callsign.en) && (sq.order?.kind === "none" || (sq.order?.kind === "hold" && !fieldsWorked.has(sq.order.point) && sq.order.point !== hq.id)));
-    const freeLeft = rules.map.points.some((p) => p.kind !== "hq" && p.kind !== "seaRig" && free(p.id) && !taken.has(p.id));
-    const prize = rules.map.points.filter((p) => p.kind !== "hq" && p.kind !== "seaRig" && owner(p.id) === 1 - side).sort((a, b) => dist(a, forward) - dist(b, forward))[0];
+    const keeper = new Map(); // point we hold → the squad that stays on it
+    for (const sq of land) {
+      const at = sq.order?.kind === "hold" && sq.order.point;
+      if (at && at !== forward.id && owner(at) === side && !keeper.has(at)) keeper.set(at, sq.callsign.en);
+    }
+    const spare = land.filter((sq) => !busy.has(sq.callsign.en) && (sq.order?.kind === "none" || (sq.order?.kind === "hold" && keeper.get(sq.order.point) !== sq.callsign.en && !fieldsWorked.has(sq.order.point) && sq.order.point !== hq.id)));
+    const freeLeft = rules.map.points.some((p) => p.kind !== "hq" && p.kind !== "seaRig" && free(p.id) && ours(p) && !taken.has(p.id));
+    const prize = rules.map.points.filter((p) => p.kind !== "hq" && p.kind !== "seaRig" && owner(p.id) !== side).sort((a, b) => dist(a, forward) - dist(b, forward))[0];
     if (!freeLeft && spare.length >= 3) {
       const there = spare.filter((sq) => dist(sq, forward) <= 230);
       const coming = spare.filter((sq) => dist(sq, forward) > 230 && !(sq.order?.point === forward.id) && !fresh(sq, 20));
@@ -315,10 +324,10 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
         // A point is taken and held; the headquarters is attacked.
         const goal = prize ?? enemyHQ;
         task(there, say(prize ? "opHold" : "opAttack", { place: name(goal.id) }));
-        if (once(`attacking:${goal.id}`, 45)) moves.push(radio([agent.commander ?? "Hammer"], say("opAttacking", { place: name(goal.id), count: there.length }), "out"));
+        if (once(`attacking:${goal.id}`, 45)) moves.push(radio([boss], say("opAttacking", { place: name(goal.id), count: there.length }), "out"));
       } else if (coming.length) {
         task(coming, say("opHold", { place: name(forward.id) }));
-        if (once("massing", 90)) moves.push(radio([agent.commander ?? "Hammer"], say("opMassing", { place: name(forward.id) }), "out"));
+        if (once("massing", 90)) moves.push(radio([boss], say("opMassing", { place: name(forward.id) }), "out"));
       }
     } else if (waiting.length) {
       // Fewer than three: the ones without work stand at the forward point.
