@@ -15,7 +15,7 @@ const orders = {
 export function hintWords(rules, lang) {
   const cs = rules.callsigns;
   const radio = rules.radio;
-  const names = [cs.player, cs.operator, cs.allStations, cs.contact, ...Object.values(cs.classes)].map((n) => n?.[lang]);
+  const names = [cs.player, cs.operator, cs.allStations, cs.contact, cs.hauler, ...Object.values(cs.classes)].map((n) => n?.[lang]);
   const points = (rules.map?.points ?? []).map((p) => p.callsign[lang]);
   const procedure = [radio.marker[lang], radio.over[lang], radio.out[lang], ...Object.values(radio.prowords ?? {}).map((w) => w[lang]?.[0])];
   return [...new Set([...names, ...points, ...procedure].filter(Boolean))];
@@ -33,6 +33,6 @@ export function hintCalls(rules, lang) {
   const calls = Object.values(cs.classes).map((c, i) => call(`${c[lang]} ${(i % 3) + 1}`, orders[lang][i % 3].replace("{p}", points[i] ?? ""), i % 4 === 3 ? out : over));
   const used = Object.keys(cs.classes).length;
   if (prowords.length > 1) calls.push(call(cs.operator[lang], prowords[0], out), call(cs.allStations[lang], prowords[1], over));
-  const rest = [...points.slice(used), cs.contact?.[lang] && `${cs.contact[lang]} 2`, ...prowords.slice(2)].filter(Boolean);
+  const rest = [...points.slice(used), cs.contact?.[lang] && `${cs.contact[lang]} 2`, cs.hauler?.[lang], ...prowords.slice(2)].filter(Boolean);
   return `${calls.join(" ")} ${rest.join(", ")}.`;
 }

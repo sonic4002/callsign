@@ -92,5 +92,13 @@ class Level(unittest.TestCase):
         self.assertEqual(listener.hear(np.zeros(server.RATE, np.float32), "he"), "")
 
 
+class Device(unittest.TestCase):
+    def test_without_a_gpu_the_reason_is_given_and_nothing_is_raised(self):
+        # This test runs with no GPU in reach, and the paths need not exist: the asking fails first.
+        reason = server.gpu_refusal({"he": "/nowhere/he"}, "float16")
+        self.assertTrue(reason)
+        self.assertNotIn("\n", reason)
+
+
 if __name__ == "__main__":
     unittest.main()

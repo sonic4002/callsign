@@ -1428,7 +1428,10 @@ requestAnimationFrame(frame);
 // What the lobby can offer, and the match lengths to choose from.
 offer = await serverInfo().catch(() => null);
 // A server with a listening service transcribes the calls of a seated commander.
-if (offer?.stt) voice.useServer(() => (role !== "hammer" ? null : room ? seat && { room, side, token: seat.token } : { room: "", side }));
+if (offer?.stt) {
+  voice.useServer(() => (role !== "hammer" ? null : room ? seat && { room, side, token: seat.token } : { room: "", side }));
+  renderVoice(); // the talk button's hint says where the recording goes
+}
 // Starting gold: the server's amounts, or one the player types, kept for next time.
 const golds = offer?.startGolds ?? [];
 const [goldMin, goldMax] = offer?.goldLimits ?? [400, 20000];

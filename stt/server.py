@@ -21,6 +21,8 @@ import asyncio
 import io
 import json
 import pathlib
+import subprocess
+import sys
 import threading
 import time
 import wave
@@ -33,6 +35,7 @@ MAX_SECONDS = 15
 MAX_BYTES = MAX_SECONDS * RATE * 2
 MAX_HINT_CHARS = 600
 MAX_WAITING = 4  # requests allowed to queue behind the one being transcribed
+GPU_RETRY_SECONDS = 300  # a service that had to start on the CPU looks for the GPU again this often
 QUIET = 0.003  # a recording whose loudest 20 ms is below this (RMS) holds no speech
 
 
@@ -66,6 +69,28 @@ def loudest(audio, window=RATE // 50):
     return float(np.sqrt((frames**2).mean(axis=1)).max())
 
 
+# What a separate process runs to see whether the models fit on the GPU right now. A failed
+# attempt inside the service itself would leave GPU memory held for as long as it runs.
+PROBE = """
+import sys
+import numpy as np
+from faster_whisper import WhisperModel
+models = [WhisperModel(d, device="cuda", compute_type=sys.argv[1]) for d in sys.argv[2:]]
+tone = (0.1 * np.sin(np.arange(16000) / 20)).astype(np.float32)
+for m in models:
+    list(m.transcribe(tone, language="en", beam_size=1)[0])
+"""
+
+
+def gpu_refusal(dirs, precision):
+    """Why the models cannot be on the GPU now, or "" when they can: asked of a separate process."""
+    try:
+        tried = subprocess.run([sys.executable, "-c", PROBE, precision, *map(str, dirs.values())], capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        return "no answer from the GPU"
+    return "" if tried.returncode == 0 else (tried.stderr.strip().splitlines() or ["no reason given"])[-1]
+
+
 class Listener:
     """The models, and the one lock they are used under."""
 
@@ -75,19 +100,46 @@ class Listener:
         self.lock = threading.Lock()  # one recording at a time
         self.device, self.precision = "cpu", "int8"
         self.models = {}
-        if device in ("auto", "cuda"):
+        self.dirs, self.wanted = dirs, precision
+        refusal = gpu_refusal(dirs, precision) if device == "auto" else ""
+        if refusal:
+            print(f"listening service: the GPU cannot be used ({refusal}); using the CPU", flush=True)
+        elif device != "cpu":
             try:
-                self.models = {lang: WhisperModel(str(d), device="cuda", compute_type=precision) for lang, d in dirs.items()}
-                self.device, self.precision = "cuda", precision
-                self.warm()
-            except Exception as err:  # no GPU, no driver, or not enough memory on it
+                self.gpu()
+            except Exception as err:  # it was taken between the asking and the loading
                 if device == "cuda":
                     raise
                 print(f"listening service: the GPU cannot be used ({type(err).__name__}: {err}); using the CPU", flush=True)
-                self.models, self.device, self.precision = {}, "cpu", "int8"
         if not self.models:
             self.models = {lang: WhisperModel(str(d), device="cpu", compute_type="int8", cpu_threads=cpu_threads) for lang, d in dirs.items()}
             self.warm()
+            if device == "auto":
+                # The GPU may only have been full for a while (another job on this machine).
+                threading.Thread(target=self.regain, daemon=True).start()
+
+    def gpu(self):
+        """Loads the models on the GPU, tries them, and only then puts them to use."""
+        from faster_whisper import WhisperModel
+
+        models = {lang: WhisperModel(str(d), device="cuda", compute_type=self.wanted) for lang, d in self.dirs.items()}
+        tone = (0.1 * np.sin(np.arange(RATE) / 20)).astype(np.float32)
+        for model in models.values():
+            list(model.transcribe(tone, language="en", beam_size=1)[0])
+        with self.lock:
+            self.models, self.device, self.precision = models, "cuda", self.wanted
+
+    def regain(self):
+        """Moves a service that started on the CPU onto the GPU once the GPU has room."""
+        while self.device == "cpu":
+            time.sleep(GPU_RETRY_SECONDS)
+            if gpu_refusal(self.dirs, self.wanted):
+                continue
+            try:
+                self.gpu()
+                print(f"listening service: the GPU has room again; using cuda ({self.wanted})", flush=True)
+            except Exception:
+                pass
 
     def warm(self):
         tone = (0.1 * np.sin(np.arange(RATE) / 20)).astype(np.float32)
