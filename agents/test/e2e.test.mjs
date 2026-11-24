@@ -2,6 +2,7 @@
 // is replaced, by the scripted brain or by a fake Anthropic client.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -24,6 +25,15 @@ async function startServer(t, base = "refinery,barracks") {
     proc.stderr.on("data", (d) => String(d).includes("listening") && resolve());
     proc.on("exit", (code) => reject(new Error(`game server exited with ${code}`)));
   });
+  // The line is logged a moment before the socket is bound: wait until it answers.
+  for (let i = 0; i < 300; i++) {
+    try {
+      await fetch(`http://127.0.0.1:${port}/`);
+      break;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
   return `ws://127.0.0.1:${port}/ws`;
 }
 
@@ -276,4 +286,90 @@ test("a squad goes to a place Hammer describes, takes cover there, and asks when
     "Hammer, this is Viper 1. Say again, the house north of Foxtrot or the house west of Foxtrot or the house east of Foxtrot or the house south of Foxtrot. Over.",
   );
   assert.equal(squadIn(hammer.frames.findLast((f) => f.type === "state"), 1).order.place, "N of D 150");
+});
+
+// The calls the page writes when a structure is placed, a unit cancelled and a rally
+// point set, said to scripted agents on a real server: the spot the ghost showed is where
+// the structure stands, and the lines, the refund and the rally order are the server's.
+test("placing a structure, a production line, a cancel and a rally point, end to end", { skip }, async (t) => {
+  const { canPlace, spotAt, spotWords, tint } = await import("../../client/placement.js");
+  const strings = Object.fromEntries(["en", "he"].map((l) => [l, JSON.parse(readFileSync(new URL(`../../client/i18n/${l}.json`, import.meta.url)))]));
+  const tr = (lang) => (key, vars = {}) => strings[lang][key].replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
+  rules.map = rules.maps.small;
+
+  const server = await startServer(t);
+  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  await host.start();
+  t.after(() => host.stop());
+  await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);
+  const hammer = await Hammer.join(t, server);
+  const latest = () => hammer.frames.findLast((f) => f.type === "state")?.state;
+  const since = async (what, mark, match, ms) => {
+    await eventually(what, () => hammer.frames.slice(mark).some(match), ms);
+    return hammer.frames.slice(mark).find(match);
+  };
+  const ask = async (text, answer) => {
+    const mark = hammer.frames.length;
+    hammer.say(text);
+    const heard = await since(`Anvil answering "${text}"`, mark, (f) => f.type === "radio" && f.message.from.en === "Anvil");
+    if (answer) assert.equal(heard.message.text, answer, text);
+    return { mark, text: heard.message.text };
+  };
+  await eventually("the first picture", () => latest());
+
+  // Green ground for a works, as the page would tint it, and the words for that spot.
+  const works = rules.factions.aegis.structures.vehicleWorks;
+  const spot = tint(rules, latest(), 0, works, 20)
+    .filter((c) => c.ok)
+    .map((c) => spotAt(rules, c.x, c.y))
+    .find((s) => canPlace(rules, latest(), 0, works, s.x, s.y) === "");
+  assert.ok(spot, "the page finds ground for a works");
+  const alpha = (lang) => rules.map.points.find((p) => p.id === spot.point).callsign[lang];
+  const say = (lang, key, vars) => tr(lang)(key, { to: lang === "he" ? "סדן" : "Anvil", from: lang === "he" ? "פטיש" : "Hammer", ...vars });
+
+  const built = await ask(say("en", "call.buildSpot", { structure: works.name.en, place: spotWords(tr("en"), spot, alpha("en")) }), "Hammer, this is Anvil. Wilco. Out.");
+  await since("the works going up", built.mark, (f) => f.type === "event" && f.event.kind === "structure_started" && f.event.unit === "vehicleWorks");
+  const done = await since("the works standing", built.mark, (f) => f.type === "event" && f.event.kind === "structure_built" && f.event.unit === "vehicleWorks", 20000);
+  const stands = latest().structures.find((st) => st.id === done.event.structure);
+  assert.deepEqual([stands.x, stands.y], [spot.x, spot.y], "the works stands on the spot the ghost showed");
+
+  // The same spot again, in Hebrew: the page would show it red, and the server refuses.
+  assert.equal(canPlace(rules, latest(), 0, rules.factions.aegis.structures.barracks, spot.x, spot.y), "room");
+  const before = latest().structures.length;
+  const refused = await ask(say("he", "call.buildSpot", { structure: rules.factions.aegis.structures.barracks.name.he, place: spotWords(tr("he"), spot, alpha("he")) }));
+  assert.match(refused.text, /^פטיש, כאן סדן, שלילי/, "a structure on top of another is refused on the net");
+  assert.equal(latest().structures.length, before);
+
+  // Three tanks bought one after another wait in one line at the one works.
+  const commandos = rules.factions.aegis.units.tank;
+  await eventually("gold for three squads", () => latest().gold >= 3 * commandos.cost, 20000);
+  const bought = hammer.frames.length;
+  const buy = say("en", "call.buy", { class: strings.en["class.vehicle"], unit: commandos.name.en });
+  for (let i = 0; i < 3; i++) await ask(buy, "Hammer, this is Anvil. Wilco. Out."); // one call at a time, as a commander speaks
+  const lined = await since("three squads in one line", bought, (f) => f.type === "state" && f.state.deploying.filter((d) => d.side === 0).length === 3);
+  const line = lined.state.deploying.filter((d) => d.side === 0);
+  assert.equal(new Set(line.map((d) => d.from)).size, 1, "one works, one line");
+  assert.deepEqual(line.map((d) => d.line), [0, 1, 2]);
+  assert.ok(line[1].ticksAhead > 0 && line[2].ticksAhead > line[1].ticksAhead, "each waits for the ones ahead of it");
+
+  // The last one is cancelled before work on it begins: all its gold comes back.
+  const cancelled = hammer.frames.length;
+  hammer.say(say("en", "call.cancel", { unit: commandos.name.en }));
+  const refund = await since("the cancellation", cancelled, (f) => f.type === "event" && f.event.kind === "deploy_cancelled");
+  assert.equal(refund.event.count, commandos.cost);
+  assert.equal(refund.event.squad, line[2].id, "the last one bought is the one that goes");
+
+  // A rally point: squads made from now on go there and hold it.
+  const delta = rules.map.points.find((p) => p.id === "D");
+  await ask(say("he", "call.rally", { point: delta.callsign.he }), "פטיש, כאן סדן, רות, יבוצע, סוף.");
+  await eventually("the works gathering at Delta", () => latest().structures.find((st) => st.side === 0 && st.role === "works")?.rally?.place === "D");
+  await eventually("gold for one more squad", () => latest().gold >= commandos.cost, 20000);
+  const again = hammer.frames.length;
+  hammer.say(buy);
+  const spawned = await since("the new squad on the field", again, (f) => f.type === "event" && f.event.kind === "squad_spawned" && f.event.side === 0);
+  await eventually("the new squad sent to hold Delta", () => {
+    const sq = latest().squads.find((x) => x.id === spawned.event.squad);
+    return sq?.order.kind === "hold" && sq.order.point === "D";
+  });
 });
