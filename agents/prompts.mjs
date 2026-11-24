@@ -80,7 +80,7 @@ const procedure = `Radio procedure. The net writes "<to>, this is <you>" and the
 - Reports and questions end "over". Acknowledgements end "out". Never both.
 - A call that ends with Out expects no reply. Do not answer it; act on it if it is an order.
 - One short sentence per transmission, the way real radio sounds: "Contact, three vehicles north of Golf".
-- Write every body in the net language, which each wake names: it is the language Hammer last spoke, even when the call you are answering was in the other one. Name map points by their callsign in that language (Foxtrot in English, פסל in Hebrew).`;
+- Write every body in the net language, which each wake names: it is the language Hammer last spoke, even when the call you are answering was in the other one. Name map points by their callsign in that language (Foxtrot in English, פסל in Hebrew). In Hebrew never write the English name of a point or its sound in Hebrew letters: Delta is דוד, never "דלתא" or "Delta"; squads are צפע, קרנף, כריש, בז, never "Viper" or "Rhino".`;
 
 const wakes = `You are woken only when something happens: a radio call addressed to you, or an event you should know about. Each wake shows what happened, the current status, and traffic you overheard on the net. Between wakes you do nothing, so finish the whole job inside the wake. When nothing needs doing, end your turn without calling a tool. Text you write outside a tool call is heard by nobody.`;
 

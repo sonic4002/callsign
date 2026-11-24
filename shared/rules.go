@@ -338,8 +338,11 @@ type Rules struct {
 		Command     map[string]Words `json:"command"`
 		OwnPurchase map[string]Text  `json:"ownPurchase"`
 		// HeroCue is what each side's net is told when a hero takes the field or falls.
-		HeroCue  map[string]Text  `json:"heroCue"`
-		Prowords map[string]Words `json:"prowords"`
+		HeroCue map[string]Text `json:"heroCue"`
+		// SpelledOut lists, per English point callsign, how it gets written in Hebrew
+		// letters by mistake ("דלתא" for Delta); the net puts the Hebrew callsign instead.
+		SpelledOut map[string][]string `json:"spelledOut"`
+		Prowords   map[string]Words    `json:"prowords"`
 	} `json:"radio"`
 }
 
