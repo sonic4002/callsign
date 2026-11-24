@@ -165,7 +165,8 @@ func (rm *Room) toolRadio(c *Client, a toolArgs) (any, error) {
 	if lang == "" {
 		lang = "en"
 	}
-	text, err := rm.net.Compose(lang, from, to, a.Body, a.End)
+	// Names in the body are put into the net's language: דוד, not "Delta" or "דלתא".
+	text, err := rm.net.Compose(lang, from, to, rm.net.Localize(a.Body, lang), a.End)
 	if err != nil {
 		return nil, err
 	}

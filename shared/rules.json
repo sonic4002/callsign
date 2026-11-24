@@ -698,6 +698,12 @@
       "heroFallen": { "gap": 2, "events": ["hero_fallen", "hero_lost"], "line": { "en": "We lost {squad}", "he": "איבדנו את {squad}" } },
       "enemyHero": { "gap": 2, "events": ["enemy_hero_fielded"], "line": { "en": "Warning: the enemy's champion is in the field", "he": "אזהרה: גיבור האויב יצא לשטח" } }
     },
+    "spelledOut": {
+      "Alpha": ["אלפא", "אלפה"], "Bravo": ["בראבו", "ברבו"], "Golf": ["גולף"], "Delta": ["דלתא", "דלתה"],
+      "Hotel": ["הוטל"], "Foxtrot": ["פוקסטרוט", "פוקסטרות"], "Kilo": ["קילו"], "Sierra": ["סיירה", "סיארה"],
+      "Zulu": ["זולו"], "Lima": ["לימה"], "Mike": ["מייק"], "November": ["נובמבר"], "Tango": ["טנגו"],
+      "Yankee": ["יאנקי", "ינקי"], "Victor": ["ויקטור"]
+    },
     "prowords": {
       "wilco": { "en": ["wilco"], "he": ["רות, יבוצע", "רות יבוצע"] },
       "roger": { "en": ["roger"], "he": ["רות"] },

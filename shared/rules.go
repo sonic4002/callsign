@@ -283,8 +283,11 @@ type Rules struct {
 		// Cues are the fixed lines the operator says about the base by itself (see
 		// server/room/cues.go): the words in both languages, the least seconds between
 		// two of a kind, and the events raised elsewhere that call for it.
-		Cues     map[string]Cue   `json:"cues"`
-		Prowords map[string]Words `json:"prowords"`
+		Cues map[string]Cue `json:"cues"`
+		// SpelledOut lists, per English point callsign, how it gets written in Hebrew
+		// letters by mistake ("דלתא" for Delta); the net puts the Hebrew callsign instead.
+		SpelledOut map[string][]string `json:"spelledOut"`
+		Prowords   map[string]Words    `json:"prowords"`
 	} `json:"radio"`
 }
 

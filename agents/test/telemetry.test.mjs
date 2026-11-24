@@ -294,3 +294,30 @@ test("an agent's report reaches its own commander through the game server, and n
   await eventually("the row to go offline", () => hammer.frames.some((f) => f.type === "telemetry" && f.agent?.squad === 2 && f.agent.online === false));
   assert.equal(hammer.reports().at(-1).telemetry.state, "stopped");
 });
+
+test("telemetry's own timers work in a browser, which refuses a timer called as a method", async () => {
+  // Browsers throw "Illegal invocation" when setTimeout is called with another object as
+  // `this`. Node does not, so stand-ins that behave like a browser's are put in its place.
+  const real = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+  globalThis.setTimeout = function (fn, ms) {
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+    return real.setTimeout(fn, ms);
+  };
+  globalThis.clearTimeout = function (id) {
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+    return real.clearTimeout(id);
+  };
+  try {
+    const sent = [];
+    const tele = new Telemetry({ send: (frame) => sent.push(frame), role: "squad", squad: 1, brain: "scripted", where: "browser", gapMs: 5 });
+    tele.joined({ tier: 1 });
+    tele.thinking([]);
+    tele.acting("hold");
+    tele.acted("hold", { point: "B" }, true);
+    tele.idle();
+    await new Promise((resolve) => real.setTimeout(resolve, 40));
+    assert.ok(sent.length >= 1, "a report was sent");
+  } finally {
+    Object.assign(globalThis, real);
+  }
+});
