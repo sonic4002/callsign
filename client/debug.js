@@ -706,6 +706,7 @@ function renderSidebar() {
   renderPower($("power"), me ? state : null, t);
   const radar = me ? radarState(state, side) : "on";
   $("radar-off").hidden = radar === "on";
+  $("radar-box").classList.toggle("off", radar !== "on"); // no mini map to show: one line, not an empty box
   if (radar !== "on") $("radar-off").textContent = t(`radar.${radar}`, { structure: ofRole(rules, faction, "radar")?.def.name[lang] ?? "" });
 
   const mine = state.squads.filter((sq) => sq.side === side);
@@ -740,6 +741,7 @@ function renderSidebar() {
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
     $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
     monitor.sync();
+    $("monitor-count").textContent = String($("monitor-strip").children.length || "");
     markThinking();
   }
   // A hero's health moves in place, like the other bars.
@@ -798,7 +800,7 @@ function renderDeploying(deploying) {
     row.querySelector(".deploy-bar b").style.inlineSize = `${progress(d) * 100}%`;
     row.querySelector(".order").textContent = deployText(d);
   }
-  for (const button of $("build").children) {
+  for (const button of $("build").querySelectorAll("button[data-unit]")) {
     // The one of this unit that comes out first, wherever it is being made, and how many
     // are on their way in all (placement.js).
     const line = unitLine(state, side, button.dataset.unit);
@@ -813,6 +815,9 @@ function renderDeploying(deploying) {
     const total = asked + line.count;
     count.hidden = total < 2 && asked === 0;
     count.textContent = String(total);
+    const cancel = button.nextElementSibling;
+    cancel.hidden = line.count === 0;
+    cancel.disabled = !me || Boolean(state.over);
   }
 }
 
@@ -912,7 +917,17 @@ function buildButton(id, unit, enabled, lock) {
   if (lock) button.append(el("span", "needs", why));
   // Buying is a radio call to the operator like any other; the button only writes and sends it.
   button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
-  return button;
+  // Beside it, while one of this unit is in a line: the last one taken back out, by a
+  // radio call like the purchase was.
+  const cancel = el("button", "cancel", "×");
+  cancel.type = "button";
+  cancel.hidden = true;
+  cancel.title = t("deploy.cancel");
+  cancel.setAttribute("aria-label", t("deploy.cancel"));
+  cancel.addEventListener("click", () => order(call("cancel", { to: anvil(), unit: unit.name[lang] })));
+  const cell = el("div", "unit");
+  cell.append(button, cancel);
+  return cell;
 }
 
 // ---- structures ----
@@ -1359,6 +1374,31 @@ function offerStructure(st, squad, box, sx, sy) {
     return call(act === "sell" ? "sell" : "repairStructure", { to: anvil(), structure: saidStructure(st) });
   };
   offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
+}
+
+// ---- the sidebar's folding sections ----
+//
+// A section with `data-fold` on its title folds away under it at a press, and stays so
+// (the choice is kept under the fold's name). `data-folded` is how it starts.
+for (const title of document.querySelectorAll("[data-fold]")) {
+  const key = `callsign.fold.${title.dataset.fold}`;
+  const panel = title.parentElement;
+  const set = (folded) => {
+    panel.classList.toggle("folded", folded);
+    title.setAttribute("aria-expanded", String(!folded));
+  };
+  const stored = localStorage.getItem(key);
+  set(stored === null ? title.hasAttribute("data-folded") : stored === "1");
+  title.tabIndex = 0;
+  title.setAttribute("role", "button");
+  const toggle = () => {
+    const folded = !panel.classList.contains("folded");
+    set(folded);
+    localStorage.setItem(key, folded ? "1" : "0");
+    scene.resize(); // the mini map may have just come back
+  };
+  title.addEventListener("click", toggle);
+  title.addEventListener("keydown", (ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), toggle()));
 }
 
 // ---- menus ----

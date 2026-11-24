@@ -11,6 +11,7 @@ import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
 import { crusherNear, drawBuilt, drawCharge, drawFlat, heroPose } from "./heroes.js";
+import { clearOf } from "./places.js";
 import { drawRank } from "./marks.js";
 import { drawField, drawFountain, fieldSeen, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
@@ -129,10 +130,16 @@ export class Scene {
     this.canvas.style.width = `${box.width}px`;
     this.canvas.style.height = `${box.height}px`;
     if (this.rules) this.cam.resize(box.width, box.height);
-    const rw = this.radar.clientWidth || 200;
-    const rh = this.rules ? Math.round((rw * this.rules.map.height) / this.rules.map.width) : rw * 0.625;
+    // The mini map is as wide as its box, unless the page caps its height (a sidebar that
+    // must fit the screen): then it keeps the map's shape and stands in the middle.
+    const ratio = this.rules ? this.rules.map.height / this.rules.map.width : 0.625;
+    const cap = parseFloat(getComputedStyle(this.radar).maxBlockSize) || Infinity;
+    let rw = this.radar.parentElement?.clientWidth || this.radar.clientWidth || 200;
+    let rh = Math.round(rw * ratio);
+    if (rh > cap) [rw, rh] = [Math.round(cap / ratio), Math.round(cap)];
     this.radar.width = Math.round(rw * dpr);
     this.radar.height = Math.round(rh * dpr);
+    this.radar.style.width = `${rw}px`;
     this.radar.style.height = `${rh}px`;
   }
 
@@ -941,7 +948,10 @@ export class Scene {
     }
   }
 
-  plate(text, sx, sy, { size = 12, color = "#e9ede6", border = "#000", bold = true, alpha = 0.72 } = {}) {
+  // plate writes a name on a dark plate. With `keep` the plate's place is remembered for
+  // this frame; with `avoid` it moves up or down out of the way of the plates kept so far
+  // (a tech building beside a point does not write its name over the point's).
+  plate(text, sx, sy, { size = 12, color = "#e9ede6", border = "#000", bold = true, alpha = 0.72, keep = false, avoid = false } = {}) {
     const { ctx } = this;
     ctx.font = `${bold ? "600 " : ""}${size}px system-ui, "Segoe UI", "Noto Sans Hebrew", "Heebo", sans-serif`;
     ctx.direction = /[֐-׿]/.test(text) ? "rtl" : "ltr";
@@ -949,6 +959,8 @@ export class Scene {
     ctx.textBaseline = "middle";
     const w = ctx.measureText(text).width + size;
     const h = size + 7;
+    if (avoid) sy += clearOf(this.plates, sx, sy, w, h);
+    if (keep || avoid) this.plates.push([sx - w / 2, sy - h / 2, w, h]);
     ctx.fillStyle = `rgba(10,14,16,${alpha})`;
     ctx.beginPath();
     ctx.roundRect(sx - w / 2, sy - h / 2, w, h, 3);
@@ -963,6 +975,7 @@ export class Scene {
 
   labels(buildScale, unitScale) {
     const { rules, state, cam } = this;
+    this.plates = []; // the plates other names must keep clear of, this frame
     const lang = this.lang();
     const tall = { hq: 100, landRig: 92, seaRig: 88, point: 60 };
     // Each gold field says how full it is, as last seen. The isolate marks keep the
@@ -979,8 +992,8 @@ export class Scene {
       const income = rules.rigs[p.kind].income;
       // The isolate marks keep "+15" reading left to right inside a Hebrew label.
       const sub = income ? `${p.name[lang]} ⁦+${income}⁩` : p.name[lang];
-      if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55 });
-      this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner] });
+      if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55, keep: true });
+      this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner], keep: true });
     }
     this.structureLabels(buildScale);
     this.landmarkLabels(buildScale, lang);
@@ -1084,10 +1097,12 @@ export class Scene {
       if (st.role === "tech") {
         // A tech building says what it is, in its holder's colour, and what holding it gives.
         const hold = sideColor[st.side] ?? sideColor[-1];
-        this.plate(def.name[lang], sx, top - 4, { size: 11, color: hold, border: `${hold}88` });
-        if (cam.zoom >= 0.3) this.plate(def.about[lang], sx, top - 19, { size: 9.5, color: "#ecdca6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.6 });
-      } else if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88` });
-      else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5 });
+        // The two lines are one block: what it gives sits on its name, wherever that lands.
+        const slide = clearOf(this.plates, sx, top - 12, Math.max(def.name[lang].length, def.about[lang].length) * 6.5 + 12, 34);
+        this.plate(def.name[lang], sx, top - 4 + slide, { size: 11, color: hold, border: `${hold}88`, keep: true });
+        if (cam.zoom >= 0.3) this.plate(def.about[lang], sx, top - 19 + slide, { size: 9.5, color: "#ecdca6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.6, keep: true });
+      } else if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88`, avoid: true });
+      else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5, avoid: true });
       const rising = st.building < 1;
       if (!rising && st.hp >= 1) continue;
       const w = 36;

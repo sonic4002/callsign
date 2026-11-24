@@ -576,5 +576,6 @@
   "act.cancel": "Cancel last",
   "call.rallyFrom": "{to}, this is {from}. Squads from the {structure} rally at {point}. Over.",
   "call.rallyFromHome": "{to}, this is {from}. Squads from the {structure} rally at home. Over.",
-  "placer.rallyFrom": "Where do squads from the {structure} gather?"
+  "placer.rallyFrom": "Where do squads from the {structure} gather?",
+  "sidebar.settings": "Settings"
 }

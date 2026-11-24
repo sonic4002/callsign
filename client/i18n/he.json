@@ -576,5 +576,6 @@
   "act.cancel": "בטל אחרון",
   "call.rallyFrom": "{to}, כאן {from}, כיתות של {structure} מתכנסות ב{point}, עבור.",
   "call.rallyFromHome": "{to}, כאן {from}, כיתות של {structure} מתכנסות ליד המבנה, עבור.",
-  "placer.rallyFrom": "איפה מתכנסות הכיתות של {structure}?"
+  "placer.rallyFrom": "איפה מתכנסות הכיתות של {structure}?",
+  "sidebar.settings": "הגדרות"
 }

@@ -457,3 +457,38 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #roster .hero-health.low i { background: #ff5a5a; }
 #roster .hero-note { display: block; color: var(--muted); font-size: .72rem; }
 #roster .earned { display: inline-flex; vertical-align: middle; margin-inline-start: .3rem; }
+/* A unit's button, and beside it the cancel for the last one of it in a line. */
+#build .unit { position: relative; display: grid; }
+#build .unit .cancel { position: absolute; inset-block-end: .2rem; inset-inline-end: .2rem; inline-size: 1.5rem; block-size: 1.5rem; min-block-size: 0; padding: 0; display: grid; place-items: center; font-size: 1rem; line-height: 1; color: var(--warn); background: #10161a; border-color: var(--warn); overflow: visible; }
+#build .unit .cancel[hidden] { display: none; }
+@media (pointer: coarse) { #build .unit .cancel { inline-size: 2.2rem; block-size: 2.2rem; font-size: 1.2rem; } }
+
+/* ---- a sidebar that fits the screen ----
+   Sections fold under their titles; the squads always keep room for three rows; the build
+   panel scrolls inside itself; the mini map is capped, and is one line while there is no
+   radar to show. */
+[data-fold] { cursor: pointer; user-select: none; display: flex; align-items: center; gap: .35rem; }
+[data-fold]::after {
+  content: ""; margin-inline-start: auto; inline-size: .42rem; block-size: .42rem; flex: none;
+  border-inline-end: 2px solid var(--muted); border-block-end: 2px solid var(--muted); transform: translateY(-25%) rotate(45deg); transition: transform .15s;
+}
+.folded > [data-fold]::after { transform: rotate(-45deg); }
+[dir="rtl"] .folded > [data-fold]::after { transform: rotate(135deg); }
+.folded > [data-fold] { margin-block-end: 0; }
+.folded > :not([data-fold]) { display: none !important; }
+#monitor-count { color: var(--muted); font-weight: 400; }
+#radar-box.off #radar-map { display: none; }
+#radar-box.off #radar-off { position: static; padding: .15rem 0; text-align: start; display: block; }
+#radar-map { margin-inline: auto; }
+@media (min-width: 701px) and (min-height: 501px) {
+  #sidebar > header.panel { padding-block: .3rem; }
+  #sidebar > header.panel h1 { font-size: .95rem; }
+  #controls { flex-wrap: nowrap; gap: .2rem; }
+  #controls button { padding: .2rem .4rem; font-size: .7rem; }
+  #treasury { gap: .3rem .8rem; padding-block: .45rem; }
+  #gold-box strong { font-size: 1.6rem; }
+  #radar-map { max-block-size: 8.5rem; }
+  .panel.grow { flex: 1 1 12.5rem; min-block-size: 12.5rem; overflow-y: auto; }
+  #sidebar > .panel[data-sheet="build"] { flex: 0 1 auto; min-block-size: 9rem; max-block-size: 40%; overflow-y: auto; }
+  #sidebar > footer.panel, #sidebar > #music { flex: none; }
+}

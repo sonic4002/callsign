@@ -143,7 +143,7 @@ body.no-server #no-server {
   #controls button, #roster .tier button { min-block-size: 44px; min-inline-size: 44px; padding-inline: .8rem; font-size: .85rem; }
   #roster li { min-block-size: 52px; padding: .45rem .6rem; }
   #build { grid-template-columns: repeat(auto-fill, minmax(5.6rem, 1fr)); gap: 6px; }
-  #build button { min-block-size: 88px; font-size: .8rem; }
+  #build button[data-unit] { min-block-size: 88px; font-size: .8rem; }
   #structures { grid-template-columns: repeat(auto-fill, minmax(5.6rem, 1fr)); gap: 6px; }
   #structures button { min-block-size: 96px; font-size: .78rem; }
   #structure-list li { min-block-size: 32px; }

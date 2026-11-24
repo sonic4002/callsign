@@ -127,12 +127,9 @@ func (p *Player) upkeep(snap sim.Snapshot, vehicles int) baseStep {
 	return baseStep{}
 }
 
-// reserve is the gold the side keeps for the fight while it builds ahead: two squads of
-// its line infantry.
-func (p *Player) reserve(snap sim.Snapshot) int {
-	_, u := p.unitOf(snap.Faction, "infantry")
-	return 2 * u.Cost
-}
+// reserve is the gold the side keeps for the fight while it builds ahead. It is the same
+// for every army: one that fields cheap squads does not build ahead any sooner.
+func (p *Player) reserve(sim.Snapshot) int { return 300 }
 
 // worstDamaged is the side's own standing structure that has lost the most, of those
 // under two thirds of their strength and not being mended already.
