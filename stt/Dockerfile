@@ -1,6 +1,6 @@
 # Listening image: the speech-recognition service (stt/server.py) that transcribes the
 # player's radio calls. Whisper on CTranslate2 (faster-whisper), with the two CUDA
-# libraries it needs from pip, so the image stands alone at about 2 GB. Model weights are
+# libraries it needs from pip (2.1 GB of the image's 4.4 GB), so the image stands alone. Model weights are
 # not in the image: `make stt-models` downloads them once into assets/models/whisper-*.
 # The service then runs with the network off.
 FROM python:3.12-slim

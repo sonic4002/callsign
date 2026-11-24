@@ -147,7 +147,7 @@ STT := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp -e P
 LISTEN = $(shell docker image inspect callsign-stt >/dev/null 2>&1 && test -f assets/models/whisper-he/model.bin && test -f assets/models/whisper-en/model.bin \
            && nvidia-smi >/dev/null 2>&1 && echo --profile listen)
 
-# Build the listening image. About 2.5 GB; it stands alone (no art image needed).
+# Build the listening image. About 4.4 GB on disk; it stands alone (no art image needed).
 stt-image:
 	docker build -t callsign-stt -f stt/Dockerfile stt
 

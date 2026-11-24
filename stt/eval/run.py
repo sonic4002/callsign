@@ -4,6 +4,7 @@
     python stt/eval/run.py --name hints --mode calls                  # the service as it runs
     python stt/eval/run.py --name cpu --device cpu --cpu-threads 4 --mode none --langs he
     python stt/eval/run.py --quiet                                    # what it writes for silence and noise
+    python stt/eval/run.py --name live --service http://stt:5003      # ask a running service instead
 
 --mode is how the hints are given: none; list (the words, comma separated); calls (the
 words as radio traffic, what the page sends); hotwords (the list, as faster-whisper hotwords).
@@ -15,6 +16,8 @@ import json
 import pathlib
 import sys
 import time
+import urllib.parse
+import urllib.request
 import wave
 
 import numpy as np
@@ -32,12 +35,27 @@ def given(data, mode, lang):
     return {"hotwords": text["list"][lang]} if mode == "hotwords" else {"hints": text[mode][lang]}
 
 
+class Remote:
+    """A running listening service, asked over HTTP as the game server asks it."""
+
+    def __init__(self, url):
+        self.url = url.rstrip("/")
+        health = json.load(urllib.request.urlopen(self.url + "/health"))
+        self.device, self.precision = health["device"], health["precision"]
+
+    def hear(self, audio, lang, hints="", **_):
+        query = urllib.parse.urlencode({"lang": lang, "hints": hints})
+        body = (np.clip(audio, -1, 1) * 32767).astype("<i2").tobytes()
+        with urllib.request.urlopen(urllib.request.Request(f"{self.url}/transcribe?{query}", data=body, method="POST")) as res:
+            return json.load(res)["text"]
+
+
 def read(path):
     with wave.open(str(path), "rb") as w:
         return np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float32) / 32768
 
 
-def quiet(listener, langs, data):
+def quiet(listener, langs, data, vad=True):
     """Recordings with nobody speaking. Every one must come back empty."""
     rng = np.random.default_rng(2)
     n = 5 * RATE
@@ -59,7 +77,7 @@ def quiet(listener, langs, data):
     for lang in langs:
         for name, audio in cases.items():
             for mode in ("none", "calls"):
-                text = listener.hear(audio.astype(np.float32), lang, **given(data, mode, lang))
+                text = listener.hear(audio.astype(np.float32), lang, vad=vad, **given(data, mode, lang))
                 bad += bool(text)
                 print(f"{lang} {name:10} {mode:6} -> {text!r}")
     print("every quiet recording came back empty" if not bad else f"{bad} quiet recordings came back with text")
@@ -72,7 +90,7 @@ def main():
     p.add_argument("--mode", default="calls", choices=["none", "list", "calls", "hotwords"])
     p.add_argument("--device", default="auto")
     p.add_argument("--cpu-threads", type=int, default=0)
-    p.add_argument("--precision", default="float16")
+    p.add_argument("--precision", default="int8_float16")
     p.add_argument("--langs", default="he,en")
     p.add_argument("--kinds", default="clean,noisy")
     p.add_argument("--beam", type=int, default=5)
@@ -82,12 +100,16 @@ def main():
     p.add_argument("--en", default="assets/models/whisper-en")
     p.add_argument("--data", type=pathlib.Path, default=root / "assets" / "stt-eval")
     p.add_argument("--quiet", action="store_true")
+    p.add_argument("--service", help="address of a running listening service to ask, instead of loading the models here")
     args = p.parse_args()
     langs = args.langs.split(",")
-    listener = Listener({lang: root / getattr(args, lang) for lang in langs}, args.device, args.cpu_threads, args.precision)
+    if args.service:
+        listener = Remote(args.service)
+    else:
+        listener = Listener({lang: root / getattr(args, lang) for lang in langs}, args.device, args.cpu_threads, args.precision)
     print(f"using {listener.device} ({listener.precision})", flush=True)
     if args.quiet:
-        sys.exit(1 if quiet(listener, langs, args.data) else 0)
+        sys.exit(1 if quiet(listener, langs, args.data, not args.no_vad) else 0)
     out = {}
     items = [i for i in json.loads((args.data / "index.json").read_text()) if i["lang"] in langs and i["kind"] in args.kinds.split(",")]
     for item in items[:: args.every]:

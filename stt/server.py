@@ -11,8 +11,10 @@ the page writes it as a few radio calls (client/voice/hints.js).
 The game server passes /stt/* on to this service (its -stt flag), so the page talks to one
 origin. The service is optional: without it the page recognises speech in the browser.
 
-The models are Whisper on CTranslate2 (faster-whisper), one per language, on the GPU in
-half precision, or on the CPU in 8 bits when no GPU can be used. Nothing is downloaded at
+The models are Whisper on CTranslate2 (faster-whisper), one per language, on the GPU with
+8-bit weights and half-precision arithmetic (2.3 GB of GPU memory for both; plain half
+precision takes 4.3 GB and is neither faster nor more accurate here: stt/eval/RESULTS.md),
+or on the CPU in 8 bits when no GPU can be used. Nothing is downloaded at
 run time. A recording is held in memory for the length of its request and never written
 to disk or to the log; the log has only its length, its language and the time taken.
 """
@@ -94,7 +96,7 @@ def gpu_refusal(dirs, precision):
 class Listener:
     """The models, and the one lock they are used under."""
 
-    def __init__(self, dirs, device="auto", cpu_threads=0, precision="float16"):
+    def __init__(self, dirs, device="auto", cpu_threads=0, precision="int8_float16"):
         from faster_whisper import WhisperModel
 
         self.lock = threading.Lock()  # one recording at a time
@@ -218,7 +220,7 @@ def main():
     p.add_argument("--models", type=pathlib.Path, default=root, help="directory the model paths in models.json start from")
     p.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     p.add_argument("--cpu-threads", type=int, default=0)
-    p.add_argument("--precision", default="float16", help="on the GPU: float16, or int8_float16 for about half the memory")
+    p.add_argument("--precision", default="int8_float16", help="on the GPU: int8_float16, or float16 for the weights as published (twice the memory)")
     args = p.parse_args()
     dirs = {lang: args.models / m["dir"] for lang, m in spec.items()}
     for d in dirs.values():
