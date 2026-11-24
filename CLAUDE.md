@@ -6,7 +6,8 @@ Browser real-time strategy game where every squad is an AI agent, commanded by v
 - **Game server:** Go. Authoritative simulation (10 ticks/s), WebSockets, radio routing. Owns all truth: gold, units, fog of war. Runs no AI.
 - **Model relay:** Go, same repo. Agents never call AI directly. The relay looks up the squad's brain tier on the game server, picks the model, and calls the provider with the player's own key (OpenRouter or Claude/Gemini/OpenAI). Keys encrypted at rest, never returned to the browser.
 - **Client:** TypeScript + Phaser 3, installable web app. Must work in Chrome, Safari and Edge on Mac, Windows and phones.
-- **Command sidebar** (2026-11-24): the client has a sidebar with radar, gold, squad roster and build buttons. Its buttons only compose radio calls; the radio stays the only way to act.
+- **Command sidebar** (2026-11-24): the client has a build panel, radar, gold and squad roster. Orders to squads go only by radio; the sidebar's order buttons only compose radio calls.
+- **Building and buying are the player's own act** (changed 2026-11-24 by the owner: "no need to wait for anvil to approve it, its a waste of time"): pressing a structure or a unit starts it at once on the server, with no agent in between. The net logs it, and Anvil is told so it can report when it is ready. Anvil can still build and buy when ordered by radio or when it holds the purse.
 - **Agents:** operator (callsign Anvil) and squad leaders run as Web Workers in the player's browser. They act only through game tools: `radio`, `move`, `hold`, `attack`, `report`, `buy` (operator only).
 - **Fireteams:** plain utility AI on the server, no LLM. One "nerve" value (steady / shaken / pinned) shown through behavior only. No fatigue.
 - **Open league:** the game also exposes an MCP endpoint with the same tools; any agent can join with its own model. Separate ladder, no tiers.
