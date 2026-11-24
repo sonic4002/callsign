@@ -756,7 +756,6 @@
     },
     "brain": {
       "wilco": { "en": ["Wilco"], "he": ["רות, יבוצע"] },
-      "roger": { "en": ["Roger"], "he": ["רות"] },
       "fiveByFive": { "en": ["Five by five"], "he": ["חמש על חמש"] },
       "negative": { "en": ["Negative, {reason}"], "he": ["שלילי, {reason}"] },
       "sayAgain": { "en": ["Say again"], "he": ["אמור שנית"] },
@@ -770,7 +769,6 @@
       "verb.hold": { "en": ["hold"], "he": ["להחזיק"] },
       "verb.attack": { "en": ["attack"], "he": ["לתקוף"] },
       "verb.repair": { "en": ["repair"], "he": ["לתקן"] },
-      "verb.capture": { "en": ["capture"], "he": ["להשתלט על"] },
       "verb.plant": { "en": ["set a charge on"], "he": ["להניח מטען על"] },
       "verb.build": { "en": ["build"], "he": ["לבנות"] },
       "verb.buy": { "en": ["buy"], "he": ["לקנות"] },
@@ -793,7 +791,6 @@
       "why.noSquads": { "en": ["no squad in the field"], "he": ["אין כיתה בשטח"] },
       "why.ordersOnly": { "en": ["I act on your orders only; give me the order"], "he": ["אני פועל רק לפי פקודה; תן את הפקודה"] },
       "why.economyOnly": { "en": ["I keep the base and the purse; the squads are yours to order"], "he": ["אני מנהל את הבסיס והקופה; הכיתות בפיקודך"] },
-      "why.notInside": { "en": ["we are not inside a building"], "he": ["אנחנו לא בתוך מבנה"] },
       "contact": { "en": ["Contact near {place}", "Contact, {target} near {place}", "Eyes on {target} near {place}"], "he": ["מגע ליד {place}", "מגע, {target} ליד {place}", "מזהה את {target} ליד {place}"] },
       "pinned": { "en": ["Pinned at {place}, request support", "Pinned down at {place}, need support", "Heavy fire at {place}, we are pinned"], "he": ["מרותקים {b_place}, מבקש סיוע", "אנחנו מרותקים {b_place}, צריך סיוע", "אש כבדה {b_place}, אנחנו מרותקים"] },
       "arrived": { "en": ["In position at {place}", "Reached {place}, in position", "At {place}, holding"], "he": ["בעמדה {b_place}", "הגענו {l_place}, בעמדה", "אנחנו {b_place}, מחזיקים"] },
@@ -812,7 +809,6 @@
       "seen.some": { "en": ["{count} enemy in sight, nearest {target}"], "he": ["{count} כוחות אויב בטווח ראייה, הקרוב {target}"] },
       "nerve.shaken": { "en": [", we are shaken"], "he": [", אנחנו מעורערים"] },
       "nerve.pinned": { "en": [", we are pinned"], "he": [", אנחנו מרותקים"] },
-      "ackCover": { "en": ["Wilco, taking cover at {place}"], "he": ["רות, יבוצע, תופסים מחסה {b_place}"] },
       "ackFlank": { "en": ["Wilco, going in from the {side}"], "he": ["רות, יבוצע, נכנסים מ{side}"] },
       "ackRange": { "en": ["Wilco, engaging from {count} metres"], "he": ["רות, יבוצע, תוקפים מטווח {count} מטר"] },
       "ackTarget": { "en": ["Wilco, engaging {target}"], "he": ["רות, יבוצע, תוקפים את {target}"] },
@@ -831,9 +827,8 @@
       "opMove": { "en": ["Move to {place}"], "he": ["נועו {l_place}"] },
       "opMassing": { "en": ["Massing at {place} before the attack"], "he": ["מרכז כוחות {b_place} לפני ההתקפה"] },
       "opAttacking": { "en": ["Attacking {place} with {count} squads"], "he": ["תוקפים את {place} עם {count} כיתות"] },
-      "opGuarding": { "en": ["{squad} is going to guard the haulers at {place}"], "he": ["{squad} יוצא לאבטח את המשאיות {b_place}"] },
-      "opDefending": { "en": ["Pulling back to defend the base: {squad}"], "he": ["חוזרים להגן על הבסיס: {squad}"] },
-      "opRetaking": { "en": ["{squad} is going to take back {place}"], "he": ["{squad} יוצא לכבוש חזרה את {place}"] }
+      "opGuarding": { "en": ["{squad} is going to guard the haulers at {place}"], "he": ["{squad} יוצאת לאבטח את המשאיות {b_place}"] },
+      "opDefending": { "en": ["Pulling back to defend the base: {squad}"], "he": ["חוזרים להגן על הבסיס: {squad}"] }
     },
     "spelledOut": {
       "Alpha": ["אלפא", "אלפה"], "Bravo": ["בראבו", "ברבו"], "Golf": ["גולף"], "Delta": ["דלתא", "דלתה"],
