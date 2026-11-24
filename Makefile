@@ -26,7 +26,7 @@ play:
 	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
 	@docker volume create callsign-gocache >/dev/null
 	@mkdir -p assets/voice-cache .relay-data
-	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) $(MORE_PROFILES) up
+	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) $(MORE_PROFILES) up $(UP_FLAGS)
 
 # The same, opened to the local network so a friend can join from another machine.
 # Read docs/FRIEND-MATCH.md first: there is no encryption and no accounts.
