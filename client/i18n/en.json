@@ -57,7 +57,7 @@
   "spectating": "Spectating: you can watch but not transmit.",
   "event.captured": "We took {point}.",
   "event.point_lost": "The enemy took {point}.",
-  "event.squad_spawned": "{squad} is ready at headquarters.",
+  "event.squad_spawned": "{squad} is out and awaiting orders.",
   "event.squad_lost": "{squad} was destroyed near {point}.",
   "event.enemy_destroyed": "An enemy squad was destroyed near {point}.",
   "event.hq_under_attack": "Our headquarters is under attack.",

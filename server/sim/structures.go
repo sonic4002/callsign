@@ -32,7 +32,6 @@ const (
 var (
 	ErrNoStructure    = errors.New("your faction has no such structure")
 	ErrNeedsStructure = errors.New("a structure is missing")
-	ErrAlreadyBuilt   = errors.New("you already have one")
 	ErrBuilding       = errors.New("one at a time")
 	ErrTooFar         = errors.New("too far from your own ground")
 	ErrNoRoom         = errors.New("no room to build there")

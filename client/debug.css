@@ -296,8 +296,6 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #structures .cost { color: var(--brass); font-weight: 700; font-variant-numeric: tabular-nums; }
 #structures .why { font-size: .6rem; line-height: 1.15; color: var(--muted); min-block-size: 2.3em; max-block-size: 2.3em; overflow: hidden; }
 #structures button.needs .why, #structures button.busy .why, #structures button.full .why { color: var(--warn); }
-#structures button.have { opacity: .6; }
-#structures button.have .why { color: var(--mine); }
 #structures button.rising:disabled { opacity: 1; }
 #structures button.rising .why { color: var(--brass); font-weight: 700; }
 #structures .fill { position: absolute; inset-inline: 0; inset-block-end: 0; block-size: 0; background: linear-gradient(#c9a44c22, #c9a44c55); border-block-start: 2px solid var(--brass); transition: block-size .12s linear; pointer-events: none; }
