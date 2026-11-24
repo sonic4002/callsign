@@ -89,6 +89,7 @@ button.primary:hover:not(:disabled) { background: #f4c552; }
 #ptt { touch-action: none; user-select: none; -webkit-user-select: none; }
 #ptt.live { background: var(--warn); color: #0a100f; }
 #ptt.busy { opacity: .6; }
+#speak.off { color: var(--muted); text-decoration: line-through; }
 #voice-status { margin: .35rem 0 0; font-size: .85em; color: #6f8d83; }
 #voice-status.warn { color: var(--warn); }
 

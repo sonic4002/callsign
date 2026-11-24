@@ -67,6 +67,7 @@
   "over.hq_destroyed": "A headquarters was destroyed.",
   "over.timer": "Time ran out; points held decided it.",
   "voiceButton": "Hold to talk",
+  "speechButton": "Radio voices on or off",
   "voiceHint": "Hold to talk, or hold the ` key (left of 1). The speech is recognised on this device.",
   "voice.asking": "Waiting for the microphone…",
   "voice.loading": "Loading the speech model: {percent}%",

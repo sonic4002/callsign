@@ -12,7 +12,7 @@ services:
       - .:/src:ro
       - callsign-gocache:/gocache
     # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
-    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}"]
+    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}", "-tts=http://tts:5002"]
     ports:
       - "127.0.0.1:8080:8080" # this machine only: Phase 0 has no accounts
 
@@ -30,6 +30,22 @@ services:
     command: node agents/main.mjs
     depends_on:
       - server
+
+  # The squads' voices, for testing (tts/server.py). `make play` starts it only when the
+  # image and the models are there (make tts-image, make tts-models); without it the page
+  # uses the browser's own voice.
+  tts:
+    profiles: ["voice"]
+    image: callsign-tts
+    init: true
+    user: "${CALLSIGN_UID:-1000}:${CALLSIGN_GID:-1000}"
+    working_dir: /tmp
+    environment:
+      HOME: /tmp
+    volumes:
+      - .:/src:ro
+      - ./assets/voice-cache:/cache
+    command: ["python", "/src/tts/server.py", "--cache=/cache"]
 
 volumes:
   callsign-gocache:

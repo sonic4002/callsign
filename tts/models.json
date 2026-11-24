@@ -1,0 +1,213 @@
+{
+ "dir": "assets/models/bluev3",
+ "files": [
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/text_encoder.onnx",
+   "dest": "onnx/text_encoder.onnx",
+   "sha256": "9dd84651a48048dce980d9d54c11fd3c04170602fb4f9e66957c08eeee2e55ba"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/vector_estimator.onnx",
+   "dest": "onnx/vector_estimator.onnx",
+   "sha256": "2f0e4af007f166afdc020331b863b1ea6b93c29258ae3b649f81234c1d7ad7c1"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/vocoder.onnx",
+   "dest": "onnx/vocoder.onnx",
+   "sha256": "054a700e9ef17d43de203212dca335fa2cd000cd9ca7701df49fcc544b49ccbe"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/duration_predictor_style.onnx",
+   "dest": "onnx/duration_predictor_style.onnx",
+   "sha256": "46197a2c10f06e151adc6dd109082889e6aaf903c46ce25d798eebaa7b07e313"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/stats.npz",
+   "dest": "onnx/stats.npz",
+   "sha256": "22a0352b4e4bb60dd4c4a45788006150a097fb5cfc84313093a95ed43ecbffe9"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/uncond.npz",
+   "dest": "onnx/uncond.npz",
+   "sha256": "54995402c6c88d93d54fbd8b48096dd675dff8c8d3e6112cede33f4d90047a71"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/tts.json",
+   "dest": "onnx/tts.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "onnx/vocab.json",
+   "dest": "onnx/vocab.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "LICENSES.md",
+   "dest": "LICENSES.md"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "LICENSE.OpenRAIL-M",
+   "dest": "LICENSE.OpenRAIL-M"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/renikud/LICENSE",
+   "dest": "frontend/renikud/LICENSE"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/renikud/README.md",
+   "dest": "frontend/renikud/README.md"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/polyg2p_data/LICENSE",
+   "dest": "frontend/polyg2p_data/LICENSE"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/polyg2p_data/NOTICE",
+   "dest": "frontend/polyg2p_data/NOTICE"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/polyg2p_data_nolex/en.lex",
+   "dest": "frontend/polyg2p_data/en.lex",
+   "sha256": "713aaed9ce1891e111eab2d213df560f043947b9268c6411b26a8c756ea99d32"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/polyg2p_data_nolex/en.g2p",
+   "dest": "frontend/polyg2p_data/en.g2p",
+   "sha256": "2f638c5358a2a90075a575024d747931d1d92160e18ce0f9ed7176894a366808"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "frontend/polyg2p_data_nolex/en-large.g2p",
+   "dest": "frontend/polyg2p_data/en-large.g2p",
+   "sha256": "a119ddaabc98ceb2696f2d9af52cfc0733388286d489b175c43129365ea15c4b"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/adam.json",
+   "dest": "voices/adam.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/ariel.json",
+   "dest": "voices/ariel.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/daniel.json",
+   "dest": "voices/daniel.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/david.json",
+   "dest": "voices/david.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/emma.json",
+   "dest": "voices/emma.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/ethan.json",
+   "dest": "voices/ethan.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/jonathan.json",
+   "dest": "voices/jonathan.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/lily.json",
+   "dest": "voices/lily.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/maya.json",
+   "dest": "voices/maya.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/michael.json",
+   "dest": "voices/michael.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/noa.json",
+   "dest": "voices/noa.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/sara.json",
+   "dest": "voices/sara.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/shira.json",
+   "dest": "voices/shira.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/tamar.json",
+   "dest": "voices/tamar.json"
+  },
+  {
+   "repo": "notmax123/BlueV3-onnx",
+   "revision": "8410bbfe508a9b84a967324ecf3caf5f655326c9",
+   "path": "voices/yael.json",
+   "dest": "voices/yael.json"
+  },
+  {
+   "repo": "notmax123/RenikudPlus",
+   "revision": "679c56ca449d41873fb8ff7711ddf7563d28198f",
+   "path": "model_int8.onnx",
+   "dest": "frontend/renikud/model.onnx",
+   "sha256": "0337468fad56eadf5ecc7becfdf21648a4d668de41de5bc27e860141b5afcadd"
+  }
+ ]
+}

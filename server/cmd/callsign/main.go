@@ -7,6 +7,8 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,6 +28,7 @@ func main() {
 	client := flag.String("client", "client", "directory of the debug page")
 	assets := flag.String("assets", "assets", "directory of generated art and audio, served read-only at /assets/")
 	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
+	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
 	flag.Parse()
 
 	rules, err := shared.Load()
@@ -54,6 +57,16 @@ func main() {
 		w.Write(shared.RulesJSON)
 	})
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*assets))))
+	if *tts != "" {
+		// The speech service gives the squads their voices in testing. The page reaches it
+		// through here so that it talks to one origin; when the service is down the page
+		// gets an error and falls back to the browser's own voice.
+		target, err := url.Parse(*tts)
+		if err != nil || target.Host == "" {
+			log.Fatalf("-tts must be a URL such as http://tts:5002, not %q", *tts)
+		}
+		mux.Handle("/tts/", http.StripPrefix("/tts", httputil.NewSingleHostReverseProxy(target)))
+	}
 	mux.Handle("/", http.FileServer(http.Dir(*client)))
 
 	// Cross-origin isolation lets the page's speech recogniser use WebAssembly threads.

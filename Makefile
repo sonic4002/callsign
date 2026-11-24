@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play stop shell voice-models voice-test art-image art-models art art-units-image art-units
+.PHONY: image test play stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -20,10 +20,11 @@ test:
 play:
 	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
 	@docker volume create callsign-gocache >/dev/null
-	CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose up
+	@mkdir -p assets/voice-cache
+	CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) up
 
 stop:
-	docker compose down
+	docker compose --profile voice down
 
 shell:
 	$(DOCKER) -it $(IMAGE) bash
@@ -66,3 +67,22 @@ art-units-image:
 # network off, in well under a minute.
 art-units:
 	$(ART) -e HOME=/tmp --network none -w /src callsign-blender python art/units.py
+
+# ---- radio voices: the squads' replies spoken aloud (tts/, client/speech/) ----
+TTS := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v $(CURDIR):/src
+
+# `make play` starts the speech service only when its image and models are both here.
+# Without it the page falls back to the browser's own voice.
+VOICES = $(shell docker image inspect callsign-tts >/dev/null 2>&1 && test -f assets/models/bluev3/onnx/vocoder.onnx && echo --profile voice)
+
+# Build the speech image: one layer (about 0.6 GB) on top of callsign-art (make art-image first).
+tts-image:
+	docker build -t callsign-tts -f tts/Dockerfile tts
+
+# Download the speech models once into assets/models/bluev3. About 680 MB.
+tts-models:
+	$(TTS) callsign-tts python tts/fetch.py
+
+# The pronunciation table's tests. No models and no network needed.
+tts-test:
+	$(TTS) --network none -w /src/tts callsign-tts python -m unittest test_pronounce

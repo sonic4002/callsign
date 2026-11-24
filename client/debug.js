@@ -6,6 +6,7 @@
 import { drawUnit, loadSprites } from "./art.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
+import { Speech } from "./speech/speech.js";
 import { tidy } from "./voice/normalize.js";
 import { Voice } from "./voice/voice.js";
 
@@ -78,6 +79,8 @@ const drawn = { roster: "", build: "" }; // what the sidebar lists show now
 
 const scene = new Scene($("map"), $("radar-map"), { lang: () => lang, showNerve: () => $("nerve").checked, side });
 const music = await new Music().load();
+const speech = new Speech({ volume: () => music.volume, duck: (on) => music.duck(on) });
+speech.bind($("speak"));
 await loadSprites();
 
 const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[lang] ?? id;
@@ -118,6 +121,7 @@ function onFrame(frame) {
       break;
     case "radio":
       entries.push({ kind: "radio", message: frame.message });
+      speech.say(frame.message, { rules, faction });
       break;
     case "refused":
       system("refused", { reason: frame.reason }, "warn");

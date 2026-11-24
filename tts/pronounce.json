@@ -1,0 +1,26 @@
+{
+  "comment": "How the radio's own words are said. The Hebrew reader guesses vowels from context and gets some names wrong (Alef as 'elef', Samech as 'semach'), so each word here is pinned to one reading, written in the phonetic alphabet the voice model takes. 'last' applies only to the final word of a message; 'before' only when that word follows.",
+  "he": {
+    "אלף": { "ipa": "ʔˈalef" },
+    "בועז": { "ipa": "bˈoʔaz" },
+    "גימל": { "ipa": "ɡˈimel" },
+    "דוד": { "ipa": "davˈid" },
+    "הגר": { "ipa": "haɡˈaʁ" },
+    "פסל": { "ipa": "pˈesel" },
+    "כרמל": { "ipa": "kaʁmˈel" },
+    "סמך": { "ipa": "sˈameχ" },
+    "זאב": { "ipa": "zeʔˈev" },
+    "צפע": { "ipa": "tsˈefa" },
+    "קרנף": { "ipa": "kaʁnˈaf" },
+    "בז": { "ipa": "bˈaz" },
+    "כריש": { "ipa": "kaʁˈiʃ" },
+    "פטיש": { "ipa": "patˈiʃ" },
+    "סדן": { "ipa": "sadˈan" },
+    "עבור": { "ipa": "ʔavˈoʁ", "last": true },
+    "סוף": { "ipa": "sˈof", "last": true },
+    "רות": { "ipa": "ʁˈut" },
+    "יבוצע": { "ipa": "jevutsˈa" },
+    "המתן": { "ipa": "hamtˈen" },
+    "אמור": { "ipa": "ʔemˈoʁ", "before": "שנית" }
+  }
+}

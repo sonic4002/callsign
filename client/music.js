@@ -9,6 +9,7 @@
 const TARGET_LUFS = -15;
 const BALANCE = { menu: 1, battle: 0.42 }; // the battle sits under the radio
 const FADE = 1.4; // seconds
+const DUCK = 0.3; // the music's level under a radio voice
 
 export class Music {
   constructor(base = "/assets/audio/") {
@@ -94,9 +95,16 @@ export class Music {
     this.applyVolume();
   }
 
+  // duck lowers the music while a radio voice is playing.
+  duck(on) {
+    if (this.ducked === on) return;
+    this.ducked = on;
+    this.applyVolume();
+  }
+
   applyVolume() {
-    const v = this.muted ? 0 : this.volume;
-    if (this.master) this.master.gain.value = v;
+    const v = (this.muted ? 0 : this.volume) * (this.ducked ? DUCK : 1);
+    if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.06);
     else for (const d of this.decks) d.el.volume = Math.min(1, v * d.level * (d.fade ?? 1));
   }
 
