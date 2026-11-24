@@ -181,3 +181,29 @@ func TestDirectActionsMeetEveryCheckAndOnlyTheCommanderMayAct(t *testing.T) {
 		t.Fatalf("selling our barracks: %v %v", res, err)
 	}
 }
+
+// A commander who has not spoken yet is told of the base in the language of their page.
+func TestCuesFollowTheCommandersPageLanguageBeforeTheySpeak(t *testing.T) {
+	rm := actRoom(t)
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	if err := rm.SetLang(anvil, "he"); !errors.Is(err, ErrNotCommander) {
+		t.Fatalf("the operator setting the language: err = %v", err)
+	}
+	if err := rm.SetLang(hammer, "fr"); err == nil {
+		t.Fatal("a language the game does not speak was accepted")
+	}
+	if err := rm.SetLang(hammer, "he"); err != nil {
+		t.Fatal(err)
+	}
+	ticks(rm, 40)
+	drain(t, hammer)
+	if _, err := act(rm, hammer, ActBuild, `{"structure":"vehicleWorks"}`); err != nil {
+		t.Fatal(err)
+	}
+	ticks(rm, rules.Factions["aegis"].Structures["vehicleWorks"].BuildSeconds+2)
+	cues := cuesHeard(t, hammer)
+	if len(cues) == 0 || cues[0].Lang != "he" || !strings.Contains(cues[0].Text, "הבנייה הושלמה") {
+		t.Fatalf("the cue was not in Hebrew: %+v", cues)
+	}
+}

@@ -456,9 +456,9 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #roster .earned { display: inline-flex; vertical-align: middle; margin-inline-start: .3rem; }
 /* A unit's button, and beside it the cancel for the last one of it in a line. */
 #build .unit { position: relative; display: grid; }
-#build .unit .cancel { position: absolute; inset-block-end: .2rem; inset-inline-end: .2rem; inline-size: 1.5rem; block-size: 1.5rem; min-block-size: 0; padding: 0; display: grid; place-items: center; font-size: 1rem; line-height: 1; color: var(--warn); background: #10161a; border-color: var(--warn); overflow: visible; }
+#build .unit .cancel { position: absolute; inset-block-end: .2rem; inset-inline-start: .2rem; inline-size: 1.5rem; block-size: 1.5rem; min-block-size: 0; padding: 0; display: grid; place-items: center; font-size: 1rem; line-height: 1; color: var(--warn); background: #10161a; border-color: var(--warn); overflow: visible; }
 #build .unit .cancel[hidden] { display: none; }
-@media (pointer: coarse) { #build .unit .cancel { inline-size: 2.2rem; block-size: 2.2rem; font-size: 1.2rem; } }
+@media (pointer: coarse) { #build .unit .cancel { inline-size: 1.9rem; block-size: 1.9rem; font-size: 1.1rem; } }
 
 /* ---- a sidebar that fits the screen ----
    Sections fold under their titles; the squads always keep room for three rows; the build
@@ -520,7 +520,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
    Tabs at the start, one row of cards beside them, scrolling sideways when there are many.
    Both tabs have the same fixed height and the same card, so switching moves nothing. */
 #build-panel.under-map {
-  --card-w: 6.6rem; --card-h: 7.3rem;
+  --card-w: 6.8rem; --card-h: 9.5rem;
   flex: none; display: flex; align-items: stretch; gap: .5rem; padding: .35rem .5rem;
   block-size: calc(var(--card-h) + 1.3rem); border-inline: 0; border-block-end: 0; overflow: hidden;
 }
@@ -552,4 +552,15 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #structures button.refused::after, #build button.refused::after {
   content: attr(data-refused); position: absolute; inset: auto 0 0 0; padding: .15rem .2rem; font-size: .62rem; line-height: 1.15;
   color: #1a1206; background: var(--warn); white-space: normal; text-align: center;
+}
+
+/* ---- the mini map on the map, beside the zoom buttons (always the physical left) ---- */
+#map-wrap > #radar-box { position: absolute; inset-block-start: .6rem; left: 3.1rem; inline-size: 13.5rem; background: #0b1013e6; border: 1px solid var(--edge-hi); box-shadow: 0 2px 10px #0008; }
+#map-wrap > #radar-box #radar-map { border: 0; max-block-size: 11rem; margin: 0; }
+#map-wrap > #radar-box.off { inline-size: auto; max-inline-size: 15rem; padding: .25rem .5rem; font-size: .74rem; }
+#map-wrap > #radar-box.off #radar-off { padding: 0; }
+@media (max-width: 700px), (pointer: coarse) and (max-width: 1100px) {
+  #map-wrap > #radar-box { left: 3.6rem; inline-size: 8.5rem; }
+  #map-wrap > #radar-box #radar-map { max-block-size: 7rem; }
+  #map-wrap > #radar-box.off { max-inline-size: 9.5rem; font-size: .68rem; }
 }

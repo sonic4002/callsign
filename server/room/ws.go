@@ -104,6 +104,11 @@ func (rm *Room) handle(c *Client, in inbound) {
 			res["data"] = data
 		}
 		rm.reply(c, res)
+	case "lang":
+		// The language the commander's page is in (act.go: SetLang).
+		if err := rm.SetLang(c, in.Text); err != nil {
+			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
+		}
 	case "ready":
 		if err := rm.Ready(c, in.Ready == nil || *in.Ready); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
