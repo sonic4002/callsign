@@ -20,7 +20,12 @@ export class Recognizer {
     this.layers = decoder.inputNames.filter((n) => n.endsWith(".decoder.key")).length;
   }
 
-  async transcribe(audio) {
+  // openers are the names a call can start with ("צפע", "Viper", …). A small model
+  // spells such names badly when it guesses freely, so the names themselves are tried as
+  // the first word: if the audio supports one of them well enough it is taken, and the
+  // rest is decoded as usual. `floor` is the lowest average log-probability per token at
+  // which an opener is believed. `trace` (optional) receives what was decided.
+  async transcribe(audio, { openers = [], floor = OPENER_FLOOR, trace } = {}) {
     const T = this.ort.Tensor;
     const x = trimSilence(audio).subarray(0, MAX_SECONDS * SR);
     if (x.length < SR / 4) return "";
@@ -36,10 +41,14 @@ export class Recognizer {
     }
     const out = await this.encoder.run(feed);
     const hidden = out.last_hidden_state ?? Object.values(out)[0];
-    return this.tokenizer.decode(await this.#decode(hidden, limit));
+    const want = openerBytes(openers);
+    const forced = want.length ? await this.#decode(hidden, limit, want, floor, trace) : null;
+    return this.tokenizer.decode(forced ?? (await this.#decode(hidden, limit, [], floor, trace)));
   }
 
-  async #decode(hidden, limit) {
+  // #decode is the greedy loop. With openers it first walks the tokens that spell one of
+  // them, and gives up (null) when none fits or the fit is poor.
+  async #decode(hidden, limit, openers, floor, trace) {
     const T = this.ort.Tensor;
     const { heads, headDim } = this.spec;
     const feed = { encoder_hidden_states: hidden, use_cache_branch: new T("bool", new Uint8Array([0]), [1]) };
@@ -48,6 +57,8 @@ export class Recognizer {
     }
     const ids = [];
     let last = BOS;
+    let remaining = openers; // what is still to be spelled of each opener that fits so far
+    let score = 0;
     for (let step = 0; step < limit; step++) {
       feed.input_ids = new T("int64", BigInt64Array.from([BigInt(last)]), [1, 1]);
       const res = await this.decoder.run(feed);
@@ -57,6 +68,28 @@ export class Recognizer {
       const base = data.length - vocab;
       let best = 0;
       for (let i = 1; i < vocab; i++) if (data[base + i] > data[base + best]) best = i;
+      if (remaining.length) {
+        // Only tokens that continue an opener are allowed here.
+        let pick = -1;
+        for (let i = 0; i < vocab; i++) {
+          const bytes = this.tokenizer.tokens[i];
+          if (!bytes?.length || this.tokenizer.special.has(i)) continue;
+          if ((pick < 0 || data[base + i] > data[base + pick]) && remaining.some((r) => startsWith(r, bytes))) pick = i;
+        }
+        if (pick < 0) return null;
+        let sum = 0;
+        for (let i = 0; i < vocab; i++) sum += Math.exp(data[base + i] - data[base + best]);
+        score += data[base + pick] - data[base + best] - Math.log(sum);
+        const bytes = this.tokenizer.tokens[pick];
+        remaining = remaining.filter((r) => startsWith(r, bytes)).map((r) => r.subarray(bytes.length));
+        if (remaining.some((r) => r.length === 0)) {
+          const mean = score / (ids.length + 1);
+          trace?.({ opener: this.tokenizer.decode([...ids, pick]), score: mean, taken: mean >= floor });
+          if (mean < floor) return null;
+          remaining = [];
+        }
+        best = pick;
+      }
       if (best === EOS) break;
       ids.push(best);
       last = best;
@@ -71,6 +104,27 @@ export class Recognizer {
     }
     return ids;
   }
+}
+
+// The lowest average log-probability per token at which a forced opener is believed.
+// Measured on eight voices: a callsign that was really said scores -0.4 to -2.7, and one
+// that was not (even "צבע אדום" against "צפע") scores below -7.
+export const OPENER_FLOOR = -5;
+
+const startsWith = (whole, part) => part.length <= whole.length && part.every((b, i) => whole[i] === b);
+
+// openerBytes spells each opener the ways a model may start a sentence with it: with or
+// without a leading space, as given and with a capital first letter.
+function openerBytes(openers) {
+  const text = new TextEncoder();
+  const forms = new Set();
+  for (const name of openers) {
+    for (const form of [name, name.toLowerCase(), name[0].toUpperCase() + name.slice(1)]) {
+      forms.add(form);
+      forms.add(` ${form}`);
+    }
+  }
+  return [...forms].map((form) => text.encode(form));
 }
 
 // isNoise spots a decoder stuck on one phrase, which is what these models write for

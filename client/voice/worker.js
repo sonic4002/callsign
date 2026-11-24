@@ -2,7 +2,7 @@
 // samples and gets text back, and the map never waits on it.
 //
 //   in:  { type: "load", lang }                      warm a language's model
-//        { type: "transcribe", id, lang, audio }     audio: Float32Array, 16 kHz mono
+//        { type: "transcribe", id, lang, audio, openers }     audio: Float32Array, 16 kHz mono
 //   out: { type: "progress", lang, loaded, total }
 //        { type: "ready", lang, ms, threads }
 //        { type: "missing", lang }                   the files are not on this server
@@ -120,7 +120,7 @@ self.addEventListener("message", ({ data }) => {
       try {
         const r = await recogniser(data.lang);
         const t0 = performance.now();
-        const text = await r.transcribe(data.audio);
+        const text = await r.transcribe(data.audio, { openers: data.openers ?? [] });
         post({ type: "result", id: data.id, text: isNoise(text) ? "" : text, ms: Math.round(performance.now() - t0) });
       } catch (err) {
         fail(err, { id: data.id, lang: data.lang });

@@ -147,3 +147,40 @@ test("a named enemy squad keeps its name and gets a digit", () => {
   assert.equal(relaxed("viper one attack target three", { lang: "en", rules }), "Viper 1 attack Target 3");
   assert.equal(relaxed("צפע 1 תקוף את מטרה שלוש", { lang: "he", rules }), "צפע 1 תקוף את מטרה 3");
 });
+
+test("openers: a callsign the audio supports is taken as the first word, a poor fit is not", async () => {
+  // A toy model that hears "zebra two": its free guess for the first word is wrong, and
+  // "viper" is its second choice (close) or a hopeless one (far).
+  const vocab = { "<pad>": 0, "<s>": 1, "</s>": 2, "▁zebra": 3, "▁vi": 4, "per": 5, "▁two": 6, "▁rhino": 7 };
+  const tokenizer = new Tokenizer({ model: { vocab }, added_tokens: [{ id: 0 }, { id: 1 }, { id: 2 }] }, "pieces");
+  class Tensor {
+    constructor(type, data, dims) {
+      Object.assign(this, { type, data, dims });
+    }
+  }
+  const model = (viperLogit) => ({
+    inputNames: ["input_ids", "encoder_hidden_states", "use_cache_branch", "past_key_values.0.decoder.key"],
+    async run(feed) {
+      const last = Number(feed.input_ids.data[0]);
+      const logits = new Float32Array(8).fill(-20);
+      if (last === 1) [logits[3], logits[4], logits[7]] = [5, viperLogit, -9]; // first word
+      else if (last === 4) logits[5] = 5; // "vi" → "per"
+      else if (last === 3 || last === 5) logits[6] = 5; // → "two"
+      else logits[2] = 5; // end
+      return { logits: new Tensor("float32", logits, [1, 1, 8]) };
+    },
+  });
+  const make = (viperLogit) =>
+    new Recognizer({
+      ort: { Tensor },
+      encoder: { run: async () => ({ last_hidden_state: new Tensor("float32", new Float32Array(1), [1, 1, 1]) }) },
+      decoder: model(viperLogit),
+      tokenizer,
+      spec: { kind: "moonshine", heads: 1, headDim: 1, maxTokens: 10, tokensPerSecond: 10 },
+    });
+  const audio = Float32Array.from({ length: 16000 }, (_, i) => Math.sin(i / 7));
+  const openers = ["Viper", "Rhino"];
+  assert.equal(await make(3).transcribe(audio), "zebra two");
+  assert.equal(await make(3).transcribe(audio, { openers }), "viper two");
+  assert.equal(await make(-12).transcribe(audio, { openers }), "zebra two");
+});

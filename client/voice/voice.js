@@ -71,7 +71,8 @@ export class Voice {
   }
 
   // stop ends the recording and resolves with what was said ("" when nothing was).
-  async stop(lang) {
+  // `openers` are the callsigns a call can start with; the recogniser listens for them.
+  async stop(lang, openers = []) {
     this.held = false;
     const recorder = this.recorder;
     if (!recorder) return "";
@@ -87,7 +88,7 @@ export class Voice {
       const id = this.nextId++;
       const text = await new Promise((resolve, reject) => {
         this.pending.set(id, { resolve, reject });
-        this.worker.postMessage({ type: "transcribe", id, lang, audio }, [audio.buffer]);
+        this.worker.postMessage({ type: "transcribe", id, lang, audio, openers }, [audio.buffer]);
       }).finally(() => this.pending.delete(id));
       this.onState(text ? "idle" : "nothing");
       return text;
