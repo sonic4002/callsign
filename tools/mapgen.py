@@ -401,7 +401,7 @@ def small():
     m.around("B", [("rocks", "E", 62), ("ruin", "W", 58)])
     m.around("D", [("bunker", "N", 56), ("rocks", "E", 62), ("grove", "SW", 70)])
     m.around("T", [("ruin", "N", 56), ("rocks", "S", 60), ("grove", "E", 76)])
-    m.around("F", [("house", "N", 110), ("house", "S", 110), ("rocks", "NW", 130)])
+    m.around("F", [("house", "N", 56), ("house", "S", 120), ("rocks", "NW", 130)])
     m.mark("house", 1090, 920)               # the bridgehead houses
     m.mark("house", 1040, 1010)
     m.mark("grove", 420, 500)                # woods north of each base

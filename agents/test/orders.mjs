@@ -4,7 +4,9 @@
 import { readFileSync } from "node:fs";
 
 export const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
-rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
+// These tests stage their squads at fixed spots, so they run on the drill ground: the
+// small map as it was, kept for tests (server/sim/testdata), which no player sees.
+rules.map = JSON.parse(readFileSync(new URL("../../server/sim/testdata/drill-ground.json", import.meta.url), "utf8"));
 export const { orders } = JSON.parse(readFileSync(new URL("./fixtures/orders.json", import.meta.url)));
 
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };

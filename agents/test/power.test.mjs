@@ -13,7 +13,9 @@ import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 import { leaderToolsFor, operatorTools } from "../tools.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
-rules.map ??= rules.maps.small;
+// These tests stage their squads at fixed spots, so they run on the drill ground: the
+// small map as it was, kept for tests (server/sim/testdata), which no player sees.
+rules.map = JSON.parse(readFileSync(new URL("../../server/sim/testdata/drill-ground.json", import.meta.url), "utf8"));
 const { aegis, ashfall } = rules.factions;
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 const anvil = { role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };

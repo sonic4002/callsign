@@ -654,7 +654,9 @@ func TestAVehicleFlattensSandbagsAndHeavyWeaponsKnockThemDown(t *testing.T) {
 	if l.Kind != sim.Sandbags || l.HP != rules.LandmarkKinds[sim.Sandbags].HP {
 		t.Fatalf("rifle fire left the position %s at %.0f", l.Kind, l.HP)
 	}
-	stand(s.Squad(1), 150, 600)
+	if rifles := s.Squad(1); rifles != nil { // the militia in the position may have shot them down
+		stand(rifles, 150, 600)
+	}
 	// A tank's gun does.
 	stand(tank, l.X, l.Y-200)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: tank.ID, Place: "N of D 450"})

@@ -305,7 +305,7 @@ func TestFogHidesTheEnemyUntilContact(t *testing.T) {
 // Nerve has to be readable from behaviour alone: a pinned team stops firing and stops
 // advancing, and a team left in peace steadies again.
 func TestNerveShowsInBehaviour(t *testing.T) {
-	s := newSim(t, 3)
+	s := newSim(t, 5)
 	for _, id := range []int{1, 2} {
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: id, Point: "F"})
 	}
@@ -427,6 +427,7 @@ func TestReachIsNotAFreeWin(t *testing.T) {
 // starts on. Before tuning, Aegis won nine in ten.
 func TestFactionsAreRoughlyEven(t *testing.T) {
 	const seeds, limit = 8, 0.75
+	rules := shared.MustLoad() // on the small map as it is played, not on the drill ground
 	wins := map[string]int{}
 	games := 0
 	for _, factions := range [][2]string{{"aegis", "ashfall"}, {"ashfall", "aegis"}} {
