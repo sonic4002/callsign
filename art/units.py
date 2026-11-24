@@ -25,6 +25,7 @@ from PIL import Image, ImageDraw, ImageFilter
 HERE = pathlib.Path(__file__).resolve().parent
 OUT = HERE.parent / "assets" / "sprites"
 RAW = HERE.parent / "assets" / "raw" / "blender"
+PLAIN = HERE.parent / "assets" / "raw" / "plain"
 
 PPM = 40  # rendered pixels per metre
 FACINGS = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]  # map headings, clockwise from east
@@ -1204,6 +1205,10 @@ def pack(name, suffix, rows, origin):
     rel = f"units/{name}{suffix}.png"
     (OUT / "units").mkdir(parents=True, exist_ok=True)
     save_small(sheet, OUT / rel)
+    # The same sheet in full colour for art/paint.py, which paints it and writes the
+    # picture the game loads over the one saved above (make art-paint).
+    (PLAIN / "units").mkdir(parents=True, exist_ok=True)
+    sheet.save(PLAIN / rel)
     anchor = [round((origin[0] - left) / w, 4), round((origin[1] - top) / h, 4)]
     print(f"{rel}  {sheet.width}x{sheet.height}, frame {w}x{h}")
     return rel, [w, h], anchor, sheet

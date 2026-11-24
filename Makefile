@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play play-lan play-public public-dns stop shell voice-models voice-test art-image art-models art art-units-image art-units art-sheet tts-image tts-models tts-test
+.PHONY: image test play play-lan play-public public-dns stop shell voice-models voice-test art-image art-models art art-units-image art-units art-paint art-sheet tts-image tts-models tts-test
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -108,8 +108,17 @@ art-units-image:
 # Render every unit's sprite sheets (the two heroes among them) into assets/sprites/units,
 # the pieces that are laid end to end (walls, fences, the bridge) and the gold lying in a
 # field into assets/sprites/segments and props, and the sandbag position into landmarks. Runs on the CPU with the network off, in a few minutes.
+# The unit sheets come out plain; `make art-paint` then paints them.
 art-units:
 	$(ART) -e HOME=/tmp --network none -w /src callsign-blender sh -c 'python art/units.py && python art/props.py && python art/rename_keys.py'
+
+# Paint the rendered unit sheets in the style of the buildings (art/paint.py, docs/art/STYLE.md):
+# the model redraws every frame over itself, so shapes and frames stay where they are.
+# Needs the renders of `make art-units` in assets/raw/plain and the GPU; about an hour for all.
+# UNITS="tank militia" paints only those.
+art-paint:
+	$(ART) --network none --device nvidia.com/gpu=all -v callsign-art-models:/models:ro callsign-art \
+		python art/paint.py $(UNITS)
 
 # One picture of every finished sprite standing on the game's ground at game size, to
 # look at before it goes in: art-sheet.png in this directory.
