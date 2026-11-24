@@ -43,7 +43,11 @@ type Config struct {
 	LengthSeconds int // 0 uses the rules default
 	// FullBase starts both sides with every base structure standing, so that every unit
 	// can be bought from the first second. Tests of other things use it.
-	FullBase  bool
+	FullBase bool
+	// Base starts both sides with these base structures standing, by role, in place of
+	// the rules' opening (the headquarters alone). Tests of what comes after the opening
+	// use it: a refinery among them has brought its hauler.
+	Base      []string
 	StartGold int // gold each side starts with; 0 uses the rules default
 }
 
@@ -189,7 +193,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 			s.field(s.raise(side, u))
 		}
 	}
-	s.initStructures(cfg.FullBase)
+	s.initStructures(cfg.FullBase, cfg.Base)
 	startGold := cfg.StartGold
 	if startGold <= 0 {
 		startGold = r.Match.StartGold

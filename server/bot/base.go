@@ -78,9 +78,15 @@ func (p *Player) raise(snap sim.Snapshot, role string, depth int) baseStep {
 // barracks or refinery, and one defence once the armour is out.
 func (p *Player) upkeep(snap sim.Snapshot, vehicles int) baseStep {
 	if p.Style == Rush {
+		// A rush wants bodies and nothing else: the barracks, and no economy.
+		if !p.stands(snap, shared.RoleBarracks) {
+			return p.raise(snap, shared.RoleBarracks, 0)
+		}
 		return baseStep{}
 	}
-	for _, role := range []string{shared.RoleBarracks, shared.RoleRefinery} {
+	// The opening, and what is put back first when it falls: the refinery, which brings
+	// a hauler, then the barracks.
+	for _, role := range []string{shared.RoleRefinery, shared.RoleBarracks} {
 		if !p.stands(snap, role) {
 			return p.raise(snap, role, 0)
 		}

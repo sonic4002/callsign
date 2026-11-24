@@ -137,10 +137,9 @@ type Rules struct {
 		CaptureSeconds float64 `json:"captureSeconds"`
 		CaptureRadius  float64 `json:"captureRadius"`
 		HoldRadius     float64 `json:"holdRadius"`
-		PointSight     float64 `json:"pointSight"` // how far a side sees from a point it holds
-		HQTrickle      int     `json:"hqTrickle"`  // gold per second every headquarters makes on its own
-		HaulerCap      int     `json:"haulerCap"`  // haulers a side may have, apart from the squad cap
-		StartHaulers   int     `json:"startHaulers"`
+		PointSight     float64 `json:"pointSight"`    // how far a side sees from a point it holds
+		HQTrickle      int     `json:"hqTrickle"`     // gold per second every headquarters makes on its own
+		HaulerCap      int     `json:"haulerCap"`     // haulers a side may have, apart from the squad cap
 		RevealSeconds  float64 `json:"revealSeconds"` // how long firing gives a team away to the enemy
 		// Bases (structures.go): the roles every side starts with besides its headquarters,
 		// how far from its own ground a side may place a defence or a fence, and how many.

@@ -283,11 +283,17 @@ test("scripted operator: acts on orders only until Hammer hands it the fight, an
   ]);
   // Told not to spend: it still tasks squads but buys nothing.
   assert.deepEqual(await think(brain, { agent: anvil, wake: heard("fight", { command: { mode: "fight", buy: false } }) }), [["radio", { to: ["Viper 1"], body: "Hold Bravo", end: "over" }]]);
-  // The purse is spent on the economy and the base before squads: a lost refinery is put
-  // back, a missing hauler replaced, and a unit's structure built before the unit.
+  // The purse is spent on the opening and the economy before squads: the refinery first
+  // (it brings a hauler), then the barracks; a second hauler once the works stands, and
+  // the works itself first when no hauler is left; a unit's structure before the unit.
   const own = async (extra) => (await think(brain, { agent: anvil, wake: heard("orders", { command: { mode: "orders", buy: true }, ...extra }) }))[0];
-  assert.deepEqual(await own({ structures: [{ id: "s1", kind: "barracks", role: "barracks", side: 0, yours: true, hp: 1, building: 1 }] }), ["build", { structure: "refinery", place: "", place2: "" }]);
-  assert.deepEqual(await own({ haulers: [{ id: 1001, side: 0 }] }), ["buy", { unit: "crawler", upgrade: "" }]);
+  const st = (id, kind, role) => ({ id, kind, role, side: 0, yours: true, hp: 1, building: 1 });
+  assert.deepEqual(await own({ structures: [], haulers: [] }), ["build", { structure: "refinery", place: "", place2: "" }]);
+  assert.deepEqual(await own({ structures: [st("s1", "refinery", "refinery")], haulers: [{ id: 1001, side: 0 }] }), ["build", { structure: "barracks", place: "", place2: "" }]);
+  assert.deepEqual(await own({ haulers: [{ id: 1001, side: 0 }] }), ["buy", { unit: "commandos", upgrade: "" }], "one hauler and no works: squads come first");
+  assert.deepEqual(await own({ haulers: [] }), ["build", { structure: "vehicleWorks", place: "", place2: "" }], "no hauler left: the works, to buy one");
+  const works = [st("s1", "barracks", "barracks"), st("s2", "refinery", "refinery"), st("s3", "vehicleWorks", "works")];
+  assert.deepEqual(await own({ structures: works, haulers: [{ id: 1001, side: 0 }] }), ["buy", { unit: "crawler", upgrade: "" }]);
   const four = [1, 2, 3, 4].map((n) => ({ callsign: { en: `Viper ${n}` }, class: "infantry", unit: "commandos", x: 150, y: 480, order: { kind: "hold", point: "D" } }));
   assert.deepEqual(await own({ squads: four }), ["build", { structure: "vehicleWorks", place: "", place2: "" }]);
   // Hammer takes command back: one Wilco and nothing more, now or on later traffic.
@@ -384,7 +390,8 @@ test("status and prompts: the operator is told about haulers, fields and income 
   assert.deepEqual(status.goldFields, [{ field: "B", full: 0.5, inSight: true }]);
   const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
   assert.match(prompt, /haulers drive out, load, and bring it home to your refinery/);
-  assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold, needs a Refinery; an unarmed gold hauler/);
+  assert.match(prompt, /opens with the headquarters alone: the refinery is the first thing to build/);
+  assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold, needs a Vehicle Works; an unarmed gold hauler/);
   assert.match(prompt, /on your own you build only while command\.buy is true/);
   assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);
   assert.doesNotMatch(prompt, /oil rigs; there are/);

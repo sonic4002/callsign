@@ -3,7 +3,7 @@
   "tickRate": 10,
   "match": {
     "lengthSeconds": 600,
-    "startGold": 300,
+    "startGold": 1000,
     "populationCap": 12,
     "captureSeconds": 10,
     "captureRadius": 70,
@@ -11,9 +11,8 @@
     "pointSight": 220,
     "hqTrickle": 10,
     "haulerCap": 4,
-    "startHaulers": 1,
     "revealSeconds": 3,
-    "startStructures": ["barracks", "refinery"],
+    "startStructures": [],
     "buildRadius": 340,
     "defenceCap": 6,
     "fenceRuns": 4
@@ -81,9 +80,9 @@
     "point": { "income": 0, "captureBy": ["infantry", "vehicle"] }
   },
   "gushers": [
-    { "id": "B", "point": "B", "x": 450, "y": 230, "ratePerSecond": 12, "fieldRadius": 90, "fieldCap": 1500, "startGold": 900 },
-    { "id": "K", "point": "K", "x": 1150, "y": 230, "ratePerSecond": 12, "fieldRadius": 90, "fieldCap": 1500, "startGold": 900 },
-    { "id": "F", "point": "F", "x": 800, "y": 385, "ratePerSecond": 18, "fieldRadius": 105, "fieldCap": 2400, "startGold": 1200 }
+    { "id": "B", "point": "B", "x": 450, "y": 230, "ratePerSecond": 12, "fieldRadius": 90, "fieldCap": 1500, "startGold": 1000 },
+    { "id": "K", "point": "K", "x": 1150, "y": 230, "ratePerSecond": 12, "fieldRadius": 90, "fieldCap": 1500, "startGold": 1000 },
+    { "id": "F", "point": "F", "x": 800, "y": 385, "ratePerSecond": 18, "fieldRadius": 105, "fieldCap": 2400, "startGold": 1000 }
   ],
   "tiers": [
     { "tier": 1, "name": { "en": "Recruit", "he": "טירון" }, "upgradeCost": 0, "modelClass": "small" },
@@ -188,7 +187,7 @@
         },
         "crawler": {
           "name": { "en": "Ore crawler", "he": "זחל כרייה" },
-          "class": "hauler", "requires": "refinery", "domain": "land", "cost": 150, "deploySeconds": 5,
+          "class": "hauler", "requires": "works", "domain": "land", "cost": 150, "deploySeconds": 5,
           "teams": 1, "members": 1, "hp": 420, "armor": 0.35,
           "speed": 40, "range": 1, "sight": 170,
           "damage": 0, "cooldownTicks": 10, "accuracy": 0, "nerveResist": 0,
@@ -203,9 +202,9 @@
         "den": { "name": { "en": "The Den", "he": "המאורה" }, "role": "hq",
           "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300 },
         "safehouse": { "name": { "en": "Safehouse", "he": "בית המסתור" }, "role": "barracks", "capturable": true,
-          "cost": 200, "buildSeconds": 8, "hp": 750, "armor": 0.2, "requires": [], "unlocks": ["militia", "rpgTeam", "sappers"], "footprint": 40, "sight": 180 },
+          "cost": 150, "buildSeconds": 6, "hp": 750, "armor": 0.2, "requires": [], "unlocks": ["militia", "rpgTeam", "sappers"], "footprint": 40, "sight": 180 },
         "smelter": { "name": { "en": "Smelter", "he": "המתכה" }, "role": "refinery", "capturable": true,
-          "cost": 400, "buildSeconds": 12, "hp": 950, "armor": 0.2, "requires": [], "unlocks": [], "footprint": 46, "sight": 180 },
+          "cost": 400, "buildSeconds": 10, "hp": 950, "armor": 0.2, "requires": [], "unlocks": [], "footprint": 46, "sight": 180 },
         "chopShop": { "name": { "en": "Chop Shop", "he": "המוסך" }, "role": "works", "capturable": true,
           "cost": 320, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["barracks"], "unlocks": ["technical"], "footprint": 48, "sight": 180 },
         "boatShed": { "name": { "en": "Boat Shed", "he": "סככת הסירות" }, "role": "dockyard", "capturable": true,
@@ -282,7 +281,7 @@
         },
         "dumpTruck": {
           "name": { "en": "Gold truck", "he": "משאית זהב" },
-          "class": "hauler", "requires": "refinery", "domain": "land", "cost": 150, "deploySeconds": 5,
+          "class": "hauler", "requires": "works", "domain": "land", "cost": 150, "deploySeconds": 5,
           "teams": 1, "members": 1, "hp": 300, "armor": 0.15,
           "speed": 52, "range": 1, "sight": 170,
           "damage": 0, "cooldownTicks": 10, "accuracy": 0, "nerveResist": 0,

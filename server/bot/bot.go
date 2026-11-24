@@ -102,7 +102,11 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 			if sq.Order.Kind != want.Kind || sq.Order.Contact != want.Contact {
 				cmds = append(cmds, want)
 			}
-		} else if want.Point != "" && (sq.Order.Kind != want.Kind || sq.Order.Point != want.Point) {
+		} else if want.Place != "" {
+			if sq.Order.Kind != want.Kind || sq.Order.Place != want.Place {
+				cmds = append(cmds, want)
+			}
+		} else if want.Point != "" && (sq.Order.Kind != want.Kind || sq.Order.Point != want.Point || sq.Order.Place != "") {
 			cmds = append(cmds, want)
 		}
 	}
@@ -124,12 +128,17 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	}
 	// A hauler bought with the enemy at the gates is a hauler lost: then fighters come first.
 	if id, u := p.R.HaulerOf(snap.Faction); id != "" && haulers < min(p.haulersWanted(snap.Tick/p.R.TickRate), p.R.Match.HaulerCap) && !p.besieged(snap) {
-		if !p.canBuy(snap, id) {
-			// No refinery stands: that comes back first, or the hauler cannot be bought.
-			if step := p.raise(snap, u.Requires, 0); step.build != nil {
-				return append(cmds, *step.build)
-			} else if step.wait && haulers == 0 {
-				return cmds // save for the refinery
+		if !p.stands(snap, shared.RoleRefinery) {
+			// No refinery: upkeep below builds it, and it brings a hauler of its own.
+		} else if !p.canBuy(snap, id) {
+			// More haulers come out of the works. With none left at all the works comes
+			// before anything else; otherwise it is built when the armour is wanted.
+			if haulers == 0 {
+				if step := p.raise(snap, u.Requires, 0); step.build != nil {
+					return append(cmds, *step.build)
+				} else if step.wait {
+					return cmds // save for it
+				}
 			}
 		} else if snap.Gold >= u.Cost {
 			return append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
@@ -213,13 +222,25 @@ func (p *Player) besieged(snap sim.Snapshot) bool {
 // command with no kind when this squad has other work.
 func (p *Player) raid(snap sim.Snapshot, sq sim.SquadView, line map[string]string) sim.Command {
 	none := sim.Command{}
-	if p.Style != Standard || sq.Class != "vehicle" || sq.Unit != line["vehicle"] {
+	if (p.Style != Standard && p.Style != Normal) || sq.Class != "vehicle" || sq.Unit != line["vehicle"] {
 		return none
 	}
+	earlier := 0
 	for _, o := range snap.Squads {
 		if o.Class == "vehicle" && o.Unit == line["vehicle"] && o.ID < sq.ID {
-			return none // only the first one raids
+			earlier++
 		}
+	}
+	if earlier == 1 {
+		// The second vehicle squad goes for what the enemy builds with: its refinery
+		// first, then whatever makes its units.
+		if id := p.strike(snap); id != "" {
+			return sim.Command{Side: p.Side, Squad: sq.ID, Kind: sim.CmdAttack, Place: id}
+		}
+		return none
+	}
+	if earlier > 0 || p.Style != Standard {
+		return none // only the relentless style's first one hunts haulers
 	}
 	for _, c := range snap.Contacts {
 		if c.Class == shared.HaulerClass {
@@ -233,6 +254,22 @@ func (p *Player) raid(snap sim.Snapshot, sq sim.SquadView, line map[string]strin
 		}
 	}
 	return none
+}
+
+// strike picks the enemy structure worth a raid, from what this side has seen: the
+// refinery, or else what the enemy's units come out of. The lowest id breaks a tie.
+func (p *Player) strike(snap sim.Snapshot) string {
+	worth := map[string]int{shared.RoleRefinery: 5, shared.RoleWorks: 4, shared.RoleAirbase: 3, shared.RoleBarracks: 2, shared.RoleDockyard: 1}
+	best, bw := "", 0
+	for _, st := range snap.Structures {
+		if st.Side == p.Side || st.Ruin || st.Building < 1 {
+			continue
+		}
+		if w := worth[st.Role]; w > bw {
+			best, bw = st.ID, w
+		}
+	}
+	return best
 }
 
 // enemyField is the point of the gusher nearest the enemy headquarters.

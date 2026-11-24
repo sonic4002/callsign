@@ -33,6 +33,7 @@ func main() {
 	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
 	agents := flag.String("agents", "agents", "directory of the agent runtime, whose browser modules are served read-only at /agents/")
 	relay := flag.String("relay", "", "address of the model relay, passed on at /relay/; empty for none")
+	base := flag.String("base", "", `start every match with these base structures standing, by role ("refinery,barracks"); for tests of what comes after the opening`)
 	fullBase := flag.Bool("full-base", false, "start every match with every base structure standing, so that any unit can be bought at once")
 	hostKey := flag.String("host-key", os.Getenv("CALLSIGN_HOST_KEY"), "password needed to make a match, for a server that strangers can reach; empty for none")
 	agentKey := flag.String("agent-key", os.Getenv("CALLSIGN_AGENT_KEY"), "secret this server's agent host and model relay show; with it set, commanders need seat tokens and the open room of Phase 0 is gone")
@@ -52,7 +53,7 @@ func main() {
 	hub, err := room.NewHub(ctx, rules, room.HubConfig{
 		Seed: *seed, Factions: [2]string{*west, *east}, LengthSeconds: *length, Bot: *enemy,
 		Interval: time.Second / time.Duration(rules.TickRate**speed),
-		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey, FullBase: *fullBase,
+		AgentKey: *agentKey, Share: *share, IdleAfter: *idle, HostKey: *hostKey, FullBase: *fullBase, Base: roles(*base),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -133,4 +134,16 @@ func agentModules(dir string) http.Handler {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 		files.ServeHTTP(w, r)
 	})
+}
+
+// roles splits a comma-separated list of structure roles; "" is none.
+func roles(list string) []string {
+	if strings.TrimSpace(list) == "" {
+		return nil
+	}
+	var out []string
+	for _, r := range strings.Split(list, ",") {
+		out = append(out, strings.TrimSpace(r))
+	}
+	return out
 }

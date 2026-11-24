@@ -15,9 +15,10 @@ const bin = process.env.CALLSIGN_BIN;
 const skip = bin ? false : "set CALLSIGN_BIN to the built game server (make test does)";
 const clientDir = fileURLToPath(new URL("../../client", import.meta.url));
 
-async function startServer(t) {
+// `base` is what stands at the first tick: by default the base once the opening is done.
+async function startServer(t, base = "refinery,barracks") {
   const port = 20000 + Math.floor(Math.random() * 20000);
-  const proc = spawn(bin, ["-addr", `127.0.0.1:${port}`, "-bot", "", "-speed", "20", "-client", clientDir]);
+  const proc = spawn(bin, ["-addr", `127.0.0.1:${port}`, "-bot", "", "-speed", "20", "-client", clientDir, "-base", base]);
   t.after(() => proc.kill());
   await new Promise((resolve, reject) => {
     proc.stderr.on("data", (d) => String(d).includes("listening") && resolve());
@@ -144,7 +145,7 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
 });
 
 test("haulers work on their own, go where the operator sends them, and can be escorted", { skip }, async (t) => {
-  const server = await startServer(t);
+  const server = await startServer(t, "refinery,barracks,works") // more haulers come out of the works;
   const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
   await host.start();
   t.after(() => host.stop());

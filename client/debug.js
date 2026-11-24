@@ -239,6 +239,7 @@ function onFrame(frame) {
       return;
     case "event":
       if (frame.event.side === side && frame.event.kind === "deploying") buyAnswered(frame.event.unit);
+      if (frame.event.side === side && frame.event.kind === "structure_started") buyAnswered(`s:${frame.event.unit}`);
       if (frame.event.side === side && frame.event.kind === "enemy_destroyed") enemyDown = true;
       if (frame.event.side === side && frame.event.kind === "upgraded") {
         // The upgrade landed: the wait is over and the squad's row shows its new rank for a while.
@@ -361,13 +362,16 @@ const classWords = {
   vehicle: /vehicle|armou?r|tank|truck|רכב|שריון|טנק|טנדר/i,
   naval: /boat|naval|ship|סירה|סירת|סירות|ימי/i,
   air: /\bair\b|aircraft|helicopter|drone|אוויר|מסוק|רחפן|נחיל/i,
+  hauler: /hauler|crawler|gold truck|משאית|זחל כרייה/i,
 };
 
 function noteBuy(text) {
   if (!rules || !faction || !buyWords.test(text)) return;
   const low = text.toLowerCase();
-  // A call to build a structure is not a purchase of a unit.
-  if (wantedStructure(low, rules.factions[faction]?.structures ?? {})) return;
+  // A call to build a structure waits on the operator like a purchase does; its button
+  // shows it until work starts.
+  const structure = wantedStructure(low, rules.factions[faction]?.structures ?? {});
+  if (structure) return void requested.set(`s:${structure}`, [...waiting(`s:${structure}`), performance.now() + REQUEST_TIMEOUT]);
   const units = Object.entries(rules.factions[faction]?.units ?? {});
   const says = ([, u]) => [u.name.en, u.name.he].some((name) => name.toLowerCase().split(/\s+/).some((word) => word.length >= 3 && low.includes(word)));
   const named = units.filter(says);
@@ -745,6 +749,30 @@ function structureEvent(ev, mySide) {
 // The Structures half of the build panel. Like the unit buttons, these only write a
 // radio call to the operator: a base structure's call is sent at once, and a defence's or
 // a fence's is put in the box so that the place can be changed first.
+// The build panel shows one of its two halves. It opens on Structures, since nothing can
+// be bought before something is built, and remembers the player's choice after that.
+let buildTab = localStorage.getItem("callsign.buildTab") === "units" ? "units" : "structures";
+function showBuildTab(name) {
+  buildTab = name;
+  for (const pane of document.querySelectorAll("[data-build-pane]")) pane.hidden = pane.dataset.buildPane !== name;
+  for (const tab of document.querySelectorAll("[data-build-tab]")) tab.setAttribute("aria-selected", String(tab.dataset.buildTab === name));
+}
+for (const tab of document.querySelectorAll("[data-build-tab]")) {
+  tab.addEventListener("click", () => {
+    localStorage.setItem("callsign.buildTab", tab.dataset.buildTab);
+    showBuildTab(tab.dataset.buildTab);
+  });
+}
+showBuildTab(buildTab);
+
+// buildBadges puts a count on each tab of what is under way behind it.
+function buildBadges(rising, deploying) {
+  for (const [id, n] of [["structures-badge", rising], ["units-badge", deploying]]) {
+    $(id).hidden = n === 0;
+    $(id).textContent = String(n);
+  }
+}
+
 function renderStructures(canAct) {
   const cards = structureCards(state, rules, faction, side);
   const key = JSON.stringify([lang, faction, canAct, cards.map((c) => [c.id, c.state, c.have])]);
@@ -756,8 +784,10 @@ function renderStructures(canAct) {
     const button = $("structures").querySelector(`[data-structure="${card.id}"]`);
     if (!button) continue;
     button.querySelector(".fill").style.blockSize = card.state === "rising" ? `${card.progress * 100}%` : "0";
+    button.classList.toggle("requested", card.state !== "rising" && waiting(`s:${card.id}`).length > 0);
     if (card.state === "rising") button.querySelector(".why").textContent = t("structure.rising", { percent: Math.round(card.progress * 100) });
   }
+  buildBadges(cards.filter((c) => c.state === "rising").length, (state.deploying ?? []).filter((d) => d.side === side).length);
   const rows = structureRows(state, rules, side);
   const listKey = JSON.stringify([lang, rows.map((r) => [r.id, Math.round(r.hp * 20), r.building >= 1, r.segments])]);
   if (listKey !== drawn.structureList) {

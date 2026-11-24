@@ -103,11 +103,28 @@ func (s *Sim) initHaul(startGold int) {
 		for i := range s.Fields {
 			sd.fields[i] = fieldMemory{Gold: s.Fields[i].Gold, danger: never}
 		}
-		if id, _ := s.R.HaulerOf(sd.Faction); id != "" {
-			for n := 0; n < s.R.Match.StartHaulers; n++ {
-				s.field(s.raise(side, id))
+		// A refinery that already stands at the first tick (a full base, in tests) has
+		// brought its hauler, like one that is built during the match.
+		for _, st := range s.Structures {
+			if st.Side == side && st.Standing() && st.def.Role == shared.RoleRefinery {
+				s.grantHauler(st)
 			}
 		}
+	}
+}
+
+// grantHauler is the hauler a refinery brings with it when it is finished: free, at the
+// refinery, and off to work at once. The hauler cap still holds.
+func (s *Sim) grantHauler(st *Structure) {
+	id, _ := s.R.HaulerOf(s.Sides[st.Side].Faction)
+	if id == "" || s.Haulers(st.Side) >= s.R.Match.HaulerCap {
+		return
+	}
+	sq := s.raise(st.Side, id)
+	s.field(sq)
+	x, y := s.unloadSpot(dropoff{st.X, st.Y}, sq.ID)
+	for i := range sq.Teams {
+		sq.Teams[i].X, sq.Teams[i].Y = x, y
 	}
 }
 

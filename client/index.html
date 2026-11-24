@@ -106,11 +106,18 @@
     </section>
 
     <section class="panel" data-sheet="build">
-      <h2 data-i18n="build"></h2>
-      <div id="build"></div>
-      <h2 data-i18n="structures"></h2>
-      <div id="structures"></div>
-      <ul id="structure-list"></ul>
+      <!-- One panel, two tabs: what to build with, and what to buy with it. -->
+      <div class="tabs" id="build-tabs" role="tablist">
+        <button type="button" role="tab" data-build-tab="structures"><span data-i18n="structures"></span> <bdi dir="ltr" class="badge" id="structures-badge" hidden></bdi></button>
+        <button type="button" role="tab" data-build-tab="units"><span data-i18n="build"></span> <bdi dir="ltr" class="badge" id="units-badge" hidden></bdi></button>
+      </div>
+      <div data-build-pane="structures">
+        <div id="structures"></div>
+        <ul id="structure-list"></ul>
+      </div>
+      <div data-build-pane="units" hidden>
+        <div id="build"></div>
+      </div>
     </section>
 
     <section id="music" class="panel" data-sheet="more" hidden>

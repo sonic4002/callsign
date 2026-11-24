@@ -1,6 +1,10 @@
 package sim
 
-import "math"
+import (
+	"math"
+
+	"callsign/shared"
+)
 
 // plan is what one fireteam does this tick.
 type plan struct {
@@ -111,9 +115,16 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	// A squad sent at a structure shoots that structure, not the headquarters behind it.
 	hq := target == nil && sq.Order.Structure == 0 && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
 		dist(t.X, t.Y, enemyHQ.X, enemyHQ.Y) <= u.Range
+	// With no unit to shoot, a structure comes before the headquarters when it shoots
+	// back (a defence), stands in the way (a fence) or is what the squad was sent at.
 	var structure *Structure
-	if target == nil && !hq {
+	if target == nil {
 		structure = s.structureTarget(tr, order)
+		if structure != nil && hq && structure.def.Role != shared.RoleDefence && structure.ID != t.blocked {
+			structure = nil
+		} else if structure != nil {
+			hq = false
+		}
 	}
 	canFire := target != nil || hq || structure != nil
 

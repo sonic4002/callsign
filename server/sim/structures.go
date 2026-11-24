@@ -221,9 +221,12 @@ func (s *Sim) blockGround(st *Structure, closed bool) {
 }
 
 // initStructures puts up what each side starts with.
-func (s *Sim) initStructures(full bool) {
+func (s *Sim) initStructures(full bool, base []string) {
 	for side := range s.Sides {
 		roles := s.R.Match.StartStructures
+		if len(base) > 0 {
+			roles = base
+		}
 		if full {
 			roles = shared.BaseRoles
 		}
@@ -601,6 +604,9 @@ func (s *Sim) construct() {
 			runBuilt[st.Run] = true
 		}
 		s.emit(Event{Side: st.Side, Kind: EvStructureBuilt, Structure: st.PlaceID(), Unit: st.Kind, Point: s.nearestPoint(st.X, st.Y)})
+		if st.def.Role == shared.RoleRefinery {
+			s.grantHauler(st) // a finished refinery brings its first hauler
+		}
 	}
 }
 
@@ -670,7 +676,8 @@ func (s *Sim) ForeignUnits(side int) []string {
 		}
 		sort.Strings(ids)
 		for _, id := range ids {
-			if units[id].Requires == st.def.Role && !contains(out, id) {
+			// A side keeps to its own hauler: a captured works does not add another kind.
+			if units[id].Requires == st.def.Role && units[id].Class != shared.HaulerClass && !contains(out, id) {
 				out = append(out, id)
 			}
 		}
@@ -923,6 +930,9 @@ func (s *Sim) orderPlace(c Command, sq *Squad) (*Squad, error) {
 				return nil, fmt.Errorf("%w: %s cannot hurt a structure", ErrUnreachable, sq.unit.Name.En)
 			}
 			o.Structure = st.ID
+		case c.Kind == CmdAttack && st.Side != c.Side:
+			// It has fallen since this side last saw it: the squad goes to where it stood
+			// and finds that out for itself.
 		case c.Kind == CmdAttack:
 			return nil, fmt.Errorf("%w: nothing to attack at %s", ErrBadPlace, c.Place)
 		default:

@@ -25,6 +25,7 @@ func newHub(t *testing.T, cfg HubConfig) *Hub {
 	if cfg.Interval == 0 {
 		cfg.Interval = time.Hour // tests tick by hand
 	}
+	cfg.FullBase = true // these tests are about rooms and seats, not about the opening
 	h, err := NewHub(ctx, rules, cfg)
 	if err != nil {
 		t.Fatal(err)

@@ -261,3 +261,9 @@ body.no-server #no-server {
   }
   #ptt.live { transform: scale(1.1); }
 }
+
+/* The build sheet's tabs are thumb-sized on a phone. */
+@media (max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px) {
+  #build-tabs button { min-block-size: 44px; font-size: .85rem; }
+  #structure-list { max-block-size: none; }
+}

@@ -16,7 +16,7 @@ func newSim(t *testing.T, seed uint64) *sim.Sim {
 	t.Helper()
 	// Every base structure stands, so these tests can buy any unit at once. The build
 	// tree itself is tested in structures_test.go, on a match that starts as a real one does.
-	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}, FullBase: true})
+	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}, FullBase: true, StartGold: 300})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestSameSeedSameMatch(t *testing.T) {
 func TestHQWellPaysGold(t *testing.T) {
 	s := newSim(t, 1)
 	run(s, 10)
-	want := rules.Match.StartGold + 10*rules.Match.HQTrickle // no hauler is home yet
+	want := 300 + 10*rules.Match.HQTrickle // the purse newSim gives; no hauler is home yet
 	if s.Gold(0) != want || s.Gold(1) != want {
 		t.Fatalf("gold after 10s = %d and %d, want %d", s.Gold(0), s.Gold(1), want)
 	}

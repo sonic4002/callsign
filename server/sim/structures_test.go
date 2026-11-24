@@ -14,7 +14,8 @@ import (
 // refinery, and everything else still to be built.
 func baseSim(t *testing.T, seed uint64) *sim.Sim {
 	t.Helper()
-	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}})
+	// The base as it stands once the opening is done: a refinery (and its hauler) and a barracks.
+	s, err := sim.New(rules, sim.Config{Seed: seed, Factions: [2]string{"aegis", "ashfall"}, Base: []string{"refinery", "barracks"}})
 	if err != nil {
 		t.Fatal(err)
 	}

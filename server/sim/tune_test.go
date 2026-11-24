@@ -24,7 +24,7 @@ func TestTune(t *testing.T) {
 	}
 	wins := map[string]int{}
 	reasons := map[string]int{}
-	structures, lost, squads := 0, 0, 0
+	structures, lost, squads, haulers, haulersLost := 0, 0, 0, 0, 0
 	games := 0
 	for _, factions := range [][2]string{{"aegis", "ashfall"}, {"ashfall", "aegis"}} {
 		for seed := uint64(1); seed <= uint64(n); seed++ {
@@ -60,9 +60,19 @@ func TestTune(t *testing.T) {
 					}
 				}
 			}
-			squads += len(s.Squads)
+			for _, sq := range s.Squads {
+				if sq.IsHauler() {
+					haulers++
+					if !sq.Alive {
+						haulersLost++
+					}
+				} else {
+					squads++
+				}
+			}
 		}
 	}
-	t.Logf("%d games: %v reasons %v; structures per side per game %.1f (lost %.1f), squads per side %.1f",
-		games, wins, reasons, float64(structures)/float64(2*games), float64(lost)/float64(2*games), float64(squads)/float64(2*games))
+	per := func(n int) float64 { return float64(n) / float64(2*games) }
+	t.Logf("%d games: %v reasons %v; per side per game: structures %.1f (lost %.1f), squads %.1f, haulers %.1f (lost %.1f)",
+		games, wins, reasons, per(structures), per(lost), per(squads), per(haulers), per(haulersLost))
 }

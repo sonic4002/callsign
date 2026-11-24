@@ -139,11 +139,16 @@ function ownMoves({ wake, rules, agent }) {
     const infantry = [...s.squads, ...(s.deploying ?? [])].filter((q) => q.class === "infantry").length;
     const cls = infantry < 4 ? "infantry" : "vehicle";
     const pick = units.filter(([, u]) => u.class === cls && !u.captureSeconds).sort((a, b) => a[1].cost - b[1].cost)[0];
-    if (!stands("barracks")) raise("barracks");
-    else if (!stands("refinery")) raise("refinery");
-    else if (hauler && haulers < Math.min(2, rules.match.haulerCap ?? 0)) {
+    // The opening and what is put back first: the refinery, which brings a hauler, then
+    // the barracks. A second hauler comes out of the works once it stands; with no hauler
+    // left at all the works comes before any squad.
+    const more = hauler && haulers < Math.min(2, rules.match.haulerCap ?? 0);
+    if (!stands("refinery")) raise("refinery");
+    else if (!stands("barracks")) raise("barracks");
+    else if (more && stands(hauler[1].requires)) {
       if (s.gold >= hauler[1].cost) moves.push({ name: "buy", input: { unit: hauler[0], upgrade: "" } });
-    } else if (pick && fielded < Math.min(rules.match.populationCap, 8)) {
+    } else if (more && haulers === 0) raise(hauler[1].requires);
+    else if (pick && fielded < Math.min(rules.match.populationCap, 8)) {
       if (pick[1].requires && !stands(pick[1].requires)) raise(pick[1].requires);
       else if (s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
     }

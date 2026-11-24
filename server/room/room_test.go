@@ -27,6 +27,9 @@ func newRoom(t *testing.T, cfg Config) *Room {
 		cfg.Seed = 1
 	}
 	cfg.FullBase = true // these tests are about other things; build_test.go starts a real base
+	if cfg.StartGold == 0 {
+		cfg.StartGold = 300 // and they count gold from the purse they were written for
+	}
 	rm, err := New(rules, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -426,7 +429,7 @@ func TestRestart(t *testing.T) {
 	if err := rm.Restart(hammer); err != nil {
 		t.Fatal(err)
 	}
-	if snap := rm.sim.Snapshot(0); len(snap.Deploying) != 0 || snap.Gold != rules.Match.StartGold {
+	if snap := rm.sim.Snapshot(0); len(snap.Deploying) != 0 || snap.Gold != 300 { // the purse newRoom gives
 		t.Fatalf("after restart: %d deployments and %d gold, want a clean start", len(snap.Deploying), snap.Gold)
 	}
 	fs := drain(t, hammer)

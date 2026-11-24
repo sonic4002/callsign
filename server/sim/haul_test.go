@@ -32,7 +32,7 @@ func field(snap sim.Snapshot, gusher string) sim.FieldView {
 func TestHaulersCollectGoldOnTheirOwn(t *testing.T) {
 	s := newSim(t, 1)
 	start := s.Snapshot(0)
-	if hs := haulersOf(start, 0); len(hs) != rules.Match.StartHaulers || len(haulersOf(start, 1)) != 0 {
+	if hs := haulersOf(start, 0); len(hs) != 1 || len(haulersOf(start, 1)) != 0 {
 		t.Fatalf("side 0 sees %d own haulers and %d enemy ones at the start", len(hs), len(haulersOf(start, 1)))
 	}
 	if len(start.Squads) != 2 {
@@ -141,7 +141,7 @@ func TestBuyingHaulers(t *testing.T) {
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: id}); !errors.Is(err, sim.ErrHaulerCap) {
 		t.Fatalf("a hauler past the cap: err = %v", err)
 	}
-	if got, want := s.Gold(0), 5000-(rules.Match.HaulerCap-rules.Match.StartHaulers)*u.Cost; got != want {
+	if got, want := s.Gold(0), 5000-(rules.Match.HaulerCap-1)*u.Cost; got != want {
 		t.Fatalf("gold after buying haulers = %d, want %d", got, want)
 	}
 	events = append(events, run(s, u.DeploySeconds+1)...)

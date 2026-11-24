@@ -212,10 +212,10 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #build .left { position: absolute; inset-block-start: .2rem; inset-inline-start: .3rem; font-size: .8rem; font-weight: 700; color: var(--brass); font-variant-numeric: tabular-nums; text-shadow: 0 0 4px #000; }
 #build .count { position: absolute; inset-block-start: .2rem; inset-inline-end: .3rem; min-inline-size: 1.1rem; padding: 0 .2rem; font-size: .7rem; font-weight: 700; line-height: 1.1rem; color: #0a100f; background: var(--brass); border-radius: .55rem; }
 #build .count[hidden] { display: none; }
-#build button.deploying:disabled, #build button.requested:disabled { opacity: 1; }
-#build button.requested { animation: requested 1.1s ease-in-out infinite; }
+#build button.deploying:disabled, #build button.requested:disabled, #structures button.requested:disabled { opacity: 1; }
+#build button.requested, #structures button.requested { animation: requested 1.1s ease-in-out infinite; }
 @keyframes requested { 50% { border-color: var(--brass); box-shadow: inset 0 0 0 1px #c9a44c88, inset 0 0 14px #c9a44c33; } }
-@media (prefers-reduced-motion: reduce) { #build button.requested { animation: none; border-color: var(--brass); } }
+@media (prefers-reduced-motion: reduce) { #build button.requested, #structures button.requested { animation: none; border-color: var(--brass); } }
 
 /* The result screen after a headquarters has fallen comes up slowly over the burning ruin. */
 #overlay.after-finale { animation: overlay-in 1.6s ease-out; background: radial-gradient(ellipse at 50% 40%, #1b262c99, #05080ae6); }
@@ -323,3 +323,12 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #haulers .load { inline-size: 3.2rem; block-size: 5px; background: #0a0f11; border: 1px solid var(--edge); }
 #haulers .load b { display: block; block-size: 100%; background: #e6b84a; }
 #haulers li.empty { display: block; color: var(--muted); border-inline-start-color: var(--edge); }
+
+/* ---- the build panel's two tabs ---- */
+#build-tabs { display: flex; gap: .3rem; margin-block-end: .45rem; border-block-end: 1px solid var(--edge-hi); }
+#build-tabs button { flex: 1; padding: .3rem .4rem; border-block-end: 0; font-size: .74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+#build-tabs button[aria-selected="true"] { opacity: 1; color: var(--brass); border-color: var(--brass); }
+#build-tabs .badge { display: inline-block; min-inline-size: 1.1rem; padding: 0 .25rem; font-size: .68rem; line-height: 1.1rem; color: #0a100f; background: var(--brass); border-radius: .55rem; }
+#build-tabs .badge[hidden] { display: none; }
+[data-build-pane][hidden] { display: none; }
+#structure-list { max-block-size: 7.5rem; overflow-y: auto; }
