@@ -739,14 +739,7 @@ func (s *Sim) unitFor(side int, unitID string) (shared.Unit, bool) {
 func (s *Sim) mayBuy(side int, unitID string) (shared.Unit, error) {
 	own := s.faction(side)
 	if u, ok := own.Units[unitID]; ok {
-		// The structure that makes it must be one of the side's own design: a captured
-		// airbase makes its builders' aircraft, not ours. What it needs besides (a radar)
-		// may be any structure of that role the side holds.
-		if u.Requires != "" && s.producer(side, unitID, &u) == nil {
-			_, need := own.StructureOfRole(u.Requires)
-			return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))
-		}
-		for _, role := range u.Needs {
+		for _, role := range append([]string{u.Requires}, u.Needs...) {
 			if role != "" && !s.Has(side, role) {
 				_, need := own.StructureOfRole(role)
 				return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))

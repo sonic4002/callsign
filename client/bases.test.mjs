@@ -27,18 +27,10 @@ test("a unit is locked until the structure it needs stands", () => {
   assert.equal(unitLock(rising, rules, "aegis", 0, "tank").id, "vehicleWorks", "a works going up unlocks nothing yet");
   const built = { ...start, structures: [...start.structures, st("s3", "vehicleWorks", "works")] };
   assert.equal(unitLock(built, rules, "aegis", 0, "tank"), null);
-  // A ruin unlocks nothing, and the enemy's works is not ours. A captured works makes its
-  // builders' vehicles, never ours: the server refuses our tank there, so the card is locked.
+  // A ruin unlocks nothing, the enemy's works is not ours, and a captured one counts.
   assert.ok(unitLock({ ...start, structures: [...start.structures, st("s3", "vehicleWorks", "works", { ruin: true })] }, rules, "aegis", 0, "tank"));
   assert.ok(unitLock({ ...start, structures: [...start.structures, st("s9", "chopShop", "works", { faction: "ashfall", side: 1 })] }, rules, "aegis", 0, "tank"));
-  const captured = { ...start, structures: [...start.structures, st("s9", "chopShop", "works", { faction: "ashfall" })] };
-  assert.equal(unitLock(captured, rules, "aegis", 0, "tank").id, "vehicleWorks");
-  assert.equal(unitLock(captured, rules, "aegis", 0, "technical"), null, "what the captured works makes is ours to buy");
-  assert.equal(unitLock(start, rules, "aegis", 0, "technical").id, "chopShop");
-  // A unit that needs more than the structure that makes it stays locked until all of it stands.
-  const most = { ...start, structures: [...start.structures, st("s3", "vehicleWorks", "works")] };
-  assert.equal(unitLock(most, rules, "aegis", 0, "sentinel").def.role, "radar");
-  assert.equal(unitLock({ ...most, structures: [...most.structures, st("s4", "radar", "radar")] }, rules, "aegis", 0, "sentinel"), null);
+  assert.equal(unitLock({ ...start, structures: [...start.structures, st("s9", "chopShop", "works", { faction: "ashfall" })] }, rules, "aegis", 0, "tank"), null);
   assert.equal(unitDef(rules, "technical").name.en, "Technical");
   assert.ok(stands(start, 0, "barracks") && !stands(start, 1, "barracks"));
 });

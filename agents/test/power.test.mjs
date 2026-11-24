@@ -110,7 +110,23 @@ test("scripted engineers mend their own side's structure; other squads do not", 
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
   const commandos = { ...engineers, unit: aegis.units.commandos };
-  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Repair the barracks")) }), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
+  // A squad that is not engineers says so, in the net's language.
+  assert.deepEqual(await think({ agent: commandos, wake: wake(call("Repair the barracks")) }), [["radio", { to: ["Hammer"], body: "Negative, only engineers mend structures", end: "over" }]]);
+  assert.deepEqual(await think({ agent: { ...commandos, lang: "he" }, wake: wake(call("תקנו את המגורים", { lang: "he" })) }), [["radio", { to: ["Hammer"], body: "שלילי, רק מהנדסים מתקנים מבנים", end: "over" }]]);
+  // The owner's own words, in Hebrew: by the structure's name, or by a word for its kind.
+  const refinery = { id: "s1", name: "Refinery", role: "refinery", yours: true, near: "B", x: 370, y: 360, hp: 0.5 };
+  const both = { ...status, structures: [...structures, refinery] };
+  for (const body of ["תקנו את בית הזיקוק", "תקנו את הזיקוק שלנו"]) {
+    assert.deepEqual(await think({ agent: { ...engineers, lang: "he" }, wake: { items: [], call: call(body, { lang: "he" }), status: both } }), [
+      ["repair", { place: "s1" }],
+      ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
+    ]);
+  }
+  // The game refuses a structure that is whole: the squad passes the reason on.
+  assert.deepEqual(await think({ agent: engineers, wake: wake(call("Repair the barracks")) }, { repair: "that structure is not damaged: the Barracks" }), [
+    ["repair", { place: "s2" }],
+    ["radio", { to: ["Hammer"], body: "Negative, that structure is not damaged: the Barracks", end: "over" }],
+  ]);
 });
 
 test("the tools, the status and the prompts carry power, the radar, selling and repairing", () => {

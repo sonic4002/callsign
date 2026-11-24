@@ -73,6 +73,10 @@ function leaderPlan({ agent, wake, rules }) {
   // A structure of their own named with a word for mending: engineers go in and mend it.
   const ours = agent.unit?.captureSeconds > 0 && mendVerb.test(call.body.toLowerCase()) && namedStructure(call.body, structures, { enemy: false });
   if (ours) return [{ name: "repair", input: { place: ours.id }, orElse }, radio(back, say.wilco[lang], "out")];
+  // Told to mend a structure, and not engineers: say so, in plain words.
+  if (!agent.unit?.captureSeconds && mendVerb.test(call.body.toLowerCase()) && namedStructure(call.body, structures, { enemy: false })) {
+    return [radio(back, `${say.negative[lang]}, ${lang === "he" ? "רק מהנדסים מתקנים מבנים" : "only engineers mend structures"}`, "over")];
+  }
   // Dig in, plant a charge, seize a vehicle: the orders of heroes.mjs.
   const heroic = heroOrder({ agent, call, wake, rules, theirs, back, orElse, radio });
   if (heroic) return heroic;

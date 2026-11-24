@@ -52,7 +52,7 @@ export const leaderTools = [
 
 // Squads that mend bridges get repair; engineer squads also take over enemy structures.
 export const repairTool = tool("repair", "Go to a bridge and mend it. The squad works from the bank while nobody shoots at it; a fallen bridge stands again part-way through. Engineers can also name a damaged structure of their own side: they go in, make it whole, and stay inside for good.", {
-  place: { type: "string", description: 'The bridge, by id or name ("bridge-south", "the south bridge"), or for engineers a damaged structure of your own side by its id from your status, such as "s5".' },
+  place: { type: "string", description: 'The bridge, by id or name ("bridge-south", "the south bridge"), or for engineers a damaged structure of your own side, by its id from your status ("s5") or by its name ("the refinery", "the barracks near Delta").' },
 });
 export const captureTool = tool("capture", "Take over an enemy base structure, or a tech building (an assay office, a clinic, a service yard) whoever holds it. Your squad walks to it and, after a few seconds beside it without being shot at, the structure is your side's and the squad stays inside it for good.", {
   place: { type: "string", description: 'The structure: its id from your status, such as "s7", or its name ("the enemy refinery", "the clinic east of Delta").' },

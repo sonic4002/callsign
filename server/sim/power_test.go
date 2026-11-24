@@ -374,7 +374,7 @@ func TestRepairStopsWhenTheGoldRunsOut(t *testing.T) {
 	}
 }
 
-func TestEngineersMendTheirOwnStructureAndAreUsedUp(t *testing.T) {
+func TestEngineersMendTheirOwnStructureStandingByIt(t *testing.T) {
 	s := newSim(t, 1)
 	works := structureOf(s, 0, shared.RoleWorks)
 	engineers := buyFielded(t, s, 0, "engineers")
@@ -382,15 +382,32 @@ func TestEngineersMendTheirOwnStructureAndAreUsedUp(t *testing.T) {
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: engineers.ID, Place: works.PlaceID()}, sim.ErrNotDamaged, "")
 	works.HP = works.Def().HP * 0.2
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: commandos.ID, Place: works.PlaceID()}, sim.ErrNotEngineers, "")
+	theirs := structureOf(s, 1, shared.RoleWorks)
+	theirs.HP = theirs.Def().HP * 0.5
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: engineers.ID, Place: theirs.PlaceID()}); err == nil {
+		t.Fatal("engineers were sent to mend the enemy's works")
+	}
 	place(engineers, works.X+works.Def().Footprint+30, works.Y)
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdRepair, Squad: engineers.ID, Place: works.PlaceID()})
 	gold := s.Gold(0)
+	// It mends over time, not all at once.
+	run(s, 4)
+	if share := works.HP / works.Def().HP; share <= 0.25 || share >= 0.6 {
+		t.Fatalf("after four seconds the works is at %.0f%%", 100*share)
+	}
 	var events []sim.Event
-	for i := 0; i < 600 && engineers.Alive; i++ {
+	for i := 0; i < 600 && works.HP < works.Def().HP; i++ {
 		events = append(events, s.Step()...)
 	}
-	if engineers.Alive || works.HP != works.Def().HP {
-		t.Fatalf("the engineers should have gone in and made the works whole: alive=%v hp=%v", engineers.Alive, works.HP)
+	if works.HP != works.Def().HP {
+		t.Fatalf("the engineers should have made the works whole: hp=%v", works.HP)
+	}
+	if !engineers.Alive || engineers.Teams[0].Members == 0 {
+		t.Fatal("mending a structure used the engineers up")
+	}
+	run(s, 1)
+	if engineers.Order.Kind != sim.OrderHold {
+		t.Fatalf("with the works whole the engineers have order %q, want to stand by it", engineers.Order.Kind)
 	}
 	if !has(events, sim.EvStructureRepaired, 0) {
 		t.Fatal("the owner should hear that the works is whole")

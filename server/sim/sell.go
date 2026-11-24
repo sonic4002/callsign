@@ -156,8 +156,9 @@ func (s *Sim) repairStructures() {
 		}
 	}
 
-	// Engineers: beside the structure and left alone for as long as a takeover takes, they
-	// make it whole, and stay inside.
+	// Engineers: standing beside the structure and not being shot at, they mend it as they
+	// mend a bridge, a little every second and for no gold, and stand by it when it is
+	// whole. The work costs time and a squad that is doing nothing else.
 	quiet := int(s.R.Nerve.QuietSeconds * float64(s.R.TickRate))
 	for _, sq := range s.Squads {
 		if !sq.Alive || sq.Order.Kind != OrderRepair || sq.Order.Structure == 0 {
@@ -179,20 +180,13 @@ func (s *Sim) repairStructures() {
 			engaged = engaged || s.Tick-t.lastShot <= quiet
 		}
 		if !beside || engaged {
-			sq.Order.work = 0
 			continue
 		}
-		sq.Order.work++
-		if float64(sq.Order.work) < sq.unit.CaptureSeconds*float64(s.R.TickRate) {
-			continue
+		st.HP = math.Min(st.def.HP, st.HP+st.def.HP*m.RepairPerSecond*s.dt)
+		if st.HP >= st.def.HP {
+			st.Repairing, st.repairDebt = false, 0 // nothing more to pay for
+			s.emit(Event{Side: sq.Side, Kind: EvStructureRepaired, Structure: st.PlaceID(), Unit: st.Kind, Squad: sq.ID, Point: s.nearestPoint(st.X, st.Y)})
 		}
-		st.HP, st.Repairing, st.repairDebt = st.def.HP, false, 0
-		s.emit(Event{Side: sq.Side, Kind: EvStructureRepaired, Structure: st.PlaceID(), Unit: st.Kind, Squad: sq.ID, Point: s.nearestPoint(st.X, st.Y)})
-		for i := range sq.Teams {
-			sq.Teams[i].Members, sq.Teams[i].HP = 0, 0
-		}
-		sq.Alive = false
-		s.emit(Event{Side: sq.Side, Kind: EvSquadLost, Squad: sq.ID, Point: s.nearestPoint(st.X, st.Y), Reason: "spent"})
 	}
 }
 

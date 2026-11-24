@@ -10,7 +10,7 @@ export function powerFact(s) {
 }
 
 // leaderMend is what an engineer leader is told about mending its own side's structures.
-export const leaderMend = (unit) => ` repair also mends a damaged structure of your own side: give its id, the squad walks in, and after ${unit.captureSeconds} seconds beside it without being shot at the structure is whole again and the squad stays inside, which is the end of the squad.`;
+export const leaderMend = () => ` repair also mends a damaged structure of your own side: give its id from your status ("s5"), or its name ("the refinery"). The squad walks to it and, standing beside it without being shot at, mends it a little every second for no gold, as with a bridge; when it is whole the squad stands by it and you report. The tool refuses a structure that is whole, still going up, or not your side's: answer Negative with that reason.`;
 
 // leaderSiege is what a leader is told about defences and its own reach.
 export function leaderSiege(unit) {
