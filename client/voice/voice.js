@@ -20,6 +20,7 @@ export class Voice {
     this.onState = onState;
     this.onLimit = onLimit;
     this.seat = null; // set by useServer
+    this.heardBy = ""; // who transcribed the last recording: "server" or "browser"
     this.restUntil = 0;
     this.supported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder && window.Worker && (window.AudioContext || window.webkitAudioContext));
     this.worker = null;
@@ -138,6 +139,7 @@ export class Voice {
         this.onState("working");
         try {
           const text = await this.#ask(seat, audio, lang, hints);
+          this.heardBy = "server";
           this.onState(text ? "idle" : "nothing");
           return text;
         } catch (err) {
@@ -146,6 +148,7 @@ export class Voice {
           if (err.status !== 429) this.restUntil = Date.now() + SERVER_REST;
         }
       }
+      this.heardBy = "browser";
       this.onState(this.ready.has(lang) ? "working" : "loading", { percent: 0 });
       const id = this.nextId++;
       const text = await new Promise((resolve, reject) => {

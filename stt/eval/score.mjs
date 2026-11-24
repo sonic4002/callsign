@@ -99,7 +99,10 @@ for (const file of results) {
       const items = index.filter((i) => i.lang === lang && i.kind === kind && res[i.file]);
       if (!items.length) continue;
       const raw = score(items, (i) => res[i.file].text);
-      const done = score(items, (i) => tidy(res[i.file].text, { lang, rules }));
+      // The page tidies the server's text carefully, and the browser's own by sound.
+      const careful = !name.startsWith("browser");
+      const fix = (text) => tidy(text, { lang, rules, careful });
+      const done = score(items, (i) => fix(res[i.file].text));
       const ms = items.map((i) => res[i.file].ms).sort((a, b) => a - b);
       const row = (s) => `${pct(s.said - s.wrong, s.said)} ${pct(s.callsigns, s.n)}  ${pct(s.points, s.withPoints)} ${pct(s.exact, s.n)}`;
       console.log(name.padEnd(22), lang.padEnd(4), kind.padEnd(5), String(items.length).padStart(3), " |          ", row(raw), "|        ", row(done), "|", (ms[ms.length >> 1] / 1000).toFixed(2));
@@ -108,8 +111,8 @@ for (const file of results) {
         // Recordings the tidying made worse: what it changed, where the words were right or closer before.
         for (const i of items) {
           const ref = words(i.text, lang);
-          const [before, after] = [distance(ref, words(res[i.file].text, lang)), distance(ref, words(tidy(res[i.file].text, { lang, rules }), lang))];
-          if (after > before) console.log(`  worse ${i.file}\n   said:   ${i.text}\n   heard:  ${res[i.file].text}\n   tidied: ${tidy(res[i.file].text, { lang, rules })}`);
+          const [before, after] = [distance(ref, words(res[i.file].text, lang)), distance(ref, words(fix(res[i.file].text), lang))];
+          if (after > before) console.log(`  worse ${i.file}\n   said:   ${i.text}\n   heard:  ${res[i.file].text}\n   tidied: ${fix(res[i.file].text)}`);
         }
       }
     }

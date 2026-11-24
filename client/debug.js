@@ -651,7 +651,7 @@ async function talkEnd() {
   }
   const text = await voice.stop(spoke, openers, rules ? hintCalls(rules, spoke) : "");
   if (!text || !rules) return;
-  let said = tidy(text, { lang: spoke, rules });
+  let said = tidy(text, { lang: spoke, rules, careful: voice.heardBy === "server" }); // the server spells well
   // Tap a squad, then speak: an order that names nobody goes to the squad that is selected.
   const picked = state?.squads.find((sq) => sq.id === scene.selected);
   const names = [...callsigns(spoke), rules.callsigns.player[spoke]].map((name) => name.toLowerCase());

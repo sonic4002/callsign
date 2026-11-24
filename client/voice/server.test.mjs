@@ -99,6 +99,7 @@ test("with a server the recording goes there with the seat and the hints, and no
   assert.ok(options.body instanceof Int16Array && options.body.length === 2 * 16000 && options.body.some((v) => Math.abs(v) > 10000), "16-bit samples at 16 kHz");
   assert.deepEqual(states, ["asking", "listening", "working", "idle"]);
   assert.equal(voice.held, false);
+  assert.equal(voice.heardBy, "server");
 });
 
 test("what the server calls silence is nothing, and is not tried again in the browser", async () => {
@@ -116,6 +117,7 @@ test("a server that fails is replaced by the browser's recogniser, and left alon
   assert.equal(await speak(voice, 2), "from the browser");
   assert.deepEqual(workers[0].posted.map((m) => m.type), ["transcribe"]);
   assert.deepEqual(states, ["asking", "listening", "working", "loading", "idle"]);
+  assert.equal(voice.heardBy, "browser");
   assert.equal(await speak(voice, 2), "from the browser");
   assert.equal(calls.length, 1, "the next call does not wait for the server again");
   t.mock.timers.tick(61000);
