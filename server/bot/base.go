@@ -39,7 +39,15 @@ func (p *Player) rising(snap sim.Snapshot, role string) bool {
 // canBuy reports whether the structure a unit needs stands.
 func (p *Player) canBuy(snap sim.Snapshot, unit string) bool {
 	u, ok := p.R.Factions[snap.Faction].Units[unit]
-	return ok && (u.Requires == "" || p.stands(snap, u.Requires))
+	if !ok || (u.Requires != "" && !p.stands(snap, u.Requires)) {
+		return false
+	}
+	for _, role := range u.Needs {
+		if !p.stands(snap, role) {
+			return false
+		}
+	}
+	return true
 }
 
 // raise asks for the structure with a role, or for what it needs first.
@@ -99,8 +107,10 @@ func (p *Player) upkeep(snap sim.Snapshot, vehicles int) baseStep {
 		return p.raise(snap, next, 0)
 	default:
 		// Ahead of need only with gold to spare: the structure, and two squads besides.
+		// The paced levels do not build ahead at all: their few purchases go to squads,
+		// and the rest of the opening comes when a unit they want needs it.
 		f := p.R.Factions[snap.Faction]
-		if _, def := f.StructureOfRole(next); def != nil && snap.Gold >= def.Cost+p.reserve(snap) {
+		if _, def := f.StructureOfRole(next); def != nil && p.Style == Standard && snap.Gold >= def.Cost+p.reserve(snap) {
 			if step := p.raise(snap, next, 0); step.build != nil {
 				return step
 			}

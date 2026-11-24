@@ -154,7 +154,10 @@ test("rules ids and the sprite manifest: every thing has a painted picture or a 
       assert.ok(u.class !== "hauler" || art.includes('if (cls === "hauler")'), "haulers have no code-drawn fallback");
     }
   }
-  const leftover = [...Object.keys(manifest.buildings), ...Object.keys(manifest.units), ...Object.keys(manifest.segments)].filter((k) => /^(aegis|ashfall)_/.test(k));
+  // A picture painted ahead of its rules keeps its pipeline name until the structure or
+  // unit exists; one whose thing is in the rules must have been renamed.
+  const known = new Set(Object.values(rules.factions).flatMap((f) => [...Object.keys(f.structures), ...Object.keys(f.units)]));
+  const leftover = [...Object.keys(manifest.buildings), ...Object.keys(manifest.units), ...Object.keys(manifest.segments)].filter((k) => /^(aegis|ashfall)_/.test(k) && known.has(k.split("_")[1]));
   assert.deepEqual(leftover, [], "pipeline names in the manifest: run art/rename_keys.py");
   for (const group of ["buildings", "units", "landmarks", "props"]) {
     for (const [id, entry] of Object.entries(manifest[group])) {

@@ -168,7 +168,7 @@ func TestCuesForHaulersTechBuildingsAndEventsNamedInTheRules(t *testing.T) {
 	// Every cue in the rules can be said in both languages with the words it asks for.
 	for name, cue := range rules.Radio.Cues {
 		for _, line := range []string{cue.Line.En, cue.Line.He} {
-			for _, hole := range []string{"{structure}", "{squad}", "{unit}", "{point}"} {
+			for _, hole := range []string{"{structure}", "{squad}", "{unit}", "{point}", "{hero}"} {
 				line = strings.ReplaceAll(line, hole, "x")
 			}
 			if strings.ContainsAny(line, "{}") {

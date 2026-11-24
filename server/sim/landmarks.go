@@ -21,6 +21,12 @@ type LandmarkState struct {
 	// Who is inside, counted at the start of every tick and kept up as teams go in and out.
 	gSide  int
 	gTeams int
+
+	// A position built during the match (sandbags): the way it faces, as a unit vector,
+	// and the side that built it. Built is false for the map's own landmarks.
+	Built        bool
+	FaceX, FaceY float64
+	By           int
 }
 
 func (s *Sim) initLandmarks() {
@@ -257,6 +263,13 @@ func (s *Sim) coverAgainst(tgt *teamRef, sx, sy float64) float64 {
 		k := s.kindOf(l)
 		d := dist(t.X, t.Y, l.X, l.Y)
 		if d > k.CoverRadius || k.Cover <= 0 || k.Cover >= best {
+			continue
+		}
+		if k.Arc > 0 {
+			// Sandbags cover from the front they were built to face, and from nowhere else.
+			if s.inArc(l, k, sx, sy) {
+				best = k.Cover
+			}
 			continue
 		}
 		if d < k.CoverRadius*0.4 || (l.X-t.X)*(sx-t.X)+(l.Y-t.Y)*(sy-t.Y) > 0 {

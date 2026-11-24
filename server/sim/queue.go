@@ -183,7 +183,24 @@ func (s *Sim) exitOf(st *Structure, u *shared.Unit) (float64, float64) {
 	case "sea":
 		return s.nav.snapXY(navWater, st.X, st.Y)
 	}
-	return s.nav.snapXY(navGround, st.X-12, st.Y+st.def.Footprint+14)
+	// The door is on the south face. When the ground there is a pocket shut in by water or
+	// by other structures, the unit comes out on the first side that leads to the rest of
+	// the map: a squad must never be made where it can go nowhere.
+	hq := s.R.HQPoint(st.Side)
+	home := s.groundRegion(hq.X, hq.Y)
+	out, in := st.def.Footprint+14, s.inward(st.Side)
+	for _, d := range [][2]float64{{-12, out}, {in * out, 0}, {-in * out, 0}, {0, -out}} {
+		if x, y := s.nav.snapXY(navGround, st.X+d[0], st.Y+d[1]); s.groundRegion(x, y) == home {
+			return x, y
+		}
+	}
+	return s.nav.snapXY(navGround, st.X-12, st.Y+out)
+}
+
+// groundRegion is the number of the connected stretch of ground a position lies on.
+func (s *Sim) groundRegion(x, y float64) int32 {
+	n := s.nav
+	return n.regions(navGround)[n.snap(navGround, n.index(x, y))]
 }
 
 // rallyBeside is where a structure's units gather when nobody chose a place: a short
@@ -198,7 +215,14 @@ func (s *Sim) rallyBeside(st *Structure, sq *Squad) (float64, float64) {
 	case "sea":
 		return s.nav.snapXY(navWater, ex+in*(70+col*44), ey+50+row*40)
 	}
-	return s.nav.snapXY(navGround, ex+in*col*46, ey+84+row*44)
+	// Straight out of the door when the ground there joins the rest of the map; beside
+	// the structure, toward the middle of the map, when it does not.
+	for _, d := range [][2]float64{{in * col * 46, 84 + row*44}, {in * (70 + col*40), 30 + row*40}, {in * (70 + col*40), -30 - row*40}} {
+		if x, y := s.nav.snapXY(navGround, ex+d[0], ey+d[1]); s.groundRegion(x, y) == s.groundRegion(ex, ey) && dist(x, y, ex+d[0], ey+d[1]) < 2*NavCell {
+			return x, y
+		}
+	}
+	return ex, ey
 }
 
 // comeOut puts a finished squad at its structure's exit and sends it to the rally place.

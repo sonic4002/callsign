@@ -135,6 +135,10 @@ type Team struct {
 	hits    int
 	misses  int
 	shooter []*Squad
+
+	// Where the team stood a tick ago, and when a vehicle last ran one of its men down (crush.go).
+	prevX, prevY float64
+	crushTick    int
 }
 
 type Squad struct {
@@ -156,6 +160,16 @@ type Squad struct {
 	// From is the structure that makes the squad and that it comes out of (queue.go), 0
 	// for a squad that was on the field from the start.
 	From int
+
+	// Rank is the standing the squad has earned (0 none, then the rules' ranks in order),
+	// and Kills what it has destroyed, in gold (ranks.go). Dug counts the sandbag
+	// positions it has built (fortify.go).
+	Rank  int
+	Kills float64
+	Dug   int
+	dig   int        // ticks spent digging the position it was told to build
+	told  int        // tick its side was last told a vehicle is running its men down
+	hero  *heroState // set for a hero (hero.go)
 
 	unit        *shared.Unit
 	haul        *haul // set for a gold hauler, which works on its own and has no leader
@@ -187,9 +201,13 @@ type Sim struct {
 	Landmarks []LandmarkState
 	// Places lets other parts of the game make their own things nameable in orders.
 	Places []PlaceFinder
-	Over   bool
-	Winner int
-	Reason string
+	// Charges are the demolition charges burning down, and seized the squads a hero has
+	// taken over for now (hero.go).
+	Charges []Charge
+	seized  []seizure
+	Over    bool
+	Winner  int
+	Reason  string
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
@@ -286,7 +304,7 @@ func (s *Sim) SquadAny(id int) *Squad {
 
 // Callsign is the squad's radio name in both languages, e.g. Viper 2 / צפע 2.
 func (s *Sim) Callsign(sq *Squad) shared.Text {
-	c := s.R.Callsigns.Classes[sq.unit.Class]
+	c := s.R.Callsigns.Classes[sq.unit.CallClass()]
 	if sq.haul != nil {
 		c = s.R.Callsigns.Hauler // a name for the player to read; haulers are not on the net
 	}
@@ -296,6 +314,9 @@ func (s *Sim) Callsign(sq *Squad) shared.Text {
 
 // Class is the squad's unit class (infantry, vehicle, naval, air).
 func (sq *Squad) Class() string { return sq.unit.Class }
+
+// CallClass is the callsign class the squad answers to: its class, or a hero's own.
+func (sq *Squad) CallClass() string { return sq.unit.CallClass() }
 
 // Center is the middle of the squad's living teams.
 func (sq *Squad) Center() (x, y float64) {
@@ -336,7 +357,7 @@ func (s *Sim) Nerve(t *Team) string {
 func (s *Sim) raise(side int, unitID string) *Squad {
 	u, _ := s.unitFor(side, unitID)
 	sd := &s.Sides[side]
-	sd.nextNum[u.Class]++
+	sd.nextNum[u.CallClass()]++
 	// Haulers are numbered apart from squads, so that buying one never shifts a squad's id.
 	var id int
 	if u.Class == shared.HaulerClass {
@@ -347,7 +368,7 @@ func (s *Sim) raise(side int, unitID string) *Squad {
 		id = s.squadN
 	}
 	sq := &Squad{
-		ID: id, Side: side, Unit: unitID, Num: sd.nextNum[u.Class],
+		ID: id, Side: side, Unit: unitID, Num: sd.nextNum[u.CallClass()],
 		Tier: 1, unit: &u,
 		Order:       Order{Kind: OrderNone},
 		lastContact: never, lastPinned: never,
@@ -366,6 +387,7 @@ func (s *Sim) field(sq *Squad) {
 		// Made by a structure: it comes out of that structure's door (queue.go).
 		if sq.haul == nil {
 			s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
+			s.heroFielded(sq)
 		}
 		return
 	}
@@ -395,6 +417,7 @@ func (s *Sim) field(sq *Squad) {
 		return // no leader joins the net for a hauler
 	}
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
+	s.heroFielded(sq)
 }
 
 // gathered reports whether a squad that came out of its structure has taken its place
@@ -508,17 +531,21 @@ func (s *Sim) Step() []Event {
 	s.trackContacts()
 	s.trackStructures()
 	s.trackObjects()
+	s.heroOrders()
 	for _, tr := range live {
 		tr.plan = s.decide(tr, live)
 	}
 	for _, tr := range live {
 		s.move(tr)
 	}
+	s.crush(live)
 	s.enterBuildings(live)
 	for _, tr := range live {
 		s.fire(tr)
 	}
 	s.defencesFire(live)
+	s.heroes(live)
+	s.resolveSandbags()
 	s.resolveDamage(live)
 	s.resolveStructures()
 	s.resolveBuildings(live)
@@ -532,6 +559,8 @@ func (s *Sim) Step() []Event {
 	s.techWork()
 	s.repairStructures()
 	s.haulWork()
+	s.fortify(live)
+	s.rankWork(live)
 	s.squadEvents(live)
 	s.countGarrisons()
 	s.observe()
@@ -558,10 +587,12 @@ func (s *Sim) spot(live []*teamRef) {
 		fired := float64(s.Tick-tr.t.lastFire) <= s.R.Match.RevealSeconds*float64(s.R.TickRate)
 		// Inside a building a team is seen only from close by, or once it has fired.
 		hidden := tr.t.In != "" && !fired
-		tr.t.Spotted = fired || (!hidden && s.postSees(enemy, tr.t.X, tr.t.Y))
+		// A stealthy unit is seen only from close by until it fires; a defence sees it at its range.
+		stealth := tr.u.Stealth > 0 && !fired
+		tr.t.Spotted = fired || (!hidden && !stealth && s.postSees(enemy, tr.t.X, tr.t.Y)) || (stealth && s.defenceSees(enemy, tr.t.X, tr.t.Y))
 		for _, o := range live {
 			d := dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y)
-			if o.sq.Side != enemy || d > o.u.Sight || (hidden && d > s.R.Match.GarrisonSight) {
+			if o.sq.Side != enemy || d > o.u.Sight || (hidden && d > s.R.Match.GarrisonSight) || (stealth && d > tr.u.Stealth) {
 				continue
 			}
 			tr.t.Spotted = true
@@ -660,7 +691,7 @@ func (s *Sim) fire(tr *teamRef) {
 		return
 	}
 	tgt := tr.plan.target
-	chance := tr.u.Accuracy
+	chance := tr.u.Accuracy * s.rankOf(tr.sq).Accuracy
 	if nerve == Shaken {
 		chance *= 0.75
 	}
@@ -668,6 +699,7 @@ func (s *Sim) fire(tr *teamRef) {
 		chance *= 0.5
 	}
 	chance *= s.coverAgainst(tgt, t.X, t.Y)
+	s.hitSandbags(tr, tgt)
 	if tgt.t.In != "" {
 		// Rounds fired at a garrison hit its walls too.
 		if i, l := s.landmarkByID(tgt.t.In); l != nil {
@@ -709,8 +741,9 @@ func (s *Sim) resolveDamage(live []*teamRef) {
 		t.Members = left
 		if lost > 0 {
 			s.Sides[1-tr.sq.Side].Destroyed += float64(tr.u.Cost) * float64(lost) / float64(max(1, tr.u.Teams*tr.u.Members))
+			s.creditKill(tr, lost)
 		}
-		t.Stress = math.Min(1, t.Stress+tr.u.NerveResist*
+		t.Stress = math.Min(1, t.Stress+tr.u.NerveResist*s.rankOf(tr.sq).Nerve*
 			(float64(t.misses)*n.PerMiss+float64(t.hits)*n.PerHit+float64(lost)*n.PerMemberLost))
 		if left == 0 {
 			s.teamLost(tr)
@@ -744,6 +777,7 @@ func (s *Sim) teamLost(tr *teamRef) {
 		return
 	}
 	tr.sq.Alive = false
+	s.heroFell(tr.sq)
 	s.emit(Event{Side: tr.sq.Side, Kind: EvSquadLost, Squad: tr.sq.ID, Point: s.nearestPoint(x, y)})
 	s.emit(Event{Side: 1 - tr.sq.Side, Kind: EvEnemyDestroyed, Contact: tr.sq.ID, Point: s.nearestPoint(x, y)})
 }

@@ -66,7 +66,7 @@ const tickOf = (e) => (e.kind === "radio" ? e.message.tick : e.kind === "event" 
 // The events the operator's base cue already tells the commander (server/room/cues.go),
 // under the names the page gives them. The cue is the line that is kept: the page does
 // not write its own line for the same news beside it.
-const cuedAlways = ["structure_built", "hq_under_attack", "structure_attacked", "hauler_attacked", "hauler_lost", "structure_lost", "structure_captured", "structure_captured_tech", "structure_taken"];
+const cuedAlways = ["structure_built", "hq_under_attack", "structure_attacked", "hauler_attacked", "hauler_lost", "structure_lost", "structure_captured", "structure_captured_tech", "structure_taken", "hero_fielded", "enemy_hero_fielded", "hero_fell", "enemy_hero_fell"];
 
 // cued reports whether a base cue tells of an event, so that the log leaves it to the cue.
 // Squads on the field when a match starts have no cue; every later one does.

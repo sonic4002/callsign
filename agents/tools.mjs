@@ -58,8 +58,24 @@ export const captureTool = tool("capture", "Take over an enemy base structure, o
   place: { type: "string", description: 'The structure: its id from your status, such as "s7", or its name ("the enemy refinery", "the clinic east of Delta").' },
 });
 
+// Infantry dig in; each hero has the one tool that makes it a hero.
+export const fortifyTool = tool("fortify", "Dig in: build a sandbag position where your squad stands. It takes a few seconds in which the squad does not move and is not shot at, faces the nearest enemy in sight (or the nearest point your side does not hold), and covers your men from that front only. Your squad then holds it.", {});
+export const plantTool = tool("plant", "Set a demolition charge. You walk to the target, work beside it for a few seconds, and the charge goes off a few seconds later. You carry only a few.", {
+  place: { type: "string", description: 'What to set the charge on: an enemy structure by its id from your status ("s7") or its name ("the enemy works"), a bridge by id or name ("bridge-south", "the south bridge"), or the enemy headquarters by its point ("Z").' },
+});
+export const seizeTool = tool("seize", "Take over an enemy vehicle squad in sight. You close with it and, after a few seconds near it, it fights for your side with a leader of its own, for as long as you live and stay near it. One at a time.", {
+  contact: { type: "integer", description: "The enemy vehicle squad's contact id from your status." },
+});
+
 // leaderToolsFor is the tool list of the leader of a squad of that unit.
-export const leaderToolsFor = (unit) => [...leaderTools, ...(unit?.captureSeconds > 0 ? [captureTool] : []), ...(unit?.repairPerSecond > 0 || unit?.captureSeconds > 0 ? [repairTool] : [])];
+export const leaderToolsFor = (unit) => [
+  ...leaderTools,
+  ...(unit?.captureSeconds > 0 ? [captureTool] : []),
+  ...(unit?.repairPerSecond > 0 || unit?.captureSeconds > 0 ? [repairTool] : []),
+  ...(unit?.class === "infantry" && unit.domain === "land" && !unit.hero ? [fortifyTool] : []),
+  ...(unit?.chargeDamage > 0 ? [plantTool] : []),
+  ...(unit?.seizeRadius > 0 ? [seizeTool] : []),
+];
 
 export const operatorTools = [
   radio,

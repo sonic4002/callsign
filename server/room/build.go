@@ -56,6 +56,9 @@ func (rm *Room) place(side int, text string, enemy bool, nearX, nearY float64) (
 	if id := rm.structureNamed(side, low, enemy, nearX, nearY); id != "" {
 		return id, nil
 	}
+	if id := rm.builtPlace(side, low, nearX, nearY); id != "" {
+		return id, nil
+	}
 	place, choices, ok := rm.net.ResolvePlace(text)
 	switch {
 	case ok:

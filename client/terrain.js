@@ -300,6 +300,15 @@ export const landmarkFallbacks = {
     box(g, -8, 0, 10, 12, 4, "#8f8674", "#746c5c", "#5a5347");
     for (const [x, y, k] of [[6, -6, 0.9], [12, 6, 0.7], [-14, 8, 0.6], [0, 8, 0.8], [-4, -8, 0.6]]) stone(g, x, y, k);
   },
+  // A sandbag position built in the match (heroes.js draws the painted one, facing its way).
+  sandbags(g) {
+    disc(g, "rgba(0,0,0,0.25)", 2, 4, 24, 9);
+    for (const [x, y] of [[-16, 2], [-8, -2], [0, -4], [8, -2], [16, 2]]) box(g, x, y, 9, 7, 5, "#b9a57a", "#9a8862", "#7d6e4f");
+  },
+  sandbagsFlat(g) {
+    disc(g, "rgba(0,0,0,0.2)", 0, 3, 24, 9);
+    for (const [x, y] of [[-14, 3], [-5, 0], [6, 2], [15, 4]]) box(g, x, y, 10, 8, 1.5, "#a8946b", "#8b7a58", "#6f6146");
+  },
 };
 
 // ---- bridges ----

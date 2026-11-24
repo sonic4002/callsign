@@ -42,8 +42,32 @@ func (rm *Room) cueOf(e sim.Event) (key string, vars map[string]string) {
 		if sq == nil || e.Tick < rm.r.TickRate {
 			return "", nil // the squads a match starts with are not news
 		}
+		if u, ok := rm.unitNamed(sq.Unit); ok && u.Hero {
+			return "", nil // a hero taking the field has a line of its own
+		}
 		vars["squad"] = rm.squadName(sq).In(lang)
 		return "unitReady", vars
+	case sim.EvHeroFielded, sim.EvHeroFell:
+		// Each side hears of a hero once, in its operator's voice: its own by name and
+		// callsign, the enemy's by what it is.
+		u, ok := rm.unitNamed(e.Unit)
+		if !ok {
+			return "", nil
+		}
+		vars["hero"] = u.Name.In(lang)
+		own := e.Squad != 0
+		if sq := rm.sim.SquadAny(e.Squad); own && sq != nil {
+			vars["hero"] += " (" + rm.sim.Callsign(sq).In(lang) + ")"
+		}
+		switch {
+		case e.Kind == sim.EvHeroFielded && own:
+			return "heroReady", vars
+		case e.Kind == sim.EvHeroFielded:
+			return "enemyHero", vars
+		case own:
+			return "heroFallen", vars
+		}
+		return "enemyHeroFallen", vars
 	case sim.EvHQUnderAttack, sim.EvStructureAttacked:
 		return "baseUnderAttack", vars
 	case sim.EvHaulerAttacked:
