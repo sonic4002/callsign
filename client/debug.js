@@ -198,7 +198,9 @@ function transmit(text) {
 // the server deploys the squad: the button and the roster show a bar that fills.
 
 const REQUEST_TIMEOUT = 25_000; // ms a call may go unanswered before the button gives up
-const requested = new Map(); // unit id, or "*" when the call did not say which → time it expires
+// Every buy call still waiting on the operator: unit id, or "*" when the call did not say
+// which → the times its calls give up, oldest first. Three clicks are three in line.
+const requested = new Map();
 const buyWords = /\b(buy|purchase|order|deploy|raise|build|recruit)\b|קנה|קנו|רכוש|הזמן|גייס|הקם/i;
 const classWords = {
   infantry: /infantry|soldier|squad of men|חי"ר|חיר|רגלים|חיילים/i,
@@ -214,18 +216,24 @@ function noteBuy(text) {
   const named = units.filter(says);
   const hit = named.length ? named : units.filter(([, u]) => classWords[u.class]?.test(text));
   const until = performance.now() + REQUEST_TIMEOUT;
-  if (hit.length) for (const [id] of hit) requested.set(id, until);
-  else requested.set("*", until);
+  for (const id of hit.length ? hit.map(([id]) => id) : ["*"]) requested.set(id, [...waiting(id), until]);
+}
+
+// waiting lists the calls for a unit that have not been answered and have not given up.
+function waiting(unit) {
+  const live = (requested.get(unit) ?? []).filter((until) => until > performance.now());
+  requested.set(unit, live);
+  return live;
 }
 
 // The operator answered, or the server did: nothing is waiting on a decision any more.
+// A deployment that starts answers the oldest call for that unit; a Negative answers them all.
 function buyAnswered(unit) {
-  if (unit) requested.delete(unit);
-  else requested.clear();
-  requested.delete("*");
+  if (!unit) return requested.clear();
+  for (const key of [unit, "*"]) requested.set(key, waiting(key).slice(1));
 }
 
-const isRequested = (unit) => [unit, "*"].some((key) => requested.get(key) > performance.now());
+const inLine = (unit) => waiting(unit).length + waiting("*").length;
 
 // How closely the net holds the player to radio procedure: 1 relaxed, 2 standard, 3 strict.
 let strict = [1, 2, 3].find((n) => String(n) === localStorage.getItem("callsign.strict")) ?? 1;
@@ -422,12 +430,15 @@ function renderDeploying(deploying) {
     const queue = deploying.filter((d) => d.unit === button.dataset.unit);
     const first = queue[0];
     button.classList.toggle("deploying", Boolean(first));
-    button.classList.toggle("requested", !first && isRequested(button.dataset.unit));
+    const asked = inLine(button.dataset.unit);
+    button.classList.toggle("requested", !first && asked > 0);
     button.querySelector(".fill").style.blockSize = first ? `${progress(first) * 100}%` : "0";
     button.querySelector(".left").textContent = first ? t("seconds", { seconds: secondsLeft(first) }) : "";
     const count = button.querySelector(".count");
-    count.hidden = queue.length < 2;
-    count.textContent = String(queue.length);
+    // How many of this unit are in line: asked for and not yet answered, plus on their way.
+    const total = asked + queue.length;
+    count.hidden = total < 2 && asked === 0;
+    count.textContent = String(total);
   }
 }
 
