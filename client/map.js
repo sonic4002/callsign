@@ -710,6 +710,32 @@ export class Scene {
     }
   }
 
+  // objectAimedAt is the thing, not a unit, that a firing team of ours is shooting at: the
+  // bridge or landmark its order names, else the nearest enemy structure within `reach`.
+  objectAimedAt(group, v, reach) {
+    const { rules, state } = this;
+    const place = group.view?.order?.kind === "attack" ? group.view.order.place : null;
+    if (place) {
+      const b = (rules.map.bridges ?? []).find((x) => x.id === place);
+      if (b) {
+        // The nearest part of the deck, so that the rounds land on the bridge itself.
+        const [ax, ay] = b.from;
+        const [bx, by] = b.to;
+        const k = Math.max(0.15, Math.min(0.85, ((v.x - ax) * (bx - ax) + (v.y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+        return { x: ax + k * (bx - ax), y: ay + k * (by - ay) };
+      }
+      const l = (rules.map.landmarks ?? []).find((x) => x.id === place);
+      if (l) return { x: l.x, y: l.y };
+    }
+    let best = null;
+    for (const st of state.structures ?? []) {
+      if (st.side === group.side || st.ruin) continue;
+      const d = Math.hypot(st.x - v.x, st.y - v.y);
+      if (d < reach) [best, reach] = [{ x: st.x, y: st.y }, d];
+    }
+    return best;
+  }
+
   // gunfire turns "this team is firing" into tracers. The server says which of our own
   // teams fire; for an enemy in sight it is inferred from having one of ours in its range.
   gunfire(now) {
@@ -728,6 +754,9 @@ export class Scene {
             if (d < bd) [target, bd] = [o, d];
           }
         }
+        // With no enemy team in reach, one of ours that fires is shooting at what it was
+        // ordered to bring down: a bridge or a building, or an enemy structure in reach.
+        if (!target && group.own) target = this.objectAimedAt(group, v, bd);
         // With no enemy team in reach, a firing team is shooting at the headquarters.
         if (!target && (group.own || now - this.hqHitAt[1 - group.side] < 1500)) {
           const hq = this.rules.map.points.find((p) => p.kind === "hq" && p.owner === 1 - group.side);
