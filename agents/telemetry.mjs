@@ -48,11 +48,11 @@ export function contextOf(usage) {
 // What woke the agent, in a few words the page can translate.
 export function wokeBy(items) {
   const call = items.findLast((i) => i.kind === "radio");
-  if (call) return { kind: "call", from: call.msg.from.en };
+  if (call) return { kind: "call", from: call.msg.from.en, fromHe: call.msg.from.he };
   const event = items.findLast((i) => i.kind === "event");
   if (event) return { kind: "event", event: event.event.kind };
   const heard = items.findLast((i) => i.kind === "heard");
-  if (heard) return { kind: "heard", from: heard.msg.from.en };
+  if (heard) return { kind: "heard", from: heard.msg.from.en, fromHe: heard.msg.from.he };
   return null;
 }
 
@@ -109,7 +109,9 @@ export class Telemetry {
 
   // report is a copy of what would be sent now.
   get report() {
-    return structuredClone({ ...this.r, seq: this.seq });
+    // `at` is this agent's clock when the report was made: with `since` and `resetAt` it
+    // gives durations that do not depend on the reader's clock agreeing with ours.
+    return structuredClone({ ...this.r, seq: this.seq, at: this.now() });
   }
 
   // Only a change of state is sent. The numbers in between (a thought's tokens, an action

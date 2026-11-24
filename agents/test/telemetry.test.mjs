@@ -69,10 +69,10 @@ test("plain: a tool call in a few words", () => {
 });
 
 test("wokeBy and troubleCode name the cause", () => {
-  const call = { kind: "radio", msg: { from: { en: "Hammer" } } };
-  assert.deepEqual(wokeBy([{ kind: "event", event: { kind: "contact" } }, call]), { kind: "call", from: "Hammer" });
+  const call = { kind: "radio", msg: { from: { en: "Hammer", he: "פטיש" } } };
+  assert.deepEqual(wokeBy([{ kind: "event", event: { kind: "contact" } }, call]), { kind: "call", from: "Hammer", fromHe: "פטיש" });
   assert.deepEqual(wokeBy([{ kind: "event", event: { kind: "pinned" } }]), { kind: "event", event: "pinned" });
-  assert.deepEqual(wokeBy([{ kind: "heard", msg: { from: { en: "Viper 2" } } }]), { kind: "heard", from: "Viper 2" });
+  assert.deepEqual(wokeBy([{ kind: "heard", msg: { from: { en: "Viper 2", he: "צפע 2" } } }]), { kind: "heard", from: "Viper 2", fromHe: "צפע 2" });
   assert.equal(troubleCode(Object.assign(new Error("x"), { code: "bad_key" })), "bad_key");
   assert.equal(troubleCode(new Error("rate limited by Anthropic; this wake is skipped")), "rate_limited");
   assert.equal(troubleCode(new Error("Claude Code did not answer within 60 s")), "timeout");
@@ -124,7 +124,8 @@ test("states go out in order, at once when they can and never faster than the ga
   assert.equal(sent.length, 2);
   assert.equal(sent[1].state, "acting");
   assert.equal(sent[1].tool, "hold");
-  assert.deepEqual(sent[1].woke, { kind: "call", from: "Hammer" });
+  assert.equal(sent[1].woke.kind, "call");
+  assert.equal(sent[1].woke.from, "Hammer");
   assert.deepEqual(sent[1].context, { input: 1084, cached: 1000, window: 1_000_000 });
   assert.equal(sent[1].model, "claude-haiku-5-5");
 
@@ -279,7 +280,7 @@ test("an agent's report reaches its own commander through the game server, and n
   // One wake per conversation: it was reset when the wake ended, and says why.
   assert.deepEqual({ messages: last.talk.messages, wakes: last.talk.wakes, why: last.talk.resetWhy }, { messages: 0, wakes: 0, why: "wakes" });
   const thinking = hammer.reports().find((a) => a.telemetry.state === "thinking").telemetry;
-  assert.deepEqual(thinking.woke, { kind: "call", from: "Hammer" });
+  assert.deepEqual(thinking.woke, { kind: "call", from: "Hammer", fromHe: "פטיש" });
   assert.equal(thinking.talk.messages, 1);
 
   // Nobody else was told: not the other side, not a spectator.
