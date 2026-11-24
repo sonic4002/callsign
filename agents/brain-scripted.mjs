@@ -22,10 +22,6 @@ const say = {
   fiveByFive: { en: "Five by five", he: "חמש על חמש" },
   negative: { en: "Negative", he: "שלילי" },
 };
-const haulerLines = {
-  hauler_attacked: { en: (p) => `Hauler under attack near ${p}`, he: (p) => `מוביל זהב מותקף ליד ${p}` },
-  hauler_lost: { en: (p) => `Hauler lost near ${p}`, he: (p) => `מוביל זהב אבד ליד ${p}` },
-};
 const eventLines = {
   pinned: { en: (p) => `Pinned at ${p}, request support`, he: (p) => `מרותקים ב${p}, מבקש סיוע` },
   contact: { en: (p) => `Contact near ${p}`, he: (p) => `מגע ליד ${p}` },
@@ -195,16 +191,8 @@ function ownMoves({ wake, rules, agent }) {
 function operatorPlan(ctx) {
   const { wake, rules, agent } = ctx;
   const call = wake.call;
-  if (!call) {
-    // A hauler in trouble is the one thing the scripted operator reports unasked.
-    const e = wake.items.find((i) => i.kind === "event" && haulerLines[i.event.kind])?.event;
-    if (e) {
-      const point = rules.map.points.find((p) => p.id === e.point);
-      const lang = agent.lang ?? "en";
-      // To the commander, whoever spoke to the operator last.
-      return [radio([rules.callsigns.player.en], haulerLines[e.kind][lang](point?.callsign[lang] ?? e.point), "out"), ...ownMoves(ctx)];
-    }
-  }
+  // A hauler in trouble, like the rest of the base's news, is told to the commander by the
+  // server's own base cues (server/room/cues.go); the operator does not say it again.
   if (!call || call.from.key !== "player") return ownMoves(ctx); // otherwise Anvil answers to Hammer only
   const lang = call.lang;
   const back = [call.from.en];

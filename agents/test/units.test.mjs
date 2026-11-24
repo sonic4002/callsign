@@ -347,10 +347,10 @@ test("scripted operator: buys haulers, sends them to a field, and reports one in
     ["haul", { field: "G", hauler: 0 }],
     ["radio", { to: ["Hammer"], body: 'Negative, no such gold field: "G"', end: "over" }],
   ]);
-  // Woken by the event, with no call: one short line to the commander.
+  // Woken by the event, with no call: nothing to say, the base cue has told the commander.
   const event = (kind) => ({ items: [{ kind: "event", event: { kind, hauler: 1001, point: "B" } }], call: null, status: status("aegis") });
-  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("hauler_attacked") }), [["radio", { to: ["Hammer"], body: "Hauler under attack near Bravo", end: "out" }]]);
-  assert.deepEqual(await think(brain, { agent: anvil("he"), wake: event("hauler_lost") }), [["radio", { to: ["Hammer"], body: "מוביל זהב אבד ליד בועז", end: "out" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("hauler_attacked") }), []);
+  assert.deepEqual(await think(brain, { agent: anvil("he"), wake: event("hauler_lost") }), []);
   assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("squad_lost") }), []);
 });
 
