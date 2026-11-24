@@ -9,9 +9,10 @@ import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
 import { Telemetry, troubleCode } from "./telemetry.mjs";
 import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
 import { compactStructures } from "./bases.mjs";
+import { describeHeroEvent, heroLeaderEvents, heroOperatorEvents, unitAnywhere } from "./heroes.mjs";
 
-const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned"]);
-const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell"]);
+const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned", ...heroLeaderEvents]);
+const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell", ...heroOperatorEvents]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
@@ -96,8 +97,10 @@ export class Agent {
     if (this.role === "squad") {
       const mine = hello.state.squads.find((s) => s.id === this.squad);
       this.tier = mine.tier;
-      this.unit = this.rules.factions[this.faction].units[mine.unit];
-      this.system = leaderPrompt({ rules: this.rules, side: this.side, faction: this.faction, station: this.me, unit: this.unit });
+      // A squad its side's hero has seized is of the other army's design.
+      const own = this.rules.factions[this.faction].units[mine.unit];
+      this.unit = own ?? unitAnywhere(this.rules, mine.unit);
+      this.system = leaderPrompt({ rules: this.rules, side: this.side, faction: this.faction, station: this.me, unit: this.unit, seized: !own });
       this.tools = leaderToolsFor(this.unit);
     } else {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
@@ -268,7 +271,7 @@ const owner = (o, side) => (o === side ? "yours" : o === -1 ? "neutral" : "enemy
 export function compactStatus(status, side) {
   if (!status) return null;
   const points = Object.fromEntries(status.points.map((p) => [p.id, owner(p.owner, side)]));
-  const contacts = status.contacts.map((c) => ({ id: c.id, unit: c.unit, class: c.class, near: c.near, x: c.x, y: c.y, teams: c.teams.length }));
+  const contacts = status.contacts.map((c) => ({ id: c.id, unit: c.unit, class: c.class, near: c.near, x: c.x, y: c.y, teams: c.teams.length, ...(c.hero ? { hero: true } : {}) }));
   const squad = (s) => ({
     near: s.near,
     x: s.x,
@@ -276,6 +279,9 @@ export function compactStatus(status, side) {
     order: s.order,
     strength: `${s.alive}/${s.full}`,
     tier: s.tier,
+    ...(s.rank ? { rank: s.rank } : {}),
+    ...(s.hero ? { hero: { chargesLeft: s.hero.charges || undefined, health: s.hero.hp, holdsSquad: s.hero.seized || undefined } } : {}),
+    ...(s.dug ? { positionsBuilt: s.dug } : {}),
     teams: (s.teams ?? []).map((t) => `${t.nerve}, ${t.action}${t.in ? `, inside ${t.in}` : t.cover ? ", in cover" : ""}`),
     contacts: s.contacts,
   });
@@ -299,6 +305,7 @@ export function compactStatus(status, side) {
     command: status.command,
     purchaseOrdered: status.purchaseOrdered,
     gold: status.gold,
+    ...(status.taken ? { taken: status.taken } : {}),
     goldPerMinute: status.income,
     // Gold haulers work on their own; `field` is the gold field (by map point) each one works.
     haulers: (status.haulers ?? []).filter((h) => h.side === side).map((h) => ({ id: h.id, state: h.state, load: h.load, field: h.field || undefined, sentTo: h.assigned || undefined })),
@@ -328,6 +335,8 @@ function describe(item) {
   }
   const e = item.event;
   const who = item.callsign?.en ?? "A squad";
+  const heroic = describeHeroEvent(e, who);
+  if (heroic) return heroic;
   switch (e.kind) {
     case "quiet":
       return "Nothing has woken you for a while and you hold the initiative: your status shows a squad without orders or gold you could spend. Act if it helps; otherwise do nothing.";

@@ -1,4 +1,5 @@
 import { leaderBases, operatorBases } from "./bases.mjs";
+import { heroFacts, leaderHeroes, operatorHeroes } from "./heroes.mjs";
 
 // System prompts for the operator and the squad leaders. Each faction ships its own
 // doctrine, so the same model plays Aegis and Ashfall differently.
@@ -16,6 +17,7 @@ export function unitFacts(u, rules) {
     return `an unarmed gold hauler that works on its own: it carries ${u.capacity} gold a trip from a gold field to your refinery; not a squad, it has no leader and takes no radio calls`;
   }
   const facts = [];
+  if (u.hero) facts.push(heroFacts(u));
   if (u.domain === "air") facts.push("flies over land and sea alike");
   else if (u.domain === "sea") facts.push("moves only at sea");
   const blind = Object.keys(rules.callsigns.classes).filter((c) => u.vs?.[c] === 0);
@@ -84,7 +86,7 @@ const procedure = `Radio procedure. The net writes "<to>, this is <you>" and the
 
 const wakes = `You are woken only when something happens: a radio call addressed to you, or an event you should know about. Each wake shows what happened, the current status, and traffic you overheard on the net. Between wakes you do nothing, so finish the whole job inside the wake. When nothing needs doing, end your turn without calling a tool. Text you write outside a tool call is heard by nobody.`;
 
-export function leaderPrompt({ rules, side, faction, station, unit }) {
+export function leaderPrompt({ rules, side, faction, station, unit, seized = false }) {
   return `You lead squad ${station.en} (${station.he}) in Callsign, a real-time strategy game commanded over a military radio net. Your squad is ${unit.name.en} (${unit.class}) of the ${rules.factions[faction].name.en}.
 
 Your fireteams fight on their own: they pick targets, take the cover at their post and return fire without you. You decide where the squad goes and what it does there, and you keep your commander informed.
@@ -93,9 +95,11 @@ Chain of command. Hammer (פטיש) is the human commander. Anvil (סדן) is Ha
 
 ${wakes}
 
-On an order: first act with move, hold or attack${unit.repairPerSecond > 0 ? " (or repair, for a bridge)" : ""}, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
+On an order: first act with move, hold or attack${unit.repairPerSecond > 0 ? " (or repair, for a bridge)" : ""}${unit.chargeDamage > 0 ? " (or plant, for a charge)" : ""}${unit.seizeRadius > 0 ? " (or seize, for an enemy vehicle)" : ""}${unit.class === "infantry" && unit.domain === "land" && !unit.hero ? ' (or fortify, when told to dig in)' : ""}, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
 
 ${leaderBases(unit)}
+
+${leaderHeroes(unit, rules, { seized })}
 
 ${procedure}
 
@@ -140,6 +144,8 @@ ${units}
 A squad's brain can be upgraded: ${tiers}. A bought squad takes a few seconds to deploy (the buy result gives deploySeconds, and your status lists squads still deploying): it counts toward the cap at once, but it cannot be ordered or upgraded until it is in the field, so do not buy the same thing twice and task it once it has arrived. Buy when Hammer asks, and confirm in a few words what was bought. Never say what a purchase or an upgrade cost, and do not report gold amounts on the radio unless Hammer asks about gold; buy on your own only while command.buy is true. If the purchase is refused, tell Hammer why.
 
 ${operatorBases(rules, faction)}
+
+${operatorHeroes(rules, faction)}
 
 ${procedure}
 

@@ -4,6 +4,7 @@
 
 import { buildVerb, captureVerb, namedStructure, placeOf, wantedStructure } from "./bases.mjs";
 import { compactStructures } from "./bases.mjs";
+import { digRelay, heroEventLine, heroOrder, heroUnit } from "./heroes.mjs";
 
 const verbs = [
   ["attack", /\b(attack|assault|destroy|hit)\b|תקוף|תקפו|לתקוף|השמד/],
@@ -43,6 +44,8 @@ function leaderPlan({ agent, wake, rules }) {
   const call = wake.call;
   if (!call) {
     const e = wake.items.find((i) => i.kind === "event")?.event;
+    const heroic = e && heroEventLine(e, rules, agent.lang ?? "en");
+    if (heroic) return [radio([agent.commander ?? "Hammer"], heroic, "over")];
     const line = e && eventLines[e.kind]?.[agent.lang];
     if (!line) return [];
     if (e.place) return [radio([agent.commander ?? "Hammer"], line(placeName(rules, e.place, agent.lang)), "over")];
@@ -60,6 +63,9 @@ function leaderPlan({ agent, wake, rules }) {
   if (theirs && captureVerb.test(call.body.toLowerCase()) && agent.unit?.captureSeconds > 0) {
     return [{ name: "capture", input: { place: theirs.id }, orElse }, radio(back, say.wilco[lang], "out")];
   }
+  // Dig in, plant a charge, seize a vehicle: the orders of heroes.mjs.
+  const heroic = heroOrder({ agent, call, wake, rules, theirs, back, orElse, radio });
+  if (heroic) return heroic;
   const escort = escortWords.test(call.body.toLowerCase()) && haulerWords.test(call.body.toLowerCase());
   let verb = escort ? "hold" : verbOf(call.body);
   if (theirs && verb === "attack") {
@@ -238,7 +244,8 @@ function operatorPlan(ctx) {
     return [{ name: "build", input, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (/\b(buy|purchase|build)\b|קנה|קנו|רכוש|בנה/.test(text)) {
-    const unit = wantedUnit(text, rules.factions[wake.status?.faction ?? ""]?.units ?? {});
+    const units = rules.factions[wake.status?.faction ?? ""]?.units ?? {};
+    const unit = heroUnit(text, units, rules) ?? wantedUnit(text, units);
     if (!unit) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit, upgrade: "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
@@ -248,6 +255,8 @@ function operatorPlan(ctx) {
     const body = lang === "he" ? `${s.squads.length} כיתות, ${s.gold} זהב, מחזיקים ב ${held.join(" ")}` : `${s.squads.length} squads, ${s.gold} gold, holding ${held.join(" ")}`;
     return [radio(back, body, "over")];
   }
+  const dig = digRelay({ call, wake, rules, back, radio });
+  if (dig) return dig;
   const verb = verbOf(text);
   const point = rules.map.points.find((p) => p.id === call.points?.[0]);
   if (!verb || !point) return [radio(back, say.sayAgain[lang], "over")];

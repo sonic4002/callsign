@@ -8,6 +8,8 @@ import { advance, spreadOut } from "./motion.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
+import { crusherNear, drawBuilt, drawCharge, drawFlat, heroPose } from "./heroes.js";
+import { drawRank } from "./marks.js";
 import { drawField, drawFountain, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
@@ -183,9 +185,11 @@ export class Scene {
     const ttl = casualtySeconds(group.unit, group.cls) * 1000;
     if (!ttl) return;
     const one = !group.small;
+    // A man lost with enemy armour on top of him was run down: he is drawn pressed flat.
+    const flat = group.cls === "infantry" && crusherNear(this.rules, this.groups.values(), group.side, v.px, v.py);
     for (let i = 0; i < (one ? 1 : count); i++) {
       const spread = () => (one ? 0 : (Math.random() - 0.5) * 14);
-      this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.px + spread(), y: v.py + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl });
+      this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.px + spread(), y: v.py + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl: flat ? ttl * 1.5 : ttl, flat });
     }
   }
 
@@ -616,7 +620,8 @@ export class Scene {
         scale: buildScale,
         // The painted picture of that very landmark (a house keeps its look for the match,
         // and falls into its own ruin), or the code-drawn stand-in.
-        draw: () => drawLandmark(ctx, l.kind, l.id, kind === "rubble" && l.kind !== "rubble") || (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time),
+        // A sandbag position built in the match faces the way it was built to.
+        draw: () => (l.built ? drawBuilt(ctx, l) : drawLandmark(ctx, l.kind, l.id, kind === "rubble" && l.kind !== "rubble") || (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time)),
       });
     }
     for (const group of this.groups.values()) {
@@ -627,13 +632,13 @@ export class Scene {
           x: v.px,
           y: v.y,
           scale: unitScale,
-          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate }),
+          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate, pose: heroPose(rules, group.view, { moving: v.moving, firing: now - (v.shotAt ?? -1e9) < 1500 }) }),
         });
       }
     }
     for (const e of this.effects) {
       if (e.kind !== "casualty" || now < e.t0) continue;
-      things.push({ depth: e.x + e.y - 1, x: e.x, y: e.y, scale: unitScale, draw: () => drawCasualty(ctx, { unit: e.unit, cls: e.cls, turn: e.turn, age: (now - e.t0) / 1000 }) });
+      things.push({ depth: e.x + e.y - 1, x: e.x, y: e.y, scale: unitScale, draw: () => (e.flat ? drawFlat : drawCasualty)(ctx, { unit: e.unit, cls: e.cls, turn: e.turn, age: (now - e.t0) / 1000 }) });
     }
     things.sort((a, b) => a.depth - b.depth);
     for (const th of things) {
@@ -825,6 +830,21 @@ export class Scene {
         ctx.lineTo(sx + 6, y);
         ctx.stroke();
       }
+      // The rank the squad has earned, in silver beside the brass, and a hero's health.
+      const under = low + 16 * unitScale + 4 + h / 2 + 2;
+      drawRank(ctx, group.view.rank, sx + ((group.view.tier ?? 1) > 1 ? 9 : -6), under, 12);
+      if (group.view.hero) {
+        const hp = Math.max(0, Math.min(1, group.view.hero.hp ?? 1));
+        ctx.fillStyle = "rgba(10,14,16,0.75)";
+        ctx.fillRect(sx - 17, under - h - 9, 34, 5);
+        ctx.fillStyle = hp < 0.35 ? "#ff5a5a" : "#63d68a";
+        ctx.fillRect(sx - 16, under - h - 8, 32 * hp, 3);
+      }
+    }
+    // Demolition charges burning down.
+    for (const c of state.charges ?? []) {
+      const [cx, cy] = cam.screen(c.x, c.y);
+      drawCharge(ctx, cx, cy - 26 * buildScale, c, performance.now(), sideColor[c.side]);
     }
     this.coachMark();
   }
@@ -908,7 +928,7 @@ export class Scene {
           ctx.stroke();
         }
       }
-      if (seen.kind !== "rubble" && seen.hp < 1) {
+      if (seen.kind !== "rubble" && seen.kind !== "sandbagsFlat" && seen.hp < 1) {
         ctx.fillStyle = "rgba(10,14,16,0.75)";
         ctx.fillRect(sx - 15, top + 4, 30, 4);
         ctx.fillStyle = seen.hp < 0.35 ? "#ff5a5a" : "#f0c04a";

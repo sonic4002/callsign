@@ -19,8 +19,9 @@ test("the game tools: the six in the design, build and haul for the operator, ca
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
   assert.deepEqual(names(operatorTools), ["build", "buy", "command", "haul", "radio", "report"]);
   const { units } = rules.factions.aegis;
-  assert.deepEqual(names(leaderToolsFor(units.commandos)), names(leaderTools));
-  assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "hold", "move", "radio", "repair", "report"]);
+  assert.deepEqual(names(leaderToolsFor(units.commandos)), [...names(leaderTools), "fortify"].sort(), "infantry also dig in");
+  assert.deepEqual(names(leaderToolsFor(units.tank)), names(leaderTools));
+  assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "fortify", "hold", "move", "radio", "repair", "report"]);
   for (const t of [...leaderToolsFor(units.engineers), ...operatorTools]) {
     assert.equal(t.strict, true);
     assert.equal(t.input_schema.additionalProperties, false);

@@ -396,3 +396,12 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   .panel.grow { flex: 1 1 10rem; min-block-size: 10rem; }
 }
 #orders-about { display: block; max-inline-size: 17rem; font-size: .7rem; line-height: 1.35; color: var(--muted); text-align: center; }
+
+/* Heroes, earned ranks (heroes.js) */
+#roster li.hero { border-inline-start-color: #e6edf2; }
+#roster li.hero .portrait { float: inline-start; inline-size: 40px; block-size: 40px; margin-inline-end: .45rem; border: 1px solid #3a464d; border-radius: 3px; object-fit: cover; background: #10161a; }
+#roster .hero-health { display: block; clear: both; block-size: 5px; margin-block-start: .3rem; background: #2a3237; border-radius: 2px; overflow: hidden; }
+#roster .hero-health i { display: block; block-size: 100%; background: #63d68a; }
+#roster .hero-health.low i { background: #ff5a5a; }
+#roster .hero-note { display: block; color: var(--muted); font-size: .72rem; }
+#roster .earned { display: inline-flex; vertical-align: middle; margin-inline-start: .3rem; }
