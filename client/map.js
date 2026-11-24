@@ -2,6 +2,8 @@
 // gunfire and labels, sorted by depth. It draws only what the server sent this side.
 
 import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, house, isoBox, rock, sprites, tree } from "./art.js";
+import { drawFence, drawStructure } from "./bases-art.js";
+import { structureAt, structureDef } from "./bases.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
@@ -103,7 +105,7 @@ export class Scene {
     for (const g of groups) {
       seen.add(g.id);
       const faction = this.factionOf[g.unit];
-      this.hqFaction[g.side] = faction;
+      this.hqFaction[g.side] ??= faction; // a squad of a captured design does not change whose base it is
       let group = this.groups.get(g.id);
       if (!group) {
         group = { visuals: [] };
@@ -550,6 +552,13 @@ export class Scene {
       const kind = p.kind === "hq" ? `hq_${this.hqFaction[p.owner] ?? (p.owner === 0 ? "aegis" : "ashfall")}${this.ruined[p.owner] ? "_ruin" : ""}` : p.kind;
       things.push({ depth: p.x + p.y, x: p.x, y: p.y, scale: buildScale, draw: () => drawBuilding(ctx, kind, sideColor[live.owner], time) });
     }
+    // What each side has built: ours as it is, the enemy's as we last saw it.
+    for (const st of state.structures ?? []) {
+      const def = structureDef(rules, st);
+      if (!def) continue;
+      if (st.role === "fence") things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: z, draw: () => drawFence(ctx, st, sideColor[st.side]) });
+      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, st, def, sideColor[st.side], time) });
+    }
     for (const group of this.groups.values()) {
       for (const v of group.visuals) {
         things.push({
@@ -620,6 +629,11 @@ export class Scene {
     }
     for (const group of this.groups.values()) {
       if (group.own) for (const v of group.visuals) eyes.push([v.x, v.y, this.unitOf[group.unit].sight]);
+    }
+    // A structure of ours that stands keeps watch too.
+    for (const st of this.state.structures ?? []) {
+      const sight = structureDef(rules, st)?.sight;
+      if (st.side === this.state.side && !st.ruin && st.building >= 1 && sight) eyes.push([st.x, st.y, sight]);
     }
     return eyes;
   }
@@ -696,6 +710,7 @@ export class Scene {
       if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55 });
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner] });
     }
+    this.structureLabels(buildScale);
     for (const group of this.groups.values()) {
       if (!group.visuals.length) continue;
       const cx = group.visuals.reduce((a, v) => a + v.x, 0) / group.visuals.length;
@@ -711,6 +726,30 @@ export class Scene {
         color: sideColor[group.side],
         border: group.id === this.selected ? "#ffffff" : `${sideColor[group.side]}88`,
       });
+    }
+  }
+
+  // structureLabels names the enemy's structures so they can be ordered as targets, and
+  // shows a bar over anything that is going up or has been hit.
+  structureLabels(buildScale) {
+    const { rules, state, cam, ctx } = this;
+    const lang = this.lang();
+    for (const st of state.structures ?? []) {
+      const def = structureDef(rules, st);
+      if (!def || st.ruin || st.role === "fence") continue;
+      const [sx, sy] = cam.screen(st.x, st.y);
+      const top = sy - (st.role === "defence" ? 44 : 66) * buildScale;
+      const enemy = st.side !== state.side;
+      if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88` });
+      else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5 });
+      const rising = st.building < 1;
+      if (!rising && st.hp >= 1) continue;
+      const w = 36;
+      const y = top + 8;
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(sx - w / 2 - 1, y - 1, w + 2, 6);
+      ctx.fillStyle = rising ? "#c9a44c" : st.hp > 0.5 ? "#63d68a" : st.hp > 0.25 ? "#f0c04a" : "#ff5a5a";
+      ctx.fillRect(sx - w / 2, y, w * (rising ? st.building : st.hp), 4);
     }
   }
 
@@ -788,6 +827,8 @@ export class Scene {
     if (squad) return { squad };
     if (contact) return { contact };
     const [wx, wy] = this.cam.world(sx, sy);
+    const structure = structureAt(this.state, this.rules, wx, wy);
+    if (structure) return { structure };
     const point = this.rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= this.rules.match.captureRadius * 1.15);
     return point ? { point } : {};
   }

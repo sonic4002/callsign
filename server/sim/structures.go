@@ -330,7 +330,7 @@ func (s *Sim) build(c Command) (*Structure, error) {
 	for _, role := range def.Requires {
 		if !s.Has(c.Side, role) {
 			_, need := f.StructureOfRole(role)
-			return nil, fmt.Errorf("%w: a %s needs a %s first", ErrNeedsStructure, def.Name.En, need.Name.En)
+			return nil, fmt.Errorf("%w: the %s needs %s first", ErrNeedsStructure, def.Name.En, a(need.Name.En))
 		}
 	}
 	// One base structure goes up at a time, and one defence or fence beside it.
@@ -625,7 +625,7 @@ func (s *Sim) mayBuy(side int, unitID string) (shared.Unit, error) {
 	if u, ok := own.Units[unitID]; ok {
 		if u.Requires != "" && !s.Has(side, u.Requires) {
 			_, need := own.StructureOfRole(u.Requires)
-			return u, fmt.Errorf("%w: build a %s first", ErrNeedsStructure, need.Name.En)
+			return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))
 		}
 		return u, nil
 	}
@@ -662,6 +662,17 @@ func (s *Sim) ForeignUnits(side int) []string {
 		}
 	}
 	return out
+}
+
+// a puts the right article in front of a structure's English name.
+func a(name string) string {
+	if strings.HasPrefix(name, "The ") {
+		return strings.ToLower(name[:1]) + name[1:]
+	}
+	if strings.ContainsRune("AEIOU", rune(name[0])) {
+		return "an " + name
+	}
+	return "a " + name
 }
 
 func contains(list []string, v string) bool {

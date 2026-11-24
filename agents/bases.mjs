@@ -66,14 +66,14 @@ export function compactStructures(status, side) {
 
 // Plain words for each role, in both languages, beside the structures' own names.
 const roleWords = {
-  barracks: /\bbarracks\b|מגורי|קסרקטין/,
-  refinery: /\brefinery\b|זיקוק/,
+  barracks: /\b(barracks|safehouse)\b|מגורי|קסרקטין|מסתור/,
+  refinery: /\b(refinery|smelter)\b|זיקוק|מתכה/,
   works: /\b(works|factory|workshop)\b|מפעל|סדנ|מוסך/,
-  airbase: /\b(airbase|air base|airfield|airport|airstrip)\b|בסיס אוויר|בסיס האוויר|שדה תעופה|מנחת/,
-  dockyard: /\b(dock|docks|dockyard|shipyard|harbou?r)\b|מספנ|נמל|מזח/,
+  airbase: /\b(airbase|air base|airfield|airport|airstrip|launch yard)\b|בסיס אוויר|בסיס האוויר|שדה תעופה|מנחת|שיגור/,
+  dockyard: /\b(dock|docks|dockyard|shipyard|harbou?r|boat shed)\b|מספנ|נמל|מזח|סככ/,
   fence: /\b(fence|wall|wire|barrier)\b|גדר|חומ/,
 };
-const antiAir = /\b(anti[- ]?air(craft)?|flak|aa)\b|נ"מ|נ״מ|נגד מטוסים/;
+const antiAir = /\b(anti[- ]?air(craft)?|flak|aa|rocket nest)\b|נ"מ|נ״מ|נגד מטוסים|קן טילים/;
 const defence = /\b(gun|guns|turret|sentry|nest|defen[cs]e|tower)\b|תותח|מקלע|עמדה|עמדת|מגדל/;
 
 export const buildVerb = /\b(build|construct|erect|put up|set up|place|fortify)\b|בנה|בנו|הקם|הקימו|הצב|בצר/;

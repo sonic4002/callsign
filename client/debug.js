@@ -5,6 +5,9 @@
 
 import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
+import { wantedStructure } from "/agents/bases.mjs";
+import { drawIcon } from "./bases-art.js";
+import { structureCards, structureDef, structureRows, unitDef, unitLock } from "./bases.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
@@ -201,6 +204,10 @@ function onFrame(frame) {
       return;
     case "event":
       if (frame.event.side === side && frame.event.kind === "deploying") buyAnswered(frame.event.unit);
+      // A squad of engineers used up in a takeover is told by the takeover itself.
+      if (frame.event.kind === "squad_lost" && frame.event.reason === "spent") break;
+      // Whose structure it was decides how its loss or takeover reads.
+      if (frame.event.side === side && frame.event.kind.startsWith("structure_")) frame.event.kind = structureEvent(frame.event, side);
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
@@ -239,7 +246,7 @@ function renderLog() {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count });
+        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, structure: ev.unit ? kindName(ev.unit) : "" });
       } else {
         time.textContent = clock(e.tick);
         text.textContent = t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" });
@@ -280,6 +287,8 @@ const classWords = {
 function noteBuy(text) {
   if (!rules || !faction || !buyWords.test(text)) return;
   const low = text.toLowerCase();
+  // A call to build a structure is not a purchase of a unit.
+  if (wantedStructure(low, rules.factions[faction]?.structures ?? {})) return;
   const units = Object.entries(rules.factions[faction]?.units ?? {});
   const says = ([, u]) => [u.name.en, u.name.he].some((name) => name.toLowerCase().split(/\s+/).some((word) => word.length >= 3 && low.includes(word)));
   const named = units.filter(says);
@@ -447,6 +456,9 @@ addEventListener("blur", talkEnd);
 $("restart").addEventListener("click", () => open() && ws.send(JSON.stringify({ type: "restart" })));
 
 // Calls the sidebar and the map write. `to` and `from` are callsigns in the page language.
+const structureName = (st) => structureDef(rules, st)?.name[lang] ?? st.kind;
+// Any faction's structure by its rules id: events name a structure by its kind alone.
+const kindName = (kind) => Object.values(rules?.factions ?? {}).map((f) => f.structures?.[kind]).find(Boolean)?.name[lang] ?? kind;
 const call = (kind, vars) => t(`call.${kind}`, { from: me[lang], ...vars });
 const anvil = () => rules.callsigns.operator[lang];
 
@@ -479,13 +491,16 @@ function renderSidebar() {
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
     $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
   }
-  const units = Object.entries(rules.factions[faction]?.units ?? {});
-  const buildKey = JSON.stringify([lang, faction, canAct, pop >= cap, units.map(([, u]) => state.gold >= u.cost)]);
+  // The faction's own units, and any a captured structure lets this side build.
+  const units = [...Object.entries(rules.factions[faction]?.units ?? {}), ...(state.foreignUnits ?? []).map((id) => [id, unitDef(rules, id)])];
+  const locks = units.map(([id]) => unitLock(state, rules, faction, side, id));
+  const buildKey = JSON.stringify([lang, faction, canAct, pop >= cap, units.map(([id, u]) => [id, state.gold >= u.cost]), locks.map((l) => l?.id)]);
   if (buildKey !== drawn.build) {
     drawn.build = buildKey;
-    $("build").replaceChildren(...units.map(([id, u]) => buildButton(id, u, canAct && pop < cap && state.gold >= u.cost)));
+    $("build").replaceChildren(...units.map(([id, u], i) => buildButton(id, u, canAct && pop < cap && state.gold >= u.cost && !locks[i], locks[i])));
   }
   renderDeploying(deploying);
+  renderStructures(canAct);
 }
 
 const secondsLeft = (d) => Math.ceil(d.ticksLeft / rules.tickRate);
@@ -518,7 +533,7 @@ function renderDeploying(deploying) {
 
 // deployRow is a bought squad on its way: it becomes an ordinary roster row on arrival.
 function deployRow(d) {
-  const unit = rules.factions[faction].units[d.unit];
+  const unit = unitDef(rules, d.unit);
   const li = el("li", "deploying");
   li.dataset.deploy = d.id;
   const name = el("span", "name", d.callsign[lang]);
@@ -531,11 +546,13 @@ function deployRow(d) {
 
 function orderText(sq) {
   if (sq.order.contact) return t("order.contact");
+  if (sq.order.kind === "capture") return t("order.capture", { percent: Math.round((sq.order.capture ?? 0) * 100) });
+  if (sq.order.place) return t("order.structure");
   return t(`order.${sq.order.kind}`, { point: sq.order.point ? pointName(sq.order.point) : t("order.here") });
 }
 
 function rosterRow(sq, canAct) {
-  const unit = rules.factions[faction].units[sq.unit];
+  const unit = unitDef(rules, sq.unit);
   const li = el("li", sq.id === scene.selected ? "selected" : "");
   const name = el("span", "name", sq.callsign[lang]);
   name.append(el("span", "unit", unit.name[lang]));
@@ -560,11 +577,13 @@ function rosterRow(sq, canAct) {
   return li;
 }
 
-function buildButton(id, unit, enabled) {
-  const button = el("button");
+function buildButton(id, unit, enabled, lock) {
+  const button = el("button", lock ? "locked" : "");
   button.type = "button";
   button.disabled = !enabled;
   button.dataset.unit = id;
+  // What has to be built first, when the structure this unit comes from does not stand.
+  if (lock) button.title = t("structure.needs", { structure: lock.def.name[lang] });
   const icon = el("canvas");
   const dpr = devicePixelRatio || 1;
   icon.width = 72 * dpr;
@@ -578,9 +597,105 @@ function buildButton(id, unit, enabled) {
   count.hidden = true;
   // The fill rises behind the picture while a squad of this unit deploys.
   button.append(el("i", "fill"), icon, el("span", "", unit.name[lang]), el("span", "cost", String(unit.cost)), el("bdi", "left"), count);
+  if (lock) button.append(el("span", "needs", t("structure.needs", { structure: lock.def.name[lang] })));
   // Buying is a radio call to the operator like any other; the button only writes and sends it.
   button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
   return button;
+}
+
+// ---- structures ----
+
+// structureEvent picks the log line for a structure event: whose it was decides the words.
+function structureEvent(ev, mySide) {
+  if (ev.kind === "structure_lost" && ev.owner !== mySide) return "structure_lost_theirs";
+  if (ev.kind === "structure_captured" && ev.owner !== mySide) return "structure_taken";
+  return ev.kind;
+}
+
+// The Structures half of the build panel. Like the unit buttons, these only write a
+// radio call to the operator: a base structure's call is sent at once, and a defence's or
+// a fence's is put in the box so that the place can be changed first.
+function renderStructures(canAct) {
+  const cards = structureCards(state, rules, faction, side);
+  const key = JSON.stringify([lang, faction, canAct, cards.map((c) => [c.id, c.state, c.have])]);
+  if (key !== drawn.structures) {
+    drawn.structures = key;
+    $("structures").replaceChildren(...cards.map((c) => structureButton(c, canAct)));
+  }
+  for (const card of cards) {
+    const button = $("structures").querySelector(`[data-structure="${card.id}"]`);
+    if (!button) continue;
+    button.querySelector(".fill").style.blockSize = card.state === "rising" ? `${card.progress * 100}%` : "0";
+    if (card.state === "rising") button.querySelector(".why").textContent = t("structure.rising", { percent: Math.round(card.progress * 100) });
+  }
+  const rows = structureRows(state, rules, side);
+  const listKey = JSON.stringify([lang, rows.map((r) => [r.id, Math.round(r.hp * 20), r.building >= 1, r.segments])]);
+  if (listKey !== drawn.structureList) {
+    drawn.structureList = listKey;
+    $("structure-list").replaceChildren(...rows.map(structureRow));
+  }
+  for (const r of rows) {
+    const row = $("structure-list").querySelector(`[data-structure="${r.id}"]`);
+    if (row && r.building < 1) row.querySelector(".bar b").style.inlineSize = `${r.building * 100}%`;
+  }
+}
+
+function structureButton(card, canAct) {
+  const { id, def } = card;
+  const button = el("button", card.state);
+  button.type = "button";
+  button.dataset.structure = id;
+  button.disabled = !canAct || !["ready"].includes(card.state);
+  const icon = el("canvas");
+  const dpr = devicePixelRatio || 1;
+  icon.width = 60 * dpr;
+  icon.height = 40 * dpr;
+  const g = icon.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.translate(30, def.role === "fence" ? 21 : 32);
+  g.scale(0.5, 0.5);
+  drawIcon(g, id, def, faction, sideColor[side]);
+  const names = (ids) => ids.map((u) => unitDef(rules, u)?.name[lang] ?? u).join(", ");
+  const what =
+    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
+  const why = {
+    ready: what,
+    poor: what,
+    rising: t("structure.rising", { percent: Math.round(card.progress * 100) }),
+    have: t("structure.have"),
+    busy: t("structure.busy"),
+    full: t("structure.full"),
+    needs: card.needs ? t("structure.needs", { structure: card.needs.def.name[lang] }) : "",
+  }[card.state];
+  const count = el("span", "count", String(card.have));
+  count.hidden = card.have < 1 || !["defence", "fence"].includes(def.role);
+  button.title = what;
+  button.append(
+    el("i", "fill"),
+    icon,
+    el("span", "", def.name[lang]),
+    el("span", "cost", `${def.cost} · ${t("seconds", { seconds: def.buildSeconds })}`),
+    el("span", "why", why),
+    count,
+  );
+  button.addEventListener("click", () => {
+    const fixed = def.role === "defence" || def.role === "fence";
+    if (fixed) draft(call("buildAt", { to: anvil(), structure: def.name[lang], place: t("place.front") }));
+    else transmit(call("build", { to: anvil(), structure: def.name[lang] }));
+  });
+  return button;
+}
+
+function structureRow(r) {
+  const def = structureDef(rules, r);
+  const li = el("li", r.building < 1 ? "rising" : "");
+  li.dataset.structure = r.id;
+  const bar = el("span", "bar");
+  const fill = el("b", r.hp > 0.5 ? "" : r.hp > 0.25 ? "hurt" : "bad");
+  fill.style.inlineSize = `${(r.building < 1 ? r.building : r.hp) * 100}%`;
+  bar.append(fill);
+  li.append(el("span", "name", def?.name[lang] ?? r.kind), bar, el("span", "order", r.building < 1 ? t("structure.rising", { percent: Math.round(r.building * 100) }) : `${Math.round(r.hp * 100)}%`));
+  return li;
 }
 
 // select marks a squad and starts a call to it.
@@ -641,6 +756,14 @@ function mapClick(ev) {
     const name = scene.contactName(hit.contact, lang);
     const mine = state.squads.find((sq) => sq.id === scene.selected);
     return draft(mine ? call("attack", { to: mine.callsign[lang], point: name }) : $("text").value + name);
+  }
+  if (hit.structure) {
+    // An enemy structure: engineers are sent to take it over, anyone else to attack it.
+    const st = hit.structure;
+    const mine = state.squads.find((sq) => sq.id === scene.selected);
+    if (st.side === side || !mine) return draft($("text").value + structureName(st));
+    const kind = unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? "capture" : "attackStructure";
+    return draft(call(kind, { to: mine.callsign[lang], structure: structureName(st) }));
   }
   if (!hit.point) return;
   const squad = state.squads.find((sq) => sq.id === scene.selected);

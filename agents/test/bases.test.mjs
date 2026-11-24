@@ -91,9 +91,9 @@ test("scripted operator: builds what Hammer names, and says why when it cannot",
   assert.deepEqual(await think({ agent: anvil, wake: wake(call("A gun at Delta", { points: ["D"] })) }), [["build", { structure: "sentryGun", place: "D", place2: "" }], wilco]);
   assert.deepEqual(await think({ agent: anvil, wake: wake(call("Fence the north side")) }), [["build", { structure: "barrierWall", place: "base:north", place2: "" }], wilco]);
   // A refusal goes back to Hammer with the game's reason.
-  assert.deepEqual(await think({ agent: anvil, wake: wake(call("Build an airbase")) }, { build: "a structure is missing: a Airbase needs a Vehicle Works first" }), [
+  assert.deepEqual(await think({ agent: anvil, wake: wake(call("Build an airbase")) }, { build: "a structure is missing: the Airbase needs a Vehicle Works first" }), [
     ["build", { structure: "airbase", place: "", place2: "" }],
-    ["radio", { to: ["Hammer"], body: "Negative, a structure is missing: a Airbase needs a Vehicle Works first", end: "over" }],
+    ["radio", { to: ["Hammer"], body: "Negative, a structure is missing: the Airbase needs a Vehicle Works first", end: "over" }],
   ]);
   // "Build a tank" is still a purchase, and an order to hold a point is still relayed.
   assert.deepEqual((await think({ agent: anvil, wake: wake(call("Build a tank")) }))[0], ["buy", { unit: "tank", upgrade: "" }]);
