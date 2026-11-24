@@ -98,8 +98,13 @@
         1,
         2
       ],
-      "subject": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the bed is sometimes heaped with gold nuggets",
-      "wreck": "the burnt-out blackened wreck of a six-wheeled hauler truck, scorched dark steel, no flames, no smoke"
+      "subject": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
+      "wreck": "the burnt-out blackened wreck of a six-wheeled hauler truck, scorched dark steel, no flames, no smoke",
+      "move": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
+      "full": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is heaped with gold nuggets",
+      "moveFull": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is heaped with gold nuggets",
+      "load": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop",
+      "unload": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop"
     },
     "technical": {
       "grid": [
@@ -135,8 +140,13 @@
         1,
         2
       ],
-      "subject": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the bed is sometimes heaped with gold nuggets",
-      "wreck": "the burnt-out blackened wreck of a dump truck, scorched dark steel, no flames, no smoke"
+      "subject": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
+      "wreck": "the burnt-out blackened wreck of a dump truck, scorched dark steel, no flames, no smoke",
+      "move": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
+      "full": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is heaped with gold nuggets",
+      "moveFull": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is heaped with gold nuggets",
+      "load": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm",
+      "unload": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm"
     }
   },
   "pieces": {
