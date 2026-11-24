@@ -80,6 +80,8 @@ export class Agent {
       // "Out" means no reply is expected, so it wakes nobody; it stays in the traffic the
       // next wake shows. Hammer is the exception: a commander may end an order with Out.
       if (forMe && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
+      // The operator runs the fight, so every other transmission on the net wakes it too.
+      else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
       return;
     }
     if (frame.type === "event") {
@@ -217,6 +219,8 @@ export function compactStatus(status, side) {
     goldPerSecond: status.income,
     hqHealth: status.hq,
     squads: status.squads.map((s) => ({ callsign: s.callsign.en, unit: s.unit, class: s.class, ...squad(s) })),
+    // Bought and on their way: they count toward the cap and cannot be ordered yet.
+    deploying: (status.deploying ?? []).map((d) => ({ callsign: d.callsign.en, unit: d.unit, secondsLeft: Math.ceil(d.ticksLeft / 10) })),
     contacts,
     points,
   };
@@ -228,6 +232,10 @@ function describe(item) {
     const lang = m.lang === "he" ? "Hebrew" : "English";
     const named = m.points?.length ? ` Points named: ${m.points.join(", ")}.` : "";
     return `Radio call for you from ${m.from.en}, in ${lang}: "${m.text}"${named}`;
+  }
+  if (item.kind === "heard") {
+    const m = item.msg;
+    return `Heard on the net, ${m.from.en} to ${m.to.map((t) => t.en).join(", ")}: "${m.text}"`;
   }
   const e = item.event;
   const who = item.callsign?.en ?? "A squad";
