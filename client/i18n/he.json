@@ -51,7 +51,7 @@
   "mute": "הפעלה או השתקה של המוזיקה",
   "volume": "עוצמת המוזיקה",
   "connecting": "מתחבר לשרת המשחק…",
-  "disconnected": "החיבור אבד. מתחבר מחדש…",
+  "disconnected": "המשחק נעצר או שהחיבור נותק. מתחבר מחדש…",
   "matchStarted": "הקרב התחיל. אתה {from}, מפקד על {faction}.",
   "refused": "לא שודר: {reason}",
   "spectating": "מצב צפייה: אפשר לצפות אבל לא לשדר.",
@@ -175,7 +175,7 @@
   "tab.radio": "קשר",
   "tab.build": "בנייה",
   "tab.more": "עוד",
-  "noServer": "אין חיבור לשרת המשחק. מנסה שוב…",
+  "noServer": "המשחק נעצר או שהחיבור נותק. מנסה שוב…",
   "voice.insecure": "דיבור דורש https או localhost; הדף נפתח ב-http רגיל. אפשר להקליד.",
   "lobby.opponent": "יריב",
   "lobby.bot": "האויב המתוסרט",
@@ -359,5 +359,7 @@
   "monitor.min": "דק׳",
   "lobby.startGold": "זהב התחלתי",
   "lobby.goldOther": "סכום אחר",
-  "lobby.goldIs": "זהב התחלתי: {gold}"
+  "lobby.goldIs": "זהב התחלתי: {gold}",
+  "declareLost": "כל התחנות, הקשר עם המשחק נותק. סוף.",
+  "reconnected": "החיבור למשחק חזר."
 }

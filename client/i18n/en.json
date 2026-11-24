@@ -51,7 +51,7 @@
   "mute": "Music on or off",
   "volume": "Music volume",
   "connecting": "Connecting to the game server…",
-  "disconnected": "Connection lost. Reconnecting…",
+  "disconnected": "The game stopped or the connection dropped. Reconnecting…",
   "matchStarted": "Match started. You are {from}, commanding {faction}.",
   "refused": "Not sent: {reason}",
   "spectating": "Spectating: you can watch but not transmit.",
@@ -175,7 +175,7 @@
   "tab.radio": "Radio",
   "tab.build": "Build",
   "tab.more": "More",
-  "noServer": "No connection to the game server. Trying again…",
+  "noServer": "The game stopped or the connection dropped. Trying again…",
   "voice.insecure": "Voice needs https or localhost; this page was opened over plain http. Typing works.",
   "lobby.opponent": "Opponent",
   "lobby.bot": "The scripted enemy",
@@ -359,5 +359,7 @@
   "monitor.min": "min",
   "lobby.startGold": "Starting gold",
   "lobby.goldOther": "Other amount",
-  "lobby.goldIs": "Starting gold: {gold}"
+  "lobby.goldIs": "Starting gold: {gold}",
+  "declareLost": "All stations, connection to the game is lost. Out.",
+  "reconnected": "Connected to the game again."
 }

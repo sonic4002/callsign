@@ -61,6 +61,8 @@ test("every string the page uses exists, and every string is used", () => {
   for (const call of script.matchAll(/\b(?:t|system)\(([^,)]*)/g)) {
     for (const m of call[1].matchAll(/"([^"]+)"/g)) used.add(m[1]);
   }
+  // Lines the page speaks by itself, read from both tables at once and not through t().
+  for (const m of script.matchAll(/strings\.en\.(\w+)/g)) used.add(m[1]);
   for (const [prefix, values] of Object.entries(dynamic)) {
     assert.ok(script.includes(`\`${prefix}\${`), `debug.js no longer builds ${prefix} keys`);
     for (const v of values) used.add(prefix + v);

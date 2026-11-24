@@ -101,6 +101,10 @@ scene.onFinale = () => renderOverlay();
 scene.sfx = new Sfx({ level: () => (music.muted ? 0 : music.volume) }); // guns and blasts follow the music's volume and mute
 const speech = new Speech({ volume: () => 0.6 + 0.4 * music.volume, duck: (on) => (music.duck(on), scene.sfx.duck(on)) });
 speech.bind($("speak"));
+// What the page says by itself when the game goes away, kept ready while the server is there.
+speech.keep({ lost: { en: strings.en.declareLost, he: strings.he.declareLost } });
+let wasOnline = false; // the connection was up, so its loss is news
+let lostBefore = false;
 await loadSprites();
 
 const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[lang] ?? id;
@@ -165,11 +169,19 @@ function connect() {
   if (seat) params.set("token", seat.token);
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?${params}`);
   ws.addEventListener("message", (ev) => onFrame(JSON.parse(ev.data)));
-  ws.addEventListener("open", () => document.body.classList.remove("no-server"));
+  ws.addEventListener("open", () => {
+    document.body.classList.remove("no-server");
+    if (lostBefore && !wasOnline) system("reconnected");
+    wasOnline = true;
+    lostBefore = true;
+  });
   ws.addEventListener("close", (ev) => {
     if (ev.code === 1008) return turnedAway(ev.reason); // refused: knocking again will not help
     document.body.classList.add("no-server"); // the page says so until the server is back
-    speech.silence(); // radio still waiting to be spoken is about a net that is gone
+    // Radio still waiting to be spoken is about a net that is gone: drop it, and say so.
+    if (wasOnline) speech.declare("lost", lang);
+    else speech.silence();
+    wasOnline = false;
     system("disconnected", {}, "warn");
     setTimeout(connect, 1000);
   });
