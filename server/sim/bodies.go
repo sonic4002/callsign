@@ -43,7 +43,14 @@ import (
 //
 // Where teams end up: a team ordered to a place claims the spot it will stand on. The
 // oldest claim wins; a team whose slot is claimed or stood on takes the nearest free
-// spot around it (post), so every team sent to one point has a spot of its own.
+// spot around it (post), so every team sent to one point has a spot of its own. A team
+// the crowd keeps from its spot stands where it is, at the crowd's edge.
+//
+// Haulers. A hauler's body is the largest. Friends standing in its lane make way for
+// it like for anyone; it follows a friend going its way; enemies it goes round (it
+// keeps no standoff, so it passes as near as touching) and, with no way round, it waits.
+// Its places at a field and at a drop-off are spots like a squad's: taken, it loads or
+// unloads from the nearest free one.
 //
 // Order: teams move one at a time, in the order they were raised on even ticks and the
 // other way round on odd ones, so neither side always gets the contested step. All of it
