@@ -712,6 +712,39 @@ export class Scene {
         border: group.id === this.selected ? "#ffffff" : `${sideColor[group.side]}88`,
       });
     }
+    this.coachMark();
+  }
+
+  // The lesson points at one thing on the map with a pulsing ring: `coach` is
+  // { point: id }, { squad: id } or { contact: true } (the first enemy in sight), or null.
+  coachMark() {
+    const { ctx, cam, coach } = this;
+    if (!coach) return;
+    let at = null;
+    if (coach.point) {
+      const p = this.rules.map.points.find((q) => q.id === coach.point);
+      at = p ? [p.x, p.y] : null;
+    } else {
+      for (const group of this.groups.values()) {
+        const mine = coach.squad ? group.own && group.id === coach.squad : coach.contact && !group.own;
+        if (!mine || !group.visuals.length) continue;
+        at = [group.visuals.reduce((a, v) => a + v.x, 0) / group.visuals.length, group.visuals.reduce((a, v) => a + v.y, 0) / group.visuals.length];
+        break;
+      }
+    }
+    if (!at) return;
+    const [sx, sy] = cam.screen(...at);
+    const beat = (performance.now() % 1300) / 1300;
+    const r = (34 + 46 * beat) * Math.max(0.6, cam.zoom * 1.6);
+    ctx.save();
+    ctx.lineWidth = 3;
+    for (const [grow, alpha] of [[1, 1 - beat], [0.55, 0.9]]) {
+      ctx.strokeStyle = `rgba(245, 200, 80, ${alpha})`;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r * grow, (r * grow) / 2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ---- radar ----

@@ -11,6 +11,7 @@ import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
 import { Speech } from "./speech/speech.js";
 import { attachGestures, fingers } from "./touch.js";
+import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
 import { Voice } from "./voice/voice.js";
 
@@ -58,6 +59,7 @@ function applyLanguage() {
   renderOverlay();
   brains.render();
   renderTrack();
+  coach.render();
 }
 
 // An empty box follows the page so the placeholder reads the right way; typed text
@@ -115,8 +117,20 @@ const brains = mountAgents({
   system,
   server: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
   side,
-  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token } : null) : { room: "" }),
+  // In the first lesson the squads always think here, with the scripted brain (`lesson`).
+  seat: () => (!ws || role !== "hammer" ? null : room ? (seat ? { room, token: seat.token, lesson: Boolean(lobby?.tutorial) } : null) : { room: "" }),
   canAct: () => role === "hammer",
+});
+
+// The first lesson's coach (tutorial.js). It reads the match the way the player sees it.
+let enemyDown = false; // an enemy squad has been destroyed in this match
+const coach = new Coach({
+  t,
+  touch: fingers,
+  scene,
+  send: (frame) => open() && (ws.send(JSON.stringify(frame)), true),
+  context: () => ({ side, state, rules, me, lang, selected: scene.selected, destroyed: enemyDown, log: entries.filter((e) => e.kind === "radio").map((e) => e.message) }),
+  leave: () => location.assign(pageFor({})),
 });
 
 function connect() {
@@ -173,6 +187,8 @@ function onFrame(frame) {
       scene.setState(state);
       drawn.roster = drawn.build = "";
       hideOrders();
+      enemyDown = false;
+      coach.enter(room, lobby?.tutorial);
       break;
     case "state":
       state = frame.state;
@@ -201,6 +217,7 @@ function onFrame(frame) {
       return;
     case "event":
       if (frame.event.side === side && frame.event.kind === "deploying") buyAnswered(frame.event.unit);
+      if (frame.event.side === side && frame.event.kind === "enemy_destroyed") enemyDown = true;
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
@@ -210,6 +227,7 @@ function onFrame(frame) {
   if (frame.type !== "state") renderLog();
   renderSidebar();
   renderOverlay();
+  coach.update();
 }
 
 function system(key, vars = {}, tone = "") {
@@ -347,9 +365,9 @@ let unsent = "";
 
 // sendBox transmits what is in the box. At the relaxed level a roughly spelled callsign
 // or place is corrected first.
-function sendBox() {
+function sendBox(spoken = false) {
   let text = $("text").value.trim();
-  if (text && strict === 1 && rules) text = tidy(text, { lang: speaks(text), rules });
+  if (text && strict === 1 && rules) text = tidy(text, { lang: speaks(text), rules, typed: !spoken });
   if (!transmit(text)) return;
   if (sent.at(-1) !== text) sent.push(text);
   recall = sent.length;
@@ -427,7 +445,7 @@ async function talkEnd() {
   if (picked && me && !names.some((name) => said.toLowerCase().startsWith(name))) said = t("callPrefix", { to: picked.callsign[spoke], from: me[spoke] }) + said;
   // Spoken calls go out at once; the log shows what was sent, and Up brings it back to fix.
   draft(said);
-  sendBox();
+  sendBox(true);
 }
 
 $("ptt").addEventListener("pointerdown", (ev) => {
@@ -590,6 +608,7 @@ function select(sq) {
   renderSidebar();
   hideOrders();
   if (me) draft(t("callPrefix", { to: sq.callsign[lang], from: me[lang] }));
+  coach.update();
 }
 
 // ---- map ----
@@ -692,6 +711,10 @@ function renderOverlay() {
 
   const making = !room && role !== "spectator";
   $("lobby-new").hidden = $("lobby-join").hidden = !making;
+  // The lesson is offered first, and pressed on a browser that has not been through it.
+  $("learn").hidden = !making;
+  $("learn").classList.toggle("first", !lessonSeen());
+  $("learn-start").disabled = lobbyBusy;
   const sides = offer?.factions ?? Object.keys(baseRules?.factions ?? {});
   $("lobby-side-0").textContent = `${t("side.0")} · ${factionName(sides[0])}`;
   $("lobby-side-1").textContent = `${t("side.1")} · ${factionName(sides[1])}`;
@@ -819,6 +842,16 @@ const makeMatch = (options) =>
   });
 const takeFreeSeat = () => lobbyStep(async () => sitDown(await takeSeat(room)));
 
+// The first lesson is a real match in a room of its own, against an enemy that waits for
+// the lesson. Its squads think in this browser, so it never needs the host's password.
+const startLesson = () => lobbyStep(async () => sitDown(await createRoom({ opponent: "bot", bot: "tutorial", side, length: 0, watch: false })));
+$("learn-start").addEventListener("click", () => {
+  music.unlock();
+  startLesson();
+});
+// From Help, in the middle of anything: leave for the start screen and begin the lesson there.
+$("help-learn").addEventListener("click", () => location.assign(`${pageFor({})}${pageFor({}).includes("?") ? "&" : "?"}learn`));
+
 // lookUp reads a room this browser has no seat in, to offer the free one.
 async function lookUp() {
   await lobbyStep(async () => {
@@ -932,6 +965,8 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
   else makeMatch({ opponent: "bot", side, length: 0, watch: true });
+} else if (query.has("learn") && role !== "spectator") {
+  startLesson(); // ?learn goes straight into the first lesson
 }
 renderOverlay();
 
