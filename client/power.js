@@ -50,7 +50,7 @@ export const repairCost = (rules, def, st) => Math.ceil(def.cost * (rules.match.
 // Each is a radio call; the page only writes and sends it.
 export function structureActions(st, side, { engineers = false } = {}) {
   if (!st || st.side !== side || st.ruin) return [];
-  const damaged = st.building >= 1 && st.hp < 1;
+  const damaged = st.building >= 1 && st.hp < 0.999; // a finished structure can stand a hair under full
   return ["sell", ...(damaged && !st.repairing ? ["repair"] : []), ...(damaged && engineers ? ["mend"] : [])];
 }
 

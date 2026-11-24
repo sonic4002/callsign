@@ -94,7 +94,7 @@ func (s *Sim) repairFor(c Command) error {
 	if st.BuildTicks > 0 {
 		return fmt.Errorf("%w: the %s is still going up", ErrBuilding, st.def.Name.En)
 	}
-	if st.HP >= st.def.HP {
+	if !st.damaged() {
 		return fmt.Errorf("%w: the %s", ErrNotDamaged, st.def.Name.En)
 	}
 	if s.Gold(c.Side) <= 0 {
@@ -121,7 +121,7 @@ func (s *Sim) mayMend(sq *Squad, st *Structure) error {
 	if st.BuildTicks > 0 {
 		return fmt.Errorf("%w: the %s is still going up", ErrBuilding, st.def.Name.En)
 	}
-	if st.HP >= st.def.HP {
+	if !st.damaged() {
 		return fmt.Errorf("%w: the %s", ErrNotDamaged, st.def.Name.En)
 	}
 	return nil
@@ -164,7 +164,7 @@ func (s *Sim) repairStructures() {
 			continue
 		}
 		st := s.structure(sq.Order.Structure)
-		if st == nil || st.Ruin || st.Side != sq.Side || st.HP >= st.def.HP {
+		if st == nil || st.Ruin || st.Side != sq.Side || !st.damaged() {
 			x, y := sq.Center()
 			sq.Order = Order{Kind: OrderHold, X: x, Y: y, Tick: s.Tick, arrived: true}
 			continue
@@ -195,3 +195,7 @@ func (s *Sim) repairStructures() {
 		s.emit(Event{Side: sq.Side, Kind: EvSquadLost, Squad: sq.ID, Point: s.nearestPoint(st.X, st.Y), Reason: "spent"})
 	}
 }
+
+// damaged reports whether a structure has lost health worth mending. Going up, its health
+// is added a tick at a time, which can leave a finished one a hair under full.
+func (st *Structure) damaged() bool { return st.HP < st.def.HP-0.5 }

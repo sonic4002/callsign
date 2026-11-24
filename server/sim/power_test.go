@@ -214,6 +214,8 @@ func TestTheRadarNeedsItsStructureAndPower(t *testing.T) {
 	// The airbase needs the radar, the radar needs the works.
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "radar"}, sim.ErrNeedsStructure, "Vehicle Works")
 	build(t, s, 0, "power")
+	// A structure that has just gone up is whole: there is nothing to mend.
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdRepair, Place: structureOf(s, 0, shared.RolePower).PlaceID()}, sim.ErrNotDamaged, "")
 	build(t, s, 0, "works")
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "airbase"}, sim.ErrNeedsStructure, "Radar Station")
 	build(t, s, 0, "radar")
@@ -506,6 +508,60 @@ func TestTheOpeningIsBuiltInTheRulesOrderWithPowerWhenNeeded(t *testing.T) {
 	for i, role := range want {
 		if got[i] != role {
 			t.Fatalf("the opening built %v, want it to begin %v", got, want)
+		}
+	}
+}
+
+// Ordinary weapons have to walk into a defence's fire to reach it: the gun draws blood
+// before it is touched, from infantry and from armour alike.
+func TestADefenceHitsOrdinaryAttackersBeforeTheyReachIt(t *testing.T) {
+	for _, tc := range []struct {
+		owner       int
+		gun, unit   string
+		description string
+	}{
+		{0, "sentryGun", "militia", "riflemen against a sentry gun"},
+		{0, "sentryGun", "technical", "gun trucks against a sentry gun"},
+		{1, "gunNest", "commandos", "commandos against a gun nest"},
+		{1, "gunNest", "tank", "tanks against a gun nest"},
+	} {
+		s := newSim(t, 1)
+		if _, err := s.Apply(sim.Command{Side: tc.owner, Kind: sim.CmdBuild, Structure: tc.gun, Place: "base:front"}); err != nil {
+			t.Fatalf("%s: %v", tc.description, err)
+		}
+		gun := structureOf(s, tc.owner, shared.RoleDefence)
+		run(s, gun.Def().BuildSeconds+1)
+		for _, sq := range s.Squads {
+			place(sq, 100+float64(sq.Side)*1400, 60) // nobody else is about
+		}
+		attackers := buyFielded(t, s, 1-tc.owner, tc.unit)
+		away := 1.0
+		if tc.owner == 1 {
+			away = -1
+		}
+		place(attackers, gun.X+away*(gun.Def().Sight+60), gun.Y)
+		for i := 0; i < 50 && seen(s, 1-tc.owner, gun.PlaceID()) == nil; i++ {
+			place(attackers, gun.X+away*(gun.Def().Sight-float64(i)*4), gun.Y) // close enough to have seen it
+			s.Step()
+		}
+		must(t, s, sim.Command{Side: 1 - tc.owner, Kind: sim.CmdAttack, Squad: attackers.ID, Place: gun.PlaceID()})
+		_, full := attackers.Strength()
+		hp := func() (sum float64) {
+			for i := range attackers.Teams {
+				sum += attackers.Teams[i].HP
+			}
+			return sum
+		}
+		whole, gunWhole := hp(), gun.HP
+		for i := 0; i < 900 && hp() == whole && !gun.Ruin; i++ {
+			if gun.HP < gunWhole {
+				x, y := attackers.Center()
+				t.Fatalf("%s: the gun was hit from beyond its own reach: tick %d, gun %.0f/%.0f at %.0f,%.0f, attackers at %.0f,%.0f", tc.description, i, gun.HP, gun.Def().HP, gun.X, gun.Y, x, y)
+			}
+			s.Step()
+		}
+		if hp() == whole {
+			t.Fatalf("%s: %d attackers walked up to the gun unhurt", tc.description, full)
 		}
 	}
 }
