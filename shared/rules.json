@@ -430,7 +430,7 @@
         "commandPost": { "name": { "en": "Command Post", "he": "מוצב הפיקוד" }, "role": "hq",
           "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 30 },
         "powerPlant": { "name": { "en": "Power Plant", "he": "תחנת כוח" }, "role": "power", "capturable": true,
-          "cost": 130, "buildSeconds": 5, "hp": 700, "armor": 0.3, "requires": [], "unlocks": [], "footprint": 44, "sight": 180, "power": 100 },
+          "cost": 140, "buildSeconds": 5, "hp": 700, "armor": 0.3, "requires": [], "unlocks": [], "footprint": 44, "sight": 180, "power": 100 },
         "barracks": { "name": { "en": "Barracks", "he": "מגורי הלוחמים" }, "role": "barracks", "capturable": true,
           "cost": 200, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": [], "unlocks": ["commandos", "engineers"], "footprint": 40, "sight": 180, "power": -10 },
         "refinery": { "name": { "en": "Refinery", "he": "בית הזיקוק" }, "role": "refinery", "capturable": true,
