@@ -84,3 +84,21 @@ test("pronunciation table: every Hebrew callsign and map point has a pinned read
   assert.deepEqual(names.filter((n) => !table.he[n]?.ipa), []);
   for (const word of [rules.radio.over.he, rules.radio.out.he]) assert.ok(table.he[word]?.last, `${word} is pinned as a closing word`);
 });
+
+test("queue: what is said to the player is kept and heard before chatter between stations", () => {
+  const q = new Queue();
+  const line = (station, text, at, direct = false) => ({ station, text, at, direct });
+  q.push(line("infantry-1", "to anvil 1", 0));
+  q.push(line("infantry-2", "wilco", 100, true));
+  q.push(line("infantry-3", "to anvil 2", 200));
+  q.push(line("infantry-4", "to anvil 3", 300));
+  q.push(line("infantry-5", "to anvil 4", 400));
+  assert.equal(q.size, 3);
+  assert.equal(q.next(500).text, "wilco");
+  // Twelve seconds on, the chatter is stale but a waiting answer to the player is not.
+  q.push(line("infantry-6", "contact", 600, true));
+  q.push(line("infantry-7", "newest chatter", 12_000));
+  assert.equal(q.next(12_500).text, "contact");
+  assert.equal(q.next(12_600).text, "newest chatter");
+  assert.equal(q.next(12_700), null);
+});

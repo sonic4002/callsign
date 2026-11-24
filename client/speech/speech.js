@@ -58,7 +58,8 @@ export class Speech {
     const lang = message.lang === "he" ? "he" : "en";
     const voice = voiceFor(message.from, faction, this.voices);
     const abort = new AbortController();
-    const line = { station: message.from?.key, filler: filler(message), at: performance.now(), text, lang, voice, cancel: () => abort.abort() };
+    const direct = (message.to ?? []).some((t) => t.key === "player" || t.key === "all");
+    const line = { station: message.from?.key, direct, filler: filler(message), at: performance.now(), text, lang, voice, cancel: () => abort.abort() };
     // The recording is asked for now, so it is usually here by the time its turn comes.
     line.audio = this.#fetch(line, abort.signal);
     this.queue.push(line);

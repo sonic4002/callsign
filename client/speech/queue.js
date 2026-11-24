@@ -2,8 +2,10 @@
 // instead of talking for a minute about a fight that has moved on.
 
 export class Queue {
-  constructor({ staleMs = 9000, max = 3, repeatMs = 6000 } = {}) {
+  constructor({ staleMs = 9000, directStaleMs = 25000, max = 3, repeatMs = 6000 } = {}) {
     this.staleMs = staleMs;
+    this.directStaleMs = directStaleMs; // lines addressed to the player wait much longer
+
     this.max = max;
     this.repeatMs = repeatMs;
     this.items = [];
@@ -14,7 +16,8 @@ export class Queue {
     return this.items.length;
   }
 
-  // push adds a line: { station, text, filler, at (ms it arrived), ... }. It returns false
+  // push adds a line: { station, text, filler, direct, at (ms it arrived), ... }. `direct`
+  // marks a line addressed to the player; chatter between stations never pushes one out. It returns false
   // when the line is not taken: the same station saying the same thing again right away.
   push(item) {
     const same = (other) => other && other.station === item.station && other.text === item.text && item.at - other.at < this.repeatMs;
@@ -27,15 +30,25 @@ export class Queue {
       if (this.items[i].filler && this.items[i].station === item.station) this.#drop(i);
     }
     this.items.push(item);
-    while (this.items.length > this.max) this.#drop(0);
+    while (this.items.length > this.max) {
+      const chatter = this.items.findIndex((it) => !it.direct);
+      if (chatter < 0 && this.items.length <= this.max * 2) break; // answers to the player pile up a little
+      this.#drop(Math.max(chatter, 0));
+    }
     return true;
   }
 
   // next returns the line to play now, or null. Lines that waited too long are dropped,
   // except the newest: the last word on the net is always heard.
   next(now) {
-    while (this.items.length > 1 && now - this.items[0].at > this.staleMs) this.#drop(0);
-    const item = this.items.shift() ?? null;
+    for (let i = 0; i < this.items.length - 1; ) {
+      const it = this.items[i];
+      if (now - it.at > (it.direct ? this.directStaleMs : this.staleMs)) this.#drop(i);
+      else i++;
+    }
+    // What was said to the player is heard before talk between stations.
+    const first = Math.max(this.items.findIndex((it) => it.direct), 0);
+    const item = this.items.splice(first, 1)[0] ?? null;
     if (item) this.last = item;
     return item;
   }
