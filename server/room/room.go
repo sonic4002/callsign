@@ -27,7 +27,9 @@ const (
 type Identity struct {
 	Side  int
 	Role  string
-	Squad int // squad id, for squad leaders
+	Squad int    // squad id, for squad leaders
+	Host  string // the agent host this connection belongs to, "" for none (see host.go)
+	Rank  int    // for a host: its claim on the side
 }
 
 type Config struct {
@@ -68,6 +70,7 @@ type Client struct {
 	Out       chan []byte
 	wantState bool
 	closed    bool
+	joined    int // order of arrival
 }
 
 type Room struct {
@@ -83,6 +86,8 @@ type Room struct {
 	lang    [2]map[string]string // language last used toward each station
 	bots    [2]*bot.Player
 	clients map[*Client]struct{}
+	host    [2]*Client // the agent host running each side's agents, if any
+	joins   int
 }
 
 func New(r *shared.Rules, cfg Config) (*Room, error) {
@@ -222,6 +227,10 @@ func (rm *Room) Join(id Identity, wantState bool) (*Client, error) {
 	defer rm.mu.Unlock()
 	switch id.Role {
 	case RoleHammer, RoleAnvil, RoleSpectator:
+	case RoleHost:
+		if id.Host == "" {
+			return nil, errors.New("a host needs an id")
+		}
 	case RoleSquad:
 		if sq := rm.sim.Squad(id.Squad); sq == nil || sq.Side != id.Side {
 			return nil, sim.ErrNoSquad
@@ -232,8 +241,15 @@ func (rm *Room) Join(id Identity, wantState bool) (*Client, error) {
 	if id.Side != 0 && id.Side != 1 {
 		return nil, errors.New("side must be 0 or 1")
 	}
-	c := &Client{ID: id, Out: make(chan []byte, 512), wantState: wantState}
+	if !rm.admits(id) {
+		return nil, ErrNotActiveHost
+	}
+	rm.joins++
+	c := &Client{ID: id, Out: make(chan []byte, 512), wantState: wantState, joined: rm.joins}
 	rm.clients[c] = struct{}{}
+	if id.Role == RoleHost {
+		rm.rehost(id.Side, c)
+	}
 	rm.send(c, rm.hello(c))
 	if id.Role == RoleHammer && !rm.started {
 		rm.started = true
@@ -257,6 +273,9 @@ func (rm *Room) hello(c *Client) []byte {
 	if st, ok := rm.station(c.ID); ok {
 		h["station"] = rm.name(st, side)
 	}
+	if c.ID.Role == RoleHost {
+		h["active"] = rm.host[side] == c
+	}
 	return encode(h)
 }
 
@@ -271,6 +290,9 @@ func (rm *Room) drop(c *Client) {
 		c.closed = true
 		close(c.Out)
 		delete(rm.clients, c)
+		if c.ID.Role == RoleHost {
+			rm.rehost(c.ID.Side, nil)
+		}
 	}
 }
 
