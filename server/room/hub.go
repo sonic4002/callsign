@@ -51,7 +51,7 @@ const guessesPerMinute = 40
 // Hub holds every room on the server. Each room is its own match with its own seed,
 // clock and radio nets; nothing is shared between them but the rules.
 type Hub struct {
-	mu    sync.Mutex
+	mu sync.Mutex
 
 	guessFrom time.Time // start of the minute wrong join codes are being counted in
 	guesses   int
@@ -105,6 +105,39 @@ type Options struct {
 	LengthSeconds int    // 0 for the server's default
 	Watch         bool   // let spectators in
 	Bot           string // how hard the scripted enemy presses, "" for the server's usual
+	Speed         string // how fast the match's clock runs, "" for normal (see Speeds)
+}
+
+// Speed is a pace a match can be played at. It changes only how much real time one tick
+// of the simulation takes: the same seed and the same commands at the same ticks give the
+// same match at every speed. The squads' leaders think in real time, so a faster match
+// leaves them fewer ticks to react in.
+type Speed struct {
+	Name   string  `json:"name"`
+	Factor float64 `json:"factor"` // match seconds per real second
+}
+
+// Speeds are the paces a player may choose in the lobby, slowest first.
+var Speeds = []Speed{{"relaxed", 0.75}, {SpeedNormal, 1}, {"fast", 1.5}}
+
+const SpeedNormal = "normal"
+
+func speedFactor(name string) (float64, bool) {
+	for _, s := range Speeds {
+		if s.Name == name {
+			return s.Factor, true
+		}
+	}
+	return 0, false
+}
+
+// tickEvery is the real time one tick takes in a room played at a speed.
+func tickEvery(base time.Duration, speed string) time.Duration {
+	f, ok := speedFactor(speed)
+	if !ok {
+		return base
+	}
+	return time.Duration(float64(base) / f)
 }
 
 // BotLevels are the scripted enemies a player may choose in the lobby, easiest first.
@@ -144,6 +177,12 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.Bot != "" && !botLevel(o.Bot) {
 		return nil, 0, "", errors.New("the scripted enemy is easy, normal or standard")
 	}
+	if o.Speed == "" {
+		o.Speed = SpeedNormal
+	}
+	if _, ok := speedFactor(o.Speed); !ok {
+		return nil, 0, "", errors.New("the match speed is relaxed, normal or fast")
+	}
 	if o.Side == -1 {
 		var b [1]byte
 		if _, err := rand.Read(b[:]); err != nil {
@@ -157,7 +196,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
-		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey,
+		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Speed: o.Speed,
 	}
 	if o.Opponent == OpponentBot && h.cfg.Bot != "" {
 		// A server started without a scripted enemy has none to choose a level of.
@@ -188,7 +227,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	h.rooms[code] = &held{rm: rm, stop: stop}
 	h.mu.Unlock()
 
-	go rm.Run(ctx, h.cfg.Interval)
+	go rm.Run(ctx, tickEvery(h.cfg.Interval, o.Speed))
 	side, token, err := rm.Sit(o.Side)
 	if err != nil {
 		h.drop(code)
@@ -354,8 +393,10 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"levels":   BotLevels,    // the scripted enemies on offer, easiest first
 		"level":    h.usualBot(), // the one the lobby starts on
 		"length":   length,
+		"speeds":   Speeds,      // the paces on offer, slowest first
+		"speed":    SpeedNormal, // the one the lobby starts on
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
-		"open":     h.open != nil, // the open room of a server without an agent key
+		"open":     h.open != nil,       // the open room of a server without an agent key
 		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
 	})
 }
@@ -367,6 +408,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Length   int    `json:"length"`
 		Watch    bool   `json:"watch"`
 		Bot      string `json:"bot"`
+		Speed    string `json:"speed"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -377,7 +419,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}
