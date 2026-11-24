@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { hintWords } from "./hints.js";
+import { hintCalls, hintWords } from "./hints.js";
 
 let audio = new Float32Array(0); // what the next recording decodes to
 const workers = [];
@@ -69,7 +69,7 @@ function fresh(remote = true) {
   if (remote) voice.useServer(() => ({ room: "ABCDEF", side: 1, token: "seat-token" }));
   return { voice, states };
 }
-async function speak(voice, seconds, lang = "he", hints = ["צפע", "פסל"]) {
+async function speak(voice, seconds, lang = "he", hints = "צפע 1, כאן פטיש, נועו לפסל, עבור.") {
   audio = speech(seconds);
   await voice.start(lang);
   return voice.stop(lang, ["צפע"], hints);
@@ -93,7 +93,7 @@ test("with a server the recording goes there with the seat and the hints, and no
   assert.equal(workers.length, 0, "the browser's recogniser is not even started");
   const { url, options } = calls[0];
   assert.equal(url.pathname, "/stt/transcribe");
-  assert.deepEqual(Object.fromEntries(url.searchParams), { room: "ABCDEF", side: "1", lang: "he", hints: "צפע,פסל" });
+  assert.deepEqual(Object.fromEntries(url.searchParams), { room: "ABCDEF", side: "1", lang: "he", hints: "צפע 1, כאן פטיש, נועו לפסל, עבור." });
   assert.equal(options.method, "POST");
   assert.equal(options.headers["X-Callsign-Seat"], "seat-token");
   assert.ok(options.body instanceof Int16Array && options.body.length === 2 * 16000 && options.body.some((v) => Math.abs(v) > 10000), "16-bit samples at 16 kHz");
@@ -129,7 +129,7 @@ test("a server that takes more than six seconds is given up on", async (t) => {
   answer = ({ signal }) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
   audio = speech(2);
   await voice.start("en");
-  const said = voice.stop("en", [], []);
+  const said = voice.stop("en", [], "");
   for (let i = 0; i < 20 && calls.length === 0; i++) await new Promise((r) => setImmediate(r));
   t.mock.timers.tick(5900);
   assert.equal(workers.length, 0, "still waiting");
@@ -185,5 +185,15 @@ test("hints are the net's own words in the language spoken", () => {
   const en = hintWords(rules, "en");
   for (const w of ["Hammer", "Anvil", "Viper", "Foxtrot", "this is", "Over", "Out", "roger", "say again"]) assert.ok(en.includes(w), w);
   assert.ok(!en.some((w) => /[֐-׿]/.test(w)) && new Set(he).size === he.length);
-  assert.ok(he.join(",").length < 600, "they fit in what the service reads");
+  // As traffic: every name is in it, written as the page writes calls, and it fits in what the service reads.
+  for (const map of Object.values(rules.maps)) {
+    for (const lang of ["he", "en"]) {
+      const text = hintCalls({ ...rules, map }, lang);
+      const names = [...Object.values(rules.callsigns.classes), rules.callsigns.operator, rules.callsigns.player, rules.callsigns.allStations, ...map.points.map((p) => p.callsign)];
+      for (const n of names) assert.ok(text.includes(n[lang]), `${n[lang]} in ${text}`);
+      assert.ok(text.length < 600, `${text.length} characters`);
+    }
+  }
+  assert.match(hintCalls(rules, "en"), /^Viper 1, this is Hammer\. Move to Alpha\. Over\. /);
+  assert.match(hintCalls(rules, "he"), /^צפע 1, כאן פטיש, נועו לאלף, עבור\. /);
 });

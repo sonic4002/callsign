@@ -162,13 +162,15 @@ stt-test:
 
 # Silence, hiss, hum and clicks through the real models: every one must come back empty.
 stt-quiet:
+	$(DOCKER) --network none $(IMAGE) node stt/eval/hints.mjs >/dev/null
 	$(STT) --network none --device nvidia.com/gpu=all callsign-stt python stt/eval/run.py --quiet
 
 # Measure it: speak the calls in stt/eval/calls.json with the speech service (make play
 # must be running with voices), transcribe them here with and without hints, and score.
 stt-eval:
 	$(STT) --network host callsign-stt python stt/eval/make.py
-	$(STT) --network none --device nvidia.com/gpu=all callsign-stt sh -c 'python stt/eval/run.py --name server-no-hints --mode none && python stt/eval/run.py --name server-hints --mode prompt'
+	$(DOCKER) --network none $(IMAGE) node stt/eval/hints.mjs >/dev/null
+	$(STT) --network none --device nvidia.com/gpu=all callsign-stt sh -c 'python stt/eval/run.py --name server-no-hints --mode none && python stt/eval/run.py --name server-hints --mode calls'
 	$(DOCKER) --network none $(IMAGE) node stt/eval/score.mjs
 
 # ---- model relay: the players' AI keys and their agents' AI calls (relay/) ----

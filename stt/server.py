@@ -1,8 +1,12 @@
 """The listening service: turns the player's radio call into text, on this machine.
 
-    POST /transcribe?lang=he|en&hints=<words, comma separated>   -> {"text": "..."}
+    POST /transcribe?lang=he|en&hints=<what to expect>   -> {"text": "..."}
          body: the recording, 16 kHz mono 16-bit, as a WAV file or as bare samples
-    GET  /health                                                 -> {"ok": true, ...}
+    GET  /health                                         -> {"ok": true, ...}
+
+`hints` is text in the language spoken that holds the names and words a call is made of.
+Whisper reads it as what was said just before the recording and follows its spelling, so
+the page writes it as a few radio calls (client/voice/hints.js).
 
 The game server passes /stt/* on to this service (its -stt flag), so the page talks to one
 origin. The service is optional: without it the page recognises speech in the browser.
@@ -65,7 +69,7 @@ def loudest(audio, window=RATE // 50):
 class Listener:
     """The models, and the one lock they are used under."""
 
-    def __init__(self, dirs, device="auto", cpu_threads=0):
+    def __init__(self, dirs, device="auto", cpu_threads=0, precision="float16"):
         from faster_whisper import WhisperModel
 
         self.lock = threading.Lock()  # one recording at a time
@@ -73,8 +77,8 @@ class Listener:
         self.models = {}
         if device in ("auto", "cuda"):
             try:
-                self.models = {lang: WhisperModel(str(d), device="cuda", compute_type="float16") for lang, d in dirs.items()}
-                self.device, self.precision = "cuda", "float16"
+                self.models = {lang: WhisperModel(str(d), device="cuda", compute_type=precision) for lang, d in dirs.items()}
+                self.device, self.precision = "cuda", precision
                 self.warm()
             except Exception as err:  # no GPU, no driver, or not enough memory on it
                 if device == "cuda":
@@ -90,16 +94,17 @@ class Listener:
         for lang in self.models:
             self.hear(tone, lang)
 
-    def hear(self, audio, lang, hints=(), mode="prompt", vad=True, beam=5):
+    def hear(self, audio, lang, hints="", hotwords="", vad=True, beam=5):
         """What was said in `audio` (float samples at 16 kHz), or "" when nothing was.
 
-        `hints` are the words to expect. Whisper writes whole sentences for silence and
-        for noise, so three things stand in its way: a level check, a voice detector that
-        cuts the recording down to its speech, and Whisper's own no-speech score.
+        `hints` is text holding the words to expect. Whisper writes whole sentences for
+        silence and for noise, so three things stand in its way: a level check, a voice
+        detector that cuts the recording down to its speech, and Whisper's own no-speech
+        score. (`hotwords` is faster-whisper's other way to pass words; it is here to be
+        measured against, and the service does not use it.)
         """
         if loudest(audio) < QUIET:
             return ""
-        words = ", ".join(hints)
         with self.lock:
             segments, _ = self.models[lang].transcribe(
                 audio,
@@ -110,8 +115,8 @@ class Listener:
                 without_timestamps=True,
                 vad_filter=vad,
                 vad_parameters={"min_silence_duration_ms": 400, "speech_pad_ms": 200},
-                initial_prompt=words if words and mode in ("prompt", "both") else None,
-                hotwords=words if words and mode in ("hotwords", "both") else None,
+                initial_prompt=hints or None,
+                hotwords=hotwords or None,
             )
             kept = [s.text.strip() for s in segments if not (s.no_speech_prob > 0.6 and s.avg_logprob < -0.7) and s.avg_logprob > -1.2 and s.compression_ratio < 2.4]
         return " ".join(t for t in kept if t)
@@ -131,7 +136,7 @@ def app(listener):
         lang = request.query.get("lang", "")
         if lang not in listener.models:
             raise web.HTTPBadRequest(text="lang must be one of: " + ", ".join(sorted(listener.models)))
-        hints = [w.strip() for w in request.query.get("hints", "")[:MAX_HINT_CHARS].split(",") if w.strip()]
+        hints = " ".join(request.query.get("hints", "").split())[:MAX_HINT_CHARS]
         try:
             audio = samples(await request.read())
         except Refused as err:
@@ -161,12 +166,13 @@ def main():
     p.add_argument("--models", type=pathlib.Path, default=root, help="directory the model paths in models.json start from")
     p.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     p.add_argument("--cpu-threads", type=int, default=0)
+    p.add_argument("--precision", default="float16", help="on the GPU: float16, or int8_float16 for about half the memory")
     args = p.parse_args()
     dirs = {lang: args.models / m["dir"] for lang, m in spec.items()}
     for d in dirs.values():
         if not (d / "model.bin").exists():
             raise SystemExit(f"no model in {d}: run `make stt-models`")
-    listener = Listener(dirs, args.device, args.cpu_threads)
+    listener = Listener(dirs, args.device, args.cpu_threads, args.precision)
     print(f"listening service ready on :{args.port}, using {listener.device} ({listener.precision}), languages {', '.join(sorted(dirs))}", flush=True)
     web.run_app(app(listener), port=args.port, print=None, access_log=None)
 

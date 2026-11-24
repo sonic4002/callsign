@@ -20,7 +20,7 @@ import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
-import { hintWords } from "./voice/hints.js";
+import { hintCalls } from "./voice/hints.js";
 import { Voice } from "./voice/voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -649,7 +649,7 @@ async function talkEnd() {
   } catch (err) {
     console.warn("callsign list failed", err);
   }
-  const text = await voice.stop(spoke, openers, rules ? hintWords(rules, spoke) : []);
+  const text = await voice.stop(spoke, openers, rules ? hintCalls(rules, spoke) : "");
   if (!text || !rules) return;
   let said = tidy(text, { lang: spoke, rules });
   // Tap a squad, then speak: an order that names nobody goes to the squad that is selected.

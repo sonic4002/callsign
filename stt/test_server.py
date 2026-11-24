@@ -21,8 +21,8 @@ class Stand(server.Listener):
         self.device, self.precision = "cpu", "int8"
         self.asked = []
 
-    def hear(self, audio, lang, hints=(), **_):
-        self.asked.append((len(audio), lang, list(hints)))
+    def hear(self, audio, lang, hints="", **_):
+        self.asked.append((len(audio), lang, hints))
         return "" if server.loudest(audio) < server.QUIET else "צפע 1, כאן פטיש, עבור"
 
 
@@ -51,9 +51,9 @@ class Service(AioHTTPTestCase):
 
     async def test_a_recording_as_samples_or_as_wav_is_transcribed_with_its_hints(self):
         for body in (tone(2), wav(tone(2))):
-            status, answer = await self.post("lang=he&hints=צפע, פסל,,עבור", body)
+            status, answer = await self.post("lang=he&hints=צפע 1, כאן פטיש,  נועו לפסל, עבור.", body)
             self.assertEqual((status, answer), (200, {"text": "צפע 1, כאן פטיש, עבור"}))
-        self.assertEqual(self.stand.asked, [(2 * server.RATE, "he", ["צפע", "פסל", "עבור"])] * 2)
+        self.assertEqual(self.stand.asked, [(2 * server.RATE, "he", "צפע 1, כאן פטיש, נועו לפסל, עבור.")] * 2)
 
     async def test_fifteen_seconds_is_the_longest_recording(self):
         self.assertEqual((await self.post("lang=en", wav(tone(15))))[0], 200)
@@ -70,8 +70,8 @@ class Service(AioHTTPTestCase):
         self.assertEqual(self.stand.asked, [])
 
     async def test_hints_are_cut_to_a_fixed_length(self):
-        await self.post("lang=en&hints=" + ",".join(["Viper"] * 500), tone(1))
-        self.assertLessEqual(len(",".join(self.stand.asked[0][2])), server.MAX_HINT_CHARS)
+        await self.post("lang=en&hints=" + ", ".join(["Viper"] * 500), tone(1))
+        self.assertEqual(len(self.stand.asked[0][2]), server.MAX_HINT_CHARS)
 
     async def test_health_says_what_is_running(self):
         res = await self.client.get("/health")

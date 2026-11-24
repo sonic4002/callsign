@@ -119,8 +119,8 @@ export class Voice {
 
   // stop ends the recording and resolves with what was said ("" when nothing was).
   // `openers` are the callsigns a call can start with; the recogniser in this browser
-  // listens for them. `hints` are all the words of the radio net (hints.js), for the server.
-  async stop(lang, openers = [], hints = []) {
+  // listens for them. `hints` is the radio net's vocabulary as text (hints.js), for the server.
+  async stop(lang, openers = [], hints = "") {
     this.held = false;
     clearTimeout(this.limit);
     const recorder = this.recorder;
@@ -165,7 +165,7 @@ export class Voice {
   async #ask(seat, audio, lang, hints) {
     const pcm = new Int16Array(audio.length);
     for (let i = 0; i < audio.length; i++) pcm[i] = Math.max(-1, Math.min(1, audio[i])) * 32767;
-    const query = new URLSearchParams({ room: seat.room ?? "", side: seat.side, lang, hints: hints.join(",") });
+    const query = new URLSearchParams({ room: seat.room ?? "", side: seat.side, lang, hints });
     const gone = new AbortController();
     const timer = setTimeout(() => gone.abort(), SERVER_WAIT);
     try {
