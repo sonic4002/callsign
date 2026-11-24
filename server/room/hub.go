@@ -240,9 +240,12 @@ type AgentWork struct {
 // AgentWork lists what the agent host should be serving right now.
 func (h *Hub) AgentWork() []AgentWork {
 	h.mu.Lock()
-	rooms := make(map[string]*Room, len(h.rooms))
+	rooms := make(map[string]*Room, len(h.rooms)+1)
 	for code, e := range h.rooms {
 		rooms[code] = e.rm
+	}
+	if h.open != nil {
+		rooms[""] = h.open // listed under the empty code while someone commands in it
 	}
 	h.mu.Unlock()
 	work := []AgentWork{}
@@ -260,6 +263,7 @@ func (h *Hub) AgentWork() []AgentWork {
 // Routes adds the hub's endpoints to a mux:
 //
 //	GET  /ws                       a connection to a room (see Room.ServeWS)
+//	GET  /api/server               what the lobby offers: factions, scripted enemy, share address
 //	POST /api/rooms                make a match and take a seat
 //	GET  /api/rooms/{code}         a match's lobby
 //	POST /api/rooms/{code}/seat    take a seat in a match
@@ -267,6 +271,7 @@ func (h *Hub) AgentWork() []AgentWork {
 //	GET  /internal/tier            for the model relay: a squad's brain tier
 func (h *Hub) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("/ws", h.serveWS)
+	mux.HandleFunc("GET /api/server", h.getServer)
 	mux.HandleFunc("POST /api/rooms", h.postRoom)
 	mux.HandleFunc("GET /api/rooms/{code}", h.getRoom)
 	mux.HandleFunc("POST /api/rooms/{code}/seat", h.postSeat)
@@ -291,6 +296,21 @@ func (h *Hub) share(code string) string {
 		return ""
 	}
 	return strings.TrimRight(h.cfg.Share, "/") + "/?room=" + code
+}
+
+// getServer tells the lobby what it can offer before any room exists.
+func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
+	length := h.cfg.LengthSeconds
+	if length == 0 {
+		length = h.r.Match.LengthSeconds
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"factions": h.cfg.Factions, // side 0, side 1
+		"bot":      h.cfg.Bot != "",
+		"length":   length,
+		"share":    strings.TrimRight(h.cfg.Share, "/"),
+		"open":     h.open != nil, // the open room of a server without an agent key
+	})
 }
 
 func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {

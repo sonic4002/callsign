@@ -14,6 +14,7 @@ import (
 //	{"type":"tool","id":7,"name":"hold","args":{"point":"F"}}
 //	{"type":"restart"}
 //	{"type":"ready","ready":true}
+//	{"type":"leave"}
 type inbound struct {
 	Type   string          `json:"type"`
 	Text   string          `json:"text"`
@@ -90,6 +91,10 @@ func (rm *Room) handle(c *Client, in inbound) {
 		rm.reply(c, res)
 	case "ready":
 		if err := rm.Ready(c, in.Ready == nil || *in.Ready); err != nil {
+			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
+		}
+	case "leave":
+		if err := rm.Stand(c); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
 		}
 	case "restart":

@@ -69,6 +69,14 @@ export class Agent {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
     }
+    // A call made just before this station came on the net is answered now: a commander
+    // who sits down and gives an order at once would otherwise be met with silence.
+    const fresh = hello.state.tick - 15 * this.rules.tickRate;
+    const spoke = hello.log.findLastIndex((m) => m.from.key === this.me.key);
+    for (const m of hello.log.slice(spoke + 1)) {
+      const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
+      if (m.tick >= fresh && forMe && m.from.key !== this.me.key && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
+    }
   }
 
   #onFrame(frame) {

@@ -653,7 +653,52 @@ func TestTheOpenRoomStillWorksWithoutAKey(t *testing.T) {
 	if _, err := rm.Enter(Identity{Side: 0, Role: RoleSpectator}, Auth{}, true); err != nil {
 		t.Fatalf("the open room refused a spectator: %v", err)
 	}
-	if len(h.AgentWork()) != 0 {
-		t.Fatal("the open room is not the agent host's to serve")
+	// While someone commands in it, the agent host serves it too, under the empty code.
+	if w := h.AgentWork(); len(w) != 1 || w[0].Room != "" || len(w[0].Sides) != 1 || w[0].Sides[0] != 0 {
+		t.Fatalf("agent work for the open room: %+v", w)
+	}
+}
+
+func TestASeatCanBeGivenBackOnlyBeforeTheStart(t *testing.T) {
+	h := newHub(t, HubConfig{})
+	rm, _, token, _ := h.Create(Options{Opponent: OpponentFriend, Side: 0})
+	_, ftoken, _ := rm.Sit(1)
+	west, east := enter(t, rm, 0, RoleHammer, token), enter(t, rm, 1, RoleHammer, ftoken)
+	if err := rm.Stand(east); err != nil {
+		t.Fatal(err)
+	}
+	if l := rm.Lobby(); l.Seats[1].Taken || l.Seats[1].Online {
+		t.Fatalf("the seat was not given back: %+v", l.Seats[1])
+	}
+	if _, err := rm.Enter(Identity{Side: 1, Role: RoleHammer}, Auth{Token: ftoken}, true); err != ErrNoSeat {
+		t.Fatalf("the old token still opens the seat: %v", err)
+	}
+	// Someone else takes it, the match starts, and now nobody can stand up.
+	_, other, err := rm.Sit(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	east = enter(t, rm, 1, RoleHammer, other)
+	rm.Ready(west, true)
+	rm.Ready(east, true)
+	if err := rm.Stand(east); err == nil {
+		t.Fatal("a seat was given back in the middle of a match")
+	}
+}
+
+func TestTheServerRunsOnlySoManyMatches(t *testing.T) {
+	h := newHub(t, HubConfig{MaxRooms: 2})
+	for i := 0; i < 2; i++ {
+		if _, _, _, err := h.Create(Options{Opponent: OpponentBot, Side: 0}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, _, err := h.Create(Options{Opponent: OpponentBot, Side: 0}); err != ErrFull {
+		t.Fatalf("a third match: %v, want %v", err, ErrFull)
+	}
+	for _, bad := range []Options{{Opponent: "nobody"}, {Opponent: OpponentBot, Side: 2}, {Opponent: OpponentBot, LengthSeconds: 30}} {
+		if _, _, _, err := h.Create(bad); err == nil || err == ErrFull {
+			t.Errorf("%+v was not refused for what it asks: %v", bad, err)
+		}
 	}
 }

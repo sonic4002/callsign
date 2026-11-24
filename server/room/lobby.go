@@ -199,6 +199,27 @@ func (rm *Room) Ready(c *Client, ready bool) error {
 	return nil
 }
 
+// Stand gives a seat back, so someone else can take it. Only before the match starts:
+// once it runs the seat stays its commander's, who may come back to it.
+func (rm *Room) Stand(c *Client) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if c.ID.Role != RoleHammer || !rm.cfg.Seats {
+		return errors.New("there is no seat to give back")
+	}
+	if rm.started {
+		return errors.New("the match has started; the seat stays yours")
+	}
+	rm.seats[c.ID.Side].token, rm.seats[c.ID.Side].ready = "", false
+	for o := range rm.clients {
+		if o.ID.Side == c.ID.Side && o.ID.Role != RoleSpectator {
+			rm.drop(o) // the commander's other tabs, and the agents that served them
+		}
+	}
+	rm.tellLobby()
+	return nil
+}
+
 func (rm *Room) everyoneReady() bool {
 	people := 0
 	for side := range rm.seats {
@@ -238,7 +259,9 @@ func (rm *Room) agentSides(grace time.Duration) []int {
 	sides := []int{}
 	for side := range rm.seats {
 		s := &rm.seats[side]
-		if !rm.closed && s.token != "" && (s.conns > 0 || time.Since(s.left) < grace) {
+		claimed := s.token != "" || !rm.cfg.Seats // without seats, whoever commands holds it
+		present := s.conns > 0 || (!s.left.IsZero() && time.Since(s.left) < grace)
+		if !rm.closed && claimed && present {
 			sides = append(sides, side)
 		}
 	}
