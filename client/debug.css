@@ -262,3 +262,4 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #lobby-error { color: var(--warn) !important; font-weight: 700; }
 #overlay [hidden] { display: none !important; }
 #lobby-note code { white-space: nowrap; unicode-bidi: isolate; direction: ltr; color: var(--brass); }
+#overlay select { max-inline-size: 100%; min-inline-size: 0; text-overflow: ellipsis; }
