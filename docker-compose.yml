@@ -18,7 +18,8 @@ services:
       - callsign-gocache:/gocache
     # CALLSIGN_BOT picks the scripted enemy: easy (default), normal, standard (relentless) or rush.
     # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
-    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-easy}", "-tts=http://tts:5002", "-relay=http://relay:8090"]
+    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-easy}", "-tts=http://tts:5002", "-stt=${CALLSIGN_STT:-}", "-relay=http://relay:8090"]
+    networks: ["default", "listen"]
     ports:
       # This machine only, unless `make play-lan` opens it to the network (docs/FRIEND-MATCH.md).
       - "${CALLSIGN_BIND:-127.0.0.1}:8080:8080"
@@ -54,6 +55,27 @@ services:
       - .:/src:ro
       - ./assets/voice-cache:/cache
     command: ["python", "/src/tts/server.py", "--cache=/cache"]
+
+  # The listening service (stt/server.py): transcribes the players' spoken calls on this
+  # machine's GPU. `make play` starts it, and tells the game server about it, only when the
+  # image, the models and a GPU are there (make stt-image, make stt-models); without it the
+  # page recognises speech in the browser. It is on a network of its own with no way out,
+  # reached only by the game server, which passes on seated commanders' recordings.
+  stt:
+    profiles: ["listen"]
+    image: callsign-stt
+    init: true
+    user: "${CALLSIGN_UID:-1000}:${CALLSIGN_GID:-1000}"
+    working_dir: /tmp
+    environment:
+      HOME: /tmp
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - .:/src:ro
+    networks: ["listen"]
+    devices:
+      - nvidia.com/gpu=all
+    command: ["python", "/src/stt/server.py"]
 
   # The model relay: holds each player's AI key, encrypted under .relay-data/, and calls
   # the AI provider with the model the squad's brain tier allows. It is reached only
@@ -104,6 +126,10 @@ services:
       - "443:443"
     depends_on:
       - server
+
+networks:
+  listen:
+    internal: true
 
 volumes:
   callsign-gocache:

@@ -7,6 +7,8 @@ assets/raw/
 
 # Speech recognition: the runtime and model weights are fetched by `make voice-models`.
 assets/models/
+# Test recordings and transcripts of the listening service's measurements (make stt-eval).
+assets/stt-eval/
 
 # Radio voices: lines already spoken by the speech service (tts/server.py).
 assets/voice-cache/
