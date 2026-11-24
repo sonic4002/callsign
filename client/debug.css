@@ -389,6 +389,13 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 @keyframes booting { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #overlay.booting .card::after { animation: none; } }
 #lobby-voice { margin: .5rem 0 0; font-size: .78rem; color: var(--muted); }
+/* A sidebar that fits a laptop screen: the agents strip shows four rows and scrolls, so a
+   full roster of agents does not push the build panel off the page. */
+@media (min-width: 701px) and (min-height: 501px) {
+  #monitor-strip { max-block-size: 5.2rem; overflow-y: auto; }
+  .panel.grow { flex: 1 1 10rem; min-block-size: 10rem; }
+}
+#orders-about { display: block; max-inline-size: 17rem; font-size: .7rem; line-height: 1.35; color: var(--muted); text-align: center; }
 
 /* ---- power, the radar and our own structures ---- */
 #power { grid-column: 1 / -1; display: grid; grid-template-columns: auto auto auto 1fr auto; align-items: center; gap: .4rem; font-size: .78rem; }

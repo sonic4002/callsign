@@ -225,12 +225,28 @@ function connect() {
   });
 }
 
+// gone is what the page does when the match in its address no longer exists (it ended,
+// or the server was restarted): it goes back to the start screen, where a new match can
+// be made or another code typed, and says why it is there.
+function gone() {
+  const code = room;
+  if (code) forgetSeat(code);
+  room = "";
+  seat = null;
+  found = null;
+  lobby = null;
+  ws = null;
+  history.replaceState(null, "", pageFor({}));
+  lobbyError = () => t("lobby.noRoom", { code });
+  renderOverlay();
+}
+
 // The server would not let this page into the room, and said why.
 function turnedAway(reason) {
   ws = null;
   lobby = null;
   if (/no such match/.test(reason)) {
-    lobbyError = () => t("lobby.noRoom");
+    return gone();
   } else if (/hold that seat/.test(reason)) {
     // The seat is someone else's now, or the token was for an older match with this code.
     forgetSeat(room);
@@ -1302,7 +1318,11 @@ async function lobbyStep(step) {
     await step();
   } catch (err) {
     const reason = err.message;
-    lobbyError = err.status === 404 ? () => t("lobby.noRoom") : err.status === 409 ? () => t("lobby.full") : err.status === 503 ? () => t("lobby.busy") : err.status === 403 && offer?.locked ? () => t("lobby.hostOnly") : err.status === 429 ? () => t("lobby.guessing") : () => t("lobby.failed", { reason });
+    if (err.status === 404 && room) {
+      lobbyBusy = false;
+      return gone();
+    }
+    lobbyError = err.status === 404 ? () => t("lobby.noRoom", { code: "" }) : err.status === 409 ? () => t("lobby.full") : err.status === 503 ? () => t("lobby.busy") : err.status === 403 && offer?.locked ? () => t("lobby.hostOnly") : err.status === 429 ? () => t("lobby.guessing") : () => t("lobby.failed", { reason });
   }
   lobbyBusy = false;
   renderOverlay();

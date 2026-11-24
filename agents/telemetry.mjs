@@ -91,7 +91,10 @@ export class Telemetry {
   // send(report) delivers one report. `gapMs` is the least time between two of them: a
   // change of state within it is sent as soon as the gap has passed, so the commander
   // sees what the agent is doing within a moment and the server is never flooded.
-  constructor({ send, role, squad = 0, brain = "", where = "", limit = 15, now = Date.now, gapMs = 150, later = setTimeout, cancel = clearTimeout }) {
+  // The timers are wrapped, never stored bare: a browser refuses setTimeout called as a
+  // method of another object ("Illegal invocation"), which stopped every agent that ran
+  // in a page (the tutorial's squads, and a player's own-key squads) from thinking.
+  constructor({ send, role, squad = 0, brain = "", where = "", limit = 15, now = Date.now, gapMs = 150, later = (fn, ms) => setTimeout(fn, ms), cancel = (id) => clearTimeout(id) }) {
     Object.assign(this, { send, now, gapMs, later, cancel });
     this.sent = -Infinity;
     this.timer = null;
