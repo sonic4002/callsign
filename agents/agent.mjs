@@ -10,8 +10,9 @@ const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
-  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15 }) {
-    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation });
+  // `join` is what else the server wants on the way in: { room, key } or { room, token }.
+  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, join = {} }) {
+    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, join });
     this.inbox = [];
     this.traffic = []; // the last few transmissions on the net, ours included
     this.history = [];
@@ -24,7 +25,7 @@ export class Agent {
   }
 
   async start() {
-    const query = new URLSearchParams({ side: this.side, role: this.role, state: "0" });
+    const query = new URLSearchParams({ ...this.join, side: this.side, role: this.role, state: "0" });
     if (this.squad) query.set("squad", this.squad);
     this.link = new Link(
       `${this.server}?${query}`,
