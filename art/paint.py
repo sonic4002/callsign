@@ -124,13 +124,19 @@ def finish(plain, painted, keep=0.0, edge=True):
     ink = np.array(OUTLINE, dtype=np.float32)
     if not edge:  # a piece of a run: an edge would show as a seam where two pieces meet
         return Image.fromarray(np.dstack([rgb, alpha * 255]).round().astype(np.uint8), "RGBA")
-    # What glows (a muzzle flash, a lamp) keeps its own bright edge.
+    # What glows (a muzzle flash, a lamp) has no dark edge: neither a new one nor the one
+    # the render came with.
     lit = np.asarray(plain.convert("RGB"), dtype=np.float32)
-    inner = inner * ~((lit.max(axis=2) > 238) & (lit.min(axis=2) > 150))
+    glow = (lit.max(axis=2) > 238) & (np.sort(lit, axis=2)[..., 1] > 180) & (alpha > 0.3)  # white or yellow
+    near = np.asarray(Image.fromarray((glow * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+    inner = inner * ~near
     k = (inner * 0.8)[..., None]
     rgb = rgb * (1 - k) + ink * k
-    a = np.maximum(alpha, outer * 0.8)
-    rgb = np.where((alpha < 0.05)[..., None], ink, rgb)
+    a = np.maximum(alpha, outer * 0.8 * ~near)
+    a[near & (lit.max(axis=2) < 70)] = 0
+    # Outside the solid shape there is only edge: a half-covered pixel of the render holds
+    # the studio grey of the painting, which would show as a pale fringe.
+    rgb = np.where(((alpha <= 0.6) & ~near)[..., None], ink, rgb)
     return Image.fromarray(np.dstack([rgb, a * 255]).round().astype(np.uint8), "RGBA")
 
 
