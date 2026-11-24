@@ -615,8 +615,10 @@ function talk() {
 // operator and "all stations".
 function callsigns(spoke) {
   const cs = rules.callsigns;
-  const classes = new Set(Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.class)));
-  return [...[...classes].map((c) => cs.classes[c][spoke]), cs.operator[spoke], cs.allStations[spoke]];
+  const classes = new Set(Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.callsign ?? u.class)));
+  // Not everything a side fields is a station: gold haulers have no callsign and no leader.
+  const names = [...classes].map((c) => cs.classes[c]?.[spoke]).filter(Boolean);
+  return [...names, cs.operator[spoke], cs.allStations[spoke]];
 }
 
 async function talkEnd() {
@@ -625,7 +627,15 @@ async function talkEnd() {
   wasMuted = null;
   if (!voice.held) return;
   const spoke = lang;
-  const text = await voice.stop(spoke, rules ? callsigns(spoke) : []);
+  // Whatever goes wrong in working out the names to listen for, the key is let go: a
+  // recording that never stops is worse than one transcribed without that help.
+  let openers = [];
+  try {
+    openers = rules ? callsigns(spoke) : [];
+  } catch (err) {
+    console.warn("callsign list failed", err);
+  }
+  const text = await voice.stop(spoke, openers);
   if (!text || !rules) return;
   let said = tidy(text, { lang: spoke, rules });
   // Tap a squad, then speak: an order that names nobody goes to the squad that is selected.
