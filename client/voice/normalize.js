@@ -17,7 +17,9 @@ const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "o
   // The words a place is described with: "the grove north of Foxtrot" is not "the Golf north of Foxtrot".
   "grove", "trees", "tree", "wood", "woods", "house", "building", "bunker", "ruin", "ruins", "rocks", "rock", "wall", "rubble", "bridge", "field", "cover", "inside", "enemy",
   "north", "south", "east", "west", "of", "metres", "meters",
-  "חורשה", "עצים", "עץ", "בית", "בניין", "בונקר", "חורבה", "סלעים", "סלע", "חומה", "הריסות", "גשר", "מחסה", "אויב", "צפון", "דרום", "מזרח", "מערב", "צפונית", "דרומית", "מזרחית", "מערבית", "מטר"]);
+  "חורשה", "עצים", "עץ", "בית", "בניין", "בונקר", "חורבה", "סלעים", "סלע", "חומה", "הריסות", "גשר", "מחסה", "אויב", "צפון", "דרום", "מזרח", "מערב", "צפונית", "דרומית", "מזרחית", "מערבית", "מטר",
+  // Selling and repairing a structure, and power: order words, never a place.
+  "sell", "repair", "power", "radar", "מכור", "מכרו", "למכור", "תקן", "תקנו", "לתקן", "חשמל", "כוח", "תחנת", "שלנו"]);
 
 // sound reduces a word to rough consonant classes, so "vapour" and "viper" come out alike.
 export function sound(word, lang) {

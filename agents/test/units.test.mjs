@@ -17,10 +17,11 @@ const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 test("the game tools: the six in the design, build and haul for the operator, capture and repair for engineers only", () => {
   const names = (tools) => tools.map((t) => t.name).sort();
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
-  assert.deepEqual(names(operatorTools), ["build", "buy", "command", "haul", "radio", "report"]);
+  assert.deepEqual(names(operatorTools), ["build", "buy", "cancel", "command", "haul", "radio", "rally", "repair", "report", "sell"]);
   const { units } = rules.factions.aegis;
-  assert.deepEqual(names(leaderToolsFor(units.commandos)), names(leaderTools));
-  assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "hold", "move", "radio", "repair", "report"]);
+  assert.deepEqual(names(leaderToolsFor(units.commandos)), [...names(leaderTools), "fortify"].sort(), "infantry also dig in");
+  assert.deepEqual(names(leaderToolsFor(units.tank)), names(leaderTools));
+  assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "fortify", "hold", "move", "radio", "repair", "report"]);
   for (const t of [...leaderToolsFor(units.engineers), ...operatorTools]) {
     assert.equal(t.strict, true);
     assert.equal(t.input_schema.additionalProperties, false);
@@ -347,10 +348,10 @@ test("scripted operator: buys haulers, sends them to a field, and reports one in
     ["haul", { field: "G", hauler: 0 }],
     ["radio", { to: ["Hammer"], body: 'Negative, no such gold field: "G"', end: "over" }],
   ]);
-  // Woken by the event, with no call: one short line to the commander.
+  // Woken by the event, with no call: nothing to say, the base cue has told the commander.
   const event = (kind) => ({ items: [{ kind: "event", event: { kind, hauler: 1001, point: "B" } }], call: null, status: status("aegis") });
-  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("hauler_attacked") }), [["radio", { to: ["Hammer"], body: "Hauler under attack near Bravo", end: "out" }]]);
-  assert.deepEqual(await think(brain, { agent: anvil("he"), wake: event("hauler_lost") }), [["radio", { to: ["Hammer"], body: "מוביל זהב אבד ליד בועז", end: "out" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("hauler_attacked") }), []);
+  assert.deepEqual(await think(brain, { agent: anvil("he"), wake: event("hauler_lost") }), []);
   assert.deepEqual(await think(brain, { agent: anvil("en"), wake: event("squad_lost") }), []);
 });
 
@@ -391,7 +392,7 @@ test("status and prompts: the operator is told about haulers, fields and income 
   assert.deepEqual(status.goldFields, [{ field: "B", full: 0.5, inSight: true }]);
   const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
   assert.match(prompt, /haulers drive out, load, and bring it home to your refinery/);
-  assert.match(prompt, /opens with the headquarters alone: the refinery is the first thing to build/);
+  assert.match(prompt, /A match opens with the headquarters alone/);
   assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold, needs a Vehicle Works; an unarmed gold hauler/);
   assert.match(prompt, /on your own you build only while command\.buy is true/);
   assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);

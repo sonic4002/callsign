@@ -34,6 +34,13 @@ KIND = {
     "house": ("house", "הבית", "m"), "bunker": ("bunker", "הבונקר", "m"), "ruin": ("ruin", "החורבה", "f"),
     "grove": ("grove", "החורשה", "f"), "rocks": ("rocks", "הסלעים", "p"), "wall": ("wall", "החומה", "f"),
 }
+# Tech buildings: kind → (short id, English, Hebrew with the article). They belong to no
+# army; an engineer squad takes one for its side (see "techBuildings" in the rules).
+TECH = {
+    "tech_goldworks": ("assay", "assay office", "בית הבוחן"),
+    "tech_clinic": ("clinic", "clinic", "המרפאה"),
+    "tech_garage": ("garage", "service yard", "המוסך"),
+}
 ORDINAL_EN = ["", "second ", "third ", "fourth "]
 ORDINAL_HE = {"m": ["", " השני", " השלישי", " הרביעי"], "f": ["", " השנייה", " השלישית", " הרביעית"], "p": ["", " השניים", " השלישיים", " הרביעיים"]}
 
@@ -49,6 +56,7 @@ class Map:
         self.w, self.h = cols * CELL, rows * CELL
         self.grid = [["L"] * cols for _ in range(rows)]
         self.points, self.bridges, self.marks, self.fields = [], [], [], []
+        self.techs = []
 
     # ---- terrain ----
     def rect(self, x0, y0, x1, y1, kind):
@@ -103,6 +111,27 @@ class Map:
         self.marks.append((kind, x, y))
         if both and abs(x - self.w / 2) > 1:
             self.marks.append((kind, self.w - x, y))
+
+    def tech(self, kind, x, y):
+        """A tech building at (x, y) and its mirror image on the east half, so that each
+        side has one as near as the other's; one on the centre line stands alone."""
+        self.techs.append((kind, x, y))
+        if abs(x - self.w / 2) > 1:
+            self.techs.append((kind, self.w - x, y))
+
+    def tech_sites(self):
+        out = []
+        for kind, x, y in sorted(self.techs, key=lambda t: (t[2], t[1], t[0])):
+            near = min(self.points, key=lambda p: (math.hypot(p["x"] - x, p["y"] - y), p["id"]))
+            dx, dy = x - near["x"], y - near["y"]
+            bearing = BEARINGS[round(math.atan2(dx, -dy) / (math.pi / 4)) % 8]
+            short, en, he = TECH[kind]
+            out.append({
+                "id": f"tech-{short}-{'w' if x < self.w / 2 else 'e' if x > self.w / 2 else 'c'}", "kind": kind, "x": x, "y": y, "near": near["id"], "bearing": bearing,
+                "name": {"en": f"the {en} {BEARING_EN[bearing]} of {near['callsign']['en']}",
+                         "he": f"{he} {BEARING_HE[bearing]}{near['callsign']['he']}"},
+            })
+        return out
 
     def around(self, pid, items, both=True):
         """Landmarks around a point: items are (kind, bearing, distance)."""
@@ -203,6 +232,28 @@ class Map:
             assert near <= 420, f"{self.key}: the nearest field to {h['id']} is {near:.0f} away"
         names = [m["name"]["en"] for m in self.landmarks()]
         assert len(names) == len(set(names)), f"{self.key}: two landmarks share a name"
+        # Tech buildings: on land both sides can walk to, clear of everything else, never
+        # in a base, and each as far from one headquarters as its twin is from the other.
+        sites = self.tech_sites()
+        assert 2 <= len(sites) <= 6, f"{self.key}: {len(sites)} tech buildings"
+        assert len({t["id"] for t in sites}) == len(sites), f"{self.key}: two tech buildings share an id"
+        for t in sites:
+            n = (int(t["x"] // CELL), int(t["y"] // CELL))
+            assert g[n[1]][n[0]] == "L" and n in land and n not in deck, f"{self.key}: {t['id']} is not on land that can be reached"
+            for p in self.points:
+                room = 300 if p["kind"] == "hq" else 85
+                assert math.hypot(p["x"] - t["x"], p["y"] - t["y"]) >= room, f"{self.key}: {t['id']} crowds point {p['id']}"
+            for f in self.fields:
+                assert math.hypot(f["x"] - t["x"], f["y"] - t["y"]) >= f["fieldRadius"] + 60, f"{self.key}: {t['id']} stands in the {f['id']} gold field"
+            for m in self.landmarks():
+                assert math.hypot(m["x"] - t["x"], m["y"] - t["y"]) >= 70, f"{self.key}: {t['id']} crowds {m['id']}"
+            for b in self.bridges:
+                for end in (b["from"], b["to"]):
+                    assert math.hypot(end[0] - t["x"], end[1] - t["y"]) >= 90, f"{self.key}: {t['id']} blocks {b['id']}"
+            for o in sites:
+                assert o is t or math.hypot(o["x"] - t["x"], o["y"] - t["y"]) >= 130, f"{self.key}: {t['id']} crowds {o['id']}"
+            twin = [o for o in sites if o["kind"] == t["kind"] and abs(o["x"] - (self.w - t["x"])) < 1 and o["y"] == t["y"]]
+            assert twin, f"{self.key}: {t['id']} has no mirror image"
 
     def data(self):
         self.check()
@@ -214,6 +265,7 @@ class Map:
             "gushers": self.fields,
             "bridges": self.bridges,
             "landmarks": self.landmarks(),
+            "techBuildings": self.tech_sites(),
         }
 
     def show(self):
@@ -223,6 +275,8 @@ class Map:
             rows[r][c] = "#"
         for m in self.landmarks():
             rows[int(m["y"] // CELL)][int(m["x"] // CELL)] = m["kind"][0]
+        for t in self.tech_sites():
+            rows[int(t["y"] // CELL)][int(t["x"] // CELL)] = "T"
         for p in self.points:
             rows[int(p["y"] // CELL)][int(p["x"] // CELL)] = p["id"]
         print(f"{self.key}: {self.name[0]}  {self.w}x{self.h}  {len(self.points)} points, {len(self.bridges)} bridges, {len(self.landmarks())} landmarks")
@@ -269,6 +323,8 @@ def small():
     m.mark("house", 590, 520)                # the bridgehead houses
     m.mark("rocks", 600, 330)
     m.mark("wall", 640, 740)
+    m.tech("tech_goldworks", 630, 170)       # on each bank above the frozen ford
+    m.tech("tech_clinic", 330, 790)          # on the coast behind each ridge
     return m
 
 
@@ -311,6 +367,8 @@ def medium():
     m.mark("rocks", 960, 1000)
     m.mark("house", 960, 1180)
     m.mark("ruin", 900, 300)
+    m.tech("tech_goldworks", 1040, 420)      # on each bank of the frozen stretch
+    m.tech("tech_garage", 1020, 1090)        # by the south bridge
     return m
 
 
@@ -364,6 +422,9 @@ def large():
     m.mark("wall", 1080, 1330)
     m.mark("grove", 1000, 1620)
     m.mark("ruin", 1300, 1920)
+    m.tech("tech_goldworks", 1340, 220)      # at each mouth of the north pass
+    m.tech("tech_clinic", 1280, 1080)        # between each village and the town
+    m.tech("tech_garage", 900, 1760)         # south of the river
     return m
 
 
@@ -378,10 +439,10 @@ def write(maps):
                  f'      "width": {d["width"]}, "height": {d["height"]}, "cell": {d["cell"]}, "lengthSeconds": {d["lengthSeconds"]}, "pace": {d["pace"]},', '      "terrain": [']
         lines += [f'        "{row}"' + ("," if i < len(d["terrain"]) - 1 else "") for i, row in enumerate(d["terrain"])]
         lines.append("      ],")
-        for field in ("points", "gushers", "bridges", "landmarks"):
+        for field in ("points", "gushers", "bridges", "landmarks", "techBuildings"):
             lines.append(f'      "{field}": [')
             lines += [f"        {one(item)}" + ("," if i < len(d[field]) - 1 else "") for i, item in enumerate(d[field])]
-            lines.append("      ]" + ("," if field != "landmarks" else ""))
+            lines.append("      ]" + ("," if field != "techBuildings" else ""))
         lines.append("    }")
         blocks.append("\n".join(lines))
     block = '"maps": {\n' + ",\n".join(blocks) + "\n  }"

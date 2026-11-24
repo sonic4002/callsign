@@ -31,6 +31,9 @@ $("map").addEventListener("pointerdown", () => show(""));
 $("log").addEventListener("click", () => phone.matches && root.dataset.sheet !== "radio" && show("radio"));
 // Picking a squad starts a call to it, so the sheet steps aside for the map and the talk button.
 $("roster").addEventListener("click", (ev) => !ev.target.closest("button") && ev.target.closest("li:not(.empty):not(.deploying)") && show(""));
+// Choosing a structure or a new rally point is finished on the map.
+$("structures").addEventListener("click", (ev) => ev.target.closest("button:not(:disabled)") && show(""));
+$("rally-set").addEventListener("click", () => show(""));
 for (const id of ["help-open", "restart"]) $(id).addEventListener("click", () => show(""));
 if (query.has("sheet")) show(query.get("sheet"));
 

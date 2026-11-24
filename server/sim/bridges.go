@@ -166,8 +166,8 @@ func (s *Sim) repairBridges(live []*teamRef) {
 	quiet := int(s.R.Nerve.QuietSeconds * float64(s.R.TickRate))
 	for _, tr := range live {
 		sq := tr.sq
-		if sq.Order.Kind != OrderRepair || tr.u.RepairPerSecond <= 0 || tr.t.Members == 0 {
-			continue
+		if sq.Order.Kind != OrderRepair || sq.Order.bridge == 0 || tr.u.RepairPerSecond <= 0 || tr.t.Members == 0 {
+			continue // a repair order may also be on a structure (sell.go)
 		}
 		b := &s.Bridges[sq.Order.bridge-1]
 		if tr.plan.act == ActFire || s.Tick-tr.t.lastShot <= quiet {
@@ -193,7 +193,7 @@ func (s *Sim) repairBridges(live []*teamRef) {
 	}
 	// A bridge made whole again needs no more work: the squad holds where it stands.
 	for _, sq := range s.Squads {
-		if sq.Alive && sq.Order.Kind == OrderRepair && s.Bridges[sq.Order.bridge-1].HP >= s.Bridges[sq.Order.bridge-1].Bridge.HP {
+		if sq.Alive && sq.Order.Kind == OrderRepair && sq.Order.bridge != 0 && s.Bridges[sq.Order.bridge-1].HP >= s.Bridges[sq.Order.bridge-1].Bridge.HP {
 			x, y := sq.Center()
 			sq.Order = Order{Kind: OrderHold, X: x, Y: y, Tick: s.Tick, arrived: true}
 		}

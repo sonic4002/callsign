@@ -49,6 +49,8 @@ type Event struct {
 	Owner     *int   `json:"owner,omitempty"`
 	Winner    *int   `json:"winner,omitempty"`
 	Reason    string `json:"reason,omitempty"`
+	// Was is the callsign a squad that changes hands had on the side that loses it.
+	Was *shared.Text `json:"was,omitempty"`
 }
 
 func (s *Sim) emit(e Event) { s.events = append(s.events, e) }
@@ -75,8 +77,11 @@ type Command struct {
 	// resolver reads (Point is the older name for the same thing and still works), and
 	// where a defence or a fence is built; Place2 is a fence's far end.
 	// Structure is what to build: a structure id of the side's faction, or a role.
-	Place     string `json:"place,omitempty"`
-	Place2    string `json:"place2,omitempty"`
+	Place  string `json:"place,omitempty"`
+	Place2 string `json:"place2,omitempty"`
+	// Run is the way a fence placed on an exact spot lies: "ns", "ew", "nesw" or "nwse"
+	// (structures.go: FenceRuns). Empty lets the run face the enemy as before.
+	Run       string `json:"run,omitempty"`
 	Structure string `json:"structure,omitempty"`
 	Field     string `json:"field,omitempty"`  // haul: a gusher id, or "auto"
 	Hauler    int    `json:"hauler,omitempty"` // haul: one hauler, or 0 for all of them
@@ -107,7 +112,14 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return nil, ErrBadCommand
 	}
 	switch c.Kind {
-	case CmdMove, CmdHold, CmdAttack, CmdRepair:
+	case CmdRepair:
+		if c.Squad == 0 {
+			return nil, s.repairFor(c) // the side pays to mend one of its structures
+		}
+		return s.order(c)
+	case CmdSell:
+		return nil, s.sell(c)
+	case CmdMove, CmdHold, CmdAttack:
 		return s.order(c)
 	case CmdBuy:
 		return s.buy(c)
@@ -120,6 +132,16 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return nil, err
 	case CmdHaul:
 		return s.haulCommand(c)
+	case CmdCancel:
+		return s.cancel(c)
+	case CmdRally:
+		return nil, s.setRally(c)
+	case CmdFortify:
+		return s.fortifyOrder(c)
+	case CmdPlant:
+		return s.plantOrder(c)
+	case CmdSeize:
+		return s.seizeOrder(c)
 	}
 	return nil, ErrBadCommand
 }
@@ -169,6 +191,7 @@ func (s *Sim) order(c Command) (*Squad, error) {
 		if pl.Kind == PlacePoint {
 			o.Point = pl.ID
 		}
+		o.ground = pl.Kind == PlaceOffset
 	case c.Kind == CmdRepair:
 		return nil, ErrNotBridge
 	case c.Kind == CmdHold:
@@ -234,7 +257,11 @@ func (s *Sim) visible(sq *Squad) bool {
 func (s *Sim) Population(side int) int {
 	n := 0
 	for _, sq := range s.Squads {
-		if sq.Side == side && sq.haul == nil && (sq.Alive || sq.Deploying()) {
+		owner := sq.Side
+		if from, taken := s.SeizedFrom(sq.ID); taken {
+			owner = from // a squad a hero holds for now still counts for the side it will go back to
+		}
+		if owner == side && sq.haul == nil && (sq.Alive || sq.Deploying()) {
 			n++
 		}
 	}
@@ -255,6 +282,9 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := s.heroAllowed(c.Side, &u); err != nil {
+		return nil, err
+	}
 	if u.Class == shared.HaulerClass {
 		if err := s.buyHauler(c, u); err != nil {
 			return nil, err
@@ -263,17 +293,23 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 		// A squad on its way already holds its place under the cap.
 		return nil, ErrPopCap
 	}
+	// The structure that makes it takes one at a time; the rest wait in its line.
+	if err := s.lineRoom(c.Side, c.Unit, &u); err != nil {
+		return nil, err
+	}
 	if err := s.spend(c.Side, u.Cost); err != nil {
 		return nil, err
 	}
 	sq := s.raise(c.Side, c.Unit)
-	ticks := int(math.Round(u.DeploySeconds * float64(s.R.TickRate)))
-	if ticks <= 0 {
-		s.field(sq)
-		return sq, nil
+	s.heroRaised(sq)
+	ticks := max(1, int(math.Round(u.DeploySeconds*float64(s.R.TickRate))))
+	ahead, _ := s.enqueue(sq, ticks)
+	ev := Event{Side: c.Side, Kind: EvDeploying, Squad: sq.ID, Unit: sq.Unit,
+		Count: int(math.Ceil(float64(ahead+ticks) / float64(s.R.TickRate)))}
+	if sq.From != 0 {
+		ev.Structure = s.structure(sq.From).PlaceID()
 	}
-	sq.DeployTicks, sq.DeployTotal = ticks, ticks
-	s.emit(Event{Side: c.Side, Kind: EvDeploying, Squad: sq.ID, Unit: sq.Unit, Count: int(math.Ceil(u.DeploySeconds))})
+	s.emit(ev)
 	return sq, nil
 }
 

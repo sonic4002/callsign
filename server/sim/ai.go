@@ -91,11 +91,14 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	}
 	sq, t, u := tr.sq, tr.t, tr.u
 	order := sq.Order.Kind
-	if order == OrderCapture {
-		order = OrderMove // engineers walk to their work and do not stop to fight
+	// A hero sent to plant a charge or to seize a vehicle keeps going under fire: being
+	// shaken does not stop it or turn it back, only being pinned does.
+	onTask := sq.unit.Hero && (order == OrderPlant || order == OrderSeize)
+	if order == OrderCapture || order == OrderPlant || order == OrderSeize {
+		order = OrderMove // engineers and heroes walk to their work and do not stop to fight
 	}
-	if order == OrderRepair {
-		order = OrderHold // engineers at a bridge fight like any squad holding ground
+	if order == OrderRepair || order == OrderFortify {
+		order = OrderHold // engineers at a bridge, and a squad digging in, fight like any squad holding ground
 	}
 	nerve := s.Nerve(t)
 
@@ -111,8 +114,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 			}
 			continue
 		}
-		if !o.t.Spotted {
-			continue
+		if !o.t.Spotted || s.passesFor(o, d) {
+			continue // unseen, or a disguised figure nobody has cause to shoot yet
 		}
 		if d <= 250 {
 			enemies++
@@ -144,6 +147,9 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if wanted != nil {
 		target, targetD = wanted, wantedD
 	}
+	if target != nil && s.holdsFire(tr, targetD) {
+		target = nil // a disguised hero at work does not give itself away at long range
+	}
 	enemyHQ := s.R.HQPoint(1 - sq.Side)
 	// A squad sent at a structure shoots that structure, not the headquarters behind it.
 	hq := target == nil && sq.Order.Structure == 0 && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
@@ -163,7 +169,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	// the team shoots at it, whoever else is about.
 	var obj *objRef
 	if order == OrderAttack && u.Against("structure") > 0 {
-		if i := sq.Order.bridge; i > 0 && s.Bridges[i-1].Standing {
+		// Nobody shoots a bridge from its own deck: a team on it walks off to the bank first.
+		if i := sq.Order.bridge; i > 0 && s.Bridges[i-1].Standing && s.bridgeAt(t.X, t.Y) != &s.Bridges[i-1] {
 			if d := s.Bridges[i-1].distTo(t.X, t.Y); d <= u.Range && d >= u.MinRange {
 				obj = &objRef{bridge: i}
 			}
@@ -196,6 +203,11 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 			}
 		}
 		destX, destY = s.clamp(u.Domain, destX, destY)
+		// A team sent to shoot or mend a bridge keeps off its deck: a slot that falls on it
+		// gives way to the spot on the bank the order chose.
+		if i := sq.Order.bridge; i > 0 && (order == OrderAttack || order == OrderRepair) && s.bridgeAt(destX, destY) == &s.Bridges[i-1] {
+			destX, destY = sq.Order.X, sq.Order.Y
+		}
 	}
 	if t.In != "" {
 		_, in := s.landmarkByID(t.In)
@@ -254,12 +266,12 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if needMove {
 		v := 0.5 + b(order == OrderMove, 0.4) + b(order == OrderAttack, 0.1) +
 			b(order == OrderHold && !canFire, 0.2) + b(enRoute, 0.4) - b(underFire, 0.1) -
-			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7)
+			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7) + b(onTask && !pinned, 0.7)
 		if v > score {
 			best, score = plan{act: ActAdvance, x: destX, y: destY}, v
 		}
 	}
-	if nearest < math.MaxFloat64 || underFire {
+	if (nearest < math.MaxFloat64 || underFire) && (!onTask || pinned) {
 		v := 0.1 + b(shaken && outnumbered, 0.45) + b(underFire && !canFire && !needMove, 0.3) +
 			b(tooClose && !canFire, 0.6)
 		if v > score {

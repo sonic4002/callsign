@@ -9,6 +9,9 @@
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
 
+// A blast is drawn just in front of whatever stands on the spot it went off on.
+export const DEPTH_BIAS = 14;
+
 export const LIMITS = { particles: 640, decals: 40, emitters: 10 };
 
 // Pool holds at most `cap` items. When it is full a new item only gets in by replacing
@@ -371,8 +374,11 @@ export class Fx {
     }
   }
 
-  // draw paints everything that stands in the air: smoke first, then fire over it.
-  draw(ctx, view, k, now) {
+  // standing lists what stands in the air (smoke, fire, sparks) that is on screen, each
+  // with the depth of the ground it rises from, so the scene can draw it among the troops
+  // and buildings: smoke behind a wall is hidden by the wall, smoke in front of it is not.
+  // Fire sorts just after smoke born on the same spot.
+  standing(view, k, now) {
     this.view = view;
     const live = [];
     for (const p of this.pool.items) {
@@ -381,27 +387,33 @@ export class Fx {
       if (sx < -70 || sx > view.w + 70 || gy < -70 || gy > view.h + 260) continue;
       p.sx = sx;
       p.sy = gy - p.h * k;
-      live.push(p);
+      live.push({ depth: p.x + p.y + DEPTH_BIAS + (p.add ? 0.5 : 0), p });
     }
-    for (const pass of [false, true]) {
-      ctx.globalCompositeOperation = pass ? "lighter" : "source-over";
-      for (const p of live) {
-        if (Boolean(p.add) !== pass) continue;
-        const life = (now - p.t0) / p.ttl;
-        if (p.kind === "speck") {
-          ctx.globalAlpha = Math.min(1, (1 - life) * 4);
-          ctx.fillStyle = p.color;
-          const s = Math.max(1, p.size * k);
-          ctx.fillRect(p.sx - s / 2, p.sy - s / 2, s, s);
-          continue;
-        }
-        const r = (p.r0 + (p.r1 - p.r0) * (1 - (1 - life) ** 2)) * k;
-        const tex = p.tex === "fire" ? (life < 0.3 ? "fireY" : life < 0.62 ? "fireO" : "fireR") : p.tex;
-        ctx.globalAlpha = p.a * Math.min(1, life * 12) * (1 - life) ** (p.add ? 1 : 1.5);
-        ctx.drawImage(texture(tex), p.sx - r, p.sy - r, 2 * r, 2 * r);
-      }
+    return live;
+  }
+
+  // drawOne paints one of the things standing() listed, in screen space.
+  drawOne(ctx, p, k, now) {
+    const life = (now - p.t0) / p.ttl;
+    ctx.globalCompositeOperation = p.add ? "lighter" : "source-over";
+    if (p.kind === "speck") {
+      ctx.globalAlpha = Math.min(1, (1 - life) * 4);
+      ctx.fillStyle = p.color;
+      const s = Math.max(1, p.size * k);
+      ctx.fillRect(p.sx - s / 2, p.sy - s / 2, s, s);
+    } else {
+      const r = (p.r0 + (p.r1 - p.r0) * (1 - (1 - life) ** 2)) * k;
+      const tex = p.tex === "fire" ? (life < 0.3 ? "fireY" : life < 0.62 ? "fireO" : "fireR") : p.tex;
+      ctx.globalAlpha = p.a * Math.min(1, life * 12) * (1 - life) ** (p.add ? 1 : 1.5);
+      ctx.drawImage(texture(tex), p.sx - r, p.sy - r, 2 * r, 2 * r);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
+  }
+
+  // draw paints everything that stands in the air at once, far to near, over whatever is
+  // already on the canvas. The scene sorts them among its own things instead (standing).
+  draw(ctx, view, k, now) {
+    for (const { p } of this.standing(view, k, now).sort((a, b) => a.depth - b.depth)) this.drawOne(ctx, p, k, now);
   }
 }

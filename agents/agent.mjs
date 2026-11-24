@@ -9,9 +9,11 @@ import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
 import { Telemetry, troubleCode } from "./telemetry.mjs";
 import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
 import { compactStructures } from "./bases.mjs";
+import { eventLine as powerEventLine } from "./power.mjs";
+import { describeHeroEvent, heroLeaderEvents, heroOperatorEvents, unitAnywhere } from "./heroes.mjs";
 
-const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned"]);
-const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell"]);
+const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned", ...heroLeaderEvents]);
+const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell", "low_power", "power_restored", "structure_repaired", "repair_stopped", ...heroOperatorEvents]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
@@ -96,8 +98,10 @@ export class Agent {
     if (this.role === "squad") {
       const mine = hello.state.squads.find((s) => s.id === this.squad);
       this.tier = mine.tier;
-      this.unit = this.rules.factions[this.faction].units[mine.unit];
-      this.system = leaderPrompt({ rules: this.rules, side: this.side, faction: this.faction, station: this.me, unit: this.unit });
+      // A squad its side's hero has seized is of the other army's design.
+      const own = this.rules.factions[this.faction].units[mine.unit];
+      this.unit = own ?? unitAnywhere(this.rules, mine.unit);
+      this.system = leaderPrompt({ rules: this.rules, side: this.side, faction: this.faction, station: this.me, unit: this.unit, seized: !own });
       this.tools = leaderToolsFor(this.unit);
     } else {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
@@ -126,9 +130,20 @@ export class Agent {
       if (this.traffic.length > 8) this.traffic.shift();
       if (m.from.key === "player") this.netLang = m.lang; // the net follows the commander's language
       if (m.from.key === this.me.key) return;
+      if (m.cue) return; // a base cue is the server's fixed line to the commander: it wakes nobody
       if (callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
       // The operator runs the fight, so every other transmission on the net wakes it too.
       else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
+      return;
+    }
+    if (frame.type === "direct") {
+      // Hammer built, bought, cancelled, sold, repaired or set a rally point by hand, from
+      // the panel. The operator keeps it in its picture of the net; it is not a call, and
+      // nobody is woken for it.
+      if (this.role === "anvil") {
+        this.traffic.push(directLine(frame));
+        if (this.traffic.length > 8) this.traffic.shift();
+      }
       return;
     }
     if (frame.type === "event") {
@@ -150,13 +165,17 @@ export class Agent {
     this.#pump();
   }
 
-  // One wake at a time. Whatever arrives while thinking is handled together in the next one.
+  // One wake at a time, and one call to a wake. News that arrives while thinking is handled
+  // together in the next wake, up to and including the first call for this station; a
+  // second call waits for a wake of its own, so each call is acted on and answered. Three
+  // purchases asked for in a burst are three purchases.
   async #pump() {
     if (this.busy) return;
     this.busy = true;
     try {
       while (this.inbox.length && !this.over && !this.stopped) {
-        await this.#wake(this.inbox.splice(0));
+        const call = this.inbox.findIndex((i) => i.kind === "radio");
+        await this.#wake(this.inbox.splice(0, call < 0 ? this.inbox.length : call + 1));
       }
     } finally {
       this.busy = false;
@@ -268,7 +287,7 @@ const owner = (o, side) => (o === side ? "yours" : o === -1 ? "neutral" : "enemy
 export function compactStatus(status, side) {
   if (!status) return null;
   const points = Object.fromEntries(status.points.map((p) => [p.id, owner(p.owner, side)]));
-  const contacts = status.contacts.map((c) => ({ id: c.id, unit: c.unit, class: c.class, near: c.near, x: c.x, y: c.y, teams: c.teams.length }));
+  const contacts = status.contacts.map((c) => ({ id: c.id, unit: c.unit, class: c.class, near: c.near, x: c.x, y: c.y, teams: c.teams.length, ...(c.hero ? { hero: true } : {}) }));
   const squad = (s) => ({
     near: s.near,
     x: s.x,
@@ -276,6 +295,9 @@ export function compactStatus(status, side) {
     order: s.order,
     strength: `${s.alive}/${s.full}`,
     tier: s.tier,
+    ...(s.rank ? { rank: s.rank } : {}),
+    ...(s.hero ? { hero: { chargesLeft: s.hero.charges || undefined, health: s.hero.hp, holdsSquad: s.hero.seized || undefined } } : {}),
+    ...(s.dug ? { positionsBuilt: s.dug } : {}),
     teams: (s.teams ?? []).map((t) => `${t.nerve}, ${t.action}${t.in ? `, inside ${t.in}` : t.cover ? ", in cover" : ""}`),
     contacts: s.contacts,
   });
@@ -299,12 +321,18 @@ export function compactStatus(status, side) {
     command: status.command,
     purchaseOrdered: status.purchaseOrdered,
     gold: status.gold,
+    ...(status.taken ? { taken: status.taken } : {}),
     goldPerMinute: status.income,
     // Gold haulers work on their own; `field` is the gold field (by map point) each one works.
     haulers: (status.haulers ?? []).filter((h) => h.side === side).map((h) => ({ id: h.id, state: h.state, load: h.load, field: h.field || undefined, sentTo: h.assigned || undefined })),
     enemyHaulersSeen: (status.haulers ?? []).filter((h) => h.side !== side).map((h) => ({ contact: h.id, x: h.x, y: h.y, inSight: h.visible })),
     goldFields: (status.fields ?? []).map((f) => ({ field: f.gusher, full: f.gold, inSight: f.visible })),
     hqHealth: status.hq,
+    // What the structures supply and use; low power slows building and silences defences.
+    power: status.power,
+    radar: status.radar,
+    // The role a base usually builds next, "" once the opening is complete.
+    opening: status.opening ?? "",
     squads: status.squads.map((s) => ({ callsign: s.callsign.en, unit: s.unit, class: s.class, ...squad(s) })),
     // Bought and on their way: they count toward the cap and cannot be ordered yet.
     deploying: (status.deploying ?? []).map((d) => ({ callsign: d.callsign.en, unit: d.unit, secondsLeft: Math.ceil(d.ticksLeft / 10) })),
@@ -328,6 +356,8 @@ function describe(item) {
   }
   const e = item.event;
   const who = item.callsign?.en ?? "A squad";
+  const heroic = describeHeroEvent(e, who);
+  if (heroic) return heroic;
   switch (e.kind) {
     case "quiet":
       return "Nothing has woken you for a while and you hold the initiative: your status shows a squad without orders or gold you could spend. Act if it helps; otherwise do nothing.";
@@ -338,7 +368,7 @@ function describe(item) {
     case "losses":
       return `Your squad lost a fireteam near ${e.point}; ${e.count} fireteams left.`;
     case "arrived":
-      return `Your squad arrived at ${e.point}.`;
+      return `Your squad arrived at ${item.place ?? (e.structure ? `the ${e.unit} (${e.structure}) near ${e.point}` : e.point)}.`;
     case "squad_lost":
       return `${who} was destroyed near ${e.point}.`;
     case "point_lost":
@@ -368,7 +398,21 @@ function describe(item) {
     case "bridge_repaired":
       return `${item.place} stands again.`;
   }
-  return `Event: ${e.kind}.`;
+  return powerEventLine(e) || `Event: ${e.kind}.`;
+}
+
+// directLine says, for the operator's picture of the net, what Hammer did by hand.
+export function directLine(frame) {
+  const r = frame.result ?? {};
+  const what = {
+    build: `started a ${r.name ?? "structure"}${r.near ? ` near ${r.near}` : ""}`,
+    buy: `bought ${r.unit ?? "a unit"}${r.squad?.en ? ` (${r.squad.en})` : ""}`,
+    cancel: `cancelled ${r.unit ?? "a unit"} in its line`,
+    sell: `sold the ${r.name ?? "structure"}`,
+    repair: `began repairing the ${r.name ?? "structure"}`,
+    rally: "set a rally point",
+  }[frame.act];
+  return `(no call) Hammer, from the panel, ${what ?? frame.act}.`;
 }
 
 // callsFor reports whether a transmission is a call this station must act on. "Out" means
@@ -376,6 +420,7 @@ function describe(item) {
 // next wake shows. Those who give orders are the exception: Hammer and the operator may
 // end an order with Out, and it is still an order.
 export function callsFor(m, me) {
+  if (m.cue) return false;
   const forMe = m.to.some((t) => t.key === me.key || t.key === "all");
   const commander = m.from.key === "player" || m.from.key === "operator";
   return forMe && m.from.key !== me.key && (m.end !== "out" || commander);

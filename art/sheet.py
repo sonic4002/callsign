@@ -9,6 +9,11 @@
                                                       then finished, then its door open and lit
     python art/sheet.py leaving out.png [key ...]     a unit coming out of each producing structure
                                                       and walking to its rally point, in six steps
+    python art/sheet.py powered out.png               the power and radar structures lit and with the
+                                                      power down, the dish through a turn, and the
+                                                      buildings of no army unheld and held
+    python art/sheet.py grid out.png zoom key ...     buildings enlarged under a grid of tenths, for
+                                                      reading off where a part of the picture sits
     python art/sheet.py strip out.png zoom unit[:rows[:anims]] ...
                                                       chosen animations of chosen heading rows of
                                                       unit sheets, e.g. tank:0,1,2:idle,move
@@ -234,6 +239,119 @@ def leaving(out, keys):
     print(out, page.size)
 
 
+def grid(out, zoom, keys):
+    """Chosen buildings enlarged, with a line every tenth of the picture: for reading off
+    where a door, a turning part, a flag or a lamp sits as fractions of the picture."""
+    m = json.loads((OUT / "manifest.json").read_text())
+    cells = []
+    for key in keys:
+        image = Image.open(OUT / m["buildings"][key]["image"]).convert("RGBA")
+        cell = Image.new("RGBA", image.size, GROUND)
+        cell.alpha_composite(image)
+        cell = cell.resize((round(image.width * zoom), round(image.height * zoom)), Image.LANCZOS)
+        draw = ImageDraw.Draw(cell)
+        for i in range(1, 10):
+            x, y = round(cell.width * i / 10), round(cell.height * i / 10)
+            draw.line([(x, 0), (x, cell.height)], fill=(255, 255, 255, 110))
+            draw.line([(0, y), (cell.width, y)], fill=(255, 255, 255, 110))
+            draw.text((x + 2, 2), f".{i}", fill=(255, 255, 0))
+            draw.text((2, y + 2), f".{i}", fill=(255, 255, 0))
+        draw.text((4, cell.height - 14), key, fill=(20, 20, 20))
+        cells.append(cell)
+    page = Image.new("RGB", (sum(c.width + 8 for c in cells), max(c.height for c in cells)), GROUND[:3])
+    x = 0
+    for cell in cells:
+        page.paste(cell.convert("RGB"), (x, 0))
+        x += cell.width + 8
+    page.save(out)
+    print(out, page.size)
+
+
+def dim(image):
+    """A picture as it looks with the power down: the page's rule (client/art.js, dimmed)."""
+    night = Image.new("RGBA", image.size, (10, 14, 30, round(255 * 0.52)))
+    dark = Image.alpha_composite(image, night)
+    dark.putalpha(image.getchannel("A"))
+    return dark
+
+
+def powered(out):
+    """The power and radar structures and the buildings of no army on the game's ground at
+    the size the page draws them, beside a headquarters and a barracks: lit and with the
+    power down, the radar's dish through a turn, each neutral building unheld and held by
+    either side, their ruins, and the four going up in stages."""
+    m = json.loads((OUT / "manifest.json").read_text())
+    b = m["buildings"]
+    load = lambda rel: Image.open(OUT / rel).convert("RGBA")
+    W, H = 2100, 1900
+    page = tiled(load(m["terrain"]["land"]).convert("RGB"), (W, H)).convert("RGBA")
+    draw = ImageDraw.Draw(page)
+    BUILD = 1.55
+
+    def stand(key, x, y, label="", dark=False, frame=None, owner=None, lamp=False):
+        entry = b[key]
+        k = BUILD * entry["height"] / entry["size"][1]
+        body = entry.get("spin", {}).get("body") if frame is not None else None
+        image = load(b[body]["image"] if body else entry["image"])
+        if dark:
+            image = dim(image)
+        w, h = round(image.width * k), round(image.height * k)
+        ax, ay = entry.get("anchor", [0.5, 0.8])
+        left, top = round(x - ax * w), round(y - ay * h)
+        page.alpha_composite(image.resize((w, h), Image.LANCZOS), (left, top))
+        spot = lambda f: (left + f[0] * w, top + f[1] * h)
+        spin = entry.get("spin")
+        if spin and frame is not None:
+            part = m["props"][spin["prop"]]
+            fw, fh = part["frame"]
+            piece = load(part["image"]).crop((frame * fw, 0, (frame + 1) * fw, fh))
+            if dark:
+                piece = dim(piece)
+            pk = BUILD * spin["height"] / fh
+            pw, ph = round(fw * pk), round(fh * pk)
+            sx, sy = spot(spin["at"])
+            page.alpha_composite(piece.resize((pw, ph), Image.LANCZOS), (round(sx - part["anchor"][0] * pw), round(sy - part["anchor"][1] * ph)))
+        if lamp:
+            lx, ly = spot(entry.get("lamp", [0.5, 0.18]))
+            draw.ellipse([lx - 9, ly - 9, lx + 9, ly + 9], fill=(255, 150, 40, 90))
+            draw.ellipse([lx - 3, ly - 3, lx + 3, ly + 3], fill=(255, 179, 71, 255))
+        if owner and entry.get("flag"):
+            fx, fy = spot(entry["flag"])
+            draw.line([(fx, fy), (fx, fy - 23)], fill=(43, 47, 51), width=2)
+            draw.polygon([(fx, fy - 23), (fx + 16, fy - 19), (fx, fy - 13)], fill=owner)
+        if label:
+            draw.text((x - 60, y + 14), label, fill=INK)
+
+    BLUE, RED = (79, 163, 255), (255, 107, 74)
+    y = 190
+    for faction, (hq, barracks, power, radar) in (("aegis", ("hq_aegis", "aegis_barracks", "aegis_powerPlant", "aegis_radar")),
+                                                  ("ashfall", ("hq_ashfall", "ashfall_safehouse", "ashfall_generatorYard", "ashfall_listeningPost"))):
+        stand(hq, 150, y, hq)
+        stand(barracks, 400, y, barracks)
+        stand(power, 640, y, power)
+        stand(power, 880, y, "power down", dark=True, lamp=True)
+        frames = m["props"][b[radar]["spin"]["prop"]]["frames"] if b[radar].get("spin") else 0
+        for i in range(4):
+            stand(radar, 1120 + i * 200, y, f"{radar} {i * 3}/12" if i == 0 else f"{i * 3}/12", frame=(i * frames // 4) if frames else None)
+        stand(radar, 1920, y, "power down", dark=True, frame=0 if frames else None, lamp=True)
+        y += 250
+    for i, key in enumerate(("tech_goldworks", "tech_clinic", "tech_garage")):
+        x = 150 + i * 680
+        stand(key, x, y, key)
+        stand(key, x + 210, y, "held by blue", owner=BLUE)
+        stand(key, x + 420, y, "held by red", owner=RED)
+    y += 250
+    for i, key in enumerate(("tech_goldworks_ruin", "tech_clinic_ruin", "tech_garage_ruin", "aegis_powerPlant_ruin", "ashfall_generatorYard_ruin", "aegis_radar_ruin", "ashfall_listeningPost_ruin")):
+        stand(key, 150 + i * 280, y, key)
+    y += 250
+    for key in ("aegis_powerPlant", "ashfall_generatorYard", "aegis_radar", "ashfall_listeningPost"):
+        for i, name in enumerate([*b[key].get("stages", []), key]):
+            stand(name, 150 + i * 240, y, name, frame=0 if name == key and b[key].get("spin") else None)
+        y += 210
+    page.convert("RGB").save(out)
+    print(out, page.size)
+
+
 def strip(out, zoom, wanted):
     m = json.loads((OUT / "manifest.json").read_text())
     strips = []
@@ -277,6 +395,10 @@ if __name__ == "__main__":
         stages(sys.argv[2], sys.argv[3:])
     elif len(sys.argv) > 2 and sys.argv[1] == "leaving":
         leaving(sys.argv[2], sys.argv[3:])
+    elif len(sys.argv) > 4 and sys.argv[1] == "grid":
+        grid(sys.argv[2], float(sys.argv[3]), sys.argv[4:])
+    elif len(sys.argv) > 2 and sys.argv[1] == "powered":
+        powered(sys.argv[2])
     elif len(sys.argv) > 4 and sys.argv[1] == "strip":
         strip(sys.argv[2], float(sys.argv[3]), sys.argv[4:])
     else:

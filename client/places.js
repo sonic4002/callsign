@@ -35,3 +35,15 @@ export function startGold(choice, typed, { min = 100, max = 20000 } = {}) {
 export function matchLengths(usual) {
   return [...new Set([300, 600, 900, 1200, usual])].filter((s) => s > 0).sort((a, b) => a - b);
 }
+
+// clearOf is how far a plate centred on (x, y) must move up or down to overlap none of the
+// plates already placed: 0 when it is clear, otherwise the least move that clears them.
+export function clearOf(placed, x, y, w, h) {
+  const hits = (dy) => placed.some(([px, py, pw, ph]) => x - w / 2 < px + pw && x + w / 2 > px && y + dy - h / 2 < py + ph && y + dy + h / 2 > py);
+  if (!hits(0)) return 0;
+  for (let step = 4; step <= 80; step += 4) {
+    if (!hits(-step)) return -step;
+    if (!hits(step)) return step;
+  }
+  return 0;
+}

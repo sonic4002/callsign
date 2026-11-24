@@ -152,6 +152,8 @@ func (rm *Room) toolCommand(side int, a toolArgs) (any, error) {
 func (rm *Room) mayBuy(side int) (own bool, err error) {
 	c := rm.cmd[side]
 	switch {
+	case rm.direct:
+		return false, nil // the commander's own hand: no leave needed, nothing to announce
 	case rm.ordered(side):
 		return false, nil
 	case c.buy:
@@ -172,7 +174,10 @@ func (rm *Room) announce(side int, kind string, sq *sim.Squad, cost int) {
 	if lang == "he" {
 		callsign = name.He
 	}
-	unit := rm.r.Factions[rm.sim.Sides[side].Faction].Units[sq.Unit].Name.In(lang)
+	// By the unit's own design, in whichever army has it: a side may hold a squad it
+	// seized, and upgrading that one is announced like any other.
+	u, _ := rm.unitNamed(sq.Unit)
+	unit := u.Name.In(lang)
 	tier := ""
 	for _, t := range rm.r.Tiers {
 		if t.Tier == sq.Tier {

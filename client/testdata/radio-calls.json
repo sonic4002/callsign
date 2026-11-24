@@ -1,0 +1,37 @@
+{
+ "about": "How a commander says, on the radio, the things the panel now does directly: buying, building on a spot, a turned fence, cancelling, rally points, selling and repairing. The page no longer writes these calls; the tests keep them so the operator goes on understanding them in both languages.",
+ "en": {
+  "call.buy": "{to}, this is {from}. Buy one {class} squad, {unit}. Over.",
+  "call.buildSpot": "{to}, this is {from}. Build a {structure} {place}. Over.",
+  "call.buildRun": "{to}, this is {from}. Build a {structure} running {run}, {place}. Over.",
+  "call.cancel": "{to}, this is {from}. Cancel the {unit}. Over.",
+  "call.rally": "{to}, this is {from}. New squads rally at {point}. Over.",
+  "call.rallyHome": "{to}, this is {from}. New squads rally at home. Over.",
+  "call.rallyFrom": "{to}, this is {from}. Squads from the {structure} rally at {point}. Over.",
+  "call.rallyFromHome": "{to}, this is {from}. Squads from the {structure} rally at home. Over.",
+  "call.sell": "{to}, this is {from}. Sell the {structure}. Over.",
+  "call.repairStructure": "{to}, this is {from}. Repair the {structure}. Over.",
+  "class.infantry": "infantry",
+  "class.vehicle": "vehicle",
+  "class.naval": "naval",
+  "class.air": "air",
+  "class.hauler": "hauler"
+ },
+ "he": {
+  "call.buy": "{to}, כאן {from}, קנה כיתת {class}, {unit}, עבור.",
+  "call.buildSpot": "{to}, כאן {from}, בנו {structure} {place}, עבור.",
+  "call.buildRun": "{to}, כאן {from}, בנו {structure} {run}, {place}, עבור.",
+  "call.cancel": "{to}, כאן {from}, בטל את {unit}, עבור.",
+  "call.rally": "{to}, כאן {from}, כיתות חדשות מתכנסות ב{point}, עבור.",
+  "call.rallyHome": "{to}, כאן {from}, כיתות חדשות מתכנסות ליד המבנה, עבור.",
+  "call.rallyFrom": "{to}, כאן {from}, כיתות של {structure} מתכנסות ב{point}, עבור.",
+  "call.rallyFromHome": "{to}, כאן {from}, כיתות של {structure} מתכנסות ליד המבנה, עבור.",
+  "call.sell": "{to}, כאן {from}, מכור את {structure}, עבור.",
+  "call.repairStructure": "{to}, כאן {from}, תקן את {structure}, עבור.",
+  "class.infantry": "רגלים",
+  "class.vehicle": "רכב",
+  "class.naval": "ימית",
+  "class.air": "אוויר",
+  "class.hauler": "מוביל זהב"
+ }
+}

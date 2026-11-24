@@ -256,6 +256,53 @@ def sandbags(state):
     return root
 
 
+# ---------------------------------------------------------------- things that turn
+
+
+def radar_dish(angle):
+    """The dish on the Aegis radar's mast: a turntable, a yoke and a tilted dish with its
+    feed, turned `angle` about the mast. The origin is the middle of the turntable."""
+    root = joint(None, name="root")
+    cyl(root, 0.34, 0.14, (0, 0, 0.07), AEGIS["hull2"], sides=12)
+    head = joint(root, (0, 0, 0.14))
+    head.rotation_euler = (0, 0, angle)
+    box(head, (0.22, 0.9, 0.12), (0, 0, 0.06), AEGIS["dark"])
+    for side in (-1, 1):
+        box(head, (0.14, 0.08, 0.62), (0, side * 0.42, 0.36), AEGIS["hull2"])
+    tilt = joint(head, (0, 0, 0.6))
+    tilt.rotation_euler = (0, math.radians(-58), 0)  # the dish looks out and a little up
+    cyl(tilt, 0.2, 0.3, (0, 0, 0.14), AEGIS["armour"], sides=14, top=0.86)
+    cyl(tilt, 0.84, 0.05, (0, 0, 0.3), "#e8eef2", sides=14, top=0.86)
+    cyl(tilt, 0.74, 0.03, (0, 0, 0.325), AEGIS["hull"], sides=14)  # the inside of the bowl, in shade
+    cyl(tilt, 0.42, 0.03, (0, 0, 0.335), AEGIS["hull2"], sides=14)
+    for a in range(4):  # the ribs of the bowl
+        box(tilt, (1.44, 0.03, 0.02), (0, 0, 0.35), AEGIS["dark"], rot=(0, 0, a * math.pi / 4))
+    cyl(tilt, 0.035, 0.52, (0, 0, 0.52), AEGIS["dark"], sides=6)
+    ball(tilt, 0.09, (0, 0, 0.8), AEGIS["trim"]).active_material = mat(AEGIS["trim"], 0.6)
+    return root
+
+
+def antenna_loop(angle):
+    """The direction finder on the Ashfall listening post's pole: a crossbar carrying a wire
+    loop and a bent mesh reflector, scavenged and rusty, turned `angle` about the pole."""
+    root = joint(None, name="root")
+    cyl(root, 0.06, 0.5, (0, 0, 0.25), ASHFALL["low"], sides=6)
+    head = joint(root, (0, 0, 0.5))
+    head.rotation_euler = (0, 0, angle)
+    box(head, (0.08, 1.5, 0.07), (0, 0, 0), ASHFALL["wood"])
+    # The loop: four thin bars standing on the crossbar.
+    for y, z, size in ((0.0, 0.62, (0.05, 0.9, 0.05)), (0.0, 0.08, (0.05, 0.9, 0.05)), (-0.45, 0.35, (0.05, 0.05, 0.59)), (0.45, 0.35, (0.05, 0.05, 0.59))):
+        box(head, size, (0.05, y, z), ASHFALL["rust"])
+    # The reflector: three slats of mesh behind the loop, bent round it.
+    for i, a in enumerate((-0.5, 0.0, 0.5)):
+        box(head, (0.04, 0.5, 0.7), (-0.32 + 0.1 * abs(a) * 2, a * 1.0, 0.36), ["#7d7a6c", "#8c8672", "#6f6a5c"][i], rot=(0, 0, -a * 0.7))
+    ball(head, 0.07, (0.05, 0.72, 0.03), "#d9b24a").active_material = mat("#d9b24a", 0.5)
+    return root
+
+
+# name → (builder, frames in one turn, cell in metres, height the camera looks at)
+SPUN = {"radar_dish": (radar_dish, 12, 3.2, 0.7), "antenna_loop": (antenna_loop, 12, 3.2, 0.6)}
+
 # Things that face a way: rendered once for each of the eight map headings.
 FACED = {"sandbags": (sandbags, ["", "damaged", "flat"], 5.0, 0.35)}
 
@@ -359,6 +406,29 @@ def main():
             "facings": len(FACINGS), "order": FACINGS, "heading": "map", "ppm": PPM,
             "states": [state or "whole" for state in states], "arc": ARC, "radius": round(BAG_RADIUS * UNITS_PER_METRE),
         }
+        page.append((name, sheet))
+
+    for name, (build, count, cell, centre) in SPUN.items():
+        if not want(name):
+            continue
+        # One row of frames, a full turn clockwise as seen on the map. Every frame is
+        # cropped to the one box that holds them all, so the mount never moves.
+        frames = []
+        for f in range(count):
+            image, origin = render(f"{name}_{f}", lambda: build(-f * 2 * math.pi / count), cell, centre)
+            frames.append(outlined(image))
+        boxes = [im.getchannel("A").point(lambda a: 255 if a > 6 else 0).getbbox() for im in frames]
+        left, top = min(b[0] for b in boxes) - 1, min(b[1] for b in boxes) - 1
+        right, bottom = max(b[2] for b in boxes) + 1, max(b[3] for b in boxes) + 1
+        w, h = right - left, bottom - top
+        sheet = Image.new("RGBA", (w * count, h), (0, 0, 0, 0))
+        for i, im in enumerate(frames):
+            sheet.paste(im.crop((left, top, right, bottom)), (i * w, 0))
+        rel = f"props/{name}.png"
+        (OUT / rel).parent.mkdir(parents=True, exist_ok=True)
+        save_small(sheet, OUT / rel)
+        print(f"{rel}  {sheet.width}x{sheet.height}, frame {w}x{h}")
+        manifest["props"][name] = {"image": rel, "frame": [w, h], "frames": count, "anchor": [round((origin[0] - left) / w, 4), round((origin[1] - top) / h, 4)], "ppm": PPM}
         page.append((name, sheet))
 
     for name, (build, cell, centre, height) in PROPS.items():

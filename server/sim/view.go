@@ -45,6 +45,14 @@ type LandmarkView struct {
 	HP       float64       `json:"hp"`                 // share 0…1
 	Garrison *GarrisonView `json:"garrison,omitempty"` // absent when empty or not known
 	Visible  bool          `json:"visible"`            // in sight now; otherwise as last seen
+	// A position built during the match is not on the map the page has: where it is, which
+	// way it faces (radians, 0 east, growing clockwise on the map), who built it and its name.
+	Built bool         `json:"built,omitempty"`
+	X     float64      `json:"x,omitempty"`
+	Y     float64      `json:"y,omitempty"`
+	Face  float64      `json:"face,omitempty"`
+	By    *int         `json:"by,omitempty"`
+	Name  *shared.Text `json:"name,omitempty"`
 }
 
 // BridgeView is a bridge as the viewer last saw it.
@@ -70,18 +78,30 @@ type SquadView struct {
 	Order    OrderView   `json:"order"`
 	Teams    []TeamView  `json:"teams"`
 	Contacts []int       `json:"contacts"`
+	// Rank is the standing the squad has earned ("" for none), Kills its progress toward
+	// the next one (0…1). Hero is set for a hero, with what it carries and is doing.
+	Rank  string    `json:"rank,omitempty"`
+	Kills float64   `json:"kills,omitempty"`
+	Hero  *HeroView `json:"hero,omitempty"`
+	// Dig is a squad's progress on the sandbag position it is building (0…1), and Dug how
+	// many it has built of the Limit it may.
+	Dig float64 `json:"dig,omitempty"`
+	Dug int     `json:"dug,omitempty"`
 }
 
 // ContactView is an enemy squad as the other side sees it: only the teams in sight.
 type ContactView struct {
-	ID    int        `json:"id"`
-	Side  int        `json:"side"`
-	Unit  string     `json:"unit"`
-	Class string     `json:"class"`
-	X     float64    `json:"x"`
-	Y     float64    `json:"y"`
-	Near  string     `json:"near"`
-	Teams []TeamView `json:"teams"`
+	ID    int    `json:"id"`
+	Side  int    `json:"side"`
+	Unit  string `json:"unit"`
+	Class string `json:"class"`
+	// Hero marks an enemy hero; Disguised one that still passes for a bystander.
+	Hero      bool       `json:"hero,omitempty"`
+	Disguised bool       `json:"disguised,omitempty"`
+	X         float64    `json:"x"`
+	Y         float64    `json:"y"`
+	Near      string     `json:"near"`
+	Teams     []TeamView `json:"teams"`
 }
 
 // DeployView is a bought squad that has not reached the field yet.
@@ -93,6 +113,12 @@ type DeployView struct {
 	Class      string      `json:"class"`
 	TicksLeft  int         `json:"ticksLeft"`
 	TicksTotal int         `json:"ticksTotal"`
+	// From is the structure it comes out of, "" for none. Line is its place in that
+	// structure's line (0 is being made now), and TicksAhead what the ones before it
+	// still need: only the first in a line counts down.
+	From       string `json:"from,omitempty"`
+	Line       int    `json:"line"`
+	TicksAhead int    `json:"ticksAhead"`
 }
 
 type PointView struct {
@@ -104,12 +130,17 @@ type PointView struct {
 }
 
 type Snapshot struct {
-	Tick      int            `json:"tick"`
-	TimeLeft  int            `json:"timeLeft"` // seconds
-	Side      int            `json:"side"`
-	Faction   string         `json:"faction,omitempty"`
-	Gold      int            `json:"gold"`
-	Income    int            `json:"income"`        // gold per minute, over the last minute
+	Tick     int       `json:"tick"`
+	TimeLeft int       `json:"timeLeft"` // seconds
+	Side     int       `json:"side"`
+	Faction  string    `json:"faction,omitempty"`
+	Gold     int       `json:"gold"`
+	Income   int       `json:"income"` // gold per minute, over the last minute
+	Power    PowerView `json:"power"`  // what the side's structures supply and use
+	Radar    bool      `json:"radar"`  // the mini map is on: a radar structure stands and has power
+	// Opening is the role the side's base usually grows by next (power.go), "" when the
+	// opening is complete: what the scripted player builds, and what the page points at.
+	Opening   string         `json:"opening,omitempty"`
 	HQ        [2]float64     `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
 	Fog       *FogView       `json:"fog,omitempty"` // absent for spectators, who see everything
 	Points    []PointView    `json:"points"`
@@ -124,9 +155,13 @@ type Snapshot struct {
 	ForeignUnits []string        `json:"foreignUnits,omitempty"`
 	Fields       []FieldView     `json:"fields"`  // every gold field; out of sight, as last seen
 	Haulers      []HaulerView    `json:"haulers"` // own haulers, then enemy ones as last seen
-	Over         bool            `json:"over"`
-	Winner       int             `json:"winner"`
-	Reason       string          `json:"reason,omitempty"`
+	Charges      []ChargeView    `json:"charges"` // demolition charges burning down: own, and enemy ones in sight
+	// Taken counts this side's squads an enemy hero holds for now. They are not in Squads,
+	// and they still count toward the cap, because they come back.
+	Taken  int    `json:"taken,omitempty"`
+	Over   bool   `json:"over"`
+	Winner int    `json:"winner"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // Snapshot is the match as one side may see it. Enemy squads appear only as contacts,
@@ -150,6 +185,10 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		snap.Faction = s.Sides[side].Faction
 		snap.Gold = s.Gold(side)
 		snap.Income = s.Income(side)
+		snap.Power, snap.Radar = s.Power(side), s.Radar(side)
+		snap.Opening = s.NextInOpening(side)
+	} else {
+		snap.Radar = true // a spectator sees everything
 	}
 	for i := range s.Sides {
 		snap.HQ[i] = math.Max(0, s.Sides[i].HQHP/s.R.HQ.HP)
@@ -176,9 +215,11 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	s.viewMap(&snap, side)
 	for _, sq := range s.Squads {
 		if sq.Deploying() && (side == Spectator || sq.Side == side) {
+			from, pos, ahead := s.lineView(sq)
 			snap.Deploying = append(snap.Deploying, DeployView{
 				ID: sq.ID, Side: sq.Side, Callsign: s.Callsign(sq), Unit: sq.Unit, Class: sq.unit.Class,
 				TicksLeft: sq.DeployTicks, TicksTotal: sq.DeployTotal,
+				From: from, Line: pos, TicksAhead: ahead,
 			})
 		}
 		if !sq.Alive {
@@ -199,6 +240,7 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		}
 	}
 	s.snapHaul(&snap, side)
+	s.snapCharges(&snap, side)
 	return snap
 }
 
@@ -212,6 +254,7 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 		Order:    OrderView{Kind: sq.Order.Kind, Point: sq.Order.Point, Contact: sq.Order.Contact, Place: sq.Order.Place, Capture: s.CaptureProgress(sq)},
 		Contacts: append([]int{}, sq.Contacts...),
 	}
+	s.viewExtras(sq, &v)
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 {
 			tv := TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, Nerve: s.Nerve(t), Action: t.Action, In: t.In}
@@ -225,7 +268,7 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 }
 
 func (s *Sim) contactView(sq *Squad) ContactView {
-	v := ContactView{ID: sq.ID, Side: sq.Side, Unit: sq.Unit, Class: sq.unit.Class}
+	v := ContactView{ID: sq.ID, Side: sq.Side, Unit: sq.Unit, Class: sq.unit.Class, Hero: sq.unit.Hero, Disguised: s.disguised(sq)}
 	var x, y float64
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 && t.Spotted {
@@ -292,6 +335,7 @@ func (s *Sim) Hash() uint64 {
 		put(uint64(sq.ID))
 		put(uint64(sq.Tier))
 		put(uint64(sq.DeployTicks))
+		put(uint64(sq.From))
 		h.Write([]byte(sq.Order.Kind))
 		h.Write([]byte(sq.Order.Point))
 		h.Write([]byte(sq.Order.Place))
@@ -308,7 +352,10 @@ func (s *Sim) Hash() uint64 {
 		}
 	}
 	s.hashStructures(put, f)
+	s.hashTech(put)
+	s.hashPower(put, f)
 	s.hashHaul(put, f)
+	s.hashHeroes(put, f)
 	return h.Sum64()
 }
 
@@ -330,10 +377,17 @@ func (s *Sim) viewMap(snap *Snapshot, side int) {
 		} else {
 			m = s.Sides[side].lands[i]
 		}
-		if m.Kind == l.Landmark.Kind && m.HP >= 1 && m.GSide == NoSide {
+		if l.Built && m.Kind == "" {
+			continue // a position this side has never seen
+		}
+		if !l.Built && m.Kind == l.Landmark.Kind && m.HP >= 1 && m.GSide == NoSide {
 			continue
 		}
 		v := LandmarkView{ID: l.ID, Kind: m.Kind, HP: round3(m.HP), Visible: m.Visible}
+		if l.Built {
+			by := l.By
+			v.Built, v.X, v.Y, v.Face, v.By, v.Name = true, l.X, l.Y, round3(math.Atan2(l.FaceY, l.FaceX)), &by, &l.Landmark.Name
+		}
 		if m.GSide != NoSide {
 			v.Garrison = &GarrisonView{Side: m.GSide, Teams: m.GTeams}
 		}
@@ -386,6 +440,9 @@ func (s *Sim) LandmarksNear(sq *Squad) []NearbyLandmark {
 			continue
 		}
 		m := s.Sides[sq.Side].lands[i]
+		if m.Kind == "" {
+			continue // a position built in the match that this side has not seen
+		}
 		k := s.R.LandmarkKinds[m.Kind]
 		v := NearbyLandmark{ID: l.ID, Name: l.Name.En, Kind: m.Kind, Cover: k.Cover}
 		if k.Garrison > 0 {

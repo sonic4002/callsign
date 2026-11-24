@@ -8,14 +8,19 @@ import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { wantedStructure } from "/agents/bases.mjs";
 import { drawIcon } from "./bases-art.js";
-import { structureCards, structureDef, unitDef, unitLock } from "./bases.js";
+import { ofRole, structureCards, structureDef, techSite, unitDef, unitLock } from "./bases.js";
+import { cueMark, cued, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
 import { haulerRows } from "./gold.js";
+import { powerTag, radarState, renderPower, repairCost, sellValue, structureActions, wouldRunShort } from "./power.js";
+import { iconSvg } from "./marks.js";
+import { canDigIn, digProgress, eventNames, heroEventKind, heroLock, heroOrders, heroRow, rankBadge, syncHero, withBuilt } from "./heroes.js";
 import { Speech } from "./speech/speech.js";
 import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
+import { RUNS, canPlace, parseSpot, runSegments, spotAt, spotForm, spotWords, tint, unitLine } from "./placement.js";
 import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
@@ -151,6 +156,8 @@ const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[la
 function placeName(id) {
   const named = [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id);
   if (named) return named.name[lang];
+  const spot = parseSpot(rules, id);
+  if (spot) return spotWords(t, spot, pointName(spot.point));
   const off = parseOffset(id);
   if (off) return t("place.offset", { metres: off.metres, bearing: t(`bearing.${off.bearing}`), point: pointName(off.point) });
   return pointName(id);
@@ -289,6 +296,7 @@ function onFrame(frame) {
       monitor.sync();
       brains.agents.newMatch(frame.match);
       brains.agents.sync(); // the seat may be a new one: a match just made or joined
+      withBuilt(rules, state);
       scene.setRules(rules);
       scene.setState(state);
       drawn.roster = drawn.build = "";
@@ -303,6 +311,8 @@ function onFrame(frame) {
       return;
     case "state":
       state = frame.state;
+      // Sandbag positions built in the match are landmarks like any; the log names them once known.
+      if (withBuilt(rules, state)) renderLog();
       scene.setState(state);
       break;
     case "lobby": {
@@ -334,8 +344,14 @@ function onFrame(frame) {
       if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) upgrading.clear();
       // The sign-off ends the match: whatever radio was still waiting is dropped for it.
       if (frame.message.final) speech.silence();
-      speech.say(frame.message, { rules, faction });
+      // A base cue is always written; whether it is also spoken is the player's choice.
+      if (spoken(frame.message)) speech.say(frame.message, { rules, faction });
       break;
+    case "acted":
+      acted(frame);
+      return;
+    case "direct":
+      return; // a line for the side's agents; the page reads the state
     case "refused":
       buyAnswered();
       upgrading.clear();
@@ -352,9 +368,16 @@ function onFrame(frame) {
       }
       // A squad of engineers used up in a takeover is told by the takeover itself.
       if (frame.event.kind === "squad_lost" && frame.event.reason === "spent") break;
+      // A hero's, or a squad that changed hands: whose it is decides the words.
+      if (frame.event.side === side) frame.event.kind = heroEventKind(frame.event);
       // Whose structure it was decides how its loss or takeover reads.
       if (frame.event.side === side && frame.event.kind.startsWith("structure_")) frame.event.kind = structureEvent(frame.event, side);
+      // A rally point put back beside the structures reads differently from one that was set.
+      if (frame.event.kind === "rally_set" && !frame.event.place) frame.event.kind = "rally_home";
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
+      // News the operator's base cue tells is left to the cue: one line, not two. Someone
+      // watching hears no cues and reads the page's own lines.
+      if (me && frame.event.side === side && cued(rules, frame.event)) break;
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
       }
@@ -376,27 +399,35 @@ function system(key, vars = {}, tone = "") {
 function renderLog() {
   const log = $("log");
   const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  // Repeats are folded into one line ("3 squads are ready"), and a phone's strip shows
+  // the few lines that matter most: radio to the player before system lines.
+  const lines = foldLog(entries);
+  const strip = new Set(stripPick(lines, "player", 4));
+  const strip2 = new Set(stripPick(lines, "player", 2));
   log.replaceChildren(
-    ...entries.map((e) => {
+    ...lines.map(({ entry: e, count }, i) => {
       const li = el("li");
       const time = el("time");
       const text = el("span", "text");
+      const shown = `${strip.has(i) ? " strip" : ""}${strip2.has(i) ? " strip2" : ""}`;
       if (e.kind === "radio") {
         const m = e.message;
         time.textContent = clock(m.tick);
-        li.className = m.from.squad ? "squad" : m.from.key;
+        li.className = `radio ${m.from.squad ? "squad" : m.from.key}${m.cue ? " cue" : ""}${shown}`;
         text.textContent = m.text; // always as transmitted, in the language it was sent in
-        li.append(time, el("span", "who", m.from[lang]), text);
+        li.append(time, el("span", "who", m.from[lang]), ...(m.cue ? [cueMark()] : []), text);
         return li;
       }
-      li.className = `system ${e.tone ?? ""}`;
+      li.className = `system ${e.tone ?? ""}${shown}`;
+      const times = (line) => (count > 1 ? `${line} \u2066×${count}\u2069` : line);
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "" });
+        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", unit: unitDef(rules, ev.unit ?? "")?.name[lang] ?? "", gold: ev.count, count, ...eventNames(rules, ev, lang) };
+        text.textContent = count > 1 && `eventMany.${ev.kind}` in strings.en ? t(`eventMany.${ev.kind}`, vars) : times(t(`event.${ev.kind}`, vars));
       } else {
         time.textContent = clock(e.tick);
-        text.textContent = t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" });
+        text.textContent = times(t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" }));
       }
       li.append(time, text);
       return li;
@@ -404,6 +435,10 @@ function renderLog() {
   );
   if (pinned) log.scrollTop = log.scrollHeight;
 }
+
+// Base cues are spoken unless the player turned that off; they are written either way.
+$("cue-voice").checked = cueVoice.on;
+$("cue-voice").addEventListener("change", (ev) => (cueVoice.on = ev.target.checked));
 
 // transmit puts text on the net. It is the one place this page acts on the match.
 function transmit(text) {
@@ -559,6 +594,39 @@ function sendBox(spoken = false) {
 // order transmits a call the page wrote itself (a squad, a place and an action picked on
 // the map; an upgrade button) at once, without passing through the box. It is kept with
 // the sent calls, so Up brings it back to change and send again.
+// ---- the commander's own hand ----
+//
+// Building, buying, cancelling, selling, repairing and setting a rally point from the
+// panel and the menus do not go over the radio: they go straight to the game, which does
+// them at once or refuses with its reason (server/room/act.go). Orders to squads are
+// never sent this way. A refusal is shown on the card or button it came from, and in the log.
+let actSeq = 0;
+const acting = new Map(); // id of an action sent → the element to show a refusal on
+function act(name, args, at = null) {
+  if (!me || !open()) return false;
+  const id = ++actSeq;
+  acting.set(id, at);
+  ws.send(JSON.stringify({ type: "act", id, name, args }));
+  return true;
+}
+
+// acted takes the game's answer to a direct action: nothing to do when it was done (the
+// state shows it), the reason on the card when it was refused.
+function acted(frame) {
+  const at = acting.get(frame.id);
+  acting.delete(frame.id);
+  if (frame.ok) return;
+  system("refused", { reason: frame.error }, "warn");
+  if (!at?.isConnected) return;
+  at.classList.add("refused");
+  at.dataset.refused = frame.error;
+  at.title = frame.error;
+  setTimeout(() => {
+    at.classList.remove("refused");
+    delete at.dataset.refused;
+  }, 4000);
+}
+
 function order(text) {
   if (!transmit(text)) return;
   if (sent.at(-1) !== text) sent.push(text);
@@ -679,9 +747,10 @@ addEventListener("blur", talkEnd);
 $("restart").addEventListener("click", () => open() && ws.send(JSON.stringify({ type: "restart" })));
 
 // Calls the sidebar and the map write. `to` and `from` are callsigns in the page language.
-const structureName = (st) => structureDef(rules, st)?.name[lang] ?? st.kind;
+// A tech building is called by its own name on the map ("the clinic east of Delta").
+const structureName = (st) => techSite(rules, st)?.name[lang] ?? structureDef(rules, st)?.name[lang] ?? st.kind;
 // Any faction's structure by its rules id: events name a structure by its kind alone.
-const kindName = (kind) => Object.values(rules?.factions ?? {}).map((f) => f.structures?.[kind]).find(Boolean)?.name[lang] ?? kind;
+const kindName = (kind) => (Object.values(rules?.factions ?? {}).map((f) => f.structures?.[kind]).find(Boolean) ?? rules?.techBuildings?.[kind])?.name[lang] ?? kind;
 const call = (kind, vars) => t(`call.${kind}`, { from: me[lang], ...vars });
 const anvil = () => rules.callsigns.operator[lang];
 
@@ -697,6 +766,11 @@ function renderSidebar() {
   $("held").textContent = `${held(side)} : ${held(1 - side)}`;
   $("hq-ours").style.inlineSize = `${state.hq[side] * 100}%`;
   $("hq-enemy").style.inlineSize = `${state.hq[1 - side] * 100}%`;
+  renderPower($("power"), me ? state : null, t);
+  const radar = me ? radarState(state, side) : "on";
+  $("radar-off").hidden = radar === "on";
+  $("radar-box").classList.toggle("off", radar !== "on"); // no mini map to show: one line, not an empty box
+  if (radar !== "on") $("radar-off").textContent = t(`radar.${radar}`, { structure: ofRole(rules, faction, "radar")?.def.name[lang] ?? "" });
 
   const mine = state.squads.filter((sq) => sq.side === side);
   const deploying = (state.deploying ?? []).filter((d) => d.side === side);
@@ -724,7 +798,7 @@ function renderSidebar() {
   // The lists are rebuilt only when what they show changes, so buttons stay clickable.
   // Progress bars are then moved in place on every frame.
   const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
-  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order]), deploying.map((d) => d.id), live(upgrading), live(promoted)]);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order, sq.rank, sq.hero?.charges, sq.hero?.seized, Math.round((sq.dig ?? 0) * 10)]), deploying.map((d) => [d.id, d.line ?? 0]), live(upgrading), live(promoted)]);
   if (rosterKey !== drawn.roster) {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
@@ -732,9 +806,11 @@ function renderSidebar() {
     monitor.sync();
     markThinking();
   }
+  // A hero's health moves in place, like the other bars.
+  for (const sq of mine) if (sq.hero) syncHero($("roster").querySelector(`li[data-squad="${sq.id}"]`) ?? document.createElement("li"), sq, t);
   // The faction's own units, and any a captured structure lets this side build.
   const units = [...Object.entries(rules.factions[faction]?.units ?? {}), ...(state.foreignUnits ?? []).map((id) => [id, unitDef(rules, id)])];
-  const locks = units.map(([id]) => unitLock(state, rules, faction, side, id));
+  const locks = units.map(([id]) => unitLock(state, rules, faction, side, id) ?? heroLock(state, rules, faction, side, id));
   const room = (u) => (u.class === "hauler" ? haulerCount < rules.match.haulerCap : pop < cap);
   const buildKey = JSON.stringify([lang, faction, canAct, units.map(([id, u]) => [id, room(u) && state.gold >= u.cost]), locks.map((l) => l?.id)]);
   if (buildKey !== drawn.build) {
@@ -772,7 +848,9 @@ function renderHaulers(haulers, count) {
   }
 }
 
-const secondsLeft = (d) => Math.ceil(d.ticksLeft / rules.tickRate);
+// A unit waits for the ones ahead of it in its structure's line, then for its own making.
+const secondsLeft = (d) => Math.ceil(((d.ticksAhead ?? 0) + d.ticksLeft) / rules.tickRate);
+const deployText = (d) => ((d.line ?? 0) > 0 ? t("deploy.waiting", { seconds: secondsLeft(d) }) : t("deployingIn", { seconds: secondsLeft(d) }));
 const progress = (d) => 1 - d.ticksLeft / d.ticksTotal;
 
 // renderDeploying moves the bars: on the roster rows, and on each unit's build button,
@@ -782,28 +860,33 @@ function renderDeploying(deploying) {
     const row = $("roster").querySelector(`[data-deploy="${d.id}"]`);
     if (!row) continue;
     row.querySelector(".deploy-bar b").style.inlineSize = `${progress(d) * 100}%`;
-    row.querySelector(".order").textContent = t("deployingIn", { seconds: secondsLeft(d) });
+    row.querySelector(".order").textContent = deployText(d);
   }
-  for (const button of $("build").children) {
-    const queue = deploying.filter((d) => d.unit === button.dataset.unit);
-    const first = queue[0];
+  for (const button of $("build").querySelectorAll("button[data-unit]")) {
+    // The one of this unit that comes out first, wherever it is being made, and how many
+    // are on their way in all (placement.js).
+    const line = unitLine(state, side, button.dataset.unit);
+    const first = line.first;
     button.classList.toggle("deploying", Boolean(first));
     // A locked unit is never "asked for": a purchase whose unit is not known yet marks
     // every card as waiting, and that must not light up what cannot be bought.
     const asked = button.classList.contains("locked") ? 0 : inLine(button.dataset.unit);
     button.classList.toggle("requested", !first && asked > 0);
-    button.querySelector(".fill").style.blockSize = first ? `${progress(first) * 100}%` : "0";
+    button.querySelector(".fill").style.blockSize = first && line.making ? `${progress(first) * 100}%` : "0";
     button.querySelector(".left").textContent = first ? t("seconds", { seconds: secondsLeft(first) }) : "";
     const count = button.querySelector(".count");
     // How many of this unit are in line: asked for and not yet answered, plus on their way.
-    const total = asked + queue.length;
+    const total = asked + line.count;
     count.hidden = total < 2 && asked === 0;
     count.textContent = String(total);
+    const cancel = button.nextElementSibling;
+    cancel.hidden = line.count === 0;
+    cancel.disabled = !me || Boolean(state.over);
   }
 }
 
 // deployRow is a bought squad on its way: it becomes an ordinary roster row on arrival.
-function deployRow(d) {
+function deployRow(d, i, all) {
   const unit = unitDef(rules, d.unit);
   const li = el("li", "deploying");
   li.dataset.deploy = d.id;
@@ -811,7 +894,17 @@ function deployRow(d) {
   name.append(el("span", "unit", unit.name[lang]));
   const bar = el("span", "deploy-bar");
   bar.append(el("b"));
-  li.append(name, bar, el("span", "order", t("deployingIn", { seconds: secondsLeft(d) })));
+  li.append(name, bar, el("span", "order", deployText(d)));
+  // The last one bought of a unit can be taken out of its line.
+  if (!all.slice(i + 1).some((o) => o.unit === d.unit)) {
+    const cancel = el("button", "cancel", "×");
+    cancel.type = "button";
+    cancel.title = t("deploy.cancel");
+    cancel.setAttribute("aria-label", t("deploy.cancel"));
+    cancel.disabled = !me || Boolean(state.over);
+    cancel.addEventListener("click", () => act("cancel", { unit: d.unit }, li));
+    li.append(cancel);
+  }
   return li;
 }
 
@@ -819,6 +912,9 @@ $("command-switch").addEventListener("click", () => transmit(call(command.mode =
 $("command-purse").addEventListener("click", () => transmit(call(command.buy ? "revoke" : "grant", { to: anvil() })));
 
 function orderText(sq) {
+  if (sq.order.kind === "fortify") return t("order.fortify", { percent: Math.round((digProgress(sq) ?? 0) * 100) });
+  if (sq.order.kind === "plant") return t("order.plant");
+  if (sq.order.kind === "seize") return t("order.seize");
   if (sq.order.contact) return t("order.contact");
   if (sq.order.kind === "capture") return t("order.capture", { percent: Math.round((sq.order.capture ?? 0) * 100) });
   if (/^s\d+$/.test(sq.order.place ?? "")) return t("order.structure");
@@ -836,6 +932,9 @@ function rosterRow(sq, canAct) {
   for (let i = 0; i < sq.full; i++) pips.append(el("i", i < sq.alive ? "" : "lost"));
   const tier = el("span", "tier");
   tier.append(el("span", "rank", t("tier", { tier: sq.tier, name: tierName(sq.tier) })));
+  // The rank a squad has earned, in silver, beside the tier it was bought.
+  const earned = rankBadge(rules, sq, lang);
+  if (earned) tier.append(earned);
   if (promoted.has(sq.id)) li.classList.add("promoted");
   const next = rules.tiers.find((x) => x.tier === sq.tier + 1);
   if (next && me) {
@@ -853,6 +952,7 @@ function rosterRow(sq, canAct) {
     if (asked) tier.append(el("small", "asked", t("upgradeAsked")));
   }
   li.append(name, pips, el("span", "order", orderText(sq)), tier);
+  if (unit.hero) heroRow(li, sq, unit, { t, name: (id) => state.squads.find((s) => s.id === id)?.callsign[lang] ?? "" });
   li.addEventListener("click", () => select(sq));
   return li;
 }
@@ -863,7 +963,8 @@ function buildButton(id, unit, enabled, lock) {
   button.disabled = !enabled;
   button.dataset.unit = id;
   // What has to be built first, when the structure this unit comes from does not stand.
-  if (lock) button.title = t("structure.needs", { structure: lock.def.name[lang] });
+  const why = lock ? (lock.text ? t("hero.one") : t("structure.needs", { structure: lock.def.name[lang] })) : "";
+  if (lock) button.title = why;
   const icon = el("canvas");
   const dpr = devicePixelRatio || 1;
   icon.width = 72 * dpr;
@@ -877,24 +978,40 @@ function buildButton(id, unit, enabled, lock) {
   count.hidden = true;
   // The fill rises behind the picture while a squad of this unit deploys.
   button.append(el("i", "fill"), icon, el("span", "", unit.name[lang]), el("span", "cost", String(unit.cost)), el("bdi", "left"), count);
-  if (lock) button.append(el("span", "needs", t("structure.needs", { structure: lock.def.name[lang] })));
-  // Buying is a radio call to the operator like any other; the button only writes and sends it.
-  button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
-  return button;
+  if (lock) {
+    // Locked: a padlock on the picture and what it still needs, and it takes no press.
+    const mark = el("span", "lock");
+    mark.innerHTML = iconSvg("lock", 16);
+    button.append(mark, el("span", "needs", why));
+  }
+  // A press buys at once: the unit joins the line of the structure that makes it.
+  button.addEventListener("click", () => act("buy", { unit: id }, button));
+  // Beside it, while one of this unit is in a line: the last one taken back out.
+  const cancel = el("button", "cancel", "×");
+  cancel.type = "button";
+  cancel.hidden = true;
+  cancel.title = t("deploy.cancel");
+  cancel.setAttribute("aria-label", t("deploy.cancel"));
+  cancel.addEventListener("click", () => act("cancel", { unit: id }, button));
+  const cell = el("div", "unit");
+  cell.append(button, cancel);
+  return cell;
 }
 
 // ---- structures ----
 
 // structureEvent picks the log line for a structure event: whose it was decides the words.
 function structureEvent(ev, mySide) {
+  // A tech building was nobody's or somebody's: the line does not call it "the enemy's".
+  if (ev.kind === "structure_captured" && rules.techBuildings?.[ev.unit]) return ev.owner === mySide ? "structure_captured_tech" : ev.reason === "seen" ? "structure_seen_taken" : "structure_taken";
   if (ev.kind === "structure_lost" && ev.owner !== mySide) return "structure_lost_theirs";
   if (ev.kind === "structure_captured" && ev.owner !== mySide) return "structure_taken";
   return ev.kind;
 }
 
 // The Structures half of the build panel. Like the unit buttons, these only write a
-// radio call to the operator: a base structure's call is sent at once, and a defence's or
-// a fence's is put in the box so that the place can be changed first.
+// radio call to the operator: pressing one puts its ghost on the map, and the spot the
+// player confirms goes into the call (see "placing" below).
 // The build panel shows one of its two halves. It opens on Structures, since nothing can
 // be bought before something is built, and remembers the player's choice after that.
 let buildTab = localStorage.getItem("callsign.buildTab") === "units" ? "units" : "structures";
@@ -921,7 +1038,7 @@ function buildBadges(rising, deploying) {
 
 function renderStructures(canAct) {
   const cards = structureCards(state, rules, faction, side);
-  const key = JSON.stringify([lang, faction, canAct, cards.map((c) => [c.id, c.state, c.have])]);
+  const key = JSON.stringify([lang, faction, canAct, cards.map((c) => [c.id, c.state, c.have, wouldRunShort(state, c.def)])]);
   if (key !== drawn.structures) {
     drawn.structures = key;
     $("structures").replaceChildren(...cards.map((c) => structureButton(c, canAct)));
@@ -931,8 +1048,11 @@ function renderStructures(canAct) {
     if (!button) continue;
     button.querySelector(".fill").style.blockSize = card.state === "rising" ? `${card.progress * 100}%` : "0";
     button.classList.toggle("requested", card.state !== "rising" && waiting(`s:${card.id}`).length > 0);
+    // What a base usually builds next, as the game works it out: marked, never pressed for.
+    button.classList.toggle("next", Boolean(me) && card.def.role === state.opening && ["ready", "poor"].includes(card.state));
     if (card.state === "rising") button.querySelector(".why").textContent = t("structure.rising", { percent: Math.round(card.progress * 100) });
   }
+  renderRally(canAct);
   buildBadges(cards.filter((c) => c.state === "rising").length, (state.deploying ?? []).filter((d) => d.side === side).length);
 }
 
@@ -953,18 +1073,17 @@ function structureButton(card, canAct) {
   drawIcon(g, id, def, faction, sideColor[side]);
   const names = (ids) => ids.map((u) => unitDef(rules, u)?.name[lang] ?? u).join(", ");
   const what =
-    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
+    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "power" ? t("structure.power") : def.role === "radar" ? t("structure.radar") : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
   const why = {
     ready: what,
     poor: what,
     rising: t("structure.rising", { percent: Math.round(card.progress * 100) }),
-    have: t("structure.have"),
     busy: t("structure.busy"),
     full: t("structure.full"),
     needs: card.needs ? t("structure.needs", { structure: card.needs.def.name[lang] }) : "",
   }[card.state];
   const count = el("span", "count", String(card.have));
-  count.hidden = card.have < 1 || !["defence", "fence"].includes(def.role);
+  count.hidden = card.have < 1;
   button.title = what;
   button.append(
     el("i", "fill"),
@@ -974,12 +1093,163 @@ function structureButton(card, canAct) {
     el("span", "why", why),
     count,
   );
-  button.addEventListener("click", () => {
-    const fixed = def.role === "defence" || def.role === "fence";
-    if (fixed) draft(call("buildAt", { to: anvil(), structure: def.name[lang], place: t("place.front") }));
-    else transmit(call("build", { to: anvil(), structure: def.name[lang] }));
-  });
+  // What it does to the side's power, and a warning when it would leave the base short.
+  const short = wouldRunShort(state, def) && ["ready", "poor"].includes(card.state);
+  const tag = powerTag(def, short);
+  if (tag) button.querySelector(".cost").after(tag);
+  if (short) button.title = t("structure.short");
+  button.addEventListener("click", () => startPlacing(id, def));
   return button;
+}
+
+// ---- placing a structure, and picking where new squads gather ----
+//
+// Pressing a structure puts a ghost of it on the map. Under a mouse it follows the
+// pointer and a click on green ground confirms; under a finger a tap moves it and the
+// button confirms. Confirming sends the structure and its spot straight to the game: it
+// starts going up at once, or the refusal comes back with its reason.
+let placing = null; // { mode: "build", id, def, faction, spot, why, touch } or { mode: "rally" }
+let pointerKind = "mouse"; // what last touched the map
+
+function startPlacing(id, def) {
+  hideOrders();
+  placing = { mode: "build", id, def, faction, spot: null, why: "", run: RUNS[0].id, segs: null, touch: matchMedia("(pointer: coarse)").matches };
+  scene.placing = placing;
+  // Start on ground that will take it: under the middle of the view when that fits,
+  // otherwise the nearest that does, brought into view.
+  const cam = scene.cam;
+  const [cx, cy] = cam.world(cam.w / 2, cam.h / 2);
+  let spot = spotAt(rules, cx, cy);
+  if (canPlace(rules, state, side, def, spot.x, spot.y)) {
+    const fits = tint(rules, state, side, def, 20)
+      .filter((c) => c.ok)
+      .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))
+      .map((c) => spotAt(rules, c.x, c.y))
+      .find((s) => !canPlace(rules, state, side, def, s.x, s.y));
+    if (fits) {
+      spot = fits;
+      const [sx, sy] = cam.screen(spot.x, spot.y);
+      if (sx < 60 || sy < 60 || sx > cam.w - 60 || sy > cam.h - 150) cam.centerOn(spot.x, spot.y);
+    }
+  }
+  moveGhost(spot.x, spot.y);
+}
+
+// judge works out whether the ghost can stand where it is: a structure by its spot, a
+// fence by its whole run in the direction it was turned to.
+function judge() {
+  const { def, spot } = placing;
+  if (def.role !== "fence") return (placing.why = canPlace(rules, state, side, def, spot.x, spot.y));
+  const laid = runSegments(rules, state, side, def, spot.x, spot.y, placing.run);
+  placing.segs = laid.segs;
+  return (placing.why = laid.why);
+}
+
+function moveGhost(wx, wy) {
+  if (placing?.mode !== "build") return;
+  placing.spot = spotAt(rules, wx, wy);
+  judge();
+  renderPlacer();
+}
+
+// turnGhost turns a fence being placed to the next of the ways a run can lie.
+function turnGhost(step = 1) {
+  if (placing?.mode !== "build" || placing.def.role !== "fence" || !placing.spot) return false;
+  const at = RUNS.findIndex((r) => r.id === placing.run);
+  placing.run = RUNS[(at + step + RUNS.length) % RUNS.length].id;
+  judge();
+  renderPlacer();
+  return true;
+}
+
+function renderPlacer() {
+  $("placer").hidden = !placing;
+  if (!placing) return;
+  const build = placing.mode === "build";
+  const from = placing.structure ? saidStructure(placing.structure) : "";
+  $("placer-title").textContent = build ? t("placer.title", { structure: placing.def.name[lang] }) : from ? t("placer.rallyFrom", { structure: from }) : t("placer.rally");
+  // It may be placed all the same; the panel says what it will do to the base's power.
+  $("placer-warn").hidden = !(build && wouldRunShort(state, placing.def));
+  const why = $("placer-why");
+  // Why it cannot stand there, or the spot as the call will say it.
+  if (!build) why.textContent = "";
+  else if (placing.why) why.textContent = t(`placer.why.${placing.why}`);
+  else why.textContent = spotWords(t, placing.spot, pointName(placing.spot.point));
+  // A fence can be turned; the panel says which way it lies now.
+  const fence = build && placing.def.role === "fence";
+  $("placer-turn").hidden = !fence;
+  $("placer-run").hidden = !fence;
+  if (fence) $("placer-run").textContent = t("placer.run", { run: t(`run.${placing.run}`) });
+  why.classList.toggle("bad", build && Boolean(placing.why));
+  $("placer-hint").textContent = !build ? t("placer.rallyHint") : t(placing.touch ? "placer.hintTouch" : "placer.hint");
+  $("placer-ok").hidden = !build;
+  $("placer-ok").disabled = !build || !placing.spot || Boolean(placing.why);
+  $("placer-home").hidden = build;
+}
+
+function stopPlacing() {
+  placing = null;
+  scene.placing = null;
+  renderPlacer();
+}
+
+function confirmPlacing() {
+  if (placing?.mode !== "build" || !placing.spot || !me) return;
+  // The base may have changed since the ghost was put down.
+  if (judge()) return renderPlacer();
+  const { def, spot, run, id: placing_id } = placing;
+  stopPlacing();
+  // It starts at once, on that spot; a fence the way it was turned.
+  const card = $("structures").querySelector(`[data-structure="${placing_id}"]`);
+  act("build", { structure: placing_id, place: spotForm(spot), run: def.role === "fence" ? run : "" }, card);
+}
+
+$("placer-ok").addEventListener("click", confirmPlacing);
+$("placer-turn").addEventListener("click", () => turnGhost());
+// R turns a fence being placed, unless the player is typing.
+addEventListener("keydown", (ev) => {
+  if ((ev.key === "r" || ev.key === "R" || ev.key === "ר") && !ev.target.closest?.("input, textarea, select") && turnGhost()) ev.preventDefault();
+});
+$("placer-cancel").addEventListener("click", stopPlacing);
+$("placer-home").addEventListener("click", () => {
+  const from = placing?.structure;
+  stopPlacing();
+  act("rally", { place: "home", structure: from?.id ?? "" });
+});
+// startRally asks where new squads gather: all of them, or those one structure makes.
+function startRally(structure = null) {
+  hideOrders();
+  scene.placing = null;
+  placing = { mode: "rally", structure };
+  renderPlacer();
+}
+$("rally-set").addEventListener("click", () => startRally());
+addEventListener("keydown", (ev) => ev.key === "Escape" && placing && stopPlacing());
+// A press outside the map and the build panel puts the ghost away.
+addEventListener("pointerdown", (ev) => {
+  if (placing && !ev.target.closest?.('#map-wrap, #placer, [data-sheet="build"]')) stopPlacing();
+});
+
+// placeRally sets the rally point to what is under a tap: a named point, a tech building
+// or a landmark. A tap on open ground asks for nothing.
+function placeRally(wx, wy) {
+  const [sx, sy] = scene.cam.screen(wx, wy);
+  const hit = scene.pick(sx, sy, side);
+  const near = rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= rules.match.captureRadius * 1.15);
+  const tech = hit.structure?.role === "tech" ? hit.structure : null;
+  const mark = hit.landmark ?? hit.bridge;
+  const where = tech?.id ?? mark?.id ?? (hit.point ?? near)?.id;
+  if (!where) return;
+  const from = placing?.structure;
+  stopPlacing();
+  act("rally", { place: where, structure: from?.id ?? "" });
+}
+
+// renderRally says where new squads gather now, as the side's structures have it.
+function renderRally(canAct) {
+  const rally = (state.structures ?? []).find((s) => s.side === side && !s.ruin && s.rally)?.rally;
+  $("rally-place").textContent = rally ? placeName(rally.place) : t("rally.home");
+  $("rally-set").disabled = !canAct;
 }
 
 
@@ -1014,16 +1284,21 @@ attachGestures(canvas, {
   onTap: mapClick,
 });
 // Under a mouse, a landmark or a bridge shows its name.
+canvas.addEventListener("pointerdown", (ev) => (pointerKind = ev.pointerType));
 canvas.addEventListener("pointermove", (ev) => {
   if (ev.pointerType !== "mouse") return;
   const box = canvas.getBoundingClientRect();
   scene.hover = { x: ev.clientX - box.left, y: ev.clientY - box.top };
+  // The ghost of a structure being placed follows the mouse.
+  if (placing?.mode === "build" && state) moveGhost(...scene.cam.world(scene.hover.x, scene.hover.y));
 });
 canvas.addEventListener("pointerleave", () => (scene.hover = null));
 canvas.addEventListener(
   "wheel",
   (ev) => {
     ev.preventDefault();
+    // While a fence is being placed the wheel turns it; otherwise it zooms the map.
+    if (turnGhost(ev.deltaY < 0 ? -1 : 1)) return;
     const box = canvas.getBoundingClientRect();
     hideOrders();
     scene.cam.zoomAt(ev.clientX - box.left, ev.clientY - box.top, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
@@ -1036,7 +1311,7 @@ $("zoom-out").addEventListener("click", () => zoomBy(1 / 1.3));
 $("zoom-fit").addEventListener("click", () => scene.cam.fit());
 addEventListener("resize", () => scene.resize());
 
-$("radar-map").addEventListener("click", (ev) => rules && scene.cam.centerOn(...scene.radarToWorld(ev)));
+$("radar-map").addEventListener("click", (ev) => rules && state?.radar !== false && scene.cam.centerOn(...scene.radarToWorld(ev)));
 
 // A click on a squad selects it and starts a call. A click on a point, with a squad
 // selected, offers the three orders; with none, it adds the point's name to the message.
@@ -1045,25 +1320,41 @@ function mapClick(ev) {
   const box = canvas.getBoundingClientRect();
   const sx = ev.clientX - box.left;
   const sy = ev.clientY - box.top;
+  if (placing?.mode === "build") {
+    moveGhost(...scene.cam.world(sx, sy));
+    // A mouse click on green ground is the confirmation; a finger only moves the ghost.
+    if (pointerKind === "mouse" && !placing.why) confirmPlacing();
+    return;
+  }
+  if (placing?.mode === "rally") return placeRally(...scene.cam.world(sx, sy));
   const hit = scene.pick(sx, sy, side);
-  if (hit.squad) return select(hit.squad);
+  if (hit.squad) {
+    // The squad already picked, tapped again: what it can do where it stands.
+    if (hit.squad.id === scene.selected && canDigIn(unitDef(rules, hit.squad.unit))) {
+      return offerOrders({ title: `${hit.squad.callsign[lang]} → ${t("order.here")}`, actions: ["fortify"], say: () => call("fortify", { to: hit.squad.callsign[lang] }) }, box, sx, sy);
+    }
+    return select(hit.squad);
+  }
   hideOrders();
   if (hit.contact) {
     const name = scene.contactName(hit.contact, lang);
     const mine = state.squads.find((sq) => sq.id === scene.selected);
     if (!mine) return draft($("text").value + name);
-    // With a squad picked, an enemy offers one action: attack it.
-    return offerOrders(mine, name, ["attack"], () => call("attack", { to: mine.callsign[lang], point: name }), box, sx, sy);
+    // With a squad picked, an enemy offers one action: attack it. A hero may seize a vehicle.
+    const acts = heroOrders(rules, mine, { kind: "contact", cls: hit.contact.class }, ["attack"]);
+    return offerOrders({ title: `${mine.callsign[lang]} → ${name}`, actions: acts, say: (action) => call(action, { to: mine.callsign[lang], point: name }) }, box, sx, sy);
   }
   if (hit.structure) {
     // An enemy structure: engineers are sent to take it over, anyone else to attack it.
     const st = hit.structure;
     const mine = state.squads.find((sq) => sq.id === scene.selected);
-    if (st.side === side || !mine) return draft($("text").value + structureName(st));
+    if (st.side === side) return offerStructure(st, mine, box, sx, sy);
+    if (!mine) return draft($("text").value + structureName(st));
     // Engineers may take it over; anyone may attack it. The action pressed is sent at once.
-    const actions = unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"];
-    const say = (action) => call(action === "capture" ? "capture" : "attackStructure", { to: mine.callsign[lang], structure: structureName(st) });
-    return offerOrders(mine, structureName(st), actions, say, box, sx, sy);
+    const actions = heroOrders(rules, mine, { kind: "structure" }, unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"]);
+    const tech = st.role === "tech"; // not "the enemy's": it may be nobody's
+    const say = (action) => (action === "plant" ? call("plantStructure", { to: mine.callsign[lang], structure: structureName(st) }) : call(`${action === "capture" ? "capture" : "attackStructure"}${tech ? "Tech" : ""}`, { to: mine.callsign[lang], structure: structureName(st) }));
+    return offerOrders({ title: `${mine.callsign[lang]} → ${structureName(st)}`, actions, say }, box, sx, sy);
   }
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (hit.gusher && !hit.landmark && !hit.bridge) {
@@ -1081,20 +1372,35 @@ function mapClick(ev) {
   if (kind !== "point") scene.showName(place.id);
   if (!squad) return draft($("text").value + name);
   const said = kind === "point" ? name : placeName(place.id);
-  offerOrders(squad, name, ordersFor(kind), (action) => call(action, { to: squad.callsign[lang], point: said }), box, sx, sy);
+  const target = kind === "point" && place.kind === "hq" && place.owner !== side ? "enemyHQ" : kind;
+  offerOrders({ title: `${squad.callsign[lang]} → ${name}`, actions: heroOrders(rules, squad, { kind: target }, ordersFor(kind)), say: (action) => call(action, { to: squad.callsign[lang], point: said }) }, box, sx, sy);
 }
 
-// offerOrders opens the small menu of actions for a squad and a place, an enemy or a
-// structure. `say(action)` writes the call for the action pressed, and pressing one
-// transmits it at once.
+// offerOrders opens the one small menu of the map: the orders for a squad at a place, an
+// enemy or a structure, or what can be done with one of the player's own structures.
+//   title, facts: what the menu is about; actions: the buttons to show, by name;
+//   gold: what a button costs or gives back, by action; say(action): the call to send.
+// Pressing an order transmits its call at once. `say` may instead do the thing itself (a
+// sale, a repair) or start something that needs one more choice (where a rally point
+// goes), and return nothing.
 let orderCall = null;
-function offerOrders(squad, placeName, actions, say, box, sx, sy) {
+function offerOrders({ title, facts = "", actions, gold = {}, say }, box, sx, sy) {
   const menu = $("orders");
   orderCall = say;
-  $("orders-title").textContent = `${squad.callsign[lang]} → ${placeName}`;
-  for (const button of menu.querySelectorAll("button")) button.hidden = !actions.includes(button.dataset.order);
-  menu.style.left = `${Math.max(90, Math.min(box.width - 90, sx))}px`;
-  menu.style.top = `${Math.min(box.height - 90, sy)}px`;
+  $("orders-title").textContent = title;
+  $("orders-facts").textContent = facts;
+  for (const button of menu.querySelectorAll("button")) {
+    const act = button.dataset.order;
+    button.hidden = !actions.includes(act);
+    const icon = button.querySelector(".icon");
+    if (icon && !icon.firstChild) icon.innerHTML = iconSvg(act === "sell" ? "sell" : act === "rally" ? "rally" : "repair", 14);
+    const n = button.querySelector(".gold");
+    if (n) n.textContent = gold[act] ?? "";
+  }
+  // The reminder of what the three orders mean is shown with the three orders only.
+  $("orders-about").hidden = !["hold", "move", "attack"].every((a) => actions.includes(a));
+  menu.style.left = `${Math.max(110, Math.min(box.width - 110, sx))}px`;
+  menu.style.top = `${Math.max(8, Math.min(box.height - 130, sy))}px`;
   menu.hidden = false;
 }
 
@@ -1104,11 +1410,91 @@ function hideOrders() {
 
 for (const button of document.querySelectorAll("#orders button")) {
   button.addEventListener("click", () => {
-    const squad = state.squads.find((sq) => sq.id === scene.selected);
     const say = orderCall;
     hideOrders();
-    if (squad && say) order(say(button.dataset.order));
+    const text = me && !state?.over && say ? say(button.dataset.order) : null;
+    if (text) order(text);
   });
+}
+
+// ---- our own structures: rally, cancel, repair and sell ----
+
+// saidStructure is how a call names one of our structures: by its name, and by its id as
+// well when the side has more than one of the kind.
+function saidStructure(st) {
+  const same = (state.structures ?? []).filter((s) => s.side === side && !s.ruin && s.kind === st.kind && s.role !== "fence");
+  return same.length > 1 ? `${structureName(st)} ${st.id}` : structureName(st);
+}
+
+// offerStructure opens the menu for one of the player's own structures: where the units
+// it makes gather, the last unit in its line taken back, its repair and its sale. With
+// an engineer squad selected it also offers to send them in to mend it.
+function offerStructure(st, squad, box, sx, sy) {
+  const def = structureDef(rules, st);
+  const engineers = Boolean(squad && unitDef(rules, squad.unit)?.captureSeconds);
+  const line = (state.deploying ?? []).filter((d) => d.side === side && d.from === st.id);
+  const makes = Object.values(rules.factions[faction]?.units ?? {}).some((u) => u.requires === st.role);
+  const actions = me && !state.over ? structureActions(st, side, { engineers, makes, line: line.length }) : [];
+  if (!def || !actions.length) return draft($("text").value + structureName(st));
+  const facts = [st.building < 1 ? t("structure.rising", { percent: Math.round(st.building * 100) }) : `${Math.round(st.hp * 100)}%`];
+  if (st.repairing) facts.push(t("structure.repairing"));
+  if (st.dark) facts.push(t("structure.dark"));
+  if (st.rally) facts.push(`${t("rally.label")} ${placeName(st.rally.place)}`);
+  const last = line.at(-1);
+  // Sending engineers in is an order to a squad, so it is a radio call; the rest is the
+  // commander's own hand and happens at once.
+  const say = (what) => {
+    if (what === "rally") return startRally(st);
+    if (what === "mend") return call("mend", { to: squad.callsign[lang], structure: saidStructure(st) });
+    if (what === "cancel") act("cancel", { unit: last.unit });
+    else act(what, { place: st.id });
+    return null;
+  };
+  offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
+}
+
+// ---- where the build panel sits ----
+//
+// On a desktop the Structures / Reinforcements panel is a bar directly under the map, both
+// tabs one fixed height, so pressing a tab moves nothing else. On a phone it stays in the
+// sidebar, where it opens as a sheet. The same element is moved; nothing is drawn twice.
+const buildPanel = $("build-panel");
+const buildHome = document.createComment("the build panel's place in the sidebar");
+buildPanel.before(buildHome);
+const phoneLayout = matchMedia("(max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px)");
+function seatBuildPanel() {
+  const under = !phoneLayout.matches;
+  if (under) $("radio").before(buildPanel);
+  else buildHome.after(buildPanel);
+  buildPanel.classList.toggle("under-map", under);
+  scene.resize();
+}
+phoneLayout.addEventListener("change", seatBuildPanel);
+seatBuildPanel();
+
+// ---- the sidebar's folding sections ----
+//
+// A section with `data-fold` on its title folds away under it at a press, and stays so
+// (the choice is kept under the fold's name). `data-folded` is how it starts.
+for (const title of document.querySelectorAll("[data-fold]")) {
+  const key = `callsign.fold.${title.dataset.fold}`;
+  const panel = title.parentElement;
+  const set = (folded) => {
+    panel.classList.toggle("folded", folded);
+    title.setAttribute("aria-expanded", String(!folded));
+  };
+  const stored = localStorage.getItem(key);
+  set(stored === null ? title.hasAttribute("data-folded") : stored === "1");
+  title.tabIndex = 0;
+  title.setAttribute("role", "button");
+  const toggle = () => {
+    const folded = !panel.classList.contains("folded");
+    set(folded);
+    localStorage.setItem(key, folded ? "1" : "0");
+    scene.resize(); // the mini map may have just come back
+  };
+  title.addEventListener("click", toggle);
+  title.addEventListener("keydown", (ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), toggle()));
 }
 
 // ---- menus ----

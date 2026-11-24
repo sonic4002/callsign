@@ -32,7 +32,8 @@ type Player struct {
 	Style string
 	R     *shared.Rules
 
-	lastBuy int // tick of the last purchase or structure, for the styles that pace themselves
+	lastBuy  int // tick of the last purchase or structure, for the styles that pace themselves
+	lastHero int // tick of the last hero bought (hero.go)
 
 	// Released lets the lesson's enemy move. The page sets it when the lesson reaches the
 	// fight; until then that enemy does nothing at all.
@@ -60,8 +61,11 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		target, push = p.nearest("point", 1), sim.CmdHold
 	}
 	infantry, naval, vehicles, air, special := 0, 0, 0, 0, 0
+	heroes := 0
 	count := func(class, unit string) {
 		switch {
+		case p.isHero(unit):
+			heroes++
 		case class == shared.HaulerClass:
 			// Haulers are counted by the economy below, not as fighting squads.
 		case class == "air":
@@ -79,6 +83,18 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	for _, sq := range snap.Squads {
 		want := sim.Command{Side: p.Side, Squad: sq.ID}
 		switch {
+		case p.isHero(sq.Unit):
+			// A hero waits at the forward point and goes out for its own work.
+			want = p.heroOrder(snap, sq, sim.CmdHold, plan[min(1, len(plan)-1)])
+			if want.Kind == "" {
+				count(sq.Class, sq.Unit)
+				continue // at its work
+			}
+			if want.Kind == sim.CmdPlant || want.Kind == sim.CmdSeize {
+				cmds = append(cmds, want)
+				count(sq.Class, sq.Unit)
+				continue
+			}
 		case sq.Class == "naval":
 			want.Kind, want.Point = sim.CmdHold, p.seaRig()
 		case sq.Class == "infantry" && sq.Unit == line["infantry"] && infantry < len(plan):
@@ -140,13 +156,13 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 					return cmds // save for it
 				}
 			}
-		} else if snap.Gold >= u.Cost {
+		} else if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) {
 			return append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
 		} else if haulers == 0 {
 			return cmds // save for the hauler
 		}
 	}
-	if len(snap.Squads)+len(snap.Deploying) >= p.R.Match.PopulationCap {
+	if len(snap.Squads)+len(snap.Deploying)+snap.Taken >= p.R.Match.PopulationCap {
 		return cmds
 	}
 	if paced && (len(snap.Squads)+len(snap.Deploying) >= slow.squads || (p.lastBuy > 0 && snap.Tick-p.lastBuy < slow.buyEvery*p.R.TickRate)) {
@@ -154,7 +170,11 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	}
 	// What the base needs whatever is bought next (base.go).
 	if step := p.upkeep(snap, vehicles); step.build != nil {
-		p.lastBuy = snap.Tick + 1
+		// The three structures every base opens with do not use up a paced level's turn
+		// to buy: an easy enemy is slow to field squads, not slow to exist.
+		if first := snap.Opening; step.build.Kind != sim.CmdBuild || (first != shared.RolePower && first != shared.RoleRefinery && first != shared.RoleBarracks) {
+			p.lastBuy = snap.Tick + 1
+		}
 		return append(cmds, *step.build)
 	} else if step.wait {
 		return cmds
@@ -173,6 +193,8 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		if id := p.specialist(snap.Faction, line); id != "" {
 			buy = id
 		}
+	case heroes == 0 && p.wantsHero(snap) && p.heroID(snap.Faction) != "":
+		buy = p.heroID(snap.Faction)
 	}
 	u, ok := p.R.Factions[snap.Faction].Units[buy]
 	if !ok {
@@ -186,9 +208,12 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		}
 		return cmds
 	}
-	if snap.Gold >= u.Cost {
+	if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) {
 		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: buy})
 		p.lastBuy = snap.Tick + 1
+		if u.Hero {
+			p.lastHero = snap.Tick + 1
+		}
 	}
 	return cmds
 }
@@ -346,7 +371,7 @@ func (p *Player) unitOf(faction, class string) (string, shared.Unit) {
 func (p *Player) specialist(faction string, line map[string]string) string {
 	units := p.R.Factions[faction].Units
 	for _, id := range sortedIDs(units) {
-		if u := units[id]; line[u.Class] != id && !u.Engineer() && u.Class != shared.HaulerClass {
+		if u := units[id]; line[u.Class] != id && !u.Engineer() && u.Class != shared.HaulerClass && !u.Hero {
 			return id
 		}
 	}
@@ -386,4 +411,25 @@ func (p *Player) lesson(snap sim.Snapshot) []sim.Command {
 		return nil
 	}
 	return []sim.Command{{Side: p.Side, Squad: first.ID, Kind: sim.CmdAttack, Point: target}}
+}
+
+// lineFull reports whether the structures of a role have no room left in their lines:
+// each makes one unit at a time and lets only so many wait (sim/queue.go).
+func (p *Player) lineFull(snap sim.Snapshot, role string) bool {
+	if role == "" {
+		return false
+	}
+	makers := map[string]bool{}
+	for _, st := range snap.Structures {
+		if st.Side == p.Side && st.Role == role && !st.Ruin && st.Building >= 1 {
+			makers[st.ID] = true
+		}
+	}
+	waiting := 0
+	for _, d := range snap.Deploying {
+		if makers[d.From] {
+			waiting++
+		}
+	}
+	return len(makers) > 0 && waiting >= len(makers)*p.R.Match.QueueLimit
 }

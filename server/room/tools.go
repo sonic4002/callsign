@@ -27,8 +27,8 @@ var ErrWhichPlace = errors.New("which one")
 
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
-	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair},
-	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul},
+	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair, ToolFortify, ToolPlant, ToolSeize},
+	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul, ToolCancel, ToolRally, ToolSell, ToolRepair},
 }
 
 // names accepts "Hammer" as well as ["Viper 1", "Viper 2"].
@@ -60,6 +60,7 @@ type toolArgs struct {
 	Structure string `json:"structure"`
 	Place     string `json:"place"`
 	Place2    string `json:"place2"`
+	Run       string `json:"run"`
 	Field     string `json:"field"`  // haul: a gold field by its point ("Kilo", "K", "the airfield"), or "auto"
 	Hauler    int    `json:"hauler"` // haul: one hauler's id, or 0 for all of them
 }
@@ -88,15 +89,28 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 	case ToolReport:
 		return rm.toolReport(c)
 	case ToolBuy:
-		return rm.toolBuy(side, a)
+		res, err := rm.toolBuy(side, a)
+		rm.cueRefusal(side, err)
+		return res, err
 	case ToolCommand:
 		return rm.toolCommand(side, a)
 	case ToolBuild:
-		return rm.toolBuild(side, a)
+		res, err := rm.toolBuild(side, a)
+		rm.cueRefusal(side, err)
+		return res, err
+	case ToolSell:
+		return rm.toolSell(side, a)
 	case ToolCapture, ToolRepair:
+		if c.ID.Role == RoleAnvil {
+			return rm.toolMend(side, a) // the operator pays to mend; engineers go in themselves
+		}
 		return rm.toolEngineer(c, name, a)
 	case ToolHaul:
 		return rm.toolHaul(side, a)
+	case ToolCancel:
+		return rm.toolCancel(side, a)
+	case ToolRally:
+		return rm.toolRally(side, a)
 	}
 
 	// move, hold, attack, repair: always the caller's own squad.
@@ -112,7 +126,7 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
 			x, y = sq.Center()
 		}
-		place, err := rm.place(side, where, name == ToolAttack, x, y)
+		place, err := rm.place(side, where, name == ToolAttack || name == ToolPlant, x, y)
 		switch {
 		case errors.Is(err, ErrWhichPlace):
 			return nil, err
@@ -255,7 +269,12 @@ func (rm *Room) toolBuy(side int, a toolArgs) (any, error) {
 	out := map[string]any{"squad": rm.squadName(sq), "unit": sq.Unit, "tier": sq.Tier, "gold": rm.sim.Gold(side), "announced": own}
 	if sq.Deploying() {
 		// The squad is on its way: it joins the net and takes orders when it reaches the field.
-		out["deploySeconds"] = float64(sq.DeployTicks) / float64(rm.r.TickRate)
+		// Its structure makes one unit at a time, so those ahead of it in line come first.
+		from, pos, ahead := rm.sim.LineOf(sq)
+		out["deploySeconds"] = float64(ahead+sq.DeployTicks) / float64(rm.r.TickRate)
+		if from != "" {
+			out["from"], out["inLine"] = from, pos
+		}
 	}
 	return out, nil
 }

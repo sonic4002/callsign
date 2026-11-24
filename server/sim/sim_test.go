@@ -109,7 +109,9 @@ func checkInvariants(t *testing.T, s *sim.Sim) {
 		if !sq.Alive {
 			continue
 		}
-		if !sq.IsHauler() {
+		if from, taken := s.SeizedFrom(sq.ID); taken {
+			alive[from]++ // a squad a hero holds still counts for the side it will go back to
+		} else if !sq.IsHauler() {
 			alive[sq.Side]++ // haulers have their own cap
 		}
 		domain := rules.Factions[s.Sides[sq.Side].Faction].Units[sq.Unit].Domain
@@ -248,6 +250,7 @@ func TestPopulationCap(t *testing.T) {
 	run(s, 200) // HQ well alone: plenty of gold
 	for i := 2; i < rules.Match.PopulationCap; i++ {
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"})
+		run(s, 5) // the barracks makes one at a time: let its line move on
 	}
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !errors.Is(err, sim.ErrPopCap) {
 		t.Fatalf("buy past the cap: err = %v, want ErrPopCap", err)
@@ -451,6 +454,9 @@ func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
 					continue // a hauler cannot answer anyway: it runs when it is shot at
 				}
 				for enemyID, e := range g.Units {
+					if e.Hero {
+						continue // a hero's shot gives it away like indirect fire does: see the hero tests
+					}
 					if e.MinRange == 0 && u.Sight < e.Range {
 						t.Errorf("%s %s sees %.0f but %s %s shoots %.0f", mine, id, u.Sight, theirs, enemyID, e.Range)
 					}
@@ -515,6 +521,7 @@ func TestCapCountsDeployingSquads(t *testing.T) {
 		if sq := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !sq.Deploying() {
 			t.Fatal("a bought squad was fielded at once")
 		}
+		run(s, 3) // the line at the barracks is short: let it move on
 	}
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}); !errors.Is(err, sim.ErrPopCap) {
 		t.Fatalf("buy past the cap while squads deploy: err = %v, want ErrPopCap", err)
@@ -582,6 +589,11 @@ func TestPacedEnemiesAreBeatable(t *testing.T) {
 func place(sq *sim.Squad, x, y float64) {
 	for i := range sq.Teams {
 		sq.Teams[i].X, sq.Teams[i].Y = x+float64(i)*6, y
+	}
+	// A squad fresh out of its structure is walking to where its kind gathers; staged
+	// somewhere else, it stays there.
+	if sq.Order.Kind == sim.OrderMove && sq.Order.Point == "" && sq.Order.Place == "" {
+		sq.Order = sim.Order{Kind: sim.OrderNone}
 	}
 }
 

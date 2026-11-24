@@ -38,6 +38,10 @@ export const gusherAt = (rules, p) => (rules.map.gushers ?? []).find((g) => g.x 
 // gusherOfPoint is the gusher named after a map point on the radio ("the Kilo field").
 export const gusherOfPoint = (rules, id) => (rules.map.gushers ?? []).find((g) => g.point === id) ?? null;
 
+// fieldSeen reports whether this side has ever had the field in sight. A server that
+// does not say is taken to mean yes.
+export const fieldSeen = (state, id) => (state.fields ?? []).find((f) => f.gusher === id)?.seen !== false;
+
 // fieldShare is how full a field is, 0…1, as this side last saw it.
 export const fieldShare = (state, id) => (state.fields ?? []).find((f) => f.gusher === id)?.gold ?? 0;
 

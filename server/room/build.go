@@ -56,6 +56,9 @@ func (rm *Room) place(side int, text string, enemy bool, nearX, nearY float64) (
 	if id := rm.structureNamed(side, low, enemy, nearX, nearY); id != "" {
 		return id, nil
 	}
+	if id := rm.builtPlace(side, low, nearX, nearY); id != "" {
+		return id, nil
+	}
 	place, choices, ok := rm.net.ResolvePlace(text)
 	switch {
 	case ok:
@@ -87,12 +90,21 @@ func (rm *Room) structureNamed(side int, low string, enemy bool, x, y float64) s
 	}
 	best, bd := "", math.MaxFloat64
 	for _, st := range rm.sim.Snapshot(side).Structures {
+		// A tech building called by its own name on the map ("the clinic east of Delta")
+		// is that one, whoever holds it.
+		if !st.Ruin && st.Site != "" {
+			for _, site := range rm.r.Map.TechBuildings {
+				if site.ID == st.Site && (strings.Contains(low, strings.ToLower(site.Name.En)) || strings.Contains(low, site.Name.He)) {
+					return st.ID
+				}
+			}
+		}
 		if st.Ruin || (st.Side != side) != enemy {
 			continue
 		}
-		def := rm.r.Factions[st.Faction].Structures[st.Kind]
+		def, _ := rm.r.StructureDef(st.Faction, st.Kind)
 		named := false
-		for _, name := range []string{def.Name.En, def.Name.He, st.Kind, st.Role, roleWord(st.Role)} {
+		for _, name := range append([]string{def.Name.En, def.Name.He, st.Kind, st.Role, roleWord(st.Role), st.Site}, def.Aliases...) {
 			named = named || (name != "" && strings.Contains(low, strings.ToLower(name)))
 		}
 		if !named {
@@ -163,6 +175,9 @@ func (rm *Room) toolBuild(side int, a toolArgs) (any, error) {
 	if cmd.Place2, err = rm.place(side, a.Place2, false, hq.X, hq.Y); err != nil {
 		return nil, err
 	}
+	if cmd.Run, err = fenceRun(a.Run); err != nil {
+		return nil, err
+	}
 	st, err := rm.sim.Build(cmd)
 	if err != nil {
 		return nil, err
@@ -226,6 +241,12 @@ type StructureBrief struct {
 	Y        float64 `json:"y"`
 	HP       float64 `json:"hp"`
 	Building bool    `json:"building,omitempty"`
+	// A tech building: whose it is ("yours", "enemy" or "nobody") and what holding it gives.
+	Holder string `json:"holder,omitempty"`
+	Gives  string `json:"gives,omitempty"`
+	// What this one is called on the map, in both languages ("the clinic east of Delta").
+	Site   string `json:"site,omitempty"`
+	SiteHe string `json:"siteHe,omitempty"`
 }
 
 // structureBriefs lists the structures a side knows of, for a leader's report: its own
@@ -237,11 +258,75 @@ func (rm *Room) structureBriefs(snap sim.Snapshot) []StructureBrief {
 		if st.Ruin || st.Role == shared.RoleFence {
 			continue
 		}
-		def := rm.r.Factions[st.Faction].Structures[st.Kind]
-		out = append(out, StructureBrief{
+		def, _ := rm.r.StructureDef(st.Faction, st.Kind)
+		b := StructureBrief{
 			ID: st.ID, Name: def.Name.En, Role: st.Role, Yours: st.Side == snap.Side, Near: rm.near(st.X, st.Y),
 			X: st.X, Y: st.Y, HP: math.Round(st.HP*100) / 100, Building: st.Building < 1,
-		})
+		}
+		if st.Role == shared.RoleTech {
+			b.Gives = def.About.En
+			for _, site := range rm.r.Map.TechBuildings {
+				if site.ID == st.Site {
+					b.Site, b.SiteHe = site.Name.En, site.Name.He
+				}
+			}
+			switch st.Side {
+			case snap.Side:
+				b.Holder = "yours"
+			case sim.NoSide:
+				b.Holder = "nobody"
+			default:
+				b.Holder = "enemy"
+			}
+		}
+		out = append(out, b)
 	}
 	return out
+}
+
+// fenceRun reads the way a fence is to lie from what the operator wrote: the short form
+// ("ns"), compass words in either order ("north-south", "south to north", "NE-SW"), or
+// the same in Hebrew. Empty stays empty: the run then faces the enemy.
+func fenceRun(text string) (string, error) {
+	low := strings.ToLower(strings.TrimSpace(text))
+	if low == "" {
+		return "", nil
+	}
+	if _, ok := sim.FenceRuns[low]; ok {
+		return low, nil
+	}
+	has := func(words ...string) bool {
+		for _, w := range words {
+			if strings.Contains(low, w) {
+				return true
+			}
+		}
+		return false
+	}
+	n, so := has("north", "צפון"), has("south", "דרום")
+	e, w := has("east", "מזרח"), has("west", "מערב")
+	switch low {
+	case "n-s", "s-n":
+		n, so = true, true
+	case "e-w", "w-e":
+		e, w = true, true
+	case "ne-sw", "sw-ne":
+		return "nesw", nil
+	case "nw-se", "se-nw":
+		return "nwse", nil
+	}
+	switch {
+	case n && so && e && w:
+		// A diagonal: which end is north decides it ("north-east to south-west").
+		ne := strings.Contains(low, "north-east") || strings.Contains(low, "northeast") || strings.Contains(low, "צפון-מזרח") || strings.Contains(low, "צפון־מזרח") || strings.Contains(low, "צפון מזרח")
+		if ne {
+			return "nesw", nil
+		}
+		return "nwse", nil
+	case n && so:
+		return "ns", nil
+	case e && w:
+		return "ew", nil
+	}
+	return "", fmt.Errorf("%w: a fence runs north-south, east-west, northeast-southwest or northwest-southeast, not %q", sim.ErrBadPlace, text)
 }

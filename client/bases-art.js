@@ -3,7 +3,7 @@
 // otherwise each role has a code-drawn picture here, in the faction's colours, so a
 // missing sprite never leaves a gap.
 
-import { drawBuilding, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
+import { drawBuilding, drawDoor, drawPoweredStructure, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
 import { toIso } from "./iso.js";
 
 const palettes = {
@@ -110,6 +110,28 @@ export const fallbacks = {
     ctx.fillStyle = p.dark;
     ctx.fillRect(37, -8, 6, 5);
   },
+  power(ctx, p) {
+    // A turbine hall with two stacks.
+    shadow(ctx, 36, 15, 0.3);
+    box(ctx, p, -4, 2, 46, 32, 15, p.wall);
+    for (const x of [-12, 6]) {
+      line(ctx, p.metal, 6, x, -14, x, -40);
+      disc(ctx, p.dark, x, -40, 3, 1.5);
+    }
+    tank(ctx, p, 24, 4, 8, 14);
+  },
+  radar(ctx, p, time) {
+    // A low hut and a dish on a mast; the dish swings with the clock.
+    shadow(ctx, 30, 13, 0.3);
+    box(ctx, p, -8, 4, 34, 26, 11, p.wall);
+    line(ctx, p.metal, 3, 12, 0, 12, -34);
+    const turn = Math.cos((time ?? 0) * 1.05);
+    ctx.fillStyle = p.trim;
+    ctx.beginPath();
+    ctx.ellipse(12, -38, 4 + 9 * Math.abs(turn), 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    line(ctx, p.dark, 1.4, 12, -38, 12 + 9 * turn, -43);
+  },
   defence(ctx, p, time, def) {
     shadow(ctx, 15, 7, 0.3);
     isoBox(ctx, 0, 2, 26, 26, 6, "#8d8468", "#5d5744", "#716a52"); // sandbags
@@ -136,7 +158,8 @@ function rubble(ctx, p) {
 const heights = { barracks: 46, refinery: 62, works: 60, airbase: 56, dockyard: 54, defence: 40 };
 
 // drawStructure draws one structure standing on the origin of the context.
-//   st: { kind, role, faction, building, ruin }  def: its rules entry  color: its side's colour
+//   st: { kind, role, faction, building, ruin, door }  def: its rules entry  color: its side's colour
+//   door: "open" or "lit" while a unit comes out of it
 export function drawStructure(ctx, st, def, color, time) {
   const p = palettes[st.faction] ?? palettes.aegis;
   if (st.ruin) {
@@ -145,12 +168,15 @@ export function drawStructure(ctx, st, def, color, time) {
     return;
   }
   const paint = () => {
-    if (sprites.buildings[st.kind]) drawBuilding(ctx, st.kind, color, time);
+    // A structure short of power stands dark, and a radar's dish turns only with power.
+    if (sprites.buildings[st.kind] && (st.dark || sprites.buildings[st.kind].spin)) drawPoweredStructure(ctx, st.kind, color, time, !st.dark);
+    else if (sprites.buildings[st.kind]) drawBuilding(ctx, st.kind, color, time);
     else (fallbacks[st.role] ?? fallbacks.barracks)(ctx, p, time, def);
   };
   const rising = st.building < 1;
   if (!rising) {
     paint();
+    if (st.door && st.door !== "closed") drawDoor(ctx, st.kind, st.door);
     if (!sprites.buildings[st.kind] && st.role !== "defence") flag(ctx, color, -30, 2, time);
     return;
   }

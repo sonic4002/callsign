@@ -112,7 +112,8 @@ body.no-server #no-server {
     padding-block: 4px; padding-inline: max(.6rem, var(--safe-s)) max(.6rem, var(--safe-e));
   }
   html:not([data-sheet="radio"]) #log { justify-content: flex-end; gap: 0; }
-  html:not([data-sheet="radio"]) #log li:not(:nth-last-child(-n+4)) { display: none; }
+  /* The page marks which four: radio to the player comes before system lines (cues.js). */
+  html:not([data-sheet="radio"]) #log li:not(.strip) { display: none; }
   html:not([data-sheet="radio"]) #log li { block-size: 22px; line-height: 22px; flex: none; }
   html:not([data-sheet="radio"]) #log .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
   html:not([data-sheet="radio"]) #log .who { min-inline-size: 0; }
@@ -142,7 +143,7 @@ body.no-server #no-server {
   #controls button, #roster .tier button { min-block-size: 44px; min-inline-size: 44px; padding-inline: .8rem; font-size: .85rem; }
   #roster li { min-block-size: 52px; padding: .45rem .6rem; }
   #build { grid-template-columns: repeat(auto-fill, minmax(5.6rem, 1fr)); gap: 6px; }
-  #build button { min-block-size: 88px; font-size: .8rem; }
+  #build button[data-unit] { min-block-size: 88px; font-size: .8rem; }
   #structures { grid-template-columns: repeat(auto-fill, minmax(5.6rem, 1fr)); gap: 6px; }
   #structures button { min-block-size: 96px; font-size: .78rem; }
   #structure-list li { min-block-size: 32px; }
@@ -213,7 +214,7 @@ body.no-server #no-server {
 @media (max-height: 500px) and (orientation: landscape) {
   :root { --strip: 38px; --send: 46px; --tick: 52px; --tabs: 0px; --rail: 76px; }
   /* Sideways there is little height: two lines of the log, not four. */
-  html:not([data-sheet="radio"]) #log li:not(:nth-last-child(-n+2)) { display: none; }
+  html:not([data-sheet="radio"]) #log li:not(.strip2) { display: none; }
 
   #map-wrap {
     inset-inline: 0 calc(var(--rail) + var(--safe-e));
@@ -277,4 +278,12 @@ body.no-server #no-server {
   #lobby-map-cards strong, #lobby-map-cards small { overflow-wrap: anywhere; }
   #lobby-gold-other { min-block-size: 44px; font-size: 16px; }
   #lobby-match canvas { inline-size: 6rem; }
+}
+
+/* ---- power and our own structures, on a phone ---- */
+@media (max-width: 820px), (pointer: coarse) and (max-height: 520px) {
+  /* In the strip there is room for the bolt and the two numbers; low power turns them to the warning colour. */
+  #power { display: flex; align-items: center; gap: .25rem; font-size: .72rem; white-space: nowrap; }
+  #power[hidden] { display: none; }
+  #power .label, #power .bar, #power .state { display: none; }
 }

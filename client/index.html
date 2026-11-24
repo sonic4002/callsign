@@ -42,14 +42,40 @@
           <button type="button" class="primary" id="coach-real" data-i18n="tut.real" hidden></button>
         </div>
       </aside>
+      <!-- Placing a structure, or picking where new squads gather: what the ghost says, and
+           the buttons a thumb reaches. -->
+      <div id="placer" hidden>
+        <strong id="placer-title"></strong>
+        <span id="placer-why" dir="auto"></span>
+        <span id="placer-warn" hidden data-i18n="structure.short"></span>
+        <span id="placer-run" hidden></span>
+        <small id="placer-hint"></small>
+        <div>
+          <button type="button" class="primary" id="placer-ok" data-i18n="placer.ok"></button>
+          <button type="button" id="placer-turn" data-i18n="placer.turn" hidden></button>
+          <button type="button" id="placer-home" data-i18n="placer.rallyHome" hidden></button>
+          <button type="button" id="placer-cancel" data-i18n="placer.cancel"></button>
+        </div>
+      </div>
+      <!-- The one small menu of the map: orders for a squad, or what to do with a structure
+           of the player's own. Every button writes a radio call and sends it at once. -->
       <div id="orders" hidden>
         <strong id="orders-title"></strong>
+        <small id="orders-facts" dir="auto"></small>
         <div>
           <button type="button" data-order="hold" data-i18n="act.hold"></button>
           <button type="button" data-order="move" data-i18n="act.move"></button>
           <button type="button" data-order="attack" data-i18n="act.attack"></button>
           <button type="button" data-order="cover" data-i18n="act.cover" hidden></button>
           <button type="button" data-order="capture" data-i18n="act.capture" hidden></button>
+          <button type="button" data-order="fortify" data-i18n="act.fortify" hidden></button>
+          <button type="button" data-order="plant" data-i18n="act.plant" hidden></button>
+          <button type="button" data-order="seize" data-i18n="act.seize" hidden></button>
+          <button type="button" data-order="rally" hidden><span class="icon"></span><span data-i18n="act.rally"></span></button>
+          <button type="button" data-order="cancel" hidden><span data-i18n="act.cancel"></span></button>
+          <button type="button" data-order="repair" hidden><span class="icon"></span><span data-i18n="act.repair"></span><bdi dir="ltr" class="gold"></bdi></button>
+          <button type="button" data-order="mend" hidden><span class="icon"></span><span data-i18n="act.mend"></span></button>
+          <button type="button" data-order="sell" hidden><span class="icon"></span><span data-i18n="act.sell"></span><bdi dir="ltr" class="gold"></bdi></button>
         </div>
         <small id="orders-about" data-i18n="orders.about"></small>
       </div>
@@ -96,11 +122,13 @@
         <label><span data-i18n="hqOurs"></span><i class="bar ours"><b id="hq-ours"></b></i></label>
         <label><span data-i18n="hqEnemy"></span><i class="bar enemy"><b id="hq-enemy"></b></i></label>
       </div>
+      <!-- What the side's structures supply and use; it turns to a warning when power is low. -->
+      <div id="power" hidden><span class="icon"></span><span class="label" data-i18n="power"></span><bdi dir="ltr" class="figures"></bdi><i class="bar"><b></b></i><small class="state"></small></div>
     </section>
 
     <section class="panel" data-sheet="more">
-      <h2 data-i18n="radar"></h2>
-      <canvas id="radar-map" dir="ltr"></canvas>
+      <h2 data-fold="radar"><span data-i18n="radar"></span></h2>
+      <div id="radar-box"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
     </section>
 
     <section class="panel grow" data-sheet="squads">
@@ -113,7 +141,9 @@
     </section>
 
 
-    <section class="panel" data-sheet="build">
+    <!-- On a desktop the page moves this panel under the map (debug.js: seatBuildPanel);
+         on a phone it stays here and opens as the build sheet. -->
+    <section class="panel" id="build-panel" data-sheet="build">
       <!-- One panel, two tabs: what to build with, and what to buy with it. -->
       <div class="tabs" id="build-tabs" role="tablist">
         <button type="button" role="tab" data-build-tab="structures"><span data-i18n="structures"></span> <bdi dir="ltr" class="badge" id="structures-badge" hidden></bdi></button>
@@ -123,6 +153,7 @@
         <div id="structures"></div>
       </div>
       <div data-build-pane="units" hidden>
+        <p id="rally"><span data-i18n="rally.label"></span> <strong id="rally-place" dir="auto"></strong> <button type="button" id="rally-set" data-i18n="rally.set"></button></p>
         <div id="build"></div>
       </div>
     </section>
@@ -250,10 +281,24 @@
       <dl class="asked">
         <dt data-i18n="help.q.orders"></dt><dd data-i18n="help.a.orders"></dd>
         <dt data-i18n="help.q.move"></dt><dd data-i18n="help.a.move"></dd>
-        <dt data-i18n="help.q.auto"></dt><dd data-i18n="help.a.auto"></dd>
-        <dt data-i18n="help.q.upgrade"></dt><dd data-i18n="help.a.upgrade"></dd>
-        <dt data-i18n="help.q.speed"></dt><dd data-i18n="help.a.speed"></dd>
+        <dt data-i18n="help.q.cover"></dt><dd data-i18n="help.a.cover"></dd>
+        <dt data-i18n="help.q.bridges"></dt><dd data-i18n="help.a.bridges"></dd>
+        <dt data-i18n="help.q.place"></dt><dd data-i18n="help.a.place"></dd>
+        <dt data-i18n="help.q.turn"></dt><dd data-i18n="help.a.turn"></dd>
+        <dt data-i18n="help.q.power"></dt><dd data-i18n="help.a.power"></dd>
+        <dt data-i18n="help.q.radar"></dt><dd data-i18n="help.a.radar"></dd>
+        <dt data-i18n="help.q.line"></dt><dd data-i18n="help.a.line"></dd>
+        <dt data-i18n="help.q.sell"></dt><dd data-i18n="help.a.sell"></dd>
+        <dt data-i18n="help.q.tech"></dt><dd data-i18n="help.a.tech"></dd>
+        <dt data-i18n="help.q.defences"></dt><dd data-i18n="help.a.defences"></dd>
         <dt data-i18n="help.q.units"></dt><dd data-i18n="help.a.units"></dd>
+        <dt data-i18n="help.q.auto"></dt><dd data-i18n="help.a.auto"></dd>
+        <dt data-i18n="help.q.cues"></dt><dd data-i18n="help.a.cues"></dd>
+        <dt data-i18n="help.q.upgrade"></dt><dd data-i18n="help.a.upgrade"></dd>
+        <dt data-i18n="help.q.heroes"></dt><dd data-i18n="help.a.heroes"></dd>
+        <dt data-i18n="help.q.digIn"></dt><dd data-i18n="help.a.digIn"></dd>
+        <dt data-i18n="help.q.ranks"></dt><dd data-i18n="help.a.ranks"></dd>
+        <dt data-i18n="help.q.speed"></dt><dd data-i18n="help.a.speed"></dd>
       </dl>
       <h2 data-i18n="strict"></h2>
       <ul>
@@ -278,6 +323,9 @@
         <li><span data-i18n="help.inside"></span><code dir="auto" data-i18n="help.inside.say"></code></li>
         <li><span data-i18n="help.repair"></span><code dir="auto" data-i18n="help.repair.say"></code></li>
         <li><span data-i18n="help.seize"></span><code dir="auto" data-i18n="help.seize.say"></code></li>
+        <li><span data-i18n="help.digIn"></span><code dir="auto" data-i18n="help.digIn.say"></code></li>
+        <li><span data-i18n="help.plant"></span><code dir="auto" data-i18n="help.plant.say"></code></li>
+        <li><span data-i18n="help.take"></span><code dir="auto" data-i18n="help.take.say"></code></li>
         <li><span data-i18n="help.several"></span><code dir="auto" data-i18n="help.several.say"></code></li>
         <li><span data-i18n="help.report"></span><code dir="auto" data-i18n="help.report.say"></code></li>
         <li><span data-i18n="help.all"></span><code dir="auto" data-i18n="help.all.say"></code></li>
@@ -289,8 +337,15 @@
         <li><span data-i18n="help.buy"></span><code dir="auto" data-i18n="help.buy.say"></code></li>
         <li><span data-i18n="help.openBase"></span><code dir="auto" data-i18n="help.openBase.say"></code></li>
         <li><span data-i18n="help.buildWorks"></span><code dir="auto" data-i18n="help.buildWorks.say"></code></li>
+        <li><span data-i18n="help.placeSpot"></span><code dir="auto" data-i18n="help.placeSpot.say"></code></li>
+        <li><span data-i18n="help.cancelUnit"></span><code dir="auto" data-i18n="help.cancelUnit.say"></code></li>
+        <li><span data-i18n="help.rally"></span><code dir="auto" data-i18n="help.rally.say"></code></li>
         <li><span data-i18n="help.defend"></span><code dir="auto" data-i18n="help.defend.say"></code></li>
         <li><span data-i18n="help.haul"></span><code dir="auto" data-i18n="help.haul.say"></code></li>
+        <li><span data-i18n="help.power"></span><code dir="auto" data-i18n="help.power.say"></code></li>
+        <li><span data-i18n="help.radar"></span><code dir="auto" data-i18n="help.radar.say"></code></li>
+        <li><span data-i18n="help.sell"></span><code dir="auto" data-i18n="help.sell.say"></code></li>
+        <li><span data-i18n="help.repairStructure"></span><code dir="auto" data-i18n="help.repairStructure.say"></code></li>
         <li><span data-i18n="help.buyNaval"></span><code dir="auto" data-i18n="help.buyNaval.say"></code></li>
         <li><span data-i18n="help.upgrade"></span><code dir="auto" data-i18n="help.upgrade.say"></code></li>
       </ul>
@@ -313,6 +368,7 @@
       <span id="track"></span>
     </div>
     <label class="check"><input type="checkbox" id="voices"> <span data-i18n="settings.voices"></span></label>
+    <label class="check"><input type="checkbox" id="cue-voice" checked> <span data-i18n="cueVoice"></span></label>
     <h2 data-i18n="settings.radio"></h2>
     <label><span data-i18n="strict"></span>
       <select id="strict">

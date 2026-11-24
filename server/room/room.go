@@ -83,6 +83,9 @@ type Message struct {
 	// Landmarks are the landmarks and bridges the body names, by id.
 	Landmarks []string `json:"landmarks,omitempty"`
 	Final     bool     `json:"final,omitempty"` // the operator's sign-off when the match ends
+	// Cue names the base cue this is (see cues.go): a fixed line the server wrote in the
+	// operator's name, not something the operator's agent thought of.
+	Cue string `json:"cue,omitempty"`
 }
 
 // Client is one connection. Out carries the JSON frames to write to it; it is closed
@@ -117,6 +120,12 @@ type Room struct {
 	seats     [2]seat
 	quiet     time.Time // since when no person has been connected; zero while one is
 	closed    bool
+
+	// The tick each kind of base cue was last said to each side; see cues.go.
+	cued [2]map[string]int
+	// direct is set while the commander's own hand is at work (act.go): what it builds or
+	// buys needs nobody's leave and is not announced as the operator's doing.
+	direct bool
 
 	// What each side's agents last said about themselves; see telemetry.go.
 	tele [2]map[int]*agentReport
@@ -154,6 +163,7 @@ func (rm *Room) reset() error {
 		rm.logs[side] = nil
 		rm.lang[side] = map[string]string{}
 		rm.cmd[side] = command{asked: -1, buy: rm.cfg.Purse}
+		rm.cued[side] = map[string]int{}
 		rm.bots[side] = nil
 		if style := rm.cfg.Bots[side]; style != "" {
 			rm.bots[side] = &bot.Player{Side: side, Style: style, R: rm.r}
@@ -199,8 +209,13 @@ func (rm *Room) Tick() {
 		frame := map[string]any{"type": "event", "event": e}
 		if sq := rm.squadAny(e.Squad); sq != nil {
 			frame["callsign"] = rm.squadName(sq)
+			if e.Was != nil {
+				// A squad that just changed hands: the side losing it knew it by this name.
+				frame["callsign"] = Name{En: e.Was.En, He: e.Was.He, Squad: sq.ID}
+			}
 		}
 		rm.broadcast(e.Side, frame)
+		rm.cueEvent(e)
 		if e.Kind == sim.EvSquadLost {
 			for c := range rm.clients {
 				if c.ID.Role == RoleSquad && c.ID.Side == e.Side && c.ID.Squad == e.Squad {
@@ -435,7 +450,7 @@ func (rm *Room) station(id Identity) (radio.Station, bool) {
 		return radio.Station{Kind: radio.Operator}, true
 	case RoleSquad:
 		if sq := rm.sim.Squad(id.Squad); sq != nil {
-			return radio.Station{Kind: radio.Squad, Class: sq.Class(), Num: sq.Num}, true
+			return radio.Station{Kind: radio.Squad, Class: sq.CallClass(), Num: sq.Num}, true
 		}
 	}
 	return radio.Station{}, false
@@ -444,7 +459,7 @@ func (rm *Room) station(id Identity) (radio.Station, bool) {
 // squadOf finds the living squad behind a callsign on one side.
 func (rm *Room) squadOf(side int, st radio.Station) *sim.Squad {
 	for _, sq := range rm.sim.Squads {
-		if sq.Alive && sq.Side == side && sq.Class() == st.Class && sq.Num == st.Num {
+		if sq.Alive && sq.Side == side && sq.CallClass() == st.Class && sq.Num == st.Num {
 			return sq
 		}
 	}
@@ -458,7 +473,7 @@ func (rm *Room) squadAny(id int) *sim.Squad {
 
 func (rm *Room) squadName(sq *sim.Squad) Name {
 	cs := rm.sim.Callsign(sq)
-	st := radio.Station{Kind: radio.Squad, Class: sq.Class(), Num: sq.Num}
+	st := radio.Station{Kind: radio.Squad, Class: sq.CallClass(), Num: sq.Num}
 	return Name{Key: st.Key(), En: cs.En, He: cs.He, Squad: sq.ID}
 }
 

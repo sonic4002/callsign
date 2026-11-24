@@ -21,6 +21,12 @@ type LandmarkState struct {
 	// Who is inside, counted at the start of every tick and kept up as teams go in and out.
 	gSide  int
 	gTeams int
+
+	// A position built during the match (sandbags): the way it faces, as a unit vector,
+	// and the side that built it. Built is false for the map's own landmarks.
+	Built        bool
+	FaceX, FaceY float64
+	By           int
 }
 
 func (s *Sim) initLandmarks() {
@@ -96,6 +102,11 @@ func (s *Sim) entryRadius(l *LandmarkState) float64 { return s.kindOf(l).Size/2 
 func (s *Sim) coverSpot(tr *teamRef, slotX, slotY float64) (x, y float64, landmark int) {
 	sq, u := tr.sq, tr.u
 	if u.Class != "infantry" || (sq.Order.Kind != OrderHold && sq.Order.Kind != OrderRepair && sq.Order.landmark == 0) {
+		return slotX, slotY, -1
+	}
+	if sq.Order.ground || (u.Hero && sq.Order.landmark == 0) {
+		// The order named the ground itself. And a hero goes inside only the building it
+		// was sent to: it is one soldier with work to do, not a squad looking for a post.
 		return slotX, slotY, -1
 	}
 	// How far from the post cover may be. At a map point the squad must stay inside the
@@ -254,6 +265,13 @@ func (s *Sim) coverAgainst(tgt *teamRef, sx, sy float64) float64 {
 		k := s.kindOf(l)
 		d := dist(t.X, t.Y, l.X, l.Y)
 		if d > k.CoverRadius || k.Cover <= 0 || k.Cover >= best {
+			continue
+		}
+		if k.Arc > 0 {
+			// Sandbags cover from the front they were built to face, and from nowhere else.
+			if s.inArc(l, k, sx, sy) {
+				best = k.Cover
+			}
 			continue
 		}
 		if d < k.CoverRadius*0.4 || (l.X-t.X)*(sx-t.X)+(l.Y-t.Y)*(sy-t.Y) > 0 {

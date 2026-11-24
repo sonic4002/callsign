@@ -4,6 +4,8 @@
 
 import { buildVerb, captureVerb, namedStructure, placeOf, wantedStructure } from "./bases.mjs";
 import { compactStructures } from "./bases.mjs";
+import { mendVerb, sellVerb, sparePower } from "./power.mjs";
+import { digRelay, heroEventLine, heroOrder, heroUnit } from "./heroes.mjs";
 
 const verbs = [
   ["attack", /\b(attack|assault|destroy|hit)\b|תקוף|תקפו|לתקוף|השמד/],
@@ -22,10 +24,6 @@ const say = {
   fiveByFive: { en: "Five by five", he: "חמש על חמש" },
   negative: { en: "Negative", he: "שלילי" },
 };
-const haulerLines = {
-  hauler_attacked: { en: (p) => `Hauler under attack near ${p}`, he: (p) => `מוביל זהב מותקף ליד ${p}` },
-  hauler_lost: { en: (p) => `Hauler lost near ${p}`, he: (p) => `מוביל זהב אבד ליד ${p}` },
-};
 const eventLines = {
   pinned: { en: (p) => `Pinned at ${p}, request support`, he: (p) => `מרותקים ב${p}, מבקש סיוע` },
   contact: { en: (p) => `Contact near ${p}`, he: (p) => `מגע ליד ${p}` },
@@ -37,17 +35,29 @@ const eventLines = {
 const radio = (to, body, end) => ({ name: "radio", input: { to, body, end } });
 // placeName is what a landmark or bridge is called on the radio.
 const placeName = (rules, id, lang) => [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id)?.name[lang] ?? id;
+// structureName is what a structure in a leader's report is called on the radio: a tech
+// building by its own name on the map, any other by its kind's.
+function structureName(rules, status, id, lang) {
+  const st = id && (status?.structures ?? []).find((s) => s.id === id);
+  if (!st) return "";
+  if (st.site) return (lang === "he" && st.siteHe) || st.site;
+  const defs = Object.values(rules.factions).flatMap((f) => Object.values(f.structures));
+  return defs.find((d) => d.name.en === st.name)?.name[lang] ?? st.name ?? "";
+}
 const verbOf = (text) => verbs.find(([, re]) => re.test(text.toLowerCase()))?.[0];
 
 function leaderPlan({ agent, wake, rules }) {
   const call = wake.call;
   if (!call) {
     const e = wake.items.find((i) => i.kind === "event")?.event;
+    const heroic = e && heroEventLine(e, rules, agent.lang ?? "en");
+    if (heroic) return [radio([agent.commander ?? "Hammer"], heroic, "over")];
     const line = e && eventLines[e.kind]?.[agent.lang];
     if (!line) return [];
-    if (e.place) return [radio([agent.commander ?? "Hammer"], line(placeName(rules, e.place, agent.lang)), "over")];
-    const point = rules.map.points.find((p) => p.id === e.point);
-    return [radio([agent.commander ?? "Hammer"], line(point.callsign[agent.lang]), "over")];
+    // Where it is, by the name of the thing it was sent to: a landmark, a bridge, a
+    // structure or a tech building; the nearest point only when it was sent to none.
+    const where = (e.place && placeName(rules, e.place, agent.lang)) || structureName(rules, wake.status, e.structure, agent.lang) || rules.map.points.find((p) => p.id === e.point).callsign[agent.lang];
+    return [radio([agent.commander ?? "Hammer"], line(where), "over")];
   }
   if (call.from.key !== "player" && call.from.key !== "operator") return []; // squads do not order squads
   const lang = call.lang;
@@ -60,6 +70,16 @@ function leaderPlan({ agent, wake, rules }) {
   if (theirs && captureVerb.test(call.body.toLowerCase()) && agent.unit?.captureSeconds > 0) {
     return [{ name: "capture", input: { place: theirs.id }, orElse }, radio(back, say.wilco[lang], "out")];
   }
+  // A structure of their own named with a word for mending: engineers go in and mend it.
+  const ours = agent.unit?.captureSeconds > 0 && mendVerb.test(call.body.toLowerCase()) && namedStructure(call.body, structures, { enemy: false });
+  if (ours) return [{ name: "repair", input: { place: ours.id }, orElse }, radio(back, say.wilco[lang], "out")];
+  // Told to mend a structure, and not engineers: say so, in plain words.
+  if (!agent.unit?.captureSeconds && mendVerb.test(call.body.toLowerCase()) && namedStructure(call.body, structures, { enemy: false })) {
+    return [radio(back, `${say.negative[lang]}, ${lang === "he" ? "רק מהנדסים מתקנים מבנים" : "only engineers mend structures"}`, "over")];
+  }
+  // Dig in, plant a charge, seize a vehicle: the orders of heroes.mjs.
+  const heroic = heroOrder({ agent, call, wake, rules, theirs, back, orElse, radio });
+  if (heroic) return heroic;
   const escort = escortWords.test(call.body.toLowerCase()) && haulerWords.test(call.body.toLowerCase());
   let verb = escort ? "hold" : verbOf(call.body);
   if (theirs && verb === "attack") {
@@ -126,6 +146,35 @@ export function wantedUnit(text, units) {
   return entries.filter(([, u]) => u.class === cls).sort((a, b) => a[1].cost - b[1].cost)[0]?.[0];
 }
 
+const cancelVerb = /\b(cancel|scrap|call off)\b|בטל|בטלו/;
+const rallyVerb = /\brall(y|ies)\b|\b(gather|assemble|muster)\b|מתכנס|התכנס|כינוס|נאספ/;
+const namesAUnit = (text, units) => Object.values(units).some((u) => text.includes(u.name.en.toLowerCase()) || text.includes(u.name.he));
+
+// spotOf cuts an exact spot out of a call: from its first distance to its end ("140 metres
+// north and 60 metres east of Alpha"). The game turns the words into the place.
+const bearing = /north|south|east|west|צפונ|דרומ|מזרח|מערב/;
+export function spotOf(body) {
+  const at = body.search(/\d+\s*(?:metres?|meters?|m\b|מטר|מ')/i); // a distance, not the number in a squad's or a structure's name
+  if (at < 0) return undefined;
+  const spot = body.slice(at).replace(/[.!\s]+$/, "");
+  return bearing.test(spot.toLowerCase()) ? spot : undefined;
+}
+
+// runOf reads the way a fence is to lie out of a call, as the build tool names it, or "".
+// The words stand before the spot ("running north to south, 140 metres north of Alpha"),
+// so only the call up to its first distance is read.
+export function runOf(body) {
+  const at = body.search(/\d/);
+  const head = (at < 0 ? body : body.slice(0, at)).toLowerCase();
+  const ne = /north-?\s?east|צפון[-־ ]מזרח/.test(head);
+  const nw = /north-?\s?west|צפון[-־ ]מערב/.test(head);
+  if (ne && /south-?\s?west|דרום[-־ ]מערב/.test(head)) return "northeast-southwest";
+  if (nw && /south-?\s?east|דרום[-־ ]מזרח/.test(head)) return "northwest-southeast";
+  if (/north to south|south to north|north-south|מצפון לדרום|מדרום לצפון/.test(head)) return "north-south";
+  if (/east to west|west to east|east-west|ממזרח למערב|ממערב למזרח/.test(head)) return "east-west";
+  return "";
+}
+
 // ownMoves is the scripted operator running the fight after Hammer handed it over: one
 // purchase when gold allows, and a point to hold for every squad that has no orders. In
 // the default mode it is never called: the operator acts on Hammer's orders only.
@@ -156,6 +205,9 @@ function ownMoves({ wake, rules, agent }) {
       const [id, def] = Object.entries(defs).find(([, d]) => d.role === role) ?? [];
       const missing = (def?.requires ?? []).find((need) => !stands(need));
       if (missing) return raise(missing);
+      // Power first: what would leave the side short waits for another power structure.
+      const plants = base.filter((st) => st.role === "power").length;
+      if (role !== "power" && def?.power < 0 && sparePower(s, agent.side, defs) + def.power < 0 && plants < (rules.match.powerStructures ?? 1)) return raise("power");
       if (id && !rising && s.gold >= cost(role)) moves.push({ name: "build", input: { structure: id, place: "", place2: "" } });
     };
     const hauler = units.find(([, u]) => u.class === "hauler");
@@ -167,11 +219,24 @@ function ownMoves({ wake, rules, agent }) {
     // the barracks. A second hauler comes out of the works once it stands; with no hauler
     // left at all the works comes before any squad.
     const more = hauler && haulers < Math.min(2, rules.match.haulerCap ?? 0);
-    if (!stands("refinery")) raise("refinery");
+    const short = s.power?.low && sparePower(s, agent.side, defs) < 0 && base.filter((st) => st.role === "power").length < (rules.match.powerStructures ?? 1);
+    // The base grows in the order of the opening, which the game works out (status.opening):
+    // power, the refinery and the barracks come before anything is bought, and what follows
+    // them goes up when a unit needs it or when there is gold to spare for it. A structure
+    // that has lost a third of itself is mended when the side is rich. Nothing is sold and
+    // no rally point is set: those are Hammer's to ask for.
+    const next = s.opening ?? "";
+    const spare = 2 * (pick?.[1].cost ?? 0);
+    const hurt = base.filter((st) => !st.building && !st.repairing && st.health < 0.66).sort((a, b) => a.health - b.health)[0];
+    if (short) raise("power");
+    else if (["power", "refinery", "barracks"].includes(next)) raise(next);
+    else if (!stands("refinery")) raise("refinery");
     else if (!stands("barracks")) raise("barracks");
     else if (more && stands(hauler[1].requires)) {
       if (s.gold >= hauler[1].cost) moves.push({ name: "buy", input: { unit: hauler[0], upgrade: "" } });
     } else if (more && haulers === 0) raise(hauler[1].requires);
+    else if (next && !rising && s.gold >= cost(next) + spare) raise(next);
+    else if (hurt && s.gold >= 2 * spare) moves.push({ name: "repair", input: { place: hurt.id } });
     else if (pick && fielded < Math.min(rules.match.populationCap, 8)) {
       if (pick[1].requires && !stands(pick[1].requires)) raise(pick[1].requires);
       else if (s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
@@ -195,16 +260,8 @@ function ownMoves({ wake, rules, agent }) {
 function operatorPlan(ctx) {
   const { wake, rules, agent } = ctx;
   const call = wake.call;
-  if (!call) {
-    // A hauler in trouble is the one thing the scripted operator reports unasked.
-    const e = wake.items.find((i) => i.kind === "event" && haulerLines[i.event.kind])?.event;
-    if (e) {
-      const point = rules.map.points.find((p) => p.id === e.point);
-      const lang = agent.lang ?? "en";
-      // To the commander, whoever spoke to the operator last.
-      return [radio([rules.callsigns.player.en], haulerLines[e.kind][lang](point?.callsign[lang] ?? e.point), "out"), ...ownMoves(ctx)];
-    }
-  }
+  // A hauler in trouble, like the rest of the base's news, is told to the commander by the
+  // server's own base cues (server/room/cues.go); the operator does not say it again.
   if (!call || call.from.key !== "player") return ownMoves(ctx); // otherwise Anvil answers to Hammer only
   const lang = call.lang;
   const back = [call.from.en];
@@ -221,6 +278,23 @@ function operatorPlan(ctx) {
     if (!squad) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
+  // "Cancel the tank", "בטל את הטנק": the last one of that kind leaves its line.
+  const units = rules.factions[wake.status?.faction ?? ""]?.units ?? {};
+  if (cancelVerb.test(text) && !(sellVerb.test(text) && namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false }))) {
+    const unit = /\b(last|that|it)\b|האחרון|האחרונה/.test(text) && !namesAUnit(text, units) ? "" : (wantedUnit(text, units) ?? "");
+    return [{ name: "cancel", input: { unit }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
+  // "New squads rally at Delta", "כיתות חדשות מתכנסות בדוד": where new units gather.
+  if (rallyVerb.test(text)) {
+    const home = /\b(home|beside|at the base|by the door)\b|ליד המבנה|הביתה|בבסיס/.test(text); // not "בבית": "בבית הבוחן" is a place
+    // Where: an exact spot, a tech building by its name on the map, a landmark, or a point.
+    const known = compactStructures(wake.status ?? {}, agent.side);
+    const tech = known.find((st) => st.site && (text.includes(st.site.toLowerCase()) || (st.siteHe && text.includes(st.siteHe))));
+    const place = home ? "home" : (spotOf(call.body) ?? tech?.id ?? call.landmarks?.[0] ?? call.points?.[0]);
+    if (!place) return [radio(back, say.sayAgain[lang], "over")];
+    const from = namedStructure(text, known.filter((st) => st.role !== "tech"), { enemy: false });
+    return [{ name: "rally", input: { place, structure: from?.id ?? "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
   if (haulerWords.test(text) && !/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
     // "Haulers to the Kilo field", "המשאיות לשדה כרמל", "haulers on their own".
     const auto = /\b(auto|on their own|themselves|choose)\b|לבד|בעצמם|בעצמן/.test(text);
@@ -228,26 +302,40 @@ function operatorPlan(ctx) {
     if (!field) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "haul", input: { field, hauler: 0 }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
+  // Selling or mending one of the side's own structures, named by its name or its role.
+  const own = (sellVerb.test(text) || mendVerb.test(text)) && namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false });
+  if (own) return [{ name: sellVerb.test(text) ? "sell" : "repair", input: { place: own.id }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  if (sellVerb.test(text)) return [radio(back, say.sayAgain[lang], "over")]; // sell what?
   // Building: a structure named with a word for building, or a defence or a fence asked
   // for by itself ("a gun at Delta", "fence the north side").
   const structures = rules.factions[wake.status?.faction ?? ""]?.structures ?? {};
   const wanted = wantedStructure(text, structures);
   const fixed = wanted && ["defence", "fence"].includes(structures[wanted].role);
   if (wanted && (buildVerb.test(text) || (fixed && !verbOf(text)))) {
-    const input = { structure: wanted, place: fixed ? placeOf(text, call.points) : "", place2: "" };
+    // An exact spot in the call ("140 metres north and 60 metres east of Alpha") is passed
+    // on as it was said; the game reads it. A base structure with no spot takes a point
+    // named in the call, or the game's own choice.
+    const input = { structure: wanted, place: spotOf(call.body) ?? (fixed ? placeOf(text, call.points) : (call.points?.[0] ?? "")), place2: "" };
+    // "running north to south", "מצפון-מזרח לדרום-מערב": the way a fence is to lie.
+    const run = structures[wanted].role === "fence" ? runOf(call.body) : "";
+    if (run) input.run = run;
     return [{ name: "build", input, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (/\b(buy|purchase|build)\b|קנה|קנו|רכוש|בנה/.test(text)) {
-    const unit = wantedUnit(text, rules.factions[wake.status?.faction ?? ""]?.units ?? {});
+    const units = rules.factions[wake.status?.faction ?? ""]?.units ?? {};
+    const unit = heroUnit(text, units, rules) ?? wantedUnit(text, units);
     if (!unit) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit, upgrade: "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (/\b(status|sitrep|happening)\b|מצב|מה קורה/.test(text) && wake.status) {
     const s = wake.status;
     const held = s.points.filter((p) => p.owner === agent.side).map((p) => p.id);
-    const body = lang === "he" ? `${s.squads.length} כיתות, ${s.gold} זהב, מחזיקים ב ${held.join(" ")}` : `${s.squads.length} squads, ${s.gold} gold, holding ${held.join(" ")}`;
+    const power = s.power?.low ? (lang === "he" ? ", חסר חשמל" : ", power is low") : "";
+    const body = (lang === "he" ? `${s.squads.length} כיתות, ${s.gold} זהב, מחזיקים ב ${held.join(" ")}` : `${s.squads.length} squads, ${s.gold} gold, holding ${held.join(" ")}`) + power;
     return [radio(back, body, "over")];
   }
+  const dig = digRelay({ call, wake, rules, back, radio });
+  if (dig) return dig;
   const verb = verbOf(text);
   const point = rules.map.points.find((p) => p.id === call.points?.[0]);
   if (!verb || !point) return [radio(back, say.sayAgain[lang], "over")];

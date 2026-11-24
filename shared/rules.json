@@ -17,8 +17,22 @@
     "coverSeek": 64,
     "startStructures": [],
     "buildRadius": 340,
+    "baseRadius": 300,
+    "baseReach": 180,
+    "baseCap": 10,
+    "queueLimit": 5,
     "defenceCap": 6,
-    "fenceRuns": 4
+    "fenceRuns": 4,
+    "powerStructures": 3,
+    "lowPowerFactor": 0.5,
+    "sellShare": 0.5,
+    "repairCostShare": 0.4,
+    "repairPerSecond": 0.05,
+    "opening": ["power", "refinery", "barracks", "works", "radar", "airbase"],
+    "fortifySeconds": 6,
+    "sandbagLimit": 2,
+    "crushRadius": 13,
+    "crushSeconds": 1.5
   },
   "hq": { "hp": 3000, "sight": 300 },
   "nerve": {
@@ -46,8 +60,14 @@
     "grove": { "word": { "en": "grove", "he": "חורשה" }, "cover": 0.75, "coverRadius": 56 },
     "rocks": { "word": { "en": "rocks", "he": "סלעים" }, "cover": 0.7, "coverRadius": 42 },
     "wall": { "word": { "en": "wall", "he": "חומה" }, "cover": 0.7, "coverRadius": 42 },
-    "rubble": { "word": { "en": "rubble", "he": "הריסות" }, "cover": 0.8, "coverRadius": 42 }
+    "rubble": { "word": { "en": "rubble", "he": "הריסות" }, "cover": 0.8, "coverRadius": 42 },
+    "sandbags": { "word": { "en": "sandbags", "he": "שקי חול" }, "cover": 0.55, "coverRadius": 34, "hp": 260, "arc": 130 },
+    "sandbagsFlat": { "word": { "en": "flattened sandbags", "he": "שקי חול הרוסים" }, "cover": 1, "coverRadius": 0 }
   },
+  "ranks": [
+    { "id": "seasoned", "name": { "en": "Seasoned", "he": "מנוסה" }, "kills": 3, "accuracy": 1.04, "nerve": 0.94, "healPerSecond": 0 },
+    { "id": "elite", "name": { "en": "Elite", "he": "עילית" }, "kills": 6, "accuracy": 1.08, "nerve": 0.88, "healPerSecond": 0.004 }
+  ],
   "bridgeRules": { "dangerShare": 0.35, "standShare": 0.5, "repairRadius": 70, "warnSeconds": 15 },
   "maps": {
     "small": {
@@ -128,6 +148,12 @@
         {"id": "H-grove-1", "kind": "grove", "x": 1199, "y": 739, "near": "H", "bearing": "SE", "name": {"en": "the grove south-east of Hotel", "he": "החורשה מדרום-מזרח להגר"}},
         {"id": "D-wall-1", "kind": "wall", "x": 640, "y": 740, "near": "D", "bearing": "E", "name": {"en": "the wall east of Delta", "he": "החומה ממזרח לדוד"}},
         {"id": "H-wall-1", "kind": "wall", "x": 960, "y": 740, "near": "H", "bearing": "W", "name": {"en": "the wall west of Hotel", "he": "החומה ממערב להגר"}}
+      ],
+      "techBuildings": [
+        {"id": "tech-assay-w", "kind": "tech_goldworks", "x": 630, "y": 170, "near": "G", "bearing": "W", "name": {"en": "the assay office west of Golf", "he": "בית הבוחן ממערב לגימל"}},
+        {"id": "tech-assay-e", "kind": "tech_goldworks", "x": 970, "y": 170, "near": "G", "bearing": "E", "name": {"en": "the assay office east of Golf", "he": "בית הבוחן ממזרח לגימל"}},
+        {"id": "tech-clinic-w", "kind": "tech_clinic", "x": 330, "y": 790, "near": "D", "bearing": "SW", "name": {"en": "the clinic south-west of Delta", "he": "המרפאה מדרום-מערב לדוד"}},
+        {"id": "tech-clinic-e", "kind": "tech_clinic", "x": 1270, "y": 790, "near": "H", "bearing": "SE", "name": {"en": "the clinic south-east of Hotel", "he": "המרפאה מדרום-מזרח להגר"}}
       ]
     },
     "medium": {
@@ -241,6 +267,12 @@
         {"id": "H-grove-1", "kind": "grove", "x": 1910, "y": 1100, "near": "H", "bearing": "E", "name": {"en": "the grove east of Hotel", "he": "החורשה ממזרח להגר"}},
         {"id": "S-house-1", "kind": "house", "x": 960, "y": 1180, "near": "S", "bearing": "NW", "name": {"en": "the house north-west of Sierra", "he": "הבית מצפון-מערב לסמך"}},
         {"id": "S-house-2", "kind": "house", "x": 1440, "y": 1180, "near": "S", "bearing": "NE", "name": {"en": "the house north-east of Sierra", "he": "הבית מצפון-מזרח לסמך"}}
+      ],
+      "techBuildings": [
+        {"id": "tech-assay-w", "kind": "tech_goldworks", "x": 1040, "y": 420, "near": "G", "bearing": "W", "name": {"en": "the assay office west of Golf", "he": "בית הבוחן ממערב לגימל"}},
+        {"id": "tech-assay-e", "kind": "tech_goldworks", "x": 1360, "y": 420, "near": "G", "bearing": "E", "name": {"en": "the assay office east of Golf", "he": "בית הבוחן ממזרח לגימל"}},
+        {"id": "tech-garage-w", "kind": "tech_garage", "x": 1020, "y": 1090, "near": "L", "bearing": "SE", "name": {"en": "the service yard south-east of Lima", "he": "המוסך מדרום-מזרח ללאה"}},
+        {"id": "tech-garage-e", "kind": "tech_garage", "x": 1380, "y": 1090, "near": "M", "bearing": "SW", "name": {"en": "the service yard south-west of Mike", "he": "המוסך מדרום-מערב למשה"}}
       ]
     },
     "large": {
@@ -389,6 +421,14 @@
         {"id": "V-grove-1", "kind": "grove", "x": 1530, "y": 1920, "near": "V", "bearing": "W", "name": {"en": "the grove west of Victor", "he": "החורשה ממערב לואו"}},
         {"id": "V-grove-2", "kind": "grove", "x": 1670, "y": 1920, "near": "V", "bearing": "E", "name": {"en": "the grove east of Victor", "he": "החורשה ממזרח לואו"}},
         {"id": "V-ruin-2", "kind": "ruin", "x": 1900, "y": 1920, "near": "V", "bearing": "E", "name": {"en": "the ruin east of Victor", "he": "החורבה ממזרח לואו"}}
+      ],
+      "techBuildings": [
+        {"id": "tech-assay-w", "kind": "tech_goldworks", "x": 1340, "y": 220, "near": "N", "bearing": "W", "name": {"en": "the assay office west of November", "he": "בית הבוחן ממערב לנשר"}},
+        {"id": "tech-assay-e", "kind": "tech_goldworks", "x": 1860, "y": 220, "near": "N", "bearing": "E", "name": {"en": "the assay office east of November", "he": "בית הבוחן ממזרח לנשר"}},
+        {"id": "tech-clinic-w", "kind": "tech_clinic", "x": 1280, "y": 1080, "near": "L", "bearing": "E", "name": {"en": "the clinic east of Lima", "he": "המרפאה ממזרח ללאה"}},
+        {"id": "tech-clinic-e", "kind": "tech_clinic", "x": 1920, "y": 1080, "near": "M", "bearing": "W", "name": {"en": "the clinic west of Mike", "he": "המרפאה ממערב למשה"}},
+        {"id": "tech-garage-w", "kind": "tech_garage", "x": 900, "y": 1760, "near": "D", "bearing": "E", "name": {"en": "the service yard east of Delta", "he": "המוסך ממזרח לדוד"}},
+        {"id": "tech-garage-e", "kind": "tech_garage", "x": 2300, "y": 1760, "near": "H", "bearing": "W", "name": {"en": "the service yard west of Hotel", "he": "המוסך ממערב להגר"}}
       ]
     }
   },
@@ -413,7 +453,35 @@
       "infantry": { "en": "Viper", "he": "צפע" },
       "vehicle": { "en": "Rhino", "he": "קרנף" },
       "air": { "en": "Hawk", "he": "בז" },
-      "naval": { "en": "Shark", "he": "כריש" }
+      "naval": { "en": "Shark", "he": "כריש" },
+      "ghost": { "en": "Ghost", "he": "רפאים" },
+      "raven": { "en": "Raven", "he": "עורב" }
+    }
+  },
+  "techBuildings": {
+    "tech_goldworks": {
+      "name": { "en": "Assay Office", "he": "בית הבוחן" },
+      "about": { "en": "pays gold while you hold it", "he": "משלם זהב כל עוד הוא בידיכם" },
+      "aliases": ["assay office", "assay", "goldworks", "gold works", "the mint", "mint", "בית הבוחן", "בית בוחן", "הבוחן", "מטבעה"],
+      "role": "tech", "effect": "gold", "capturable": true,
+      "hp": 900, "armor": 0.35, "footprint": 42, "sight": 160,
+      "lump": 250, "incomePerSecond": 3
+    },
+    "tech_clinic": {
+      "name": { "en": "Field Clinic", "he": "מרפאת השדה" },
+      "about": { "en": "heals your infantry standing by it", "he": "מרפאה את החי\"ר שלכם שעומד לידה" },
+      "aliases": ["field clinic", "clinic", "hospital", "aid station", "מרפאת השדה", "מרפאת שדה", "המרפאה", "מרפאה", "בית החולים"],
+      "role": "tech", "effect": "heal", "capturable": true,
+      "hp": 700, "armor": 0.25, "footprint": 44, "sight": 160,
+      "mendPerSecond": 4, "radius": 130
+    },
+    "tech_garage": {
+      "name": { "en": "Service Yard", "he": "מוסך השדה" },
+      "about": { "en": "repairs your vehicles beside it", "he": "מתקן את הרכבים שלכם שלידו" },
+      "aliases": ["service yard", "garage", "workshop", "repair yard", "מוסך השדה", "מוסך שדה", "המוסך", "מוסך", "הסדנה"],
+      "role": "tech", "effect": "repair", "capturable": true,
+      "hp": 800, "armor": 0.35, "footprint": 46, "sight": 160,
+      "mendPerSecond": 14, "radius": 140
     }
   },
   "factions": {
@@ -422,22 +490,26 @@
       "startUnits": ["commandos", "commandos"],
       "structures": {
         "commandPost": { "name": { "en": "Command Post", "he": "מוצב הפיקוד" }, "role": "hq",
-          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300 },
+          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 30 },
+        "powerPlant": { "name": { "en": "Power Plant", "he": "תחנת כוח" }, "role": "power", "capturable": true,
+          "cost": 140, "buildSeconds": 5, "hp": 700, "armor": 0.3, "requires": [], "unlocks": [], "footprint": 44, "sight": 180, "power": 100 },
         "barracks": { "name": { "en": "Barracks", "he": "מגורי הלוחמים" }, "role": "barracks", "capturable": true,
-          "cost": 200, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": [], "unlocks": ["commandos", "engineers"], "footprint": 40, "sight": 180 },
+          "cost": 200, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": [], "unlocks": ["commandos", "engineers"], "footprint": 40, "sight": 180, "power": -10 },
         "refinery": { "name": { "en": "Refinery", "he": "בית הזיקוק" }, "role": "refinery", "capturable": true,
-          "cost": 400, "buildSeconds": 12, "hp": 1100, "armor": 0.3, "requires": [], "unlocks": [], "footprint": 46, "sight": 180 },
+          "cost": 400, "buildSeconds": 12, "hp": 1100, "armor": 0.3, "requires": [], "unlocks": [], "footprint": 46, "sight": 180, "power": -15 },
         "vehicleWorks": { "name": { "en": "Vehicle Works", "he": "מפעל הרכב" }, "role": "works", "capturable": true,
-          "cost": 240, "buildSeconds": 10, "hp": 1200, "armor": 0.4, "requires": ["barracks"], "unlocks": ["tank", "rocketLauncher"], "footprint": 48, "sight": 180 },
+          "cost": 240, "buildSeconds": 10, "hp": 1200, "armor": 0.4, "requires": ["barracks"], "unlocks": ["tank", "rocketLauncher"], "footprint": 48, "sight": 180, "power": -20 },
+        "radar": { "name": { "en": "Radar Station", "he": "תחנת מכ״ם" }, "role": "radar", "capturable": true,
+          "cost": 280, "buildSeconds": 9, "hp": 800, "armor": 0.3, "requires": ["works"], "unlocks": [], "footprint": 42, "sight": 260, "power": -20 },
         "dockyard": { "name": { "en": "Dockyard", "he": "המספנה" }, "role": "dockyard", "capturable": true,
-          "cost": 220, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": ["barracks"], "unlocks": ["patrolBoat"], "footprint": 44, "sight": 180 },
+          "cost": 220, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": ["barracks"], "unlocks": ["patrolBoat"], "footprint": 44, "sight": 180, "power": -15 },
         "airbase": { "name": { "en": "Airbase", "he": "בסיס האוויר" }, "role": "airbase", "capturable": true,
-          "cost": 300, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["works"], "unlocks": ["helicopter"], "footprint": 54, "sight": 180 },
+          "cost": 300, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["radar"], "unlocks": ["helicopter"], "footprint": 54, "sight": 180, "power": -20 },
         "sentryGun": { "name": { "en": "Sentry Gun", "he": "תותח זקיף" }, "role": "defence",
-          "cost": 150, "buildSeconds": 6, "hp": 420, "armor": 0.5, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 280,
-          "range": 250, "damage": 20, "cooldownTicks": 6, "accuracy": 0.65, "vs": { "air": 0.3 } },
+          "cost": 150, "buildSeconds": 6, "hp": 420, "armor": 0.5, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 310, "power": -10,
+          "range": 290, "damage": 20, "cooldownTicks": 6, "accuracy": 0.65, "vs": { "air": 0.3 } },
         "flakBattery": { "name": { "en": "Flak Battery", "he": "סוללת נ״מ" }, "role": "defence",
-          "cost": 200, "buildSeconds": 8, "hp": 380, "armor": 0.4, "requires": ["works"], "unlocks": [], "footprint": 18, "sight": 320,
+          "cost": 200, "buildSeconds": 8, "hp": 380, "armor": 0.4, "requires": ["works"], "unlocks": [], "footprint": 18, "sight": 320, "power": -10,
           "range": 300, "damage": 34, "cooldownTicks": 8, "accuracy": 0.7, "vs": { "infantry": 0, "vehicle": 0, "naval": 0 } },
         "barrierWall": { "name": { "en": "Barrier Wall", "he": "חומת מגן" }, "role": "fence",
           "cost": 80, "buildSeconds": 5, "hp": 520, "armor": 0.6, "requires": [], "unlocks": [], "footprint": 8, "sight": 0,
@@ -466,7 +538,7 @@
         "tank": {
           "name": { "en": "Main battle tank", "he": "טנק מערכה" },
           "requires": "works",
-          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 7,
+          "class": "vehicle", "crushes": true, "domain": "land", "cost": 250, "deploySeconds": 7,
           "teams": 2, "members": 1, "hp": 450, "armor": 0.6,
           "speed": 34, "range": 260, "sight": 260,
           "damage": 60, "cooldownTicks": 25, "accuracy": 0.7, "nerveResist": 0.5,
@@ -492,7 +564,7 @@
         },
         "rocketLauncher": {
           "name": { "en": "Precision rocket launcher", "he": "משגר רקטות מדויק" },
-          "requires": "works",
+          "requires": "works", "siege": true,
           "class": "vehicle", "domain": "land", "cost": 300, "deploySeconds": 7,
           "teams": 2, "members": 1, "hp": 150, "armor": 0.1,
           "speed": 30, "range": 420, "minRange": 150, "sight": 260,
@@ -506,6 +578,16 @@
           "speed": 40, "range": 1, "sight": 170,
           "damage": 0, "cooldownTicks": 10, "accuracy": 0, "nerveResist": 0,
           "capacity": 320, "loadSeconds": 7, "unloadSeconds": 3, "noCapture": true
+        },
+        "sentinel": {
+          "name": { "en": "Sentinel", "he": "זקיף" },
+          "class": "infantry", "callsign": "ghost", "hero": true, "startTier": 2,
+          "requires": "barracks", "needs": ["works", "radar"], "domain": "land", "cost": 500, "deploySeconds": 15,
+          "teams": 1, "members": 1, "hp": 150, "armor": 0,
+          "speed": 31, "range": 280, "sight": 320,
+          "damage": 45, "cooldownTicks": 20, "accuracy": 0.85, "nerveResist": 0.3,
+          "vs": { "vehicle": 0.12, "naval": 0.12, "air": 0.2, "hauler": 0.3, "hq": 0.05, "structure": 0.03, "fence": 0.1 },
+          "stealth": 95, "charges": 2, "chargeDamage": 1200, "chargeVsHQ": 0.3, "fuseSeconds": 5, "plantSeconds": 3, "noCapture": true
         }
       }
     },
@@ -514,22 +596,26 @@
       "startUnits": ["militia", "militia"],
       "structures": {
         "den": { "name": { "en": "The Den", "he": "המאורה" }, "role": "hq",
-          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300 },
+          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 30 },
+        "generatorYard": { "name": { "en": "Generator Yard", "he": "חצר הגנרטורים" }, "role": "power", "capturable": true,
+          "cost": 130, "buildSeconds": 5, "hp": 550, "armor": 0.2, "requires": [], "unlocks": [], "footprint": 44, "sight": 180, "power": 100 },
         "safehouse": { "name": { "en": "Safehouse", "he": "בית המסתור" }, "role": "barracks", "capturable": true,
-          "cost": 150, "buildSeconds": 4, "hp": 750, "armor": 0.2, "requires": [], "unlocks": ["militia", "rpgTeam", "sappers"], "footprint": 40, "sight": 180 },
+          "cost": 150, "buildSeconds": 4, "hp": 750, "armor": 0.2, "requires": [], "unlocks": ["militia", "rpgTeam", "sappers"], "footprint": 40, "sight": 180, "power": -10 },
         "smelter": { "name": { "en": "Smelter", "he": "המתכה" }, "role": "refinery", "capturable": true,
-          "cost": 360, "buildSeconds": 9, "hp": 950, "armor": 0.2, "requires": [], "unlocks": [], "footprint": 46, "sight": 180 },
+          "cost": 360, "buildSeconds": 9, "hp": 950, "armor": 0.2, "requires": [], "unlocks": [], "footprint": 46, "sight": 180, "power": -15 },
         "chopShop": { "name": { "en": "Chop Shop", "he": "המוסך" }, "role": "works", "capturable": true,
-          "cost": 290, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["barracks"], "unlocks": ["technical"], "footprint": 48, "sight": 180 },
+          "cost": 290, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["barracks"], "unlocks": ["technical"], "footprint": 48, "sight": 180, "power": -20 },
+        "listeningPost": { "name": { "en": "Listening Post", "he": "עמדת ההאזנה" }, "role": "radar", "capturable": true,
+          "cost": 280, "buildSeconds": 9, "hp": 650, "armor": 0.2, "requires": ["works"], "unlocks": [], "footprint": 42, "sight": 260, "power": -20 },
         "boatShed": { "name": { "en": "Boat Shed", "he": "סככת הסירות" }, "role": "dockyard", "capturable": true,
-          "cost": 250, "buildSeconds": 10, "hp": 760, "armor": 0.2, "requires": ["barracks"], "unlocks": ["speedboat"], "footprint": 44, "sight": 180 },
+          "cost": 250, "buildSeconds": 10, "hp": 760, "armor": 0.2, "requires": ["barracks"], "unlocks": ["speedboat"], "footprint": 44, "sight": 180, "power": -15 },
         "launchYard": { "name": { "en": "Launch Yard", "he": "חצר השיגור" }, "role": "airbase", "capturable": true,
-          "cost": 400, "buildSeconds": 14, "hp": 700, "armor": 0.2, "requires": ["works"], "unlocks": ["fpvSwarm"], "footprint": 50, "sight": 180 },
+          "cost": 400, "buildSeconds": 14, "hp": 700, "armor": 0.2, "requires": ["radar"], "unlocks": ["fpvSwarm"], "footprint": 50, "sight": 180, "power": -20 },
         "gunNest": { "name": { "en": "Gun Nest", "he": "קן מקלעים" }, "role": "defence",
-          "cost": 120, "buildSeconds": 5, "hp": 330, "armor": 0.35, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 265,
-          "range": 215, "damage": 13, "cooldownTicks": 4, "accuracy": 0.55, "vs": { "air": 0.5 } },
+          "cost": 120, "buildSeconds": 5, "hp": 330, "armor": 0.35, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 300, "power": -10,
+          "range": 280, "damage": 13, "cooldownTicks": 4, "accuracy": 0.55, "vs": { "air": 0.5 } },
         "rocketNest": { "name": { "en": "Rocket Nest", "he": "קן טילים" }, "role": "defence",
-          "cost": 170, "buildSeconds": 6, "hp": 300, "armor": 0.3, "requires": ["barracks"], "unlocks": [], "footprint": 18, "sight": 300,
+          "cost": 170, "buildSeconds": 6, "hp": 300, "armor": 0.3, "requires": ["barracks"], "unlocks": [], "footprint": 18, "sight": 300, "power": -10,
           "range": 290, "damage": 46, "cooldownTicks": 14, "accuracy": 0.65, "vs": { "infantry": 0, "vehicle": 0, "naval": 0 } },
         "wireFence": { "name": { "en": "Wire Fence", "he": "גדר תיל" }, "role": "fence",
           "cost": 50, "buildSeconds": 3, "hp": 260, "armor": 0.1, "requires": [], "unlocks": [], "footprint": 6, "sight": 0,
@@ -549,7 +635,7 @@
         "militia": {
           "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
           "requires": "barracks",
-          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3,
+          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3.5,
           "teams": 4, "members": 3, "hp": 41, "armor": 0,
           "speed": 30, "range": 160, "sight": 265,
           "damage": 9, "cooldownTicks": 8, "accuracy": 0.46, "nerveResist": 0.8,
@@ -558,7 +644,7 @@
         "technical": {
           "name": { "en": "Technical", "he": "טנדר חמוש" },
           "requires": "works",
-          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 5,
+          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 3.5,
           "teams": 3, "members": 1, "hp": 290, "armor": 0.25,
           "speed": 48, "range": 200, "sight": 265,
           "damage": 28, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.8,
@@ -567,7 +653,7 @@
         "speedboat": {
           "name": { "en": "Speedboat", "he": "סירה מהירה" },
           "requires": "dockyard",
-          "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 5,
+          "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 4,
           "teams": 3, "members": 1, "hp": 190, "armor": 0.1,
           "speed": 52, "range": 185, "sight": 265,
           "damage": 21, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9,
@@ -576,7 +662,7 @@
         "fpvSwarm": {
           "name": { "en": "Drone swarm", "he": "נחיל רחפנים" },
           "requires": "airbase",
-          "class": "air", "domain": "air", "cost": 150, "deploySeconds": 4,
+          "class": "air", "domain": "air", "cost": 150, "deploySeconds": 3.5,
           "teams": 4, "members": 2, "hp": 28, "armor": 0,
           "speed": 90, "range": 70, "sight": 265,
           "damage": 25, "cooldownTicks": 14, "accuracy": 0.6, "nerveResist": 0.2,
@@ -585,8 +671,8 @@
         },
         "rpgTeam": {
           "name": { "en": "Rocket team", "he": "חוליית טילי כתף" },
-          "requires": "barracks",
-          "class": "infantry", "domain": "land", "cost": 150, "deploySeconds": 3,
+          "requires": "barracks", "siege": true, "siegeRange": 340,
+          "class": "infantry", "domain": "land", "cost": 150, "deploySeconds": 2.5,
           "teams": 2, "members": 3, "hp": 32, "armor": 0,
           "speed": 30, "range": 210, "sight": 265,
           "damage": 55, "cooldownTicks": 22, "accuracy": 0.55, "nerveResist": 0.8,
@@ -600,6 +686,16 @@
           "speed": 52, "range": 1, "sight": 170,
           "damage": 0, "cooldownTicks": 10, "accuracy": 0, "nerveResist": 0,
           "capacity": 250, "loadSeconds": 5, "unloadSeconds": 3, "noCapture": true
+        },
+        "oracle": {
+          "name": { "en": "Oracle", "he": "חוזה" },
+          "class": "infantry", "callsign": "raven", "hero": true, "startTier": 2,
+          "requires": "barracks", "needs": ["works", "radar"], "domain": "land", "cost": 500, "deploySeconds": 15,
+          "teams": 1, "members": 1, "hp": 220, "armor": 0,
+          "speed": 33, "range": 150, "sight": 280,
+          "damage": 16, "cooldownTicks": 7, "accuracy": 0.6, "nerveResist": 0.3,
+          "vs": { "air": 0.3, "hq": 0.05, "structure": 0.1, "fence": 0.3 },
+          "disguise": 85, "seizeRadius": 240, "seizeSeconds": 3, "dread": 0.17, "dreadRadius": 185, "noCapture": true
         }
       }
     }
@@ -629,12 +725,34 @@
     "ownPurchase": {
       "bought": { "en": "Bought {unit}, {squad} is deploying", "he": "נקנה {unit}, {squad} בדרך" },
       "built": { "en": "Building {unit}", "he": "מתחיל לבנות {unit}" },
+      "repairing": { "en": "Repairing the {unit}", "he": "מתקן את {unit}" },
       "upgraded": { "en": "Upgraded {squad} to {tier}", "he": "{squad} שודרג לדרגת {tier}" }
     },
     "signOff": {
       "won": { "en": "Victory. The enemy is defeated", "he": "ניצחון. האויב הובס" },
       "lost": { "en": "We have been defeated", "he": "הובסנו" },
       "draw": { "en": "The fight is over. Neither side won", "he": "הקרב הסתיים. אין מנצח" }
+    },
+    "cues": {
+      "structureReady": { "gap": 1, "line": { "en": "Construction complete: {structure}", "he": "הבנייה הושלמה: {structure}" } },
+      "newOptions": { "gap": 1, "line": { "en": "Construction complete: {structure}. New options available", "he": "הבנייה הושלמה: {structure}. נפתחו אפשרויות חדשות" } },
+      "unitReady": { "gap": 2, "line": { "en": "{squad} in the field", "he": "{squad} בשטח" } },
+      "noGold": { "gap": 8, "line": { "en": "Not enough gold", "he": "אין מספיק זהב" } },
+      "lowPower": { "gap": 20, "events": ["low_power"], "line": { "en": "Low power", "he": "מחסור בחשמל" } },
+      "powerRestored": { "gap": 5, "events": ["power_restored"], "line": { "en": "Power restored", "he": "החשמל חזר" } },
+      "baseUnderAttack": { "gap": 30, "line": { "en": "Our base is under attack", "he": "הבסיס שלנו מותקף" } },
+      "haulerUnderAttack": { "gap": 20, "line": { "en": "{unit} under attack near {point}", "he": "מתקיפים את {unit} ליד {point}" } },
+      "haulerLost": { "gap": 2, "line": { "en": "We lost {unit} near {point}", "he": "איבדנו את {unit} ליד {point}" } },
+      "structureLost": { "gap": 2, "line": { "en": "We lost {structure}", "he": "איבדנו את {structure}" } },
+      "structureTaken": { "gap": 2, "line": { "en": "{structure} is ours", "he": "{structure} בידינו" } },
+      "structureSold": { "gap": 1, "events": ["structure_sold"], "line": { "en": "{structure} sold", "he": "{structure} נמכר" } },
+      "repairStopped": { "gap": 10, "events": ["repair_stopped"], "line": { "en": "Repairs stopped: not enough gold", "he": "התיקון נעצר: אין מספיק זהב" } },
+      "deployLost": { "gap": 2, "events": ["deploy_lost"], "line": { "en": "We lost a {unit} with the structure that was making it", "he": "איבדנו {unit} עם המבנה שייצר אותו" } },
+      "queueFull": { "gap": 8, "line": { "en": "The line is full", "he": "התור מלא" } },
+      "heroReady": { "gap": 1, "line": { "en": "{hero} is in the field", "he": "{hero} בשטח" } },
+      "heroFallen": { "gap": 1, "line": { "en": "{hero} is down", "he": "{hero} נפל" } },
+      "enemyHero": { "gap": 1, "line": { "en": "Warning: enemy hero in the field: {hero}", "he": "אזהרה: גיבור אויב בשטח: {hero}" } },
+      "enemyHeroFallen": { "gap": 1, "line": { "en": "The enemy's {hero} is down", "he": "{hero} של האויב נפל" } }
     },
     "spelledOut": {
       "Alpha": ["אלפא", "אלפה"], "Bravo": ["בראבו", "ברבו"], "Golf": ["גולף"], "Delta": ["דלתא", "דלתה"],

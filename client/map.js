@@ -4,11 +4,16 @@
 import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawSegment, drawUnit, hasAnimation, sprites } from "./art.js";
 import { drawFence, drawStructure } from "./bases-art.js";
 import { structureAt, structureDef } from "./bases.js";
+import { drawRadarOff } from "./power.js";
 import { advance, spreadOut } from "./motion.js";
+import { tint, tintKey } from "./placement.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
-import { drawField, drawFountain, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
+import { crusherNear, drawBuilt, drawCharge, drawFlat, heroPose } from "./heroes.js";
+import { clearOf } from "./places.js";
+import { drawRank } from "./marks.js";
+import { drawField, drawFountain, fieldSeen, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
 import { coverPercent, drawBridge, drawMiniMap, drawScenery, isWater, landmarkFallbacks, paintGround, placeAt, scenery } from "./terrain.js";
@@ -25,6 +30,31 @@ const MARGIN = 90;
 function rng(seed) {
   let s = seed >>> 0;
   return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+}
+
+// rallyFlag is the marker where new units gather: a pole and a pennant that moves in the wind.
+function rallyFlag(ctx, color, time) {
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 9, 4, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#e6e9e2";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -40);
+  ctx.stroke();
+  const wave = Math.sin(time * 4) * 3;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, -40);
+  ctx.quadraticCurveTo(11, -41 + wave, 22, -33 + wave * 0.6);
+  ctx.quadraticCurveTo(11, -29 + wave, 0, -26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 export class Scene {
@@ -51,6 +81,10 @@ export class Scene {
     this.sawLive = false; // this page has seen the match running, so its end is news
     this.onFinale = null; // the page's hook: called when the result screen may come up
     this.selected = 0;
+    this.placing = null; // the page's ghost: { id, def, faction, spot, why } while a structure is being placed
+    this.tinted = null; // the ground that ghost may stand on, kept until the base changes
+    this.sites = new Map(); // structure id → when its building site next throws dust and rings
+    this.doors = new Map(); // structure id → until when its door stands open behind a unit
     this.last = performance.now();
     this.waves = [];
   }
@@ -96,10 +130,16 @@ export class Scene {
     this.canvas.style.width = `${box.width}px`;
     this.canvas.style.height = `${box.height}px`;
     if (this.rules) this.cam.resize(box.width, box.height);
-    const rw = this.radar.clientWidth || 200;
-    const rh = this.rules ? Math.round((rw * this.rules.map.height) / this.rules.map.width) : rw * 0.625;
+    // The mini map is as wide as its box, unless the page caps its height (a sidebar that
+    // must fit the screen): then it keeps the map's shape and stands in the middle.
+    const ratio = this.rules ? this.rules.map.height / this.rules.map.width : 0.625;
+    const cap = parseFloat(getComputedStyle(this.radar).maxBlockSize) || Infinity;
+    let rw = this.radar.parentElement?.clientWidth || this.radar.clientWidth || 200;
+    let rh = Math.round(rw * ratio);
+    if (rh > cap) [rw, rh] = [Math.round(cap / ratio), Math.round(cap)];
     this.radar.width = Math.round(rw * dpr);
     this.radar.height = Math.round(rh * dpr);
+    this.radar.style.width = `${rw}px`;
     this.radar.style.height = `${rh}px`;
   }
 
@@ -111,6 +151,7 @@ export class Scene {
       this.fx.coins(h.x, h.y, performance.now());
       this.sound("coins", h.x, h.y);
     }
+    const first = !this.state; // the first picture of a match: nothing has just come out of anything
     this.state = state;
     this.lands = new Map((state.landmarks ?? []).map((l) => [l.id, l]));
     const bridges = new Map((state.bridges ?? []).map((b) => [b.id, b]));
@@ -127,9 +168,18 @@ export class Scene {
       const faction = this.factionOf[g.unit];
       this.hqFaction[g.side] ??= faction; // a squad of a captured design does not change whose base it is
       let group = this.groups.get(g.id);
+      let born = 0;
       if (!group) {
         group = { visuals: [] };
         this.groups.set(g.id, group);
+        // A unit seen for the first time beside a structure that makes units has just come
+        // out of it: the door stands open behind it, and it grows out of the doorway.
+        const maker = first ? null : this.makerOf(state, g);
+        if (maker) {
+          born = performance.now();
+          this.doors.set(maker.id, born + 1700);
+          this.sound("door", maker.x, maker.y);
+        }
       }
       // `small` is a squad of many small figures (soldiers, drones) and not one big machine;
       // `air` is anything that flies.
@@ -147,7 +197,7 @@ export class Scene {
           if (d < bd) [best, bd] = [v, d];
         }
         if (best) free.delete(best);
-        else best = { x: tm.x, y: tm.y, px: tm.x, py: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
+        else best = { x: tm.x, y: tm.y, px: tm.x, py: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members, bornAt: born };
         // Losses inside a building are not seen from outside.
         if (tm.members < best.members && !tm.in) {
           this.lose(group, best, false);
@@ -178,14 +228,145 @@ export class Scene {
     this.hqWatch(state);
   }
 
+  // makerOf is the standing structure of a unit's own side that it appeared beside, if any.
+  makerOf(state, g) {
+    const at = g.teams?.[0];
+    if (!at) return null;
+    for (const st of state.structures ?? []) {
+      if (st.side !== g.side || st.ruin || st.building < 1 || st.role === "defence" || st.role === "fence") continue;
+      const fp = structureDef(this.rules, st)?.footprint ?? 40;
+      if (Math.hypot(st.x - at.x, st.y - at.y) <= fp + 70) return st;
+    }
+    return null;
+  }
+
+  // doorOf is what a structure's door shows: open behind a unit that just came out, lit
+  // when the one it is making is about to.
+  doorOf(st, now) {
+    if (this.doors.get(st.id) > now) return "open";
+    const head = (this.state.deploying ?? []).find((d) => d.from === st.id && (d.line ?? 0) === 0);
+    return head && head.ticksLeft <= this.rules.tickRate ? "lit" : "closed";
+  }
+
+  // building plays a site at work: dust at the footing, sparks, a hammer now and then,
+  // and a puff and two notes when the structure stands. Ours, and the enemy's in sight.
+  building(now) {
+    const live = new Set();
+    for (const st of this.state.structures ?? []) {
+      if (st.ruin || st.role === "fence" || !(st.side === this.side || st.visible)) continue;
+      const site = this.sites.get(st.id);
+      if (st.building >= 1) {
+        if (!site) continue;
+        this.sites.delete(st.id);
+        for (let i = 0; i < 6; i++) this.fx.dust(st.x + (Math.random() - 0.5) * 60, st.y + (Math.random() - 0.5) * 60, now + i * 40, 1.8);
+        this.sound("built", st.x, st.y);
+        continue;
+      }
+      live.add(st.id);
+      const s = site ?? { dust: 0, clank: now + 300 };
+      this.sites.set(st.id, s);
+      const fp = structureDef(this.rules, st)?.footprint ?? 40;
+      if (now >= s.dust) {
+        s.dust = now + 240 + Math.random() * 260;
+        const a = Math.random() * TAU;
+        this.fx.dust(st.x + Math.cos(a) * fp * 0.8, st.y + Math.sin(a) * fp * 0.8, now, 1.5);
+        // Welding and cutting: a few bright sparks thrown from the frame.
+        for (let i = 0; i < 3; i++) {
+          this.fx.speck("#ffd27a", st.x + (Math.random() - 0.5) * fp, st.y + (Math.random() - 0.5) * fp, { t0: now + i * 25, ttl: 420, h: 14 + Math.random() * 20, vx: (Math.random() - 0.5) * 50, vy: (Math.random() - 0.5) * 50, vh: 40 + Math.random() * 70, size: 1.3, add: true, pri: 0 });
+        }
+      }
+      if (now >= s.clank) {
+        s.clank = now + 500 + Math.random() * 900;
+        this.sound("hammer", st.x, st.y);
+      }
+    }
+    for (const id of this.sites.keys()) if (!live.has(id) && !(this.state.structures ?? []).some((st) => st.id === id)) this.sites.delete(id);
+  }
+
+  // drawTint colours the ground a structure being placed may stand on: green where it
+  // fits, red where something is in the way. Ground too far from the base is left bare.
+  drawTint(ctx, S) {
+    const p = this.placing;
+    if (!p?.def) return;
+    const key = tintKey(this.state, this.side, p.id);
+    if (this.tinted?.key !== key) this.tinted = { key, cells: tint(this.rules, this.state, this.side, p.def, 20) };
+    const { w, h } = this.cam;
+    for (const ok of [true, false]) {
+      ctx.fillStyle = ok ? "rgba(86,224,122,0.3)" : "rgba(236,84,70,0.17)";
+      ctx.beginPath();
+      for (const c of this.tinted.cells) {
+        if (c.ok !== ok) continue;
+        const a = S(c.x - 10, c.y - 10);
+        if (a[0] < -60 || a[1] < -60 || a[0] > w + 60 || a[1] > h + 60) continue;
+        const b = S(c.x + 10, c.y - 10);
+        const d = S(c.x + 10, c.y + 10);
+        const e = S(c.x - 10, c.y + 10);
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.lineTo(d[0], d[1]);
+        ctx.lineTo(e[0], e[1]);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
+  }
+
+  // drawGhost draws the structure being placed where the pointer put it: its footprint on
+  // the ground, green or red, and the building itself seen through.
+  drawGhost(ctx, S, buildScale, time) {
+    const p = this.placing;
+    if (!p?.spot) return;
+    const { x, y } = p.spot;
+    const ok = !p.why;
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = ok ? "#7dffa0" : "#ff6b5a";
+    ctx.fillStyle = ok ? "rgba(86,224,122,0.35)" : "rgba(236,84,70,0.4)";
+    if (p.def.role === "fence") {
+      // A fence run lies the way the player turned it, centred on the spot: each segment
+      // green or red by the ground it would stand on.
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      for (const g of p.segs ?? []) {
+        const [ax, ay] = S(g.ax, g.ay);
+        const [bx, by] = S(g.bx, g.by);
+        ctx.strokeStyle = g.ok && ok ? "#7dffa0" : g.ok ? "#e7c15a" : "#ff6b5a";
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+    ctx.beginPath();
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * TAU;
+      const [sx, sy] = S(x + Math.cos(a) * p.def.footprint, y + Math.sin(a) * p.def.footprint);
+      if (i) ctx.lineTo(sx, sy);
+      else ctx.moveTo(sx, sy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const [sx, sy] = S(x, y);
+    ctx.translate(sx, sy);
+    ctx.scale(buildScale, buildScale);
+    ctx.globalAlpha = ok ? 0.72 : 0.45;
+    drawStructure(ctx, { kind: p.id, role: p.def.role, faction: p.faction, building: 1 }, p.def, sideColor[this.side], time);
+    ctx.restore();
+  }
+
   // fall leaves what is left of `count` soldiers, or of a vehicle or boat, where it was.
   fall(group, v, count) {
     const ttl = casualtySeconds(group.unit, group.cls) * 1000;
     if (!ttl) return;
     const one = !group.small;
+    // A man lost with enemy armour on top of him was run down: he is drawn pressed flat.
+    const flat = group.cls === "infantry" && crusherNear(this.rules, this.groups.values(), group.side, v.px, v.py);
     for (let i = 0; i < (one ? 1 : count); i++) {
       const spread = () => (one ? 0 : (Math.random() - 0.5) * 14);
-      this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.px + spread(), y: v.py + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl });
+      this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.px + spread(), y: v.py + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl: flat ? ttl * 1.5 : ttl, flat });
     }
   }
 
@@ -486,6 +667,7 @@ export class Scene {
     this.gunfire(now);
     this.smoulder(now);
     this.gush(now);
+    if (this.state) this.building(now);
     this.fx.update(now, dt);
     this.sfx?.refresh();
 
@@ -563,6 +745,7 @@ export class Scene {
     // The gold lying around each gusher, as this side last saw it.
     for (const g of rules.map.gushers ?? []) drawField(ctx, S, z, g, fieldShare(state, g.id), time);
 
+    this.drawTint(ctx, S);
     this.fx.drawGround(ctx, cam, unitScale, now);
 
     // Everything that stands up, far to near.
@@ -578,8 +761,12 @@ export class Scene {
       const def = structureDef(rules, st);
       if (!def) continue;
       if (st.role === "fence") things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: z, draw: () => drawFence(ctx, st, sideColor[st.side]) });
-      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, st, def, sideColor[st.side], time) });
+      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, { ...st, door: this.doorOf(st, now) }, def, sideColor[st.side], time) });
     }
+    // Where new units gather, when a place was chosen: a flag in the side's colour.
+    const flags = new Map();
+    for (const st of state.structures ?? []) if (st.rally && st.side === this.side && !st.ruin) flags.set(`${st.rally.x},${st.rally.y}`, st.rally);
+    for (const r of flags.values()) things.push({ depth: r.x + r.y, x: r.x, y: r.y, scale: buildScale, draw: () => rallyFlag(ctx, sideColor[this.side], time) });
     for (const g of rules.map.gushers ?? []) {
       things.push({
         depth: g.x + g.y,
@@ -616,7 +803,8 @@ export class Scene {
         scale: buildScale,
         // The painted picture of that very landmark (a house keeps its look for the match,
         // and falls into its own ruin), or the code-drawn stand-in.
-        draw: () => drawLandmark(ctx, l.kind, l.id, kind === "rubble" && l.kind !== "rubble") || (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time),
+        // A sandbag position built in the match faces the way it was built to.
+        draw: () => (l.built ? drawBuilt(ctx, l) : drawLandmark(ctx, l.kind, l.id, kind === "rubble" && l.kind !== "rubble") || (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time)),
       });
     }
     for (const group of this.groups.values()) {
@@ -627,16 +815,30 @@ export class Scene {
           x: v.px,
           y: v.y,
           scale: unitScale,
-          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate }),
+          draw: () => {
+            // Just out of its structure: it shows and grows as it clears the doorway.
+            const age = v.bornAt ? (now - v.bornAt) / 900 : 1;
+            if (age < 1) {
+              ctx.globalAlpha = Math.min(1, age * 2.5);
+              ctx.scale(0.55 + 0.45 * age, 0.55 + 0.45 * age);
+            }
+            drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate, pose: heroPose(rules, group.view, { moving: v.moving, firing: now - (v.shotAt ?? -1e9) < 1500 }) });
+          },
         });
       }
     }
     for (const e of this.effects) {
       if (e.kind !== "casualty" || now < e.t0) continue;
-      things.push({ depth: e.x + e.y - 1, x: e.x, y: e.y, scale: unitScale, draw: () => drawCasualty(ctx, { unit: e.unit, cls: e.cls, turn: e.turn, age: (now - e.t0) / 1000 }) });
+      things.push({ depth: e.x + e.y - 1, x: e.x, y: e.y, scale: unitScale, draw: () => (e.flat ? drawFlat : drawCasualty)(ctx, { unit: e.unit, cls: e.cls, turn: e.turn, age: (now - e.t0) / 1000 }) });
     }
+    // Smoke and fire stand among the troops and buildings, not over all of them.
+    for (const { depth, p } of this.fx.standing(cam, unitScale, now)) things.push({ depth, raw: true, draw: () => this.fx.drawOne(ctx, p, unitScale, now) });
     things.sort((a, b) => a.depth - b.depth);
     for (const th of things) {
+      if (th.raw) {
+        th.draw(); // already in screen space
+        continue;
+      }
       const [sx, sy] = S(th.x, th.y);
       ctx.save();
       ctx.translate(sx, sy);
@@ -669,11 +871,11 @@ export class Scene {
         }
       }
     }
-    this.fx.draw(ctx, cam, unitScale, now);
 
     // Fog of war over everything on the ground; the labels stay readable above it.
     this.fog.render(state.fog, this.eyes());
     this.fog.draw(ctx, cam);
+    this.drawGhost(ctx, S, buildScale, time);
 
     this.labels(buildScale, unitScale);
     this.drawRadar();
@@ -748,7 +950,10 @@ export class Scene {
     }
   }
 
-  plate(text, sx, sy, { size = 12, color = "#e9ede6", border = "#000", bold = true, alpha = 0.72 } = {}) {
+  // plate writes a name on a dark plate. With `keep` the plate's place is remembered for
+  // this frame; with `avoid` it moves up or down out of the way of the plates kept so far
+  // (a tech building beside a point does not write its name over the point's).
+  plate(text, sx, sy, { size = 12, color = "#e9ede6", border = "#000", bold = true, alpha = 0.72, keep = false, avoid = false } = {}) {
     const { ctx } = this;
     ctx.font = `${bold ? "600 " : ""}${size}px system-ui, "Segoe UI", "Noto Sans Hebrew", "Heebo", sans-serif`;
     ctx.direction = /[֐-׿]/.test(text) ? "rtl" : "ltr";
@@ -756,6 +961,8 @@ export class Scene {
     ctx.textBaseline = "middle";
     const w = ctx.measureText(text).width + size;
     const h = size + 7;
+    if (avoid) sy += clearOf(this.plates, sx, sy, w, h);
+    if (keep || avoid) this.plates.push([sx - w / 2, sy - h / 2, w, h]);
     ctx.fillStyle = `rgba(10,14,16,${alpha})`;
     ctx.beginPath();
     ctx.roundRect(sx - w / 2, sy - h / 2, w, h, 3);
@@ -770,11 +977,13 @@ export class Scene {
 
   labels(buildScale, unitScale) {
     const { rules, state, cam } = this;
+    this.plates = []; // the plates other names must keep clear of, this frame
     const lang = this.lang();
     const tall = { hq: 100, landRig: 92, seaRig: 88, point: 60 };
     // Each gold field says how full it is, as last seen. The isolate marks keep the
     // percentage reading left to right in a Hebrew page.
     for (const g of rules.map.gushers ?? []) {
+      if (!fieldSeen(state, g.id)) continue; // how full a field nobody has looked at is, nobody knows
       const [sx, sy] = cam.screen(g.x, g.y);
       this.plate(`◆ ⁦${Math.round(fieldShare(state, g.id) * 100)}%⁩`, sx, sy + 30 * buildScale, { size: 11, color: "#f0c95a", border: "rgba(0,0,0,0)", bold: true, alpha: 0.6 });
     }
@@ -785,8 +994,8 @@ export class Scene {
       const income = rules.rigs[p.kind].income;
       // The isolate marks keep "+15" reading left to right inside a Hebrew label.
       const sub = income ? `${p.name[lang]} ⁦+${income}⁩` : p.name[lang];
-      if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55 });
-      this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner] });
+      if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55, keep: true });
+      this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner], keep: true });
     }
     this.structureLabels(buildScale);
     this.compass();
@@ -826,6 +1035,21 @@ export class Scene {
         ctx.lineTo(sx + 6, y);
         ctx.stroke();
       }
+      // The rank the squad has earned, in silver beside the brass, and a hero's health.
+      const under = low + 16 * unitScale + 4 + h / 2 + 2;
+      drawRank(ctx, group.view.rank, sx + ((group.view.tier ?? 1) > 1 ? 9 : -6), under, 12);
+      if (group.view.hero) {
+        const hp = Math.max(0, Math.min(1, group.view.hero.hp ?? 1));
+        ctx.fillStyle = "rgba(10,14,16,0.75)";
+        ctx.fillRect(sx - 17, under - h - 9, 34, 5);
+        ctx.fillStyle = hp < 0.35 ? "#ff5a5a" : "#63d68a";
+        ctx.fillRect(sx - 16, under - h - 8, 32 * hp, 3);
+      }
+    }
+    // Demolition charges burning down.
+    for (const c of state.charges ?? []) {
+      const [cx, cy] = cam.screen(c.x, c.y);
+      drawCharge(this.ctx, cx, cy - 26 * buildScale, c, performance.now(), sideColor[c.side]);
     }
     this.coachMark();
   }
@@ -873,8 +1097,15 @@ export class Scene {
       const [sx, sy] = cam.screen(st.x, st.y);
       const top = sy - (st.role === "defence" ? 44 : 66) * buildScale;
       const enemy = st.side !== state.side;
-      if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88` });
-      else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5 });
+      if (st.role === "tech") {
+        // A tech building says what it is, in its holder's colour, and what holding it gives.
+        const hold = sideColor[st.side] ?? sideColor[-1];
+        // The two lines are one block: what it gives sits on its name, wherever that lands.
+        const slide = clearOf(this.plates, sx, top - 12, Math.max(def.name[lang].length, def.about[lang].length) * 6.5 + 12, 34);
+        this.plate(def.name[lang], sx, top - 4 + slide, { size: 11, color: hold, border: `${hold}88`, keep: true });
+        if (cam.zoom >= 0.3) this.plate(def.about[lang], sx, top - 19 + slide, { size: 9.5, color: "#ecdca6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.6, keep: true });
+      } else if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88`, avoid: true });
+      else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5, avoid: true });
       const rising = st.building < 1;
       if (!rising && st.hp >= 0.995) continue; // a whole building shows no bar (building ends a hair under full)
       this.healthBar(sx, top + 8, rising ? st.building : st.hp, rising ? "#c9a44c" : null);
@@ -972,11 +1203,8 @@ export class Scene {
           ctx.stroke();
         }
       }
-      if (seen.kind !== "rubble" && seen.hp < 1) {
-        ctx.fillStyle = "rgba(10,14,16,0.75)";
-        ctx.fillRect(sx - 15, top + 4, 30, 4);
-        ctx.fillStyle = seen.hp < 0.35 ? "#ff5a5a" : "#f0c04a";
-        ctx.fillRect(sx - 14, top + 5, 28 * seen.hp, 2);
+      if (seen.kind !== "rubble" && seen.kind !== "sandbagsFlat" && seen.hp < 1) {
+        this.healthBar(sx, top + 4, seen.hp, null); // the same bar every damaged building carries
       }
     }
     const now = performance.now();
@@ -1009,6 +1237,8 @@ export class Scene {
     const w = this.radar.width;
     const h = this.radar.height;
     const k = w / rules.map.width;
+    // Without a radar structure that stands and has power, the mini map shows nothing.
+    if (state.radar === false) return drawRadarOff(g, w, h, performance.now() / 1000);
     g.setTransform(1, 0, 0, 1, 0, 0);
     // The terrain, drawn once for this size and redrawn when a bridge falls or stands again.
     if (!this.radarBase || this.radarBase.width !== w || this.radarBase.height !== h) {

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
+import { clearOf, matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
 import { coverPercent, deckOf, drawBridge, drawMiniMap, drawScenery, isWater, landmarkFallbacks, onDeck, paintGround, placeAt, scenery, terrainAt, terrainColors } from "./terrain.js";
 
 const rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8"));
@@ -136,4 +136,14 @@ test("places, seats and the lobby's gold and length choices", () => {
 
   assert.deepEqual(matchLengths(600), [300, 600, 900, 1200]);
   assert.deepEqual(matchLengths(420), [300, 420, 600, 900, 1200]);
+});
+
+test("a name on the map moves out of the way of the names already written", () => {
+  const point = [[100, 50, 80, 20], [110, 72, 60, 18]]; // a point's name and the line under it
+  assert.equal(clearOf(point, 400, 60, 90, 18), 0, "nothing near: it stays");
+  const dy = clearOf(point, 140, 60, 90, 18);
+  assert.notEqual(dy, 0);
+  const [x, y, w, h] = [140, 60 + dy, 90, 18];
+  for (const [px, py, pw, ph] of point) assert.ok(!(x - w / 2 < px + pw && x + w / 2 > px && y - h / 2 < py + ph && y + h / 2 > py), "clear of both");
+  assert.ok(Math.abs(dy) <= 40, "and no farther than it must");
 });

@@ -62,6 +62,7 @@ type Side struct {
 	// and vehicles at their share of the squad's cost, and structures at theirs.
 	Destroyed float64
 	nextNum   map[string]int // next callsign number per unit class
+	rally     *rallyPoint    // where the units of structures built from now on gather, nil for beside them
 	hqAlarm   int            // tick of the last "HQ under attack" event
 
 	// Fog of war: what this side has seen, and what it last knew.
@@ -89,10 +90,16 @@ type Order struct {
 	X, Y    float64
 	Tick    int
 	arrived bool
+	// rally marks the short walk from a structure's door to where its units gather: it
+	// ends without a report, and the squad then awaits orders.
+	rally bool
 	// Structure is the structure an attack or capture order is on (structures.go).
 	Structure int
 	work      int // ticks an engineer squad has spent on its capture
 
+	// ground marks an order to a spot given by its distance from a point: the squad
+	// stands on that ground, and does not go into a building that happens to be near it.
+	ground   bool
 	landmark int // index+1 of the landmark named, 0 for none
 	bridge   int // index+1 of the bridge named, 0 for none
 }
@@ -128,6 +135,10 @@ type Team struct {
 	hits    int
 	misses  int
 	shooter []*Squad
+
+	// Where the team stood a tick ago, and when a vehicle last ran one of its men down (crush.go).
+	prevX, prevY float64
+	crushTick    int
 }
 
 type Squad struct {
@@ -146,6 +157,19 @@ type Squad struct {
 	// has no teams and is not Alive. DeployTotal is the whole wait, for progress bars.
 	DeployTicks int
 	DeployTotal int
+	// From is the structure that makes the squad and that it comes out of (queue.go), 0
+	// for a squad that was on the field from the start.
+	From int
+
+	// Rank is the standing the squad has earned (0 none, then the rules' ranks in order),
+	// and Kills what it has destroyed, in gold (ranks.go). Dug counts the sandbag
+	// positions it has built (fortify.go).
+	Rank  int
+	Kills float64
+	Dug   int
+	dig   int        // ticks spent digging the position it was told to build
+	told  int        // tick its side was last told a vehicle is running its men down
+	hero  *heroState // set for a hero (hero.go)
 
 	unit        *shared.Unit
 	haul        *haul // set for a gold hauler, which works on its own and has no leader
@@ -177,13 +201,18 @@ type Sim struct {
 	Landmarks []LandmarkState
 	// Places lets other parts of the game make their own things nameable in orders.
 	Places []PlaceFinder
-	Over   bool
-	Winner int
-	Reason string
+	// Charges are the demolition charges burning down, and seized the squads a hero has
+	// taken over for now (hero.go).
+	Charges []Charge
+	seized  []seizure
+	Over    bool
+	Winner  int
+	Reason  string
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
 	slots           [2][][2]float64 // where each side's base slots lie on this map (structures.go)
+	power           [2]powerState   // each side's power this tick (power.go)
 	landIdx         map[string]int  // landmark id → index
 	rng             *rand.Rand
 	events          []Event
@@ -237,13 +266,14 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		}
 	}
 	s.initStructures(cfg.FullBase, cfg.Base)
+	s.initTech()
 	startGold := cfg.StartGold
 	if startGold <= 0 {
 		startGold = r.Match.StartGold
 	}
 	s.initHaul(startGold)
 	// What is built or lies on the ground can be named in an order like the map's own places.
-	s.Places = append(s.Places, s.structurePlace, s.fieldPlace)
+	s.Places = append(s.Places, s.structurePlace, s.fieldPlace, s.techPlace)
 	s.initFog()
 	return s, nil
 }
@@ -274,7 +304,7 @@ func (s *Sim) SquadAny(id int) *Squad {
 
 // Callsign is the squad's radio name in both languages, e.g. Viper 2 / צפע 2.
 func (s *Sim) Callsign(sq *Squad) shared.Text {
-	c := s.R.Callsigns.Classes[sq.unit.Class]
+	c := s.R.Callsigns.Classes[sq.unit.CallClass()]
 	if sq.haul != nil {
 		c = s.R.Callsigns.Hauler // a name for the player to read; haulers are not on the net
 	}
@@ -284,6 +314,9 @@ func (s *Sim) Callsign(sq *Squad) shared.Text {
 
 // Class is the squad's unit class (infantry, vehicle, naval, air).
 func (sq *Squad) Class() string { return sq.unit.Class }
+
+// CallClass is the callsign class the squad answers to: its class, or a hero's own.
+func (sq *Squad) CallClass() string { return sq.unit.CallClass() }
 
 // Center is the middle of the squad's living teams.
 func (sq *Squad) Center() (x, y float64) {
@@ -324,7 +357,7 @@ func (s *Sim) Nerve(t *Team) string {
 func (s *Sim) raise(side int, unitID string) *Squad {
 	u, _ := s.unitFor(side, unitID)
 	sd := &s.Sides[side]
-	sd.nextNum[u.Class]++
+	sd.nextNum[u.CallClass()]++
 	// Haulers are numbered apart from squads, so that buying one never shifts a squad's id.
 	var id int
 	if u.Class == shared.HaulerClass {
@@ -335,7 +368,7 @@ func (s *Sim) raise(side int, unitID string) *Squad {
 		id = s.squadN
 	}
 	sq := &Squad{
-		ID: id, Side: side, Unit: unitID, Num: sd.nextNum[u.Class],
+		ID: id, Side: side, Unit: unitID, Num: sd.nextNum[u.CallClass()],
 		Tier: 1, unit: &u,
 		Order:       Order{Kind: OrderNone},
 		lastContact: never, lastPinned: never,
@@ -350,6 +383,14 @@ func (s *Sim) raise(side int, unitID string) *Squad {
 // field puts a raised squad beside its headquarters, alive and ready for orders.
 func (s *Sim) field(sq *Squad) {
 	u, side := sq.unit, sq.Side
+	if sq.From != 0 && s.comeOut(sq) {
+		// Made by a structure: it comes out of that structure's door (queue.go).
+		if sq.haul == nil {
+			s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
+			s.heroFielded(sq)
+		}
+		return
+	}
 	hq := s.R.HQPoint(side)
 	inward := 1.0
 	if hq.X > s.R.Map.Width/2 {
@@ -376,18 +417,22 @@ func (s *Sim) field(sq *Squad) {
 		return // no leader joins the net for a hauler
 	}
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
+	s.heroFielded(sq)
 }
 
-// deploy counts down the squads on their way and fields the ones whose time has come.
-func (s *Sim) deploy() {
-	for _, sq := range s.Squads {
-		if sq.DeployTicks == 0 {
-			continue
-		}
-		if sq.DeployTicks--; sq.DeployTicks == 0 {
-			s.field(sq)
+// gathered reports whether a squad that came out of its structure has taken its place
+// beside it: every team is close to the spot, or the squad has had time enough to walk
+// there (a neighbouring structure can keep a team's own slot out of reach for good).
+func (s *Sim) gathered(sq *Squad) bool {
+	if s.Tick-sq.Order.Tick > 10*s.R.TickRate {
+		return true
+	}
+	for i := range sq.Teams {
+		if t := &sq.Teams[i]; t.Members > 0 && dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > 48 {
+			return false
 		}
 	}
+	return true
 }
 
 // Deploying reports whether a squad has been bought and has not reached the field yet.
@@ -476,6 +521,7 @@ func (s *Sim) Step() []Event {
 	if s.Over {
 		return nil
 	}
+	s.powerStep()
 	s.deploy()
 	s.construct()
 
@@ -485,17 +531,21 @@ func (s *Sim) Step() []Event {
 	s.trackContacts()
 	s.trackStructures()
 	s.trackObjects()
+	s.heroOrders()
 	for _, tr := range live {
 		tr.plan = s.decide(tr, live)
 	}
 	for _, tr := range live {
 		s.move(tr)
 	}
+	s.crush(live)
 	s.enterBuildings(live)
 	for _, tr := range live {
 		s.fire(tr)
 	}
 	s.defencesFire(live)
+	s.heroes(live)
+	s.resolveSandbags()
 	s.resolveDamage(live)
 	s.resolveStructures()
 	s.resolveBuildings(live)
@@ -506,7 +556,11 @@ func (s *Sim) Step() []Event {
 	s.recover(live)
 	s.capture(live)
 	s.engineers()
+	s.techWork()
+	s.repairStructures()
 	s.haulWork()
+	s.fortify(live)
+	s.rankWork(live)
 	s.squadEvents(live)
 	s.countGarrisons()
 	s.observe()
@@ -533,10 +587,12 @@ func (s *Sim) spot(live []*teamRef) {
 		fired := float64(s.Tick-tr.t.lastFire) <= s.R.Match.RevealSeconds*float64(s.R.TickRate)
 		// Inside a building a team is seen only from close by, or once it has fired.
 		hidden := tr.t.In != "" && !fired
-		tr.t.Spotted = fired || (!hidden && s.postSees(enemy, tr.t.X, tr.t.Y))
+		// A stealthy unit is seen only from close by until it fires; a defence sees it at its range.
+		stealth := tr.u.Stealth > 0 && !fired
+		tr.t.Spotted = fired || (!hidden && !stealth && s.postSees(enemy, tr.t.X, tr.t.Y)) || (stealth && s.defenceSees(enemy, tr.t.X, tr.t.Y))
 		for _, o := range live {
 			d := dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y)
-			if o.sq.Side != enemy || d > o.u.Sight || (hidden && d > s.R.Match.GarrisonSight) {
+			if o.sq.Side != enemy || d > o.u.Sight || (hidden && d > s.R.Match.GarrisonSight) || (stealth && d > tr.u.Stealth) {
 				continue
 			}
 			tr.t.Spotted = true
@@ -635,7 +691,7 @@ func (s *Sim) fire(tr *teamRef) {
 		return
 	}
 	tgt := tr.plan.target
-	chance := tr.u.Accuracy
+	chance := tr.u.Accuracy * s.rankOf(tr.sq).Accuracy
 	if nerve == Shaken {
 		chance *= 0.75
 	}
@@ -643,6 +699,7 @@ func (s *Sim) fire(tr *teamRef) {
 		chance *= 0.5
 	}
 	chance *= s.coverAgainst(tgt, t.X, t.Y)
+	s.hitSandbags(tr, tgt)
 	if tgt.t.In != "" {
 		// Rounds fired at a garrison hit its walls too.
 		if i, l := s.landmarkByID(tgt.t.In); l != nil {
@@ -684,8 +741,9 @@ func (s *Sim) resolveDamage(live []*teamRef) {
 		t.Members = left
 		if lost > 0 {
 			s.Sides[1-tr.sq.Side].Destroyed += float64(tr.u.Cost) * float64(lost) / float64(max(1, tr.u.Teams*tr.u.Members))
+			s.creditKill(tr, lost)
 		}
-		t.Stress = math.Min(1, t.Stress+tr.u.NerveResist*
+		t.Stress = math.Min(1, t.Stress+tr.u.NerveResist*s.rankOf(tr.sq).Nerve*
 			(float64(t.misses)*n.PerMiss+float64(t.hits)*n.PerHit+float64(lost)*n.PerMemberLost))
 		if left == 0 {
 			s.teamLost(tr)
@@ -719,6 +777,7 @@ func (s *Sim) teamLost(tr *teamRef) {
 		return
 	}
 	tr.sq.Alive = false
+	s.heroFell(tr.sq)
 	s.emit(Event{Side: tr.sq.Side, Kind: EvSquadLost, Squad: tr.sq.ID, Point: s.nearestPoint(x, y)})
 	s.emit(Event{Side: 1 - tr.sq.Side, Kind: EvEnemyDestroyed, Contact: tr.sq.ID, Point: s.nearestPoint(x, y)})
 }
@@ -812,7 +871,10 @@ func (s *Sim) squadEvents(live []*teamRef) {
 			sq.inContact = false
 		}
 
-		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived, 0
+		if sq.Order.rally && s.gathered(sq) {
+			sq.Order = Order{Kind: OrderNone} // out of the door and in its place: awaiting orders
+		}
+		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived && !sq.Order.rally, 0
 		cx, cy := sq.Center()
 		for i := range sq.Teams {
 			t := &sq.Teams[i]
@@ -833,7 +895,18 @@ func (s *Sim) squadEvents(live []*teamRef) {
 		}
 		if arrived && alive > 0 && sq.Order.Contact == 0 {
 			sq.Order.arrived = true
-			s.emit(Event{Side: sq.Side, Kind: EvArrived, Squad: sq.ID, Point: s.nearestPoint(cx, cy)})
+			// Where it was sent goes with the news: a landmark or a bridge by its id, a
+			// structure by its own. A squad at the clinic says so, not "at Delta".
+			e := Event{Side: sq.Side, Kind: EvArrived, Squad: sq.ID, Point: s.nearestPoint(cx, cy)}
+			if sq.Order.landmark > 0 || sq.Order.bridge > 0 {
+				e.Place = sq.Order.Place
+			}
+			if sq.Order.Place != "" && sq.Order.Point == "" && sq.Order.landmark == 0 && sq.Order.bridge == 0 {
+				if pl, err := s.resolveFor(sq.Side, sq.Order.Place); err == nil && pl.Structure != nil {
+					e.Structure, e.Unit = "s"+fmt.Sprint(pl.Structure.ID), pl.Structure.Kind
+				}
+			}
+			s.emit(e)
 		}
 	}
 }
