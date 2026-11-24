@@ -110,6 +110,28 @@ export const fallbacks = {
     ctx.fillStyle = p.dark;
     ctx.fillRect(37, -8, 6, 5);
   },
+  power(ctx, p) {
+    // A turbine hall with two stacks.
+    shadow(ctx, 36, 15, 0.3);
+    box(ctx, p, -4, 2, 46, 32, 15, p.wall);
+    for (const x of [-12, 6]) {
+      line(ctx, p.metal, 6, x, -14, x, -40);
+      disc(ctx, p.dark, x, -40, 3, 1.5);
+    }
+    tank(ctx, p, 24, 4, 8, 14);
+  },
+  radar(ctx, p, time) {
+    // A low hut and a dish on a mast; the dish swings with the clock.
+    shadow(ctx, 30, 13, 0.3);
+    box(ctx, p, -8, 4, 34, 26, 11, p.wall);
+    line(ctx, p.metal, 3, 12, 0, 12, -34);
+    const turn = Math.cos((time ?? 0) * 1.05);
+    ctx.fillStyle = p.trim;
+    ctx.beginPath();
+    ctx.ellipse(12, -38, 4 + 9 * Math.abs(turn), 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    line(ctx, p.dark, 1.4, 12, -38, 12 + 9 * turn, -43);
+  },
   defence(ctx, p, time, def) {
     shadow(ctx, 15, 7, 0.3);
     isoBox(ctx, 0, 2, 26, 26, 6, "#8d8468", "#5d5744", "#716a52"); // sandbags

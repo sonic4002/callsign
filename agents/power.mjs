@@ -57,6 +57,7 @@ export const powerLines = {
 
 // spare is the power a side will have to spare once everything going up stands.
 export function sparePower(status, side, defs) {
+  if (!status.power) return Infinity; // a status from before power: nothing to keep to
   let spare = (status.power?.supply ?? 0) - (status.power?.use ?? 0);
   for (const st of status.structures ?? []) {
     const rising = st.building === true || (typeof st.building === "number" && st.building < 1);

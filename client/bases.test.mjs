@@ -41,7 +41,8 @@ test("the structure cards say what can be built and why not", () => {
   assert.equal(card(start, "vehicleWorks").state, "ready");
   assert.deepEqual(card(start, "vehicleWorks").unlocks, ["tank", "rocketLauncher"]);
   assert.equal(card(start, "airbase").state, "needs");
-  assert.equal(card(start, "airbase").needs.id, "vehicleWorks");
+  assert.equal(card(start, "airbase").needs.id, "radar");
+  assert.equal(card(start, "radar").needs.id, "vehicleWorks");
   assert.equal(card({ ...start, gold: 10 }, "vehicleWorks").state, "poor");
   assert.equal(card(start, "sentryGun").state, "ready");
 
