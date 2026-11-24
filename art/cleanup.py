@@ -362,6 +362,8 @@ def main():
         print(f"{rel}  {result.width}x{result.height}")
 
     # A structure's stages, earliest first; `<id>_site` is another name for the first.
+    for entry in manifest["buildings"].values():
+        entry.pop("stages", None)  # an entry kept from the last run brings its old list
     for key in sorted(manifest["buildings"]):
         stage = re.fullmatch(r"(.+)_stage(\d+)", key)
         if stage and stage[1] in manifest["buildings"]:

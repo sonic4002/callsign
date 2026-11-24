@@ -162,6 +162,7 @@ test("manifest: every structure has its stages in its own frame, and producers h
   for (const key of structures) {
     const entry = b[key];
     assert.ok(entry.stages?.length >= 3, `${key} goes up in at least three stages before it is finished`);
+    assert.deepEqual(entry.stages, [...new Set(entry.stages)].sort(), `${key}'s stages are each listed once, in order`);
     for (const stage of [...entry.stages, `${key}_site`, `${key}_ruin`]) {
       assert.ok(b[stage], `${stage} is missing`);
       assert.deepEqual(b[stage].size, entry.size, `${stage} does not fill the frame of ${key}`);

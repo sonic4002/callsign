@@ -1174,10 +1174,6 @@
         "aegis_barracks_stage1",
         "aegis_barracks_stage2",
         "aegis_barracks_stage3",
-        "aegis_barracks_stage4",
-        "aegis_barracks_stage1",
-        "aegis_barracks_stage2",
-        "aegis_barracks_stage3",
         "aegis_barracks_stage4"
       ]
     },
@@ -1290,10 +1286,6 @@
         "faces": "SW"
       },
       "stages": [
-        "aegis_works_stage1",
-        "aegis_works_stage2",
-        "aegis_works_stage3",
-        "aegis_works_stage4",
         "aegis_works_stage1",
         "aegis_works_stage2",
         "aegis_works_stage3",
@@ -1413,10 +1405,6 @@
         "aegis_airbase_stage1",
         "aegis_airbase_stage2",
         "aegis_airbase_stage3",
-        "aegis_airbase_stage4",
-        "aegis_airbase_stage1",
-        "aegis_airbase_stage2",
-        "aegis_airbase_stage3",
         "aegis_airbase_stage4"
       ]
     },
@@ -1529,10 +1517,6 @@
         "faces": "S"
       },
       "stages": [
-        "aegis_dockyard_stage1",
-        "aegis_dockyard_stage2",
-        "aegis_dockyard_stage3",
-        "aegis_dockyard_stage4",
         "aegis_dockyard_stage1",
         "aegis_dockyard_stage2",
         "aegis_dockyard_stage3",
@@ -1651,10 +1635,6 @@
         "aegis_refinery_stage1",
         "aegis_refinery_stage2",
         "aegis_refinery_stage3",
-        "aegis_refinery_stage4",
-        "aegis_refinery_stage1",
-        "aegis_refinery_stage2",
-        "aegis_refinery_stage3",
         "aegis_refinery_stage4"
       ]
     },
@@ -1770,10 +1750,6 @@
         "ashfall_safehouse_stage1",
         "ashfall_safehouse_stage2",
         "ashfall_safehouse_stage3",
-        "ashfall_safehouse_stage4",
-        "ashfall_safehouse_stage1",
-        "ashfall_safehouse_stage2",
-        "ashfall_safehouse_stage3",
         "ashfall_safehouse_stage4"
       ]
     },
@@ -1886,10 +1862,6 @@
         "faces": "SW"
       },
       "stages": [
-        "ashfall_chopShop_stage1",
-        "ashfall_chopShop_stage2",
-        "ashfall_chopShop_stage3",
-        "ashfall_chopShop_stage4",
         "ashfall_chopShop_stage1",
         "ashfall_chopShop_stage2",
         "ashfall_chopShop_stage3",
@@ -2009,10 +1981,6 @@
         "ashfall_launchYard_stage1",
         "ashfall_launchYard_stage2",
         "ashfall_launchYard_stage3",
-        "ashfall_launchYard_stage4",
-        "ashfall_launchYard_stage1",
-        "ashfall_launchYard_stage2",
-        "ashfall_launchYard_stage3",
         "ashfall_launchYard_stage4"
       ]
     },
@@ -2125,10 +2093,6 @@
         "faces": "SW"
       },
       "stages": [
-        "ashfall_boatShed_stage1",
-        "ashfall_boatShed_stage2",
-        "ashfall_boatShed_stage3",
-        "ashfall_boatShed_stage4",
         "ashfall_boatShed_stage1",
         "ashfall_boatShed_stage2",
         "ashfall_boatShed_stage3",
@@ -2247,10 +2211,6 @@
         "ashfall_smelter_stage1",
         "ashfall_smelter_stage2",
         "ashfall_smelter_stage3",
-        "ashfall_smelter_stage4",
-        "ashfall_smelter_stage1",
-        "ashfall_smelter_stage2",
-        "ashfall_smelter_stage3",
         "ashfall_smelter_stage4"
       ]
     },
@@ -2328,9 +2288,6 @@
       "stages": [
         "aegis_sentryGun_stage1",
         "aegis_sentryGun_stage2",
-        "aegis_sentryGun_stage3",
-        "aegis_sentryGun_stage1",
-        "aegis_sentryGun_stage2",
         "aegis_sentryGun_stage3"
       ]
     },
@@ -2394,9 +2351,6 @@
       ],
       "height": 42,
       "stages": [
-        "aegis_flakBattery_stage1",
-        "aegis_flakBattery_stage2",
-        "aegis_flakBattery_stage3",
         "aegis_flakBattery_stage1",
         "aegis_flakBattery_stage2",
         "aegis_flakBattery_stage3"
@@ -2464,9 +2418,6 @@
       "stages": [
         "ashfall_gunNest_stage1",
         "ashfall_gunNest_stage2",
-        "ashfall_gunNest_stage3",
-        "ashfall_gunNest_stage1",
-        "ashfall_gunNest_stage2",
         "ashfall_gunNest_stage3"
       ]
     },
@@ -2530,9 +2481,6 @@
       ],
       "height": 38,
       "stages": [
-        "ashfall_rocketNest_stage1",
-        "ashfall_rocketNest_stage2",
-        "ashfall_rocketNest_stage3",
         "ashfall_rocketNest_stage1",
         "ashfall_rocketNest_stage2",
         "ashfall_rocketNest_stage3"
