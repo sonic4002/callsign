@@ -8,7 +8,7 @@ import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { wantedStructure } from "/agents/bases.mjs";
 import { drawIcon } from "./bases-art.js";
-import { ofRole, structureCards, structureDef, structureRows, techSite, unitDef, unitLock } from "./bases.js";
+import { ofRole, structureCards, structureDef, techSite, unitDef, unitLock } from "./bases.js";
 import { cueMark, cued, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
@@ -128,6 +128,17 @@ scene.onFinale = () => renderOverlay();
 scene.sfx = new Sfx({ level: () => (music.muted ? 0 : music.volume) }); // guns and blasts follow the music's volume and mute
 const speech = new Speech({ volume: () => 0.6 + 0.4 * music.volume, duck: (on) => (music.duck(on), scene.sfx.duck(on)) });
 speech.bind($("speak"));
+// Settings: the gear opens them. Sound, the radio procedure level and the display options
+// live there, out of the sidebar.
+$("settings-open").addEventListener("click", () => {
+  $("voices").checked = speech.enabled;
+  $("settings").showModal();
+});
+$("voices").addEventListener("change", (ev) => {
+  speech.setEnabled(ev.target.checked);
+  $("speak").classList.toggle("off", !speech.enabled);
+});
+$("settings").addEventListener("click", (ev) => ev.target === $("settings") && $("settings").close());
 // What the page says by itself when the game goes away, kept ready while the server is there.
 speech.keep({ lost: { en: strings.en.declareLost, he: strings.he.declareLost } });
 let wasOnline = false; // the connection was up, so its loss is news
@@ -751,7 +762,6 @@ function renderSidebar() {
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
     $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
     monitor.sync();
-    $("monitor-count").textContent = String($("monitor-strip").children.length || "");
     markThinking();
   }
   // A hero's health moves in place, like the other bars.
@@ -996,16 +1006,6 @@ function renderStructures(canAct) {
   }
   renderRally(canAct);
   buildBadges(cards.filter((c) => c.state === "rising").length, (state.deploying ?? []).filter((d) => d.side === side).length);
-  const rows = structureRows(state, rules, side);
-  const listKey = JSON.stringify([lang, rows.map((r) => [r.id, Math.round(r.hp * 20), r.building >= 1, r.segments, flagsOf(r.id)])]);
-  if (listKey !== drawn.structureList) {
-    drawn.structureList = listKey;
-    $("structure-list").replaceChildren(...rows.map(structureRow));
-  }
-  for (const r of rows) {
-    const row = $("structure-list").querySelector(`[data-structure="${r.id}"]`);
-    if (row && r.building < 1) row.querySelector(".bar b").style.inlineSize = `${r.building * 100}%`;
-  }
 }
 
 function structureButton(card, canAct) {
@@ -1016,12 +1016,12 @@ function structureButton(card, canAct) {
   button.disabled = !canAct || !["ready"].includes(card.state);
   const icon = el("canvas");
   const dpr = devicePixelRatio || 1;
-  icon.width = 60 * dpr;
-  icon.height = 40 * dpr;
+  icon.width = 84 * dpr;
+  icon.height = 56 * dpr;
   const g = icon.getContext("2d");
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.translate(30, def.role === "fence" ? 21 : 32);
-  g.scale(0.5, 0.5);
+  g.translate(42, def.role === "fence" ? 29 : 45);
+  g.scale(0.7, 0.7);
   drawIcon(g, id, def, faction, sideColor[side]);
   const names = (ids) => ids.map((u) => unitDef(rules, u)?.name[lang] ?? u).join(", ");
   const what =
@@ -1173,26 +1173,6 @@ function renderRally(canAct) {
   $("rally-set").disabled = !canAct;
 }
 
-// flagsOf is how a standing structure of ours is doing besides its health: being
-// repaired, or dark for want of power.
-function flagsOf(id) {
-  const st = (state.structures ?? []).find((s) => s.id === id);
-  return st?.repairing ? "repairing" : st?.dark ? "dark" : "";
-}
-
-function structureRow(r) {
-  const def = structureDef(rules, r);
-  const flag = flagsOf(r.id);
-  const li = el("li", `${r.building < 1 ? "rising" : ""} ${flag}`.trim());
-  if (flag) li.title = t(`structure.${flag}`);
-  li.dataset.structure = r.id;
-  const bar = el("span", "bar");
-  const fill = el("b", r.hp > 0.5 ? "" : r.hp > 0.25 ? "hurt" : "bad");
-  fill.style.inlineSize = `${(r.building < 1 ? r.building : r.hp) * 100}%`;
-  bar.append(fill);
-  li.append(el("span", "name", def?.name[lang] ?? r.kind), bar, el("span", "order", r.building < 1 ? t("structure.rising", { percent: Math.round(r.building * 100) }) : `${Math.round(r.hp * 100)}%`));
-  return li;
-}
 
 // select marks a squad and starts a call to it.
 function select(sq) {

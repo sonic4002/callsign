@@ -44,7 +44,6 @@
   "placeholder": "Viper 2, this is Hammer. Hold Foxtrot. Over.",
   "send": "Send",
   "showNerve": "Show nerve (debug)",
-  "hint": "Pick a squad, then a point, then an action: the radio call is sent at once. Help shows how to command.",
   "zoomIn": "Zoom in",
   "zoomOut": "Zoom out",
   "zoomFit": "Show the whole map",
@@ -368,7 +367,6 @@
   "help.repair.say": "Viper 3 repair the west bridge",
   "help.seize": "Engineers take an enemy structure",
   "help.seize.say": "Viper 3 capture the enemy refinery",
-  "monitor.title": "AI agents",
   "monitor.open": "Open the live view of your AI agents",
   "monitor.tab.live": "Live",
   "monitor.tab.key": "Your key",
@@ -576,7 +574,6 @@
   "call.rallyFrom": "{to}, this is {from}. Squads from the {structure} rally at {point}. Over.",
   "call.rallyFromHome": "{to}, this is {from}. Squads from the {structure} rally at home. Over.",
   "placer.rallyFrom": "Where do squads from the {structure} gather?",
-  "sidebar.settings": "Settings",
   "tut.cover": "Cover decides fights. A squad holding a place uses the cover it finds there; the shield beside its name shows how much. For more, pick a squad, click a building and choose {cover}.",
   "tut.power": "Now your base. A match opens with the headquarters alone. Under {structures}, click {power}: a ghost of it follows the pointer. Click green ground and {anvil} builds it there. Everything else you build uses power: run short and building slows, the defences fall silent and the radar goes dark.",
   "tutTouch.power": "Now your base. A match opens with the headquarters alone. Open {buildTab}, then {structures}, and tap {power}: a ghost of it appears on the map. Tap green ground to move it, then {buildHere}. Everything else you build uses power: run short and building slows, the defences fall silent and the radar goes dark.",
@@ -587,5 +584,10 @@
   "help.q.tech": "What are the buildings that belong to nobody?",
   "help.a.tech": "Tech buildings stand on the map from the start: the Assay Office pays gold while you hold it, the Field Clinic heals infantry near it, the Service Yard mends vehicles near it. Send engineers to take one (pick them, tap the building, Take over); the enemy can take it back the same way, and it can be destroyed. Each has a name you can use as a place, also for a rally point.",
   "help.q.cues": "Who is telling me “Construction complete”?",
-  "help.a.cues": "Anvil. The plain news of your base comes as short fixed lines in Anvil's voice, marked with a small beacon in the log: construction complete, a squad in the field, not enough gold, the line is full, low power and power restored, the base or a hauler under attack, a structure lost, taken or sold, repairs stopped for want of gold, a unit lost with the structure that was making it, a hero in the field or down. They cost no AI and wake nobody. Settings has a switch to have them written only, not spoken."
+  "help.a.cues": "Anvil. The plain news of your base comes as short fixed lines in Anvil's voice, marked with a small beacon in the log: construction complete, a squad in the field, not enough gold, the line is full, low power and power restored, the base or a hauler under attack, a structure lost, taken or sold, repairs stopped for want of gold, a unit lost with the structure that was making it, a hero in the field or down. They cost no AI and wake nobody. Settings has a switch to have them written only, not spoken.",
+  "settings": "Settings",
+  "settings.sound": "Sound",
+  "settings.voices": "Speak the radio aloud",
+  "settings.radio": "Radio",
+  "settings.display": "Display"
 }

@@ -996,6 +996,7 @@ export class Scene {
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner], keep: true });
     }
     this.structureLabels(buildScale);
+    this.compass();
     this.landmarkLabels(buildScale, lang);
     for (const group of this.groups.values()) {
       if (!group.visuals.length) continue;
@@ -1104,14 +1105,70 @@ export class Scene {
       } else if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88`, avoid: true });
       else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5, avoid: true });
       const rising = st.building < 1;
-      if (!rising && st.hp >= 1) continue;
-      const w = 36;
-      const y = top + 8;
-      ctx.fillStyle = "rgba(0,0,0,0.65)";
-      ctx.fillRect(sx - w / 2 - 1, y - 1, w + 2, 6);
-      ctx.fillStyle = rising ? "#c9a44c" : st.hp > 0.5 ? "#63d68a" : st.hp > 0.25 ? "#f0c04a" : "#ff5a5a";
-      ctx.fillRect(sx - w / 2, y, w * (rising ? st.building : st.hp), 4);
+      if (!rising && st.hp >= 0.995) continue; // a whole building shows no bar (building ends a hair under full)
+      this.healthBar(sx, top + 8, rising ? st.building : st.hp, rising ? "#c9a44c" : null);
     }
+    // The two headquarters carry the same bar once they are hit.
+    for (const p of rules.map.points) {
+      if (p.kind !== "hq") continue;
+      const hp = state.hq?.[p.owner];
+      if (!(hp < 0.995) || !(hp > 0)) continue;
+      const [sx, sy] = cam.screen(p.x, p.y);
+      this.healthBar(sx, sy - 118 * buildScale, hp, null);
+    }
+  }
+
+  // compass shows where north, east, south and west lie on the tilted map, in the corner
+  // of the view: the radio speaks of "east of Foxtrot", and the map never turns.
+  compass() {
+    const { ctx, cam } = this;
+    const he = this.lang() === "he";
+    const cx = cam.w - 54;
+    const cy = 58;
+    const [ox, oy] = cam.screen(0, 0);
+    ctx.save();
+    ctx.fillStyle = "rgba(10,14,16,0.72)";
+    ctx.strokeStyle = "rgba(201,164,76,0.55)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const [dx, dy, en, heb] of [[0, -1, "N", "צ"], [1, 0, "E", "מז"], [0, 1, "S", "ד"], [-1, 0, "W", "מע"]]) {
+      const [px, py] = cam.screen(dx, dy);
+      const len = Math.hypot(px - ox, py - oy) || 1;
+      const ux = (px - ox) / len;
+      const uy = (py - oy) / len;
+      const north = dy === -1;
+      ctx.strokeStyle = north ? "#ff6b5a" : "rgba(233,238,228,0.6)";
+      ctx.lineWidth = north ? 2.5 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + ux * 20, cy + uy * 20);
+      ctx.stroke();
+      ctx.fillStyle = north ? "#ff8a7a" : "#e9eee4";
+      ctx.font = `${north ? "700 " : ""}12px system-ui, sans-serif`;
+      ctx.fillText(he ? heb : en, cx + ux * 30, cy + uy * 30);
+    }
+    ctx.restore();
+  }
+
+  // healthBar draws a building's health above it: green, yellow under half, and red for
+  // the last fifth. `color` overrides that for a building still going up.
+  healthBar(sx, y, share, color) {
+    const { ctx, cam } = this;
+    const w = Math.max(40, Math.min(72, 64 * cam.zoom + 22));
+    const h = 7;
+    const part = Math.max(0, Math.min(1, share));
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.fillRect(sx - w / 2 - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = color ?? (part <= 0.2 ? "#ff4d4d" : part <= 0.5 ? "#f0c04a" : "#58d67f");
+    ctx.fillRect(sx - w / 2, y, w * part, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx - w / 2 - 0.5, y - 0.5, w + 1, h + 1);
   }
 
   // landmarkLabels shows what the side knows about the buildings (who is inside, how
@@ -1138,10 +1195,7 @@ export class Scene {
         }
       }
       if (seen.kind !== "rubble" && seen.kind !== "sandbagsFlat" && seen.hp < 1) {
-        ctx.fillStyle = "rgba(10,14,16,0.75)";
-        ctx.fillRect(sx - 15, top + 4, 30, 4);
-        ctx.fillStyle = seen.hp < 0.35 ? "#ff5a5a" : "#f0c04a";
-        ctx.fillRect(sx - 14, top + 5, 28 * seen.hp, 2);
+        this.healthBar(sx, top + 4, seen.hp, null); // the same bar every damaged building carries
       }
     }
     const now = performance.now();

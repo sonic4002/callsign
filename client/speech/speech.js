@@ -7,10 +7,10 @@
 
 import { Queue } from "./queue.js";
 import { click, transmit } from "./radio.js";
-import { filler, speakable, voiceFor } from "./text.js";
+import { filler, pointed, speakable, voiceFor } from "./text.js";
 
 const PROBE_EVERY = 30_000; // ms between looks for a service that was not there
-const WAIT_FOR_VOICE = 5000; // ms a line may take to arrive before it is skipped
+const WAIT_FOR_VOICE = 8000; // ms a line may take to arrive before it is skipped
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class Speech {
@@ -195,7 +195,7 @@ export class Speech {
   async #browser(line) {
     const synth = globalThis.speechSynthesis;
     if (!synth || typeof SpeechSynthesisUtterance === "undefined") return;
-    const said = new SpeechSynthesisUtterance(line.text);
+    const said = new SpeechSynthesisUtterance(line.lang === "he" ? pointed(line.text) : line.text);
     said.lang = line.lang === "he" ? "he-IL" : "en-US";
     const mine = synth.getVoices().filter((v) => v.lang?.toLowerCase().startsWith(line.lang));
     if (line.lang === "he" && synth.getVoices().length && mine.length === 0) return; // no Hebrew voice on this device

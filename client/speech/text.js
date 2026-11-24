@@ -7,6 +7,14 @@ const MAX_CHARS = 300;
 const heNumbers = ["", "אחת", "שתיים", "שלוש", "ארבע", "חמש", "שש", "שבע", "שמונה", "תשע", "עשר", "אחת עשרה", "שתים עשרה", "שלוש עשרה", "ארבע עשרה", "חמש עשרה", "שש עשרה", "שבע עשרה", "שמונה עשרה", "תשע עשרה", "עשרים"];
 
 // speakable returns the text to say for a message, or "" when there is nothing to say.
+// The device's own voice, used when the speech service has no recording in time, guesses
+// Hebrew vowels and gets the radio's words wrong ("suf" for סוף). Written with their
+// vowel points it reads them right.
+const pointedWords = { סוף: "סוֹף", עבור: "עֲבוֹר", רות: "רוּת", צפע: "צֶפַע", קרנף: "קַרְנַף", סדן: "סַדָּן", פטיש: "פַּטִּישׁ", סמל: "סַמָּל", המתן: "הַמְתֵּן" };
+export function pointed(text) {
+  return text.replace(/[\u05d0-\u05ea]+/g, (word) => pointedWords[word] ?? word);
+}
+
 export function speakable(message, rules) {
   const lang = message.lang === "he" ? "he" : "en";
   let text = String(message.text ?? "")
