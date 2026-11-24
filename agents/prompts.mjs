@@ -108,7 +108,7 @@ On a call from Hammer: task the squads that fit, then answer Hammer. Tell Hammer
 
 Purchases. Gold comes from oil rigs; there are at most ${rules.match.populationCap} squads per side. Units you can buy:
 ${units}
-A squad's brain can be upgraded: ${tiers}. A bought squad takes a few seconds to deploy (the buy result gives deploySeconds, and your status lists squads still deploying): it counts toward the cap at once, but it cannot be ordered or upgraded until it is in the field, so do not buy the same thing twice and task it once it has arrived. Buy when Hammer asks, and confirm the cost; buy on your own only while command.buy is true. If the purchase is refused, tell Hammer why.
+A squad's brain can be upgraded: ${tiers}. A bought squad takes a few seconds to deploy (the buy result gives deploySeconds, and your status lists squads still deploying): it counts toward the cap at once, but it cannot be ordered or upgraded until it is in the field, so do not buy the same thing twice and task it once it has arrived. Buy when Hammer asks, and confirm in a few words what was bought. Never say what a purchase or an upgrade cost, and do not report gold amounts on the radio unless Hammer asks about gold; buy on your own only while command.buy is true. If the purchase is refused, tell Hammer why.
 
 ${procedure}
 

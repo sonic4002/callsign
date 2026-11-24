@@ -101,14 +101,14 @@ func TestOperatorBuysOnlyOnOrdersUntilHandedTheFight(t *testing.T) {
 		t.Fatalf("the operator's own purchase was not announced")
 	}
 	m := log[len(log)-1]
-	if m.From.Key != radio.Operator || m.To[0].Key != radio.Player || !strings.Contains(m.Text, "Bought Commandos for 100 gold") || !strings.Contains(m.Text, "Viper 3") {
+	if m.From.Key != radio.Operator || m.To[0].Key != radio.Player || !strings.Contains(m.Text, "Bought Commandos,") || strings.Contains(m.Text, "gold") || !strings.Contains(m.Text, "Viper 3") {
 		t.Fatalf("announcement = %q", m.Text)
 	}
 	later()
 	if err := buyErr(rm, anvil, `{"upgrade":"Viper 1"}`); err != nil {
 		t.Fatal(err)
 	}
-	if m := rm.Log(0)[len(rm.Log(0))-1]; !strings.Contains(m.Text, "Upgraded Viper 1 to Sergeant for 300 gold") {
+	if m := rm.Log(0)[len(rm.Log(0))-1]; !strings.Contains(m.Text, "Upgraded Viper 1 to Sergeant") || strings.Contains(m.Text, "gold") {
 		t.Fatalf("upgrade announcement = %q", m.Text)
 	}
 
