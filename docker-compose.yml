@@ -12,7 +12,7 @@ services:
       - .:/src:ro
       - callsign-gocache:/gocache
     # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
-    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}", "-tts=http://tts:5002"]
+    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}", "-tts=http://tts:5002", "-relay=http://relay:8090"]
     ports:
       - "127.0.0.1:8080:8080" # this machine only: Phase 0 has no accounts
 
@@ -46,6 +46,24 @@ services:
       - .:/src:ro
       - ./assets/voice-cache:/cache
     command: ["python", "/src/tts/server.py", "--cache=/cache"]
+
+  # The model relay: holds each player's AI key, encrypted under .relay-data/, and calls
+  # the AI provider with the model the squad's brain tier allows. It is reached only
+  # through the game server, at /relay/, and has no port of its own.
+  relay:
+    image: callsign-dev
+    init: true
+    user: "${CALLSIGN_UID:-1000}:${CALLSIGN_GID:-1000}"
+    working_dir: /src
+    environment:
+      HOME: /tmp
+      CALLSIGN_RELAY_MASTER_KEY: "${CALLSIGN_RELAY_MASTER_KEY:-}"
+      CALLSIGN_INTERNAL_SECRET: "${CALLSIGN_INTERNAL_SECRET:-}"
+    volumes:
+      - .:/src:ro
+      - callsign-gocache:/gocache
+      - ./.relay-data:/data
+    command: ["go", "run", "./relay/cmd/relay", "-addr=:8090", "-game=http://server:8080/internal/tier", "-data=/data"]
 
 volumes:
   callsign-gocache:

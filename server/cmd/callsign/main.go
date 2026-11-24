@@ -29,6 +29,7 @@ func main() {
 	assets := flag.String("assets", "assets", "directory of generated art and audio, served read-only at /assets/")
 	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
 	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
+	relayAddr := flag.String("relay", "", "address of the model relay (relay/cmd/relay), passed on at /relay/; empty for none")
 	flag.Parse()
 
 	rules, err := shared.Load()
@@ -66,6 +67,17 @@ func main() {
 			log.Fatalf("-tts must be a URL such as http://tts:5002, not %q", *tts)
 		}
 		mux.Handle("/tts/", http.StripPrefix("/tts", httputil.NewSingleHostReverseProxy(target)))
+	}
+	if *relayAddr != "" {
+		// The model relay (relay/cmd/relay) holds the players' AI keys and makes their
+		// agents' AI calls. The page reaches it through here, on the game's own origin;
+		// the path and the Host header go on unchanged, which is how the relay knows the
+		// call came from a page of this game.
+		target, err := url.Parse(*relayAddr)
+		if err != nil || target.Host == "" {
+			log.Fatalf("-relay must be a URL such as http://relay:8090, not %q", *relayAddr)
+		}
+		mux.Handle("/relay/", httputil.NewSingleHostReverseProxy(target))
 	}
 	mux.Handle("/", http.FileServer(http.Dir(*client)))
 

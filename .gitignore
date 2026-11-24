@@ -11,3 +11,6 @@ assets/models/
 # Radio voices: lines already spoken by the speech service (tts/server.py).
 assets/voice-cache/
 client/vendor/ort/
+
+# Model relay: the encrypted key store and its master key.
+.relay-data/
