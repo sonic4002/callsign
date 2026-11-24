@@ -27,6 +27,7 @@ KEYS = {
     "units": {
         "aegis_hauler": "crawler", "ashfall_hauler": "dumpTruck",
         "aegis_engineer": "engineers", "ashfall_sapper": "sappers",
+        "aegis_sentinel": "sentinel", "ashfall_oracle": "oracle",  # the heroes of the second wave
     },
 }
 
@@ -51,6 +52,10 @@ def move(root, entry, table):
                 if os.path.exists(src):
                     os.replace(src, dst)
                 entry["image"] = new
+        # A list of other keys of the group (a structure's construction stages).
+        stages = entry.get("stages")
+        if isinstance(stages, list):
+            entry["stages"] = [renamed(k, table) if isinstance(k, str) else k for k in stages]
         for value in entry.values():
             move(root, value, table)
 

@@ -3,7 +3,7 @@
 For every sprite in art/sprites.json that names a `keep` seed (the candidate that passed
 review), this cuts the background away, trims, scales to game size and writes
 
-    assets/sprites/{buildings,landmarks,terrain}/<id>.png
+    assets/sprites/{buildings,landmarks,terrain,portraits}/<id>.png
     assets/sprites/manifest.json     what the page loads
     assets/sprites/CREDITS.md        model, licence, seed and prompt of every sprite
 
@@ -12,6 +12,14 @@ of the manifest, and art/props.py owns "segments" and "props"; those are kept as
 
 A sprite with `from` is a second state of that sprite (a headquarters in ruins): it is
 trimmed to the same frame, so both have one size and one anchor.
+
+A structure goes up in stages: `<id>_stage1`, `_stage2` … are that building at earlier
+moments, listed in order under the building's `stages`, and `<id>_site` is kept as another
+name for the first of them. A door (`<id>_open`) is not a whole picture but a small patch
+cut from around the building's `door.box`, to be drawn over the building; `<id>_lit` is
+that same patch with the light on inside, made here so the two match exactly. The
+box, the way out (`exit`) and the place a new unit goes to stand (`rally`) are given in
+art/sprites.json as fractions of the building's picture.
 
 Sprites without `keep` are left out of the manifest, and the page draws its own stand-in.
 A kept sprite whose raw image is not on this machine (assets/raw is not in git) keeps the
@@ -25,6 +33,7 @@ With ids, only those sprites are made again; the rest keep the pictures they hav
 import argparse
 import json
 import pathlib
+import re
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -34,7 +43,7 @@ ROOT = HERE.parent
 RAW = ROOT / "assets" / "raw"
 OUT = ROOT / "assets" / "sprites"
 
-FOLDER = {"building": "buildings", "landmark": "landmarks", "terrain": "terrain"}
+FOLDER = {"building": "buildings", "landmark": "landmarks", "terrain": "terrain", "portrait": "portraits"}
 ANCHOR = {"building": [0.5, 0.8], "scenery": [0.5, 0.9]}  # by style: where the thing stands in its picture
 DRAWN = 2.6  # a sprite is stored this many times the height the page draws it at, for zooming in
 
@@ -61,8 +70,34 @@ code in `art/props.py`, with the same Blender set-up as the units. In the manife
   page draws it at before its own scale.
 - `variants.<name>` lists the keys that are different pictures of one thing (`house`,
   `grove`, `rocks`, `mountain`, `gold_field`); pick one by the thing's id so it never changes.
-- `<key>_ruin` is that building destroyed and `<key>_site` is it under construction; both
-  fill exactly the frame of `<key>`, so one can be swapped for another in place.
+- `<key>_ruin` is that building destroyed; it fills exactly the frame of `<key>`, so one can
+  be swapped for the other in place.
+- A structure's `stages` lists the keys of its pictures while it is being built, earliest
+  first (`<key>_stage1` …); each fills the frame of `<key>`. `<key>_site` is the first stage
+  under its old name. Show stage `floor(progress * stages.length)` and the finished picture
+  at progress 1 (`stageOf` in client/art.js).
+- A structure that makes units has `door`: `frames.open` and `frames.lit` are small patches
+  (`image`, `size`, and `at`, the patch's top-left corner in the building's picture) to draw
+  over the finished building; `exit` is the doorway and `rally` where a new unit goes to
+  stand, both as fractions of the building's picture; `faces` is the way the door looks out;
+  `lift: true` means what comes out rises from a pad on the roof and does not walk away.
+  `doorAt`, `structurePoint`, `emergence` and `drawStructure` in client/art.js use these.
+- `portraits.<name>` is a square roster picture of a hero.
+- Units: a sheet's `facings` is 8 or 16 and `order` names its rows; `anims` names runs of
+  columns. Vehicles and boats have `move`; the helicopter `move`, `bankLeft`, `bankRight`;
+  soldiers `walk` (twelve frames) and `stop`; the heroes (`hero: true`) their own poses.
+
+## Sandbags
+
+`landmarks/sandbags.png` is rendered by `make art-units` (art/props.py) like the units: a row
+for each of eight map headings the position faces, a column for each state in `states`.
+
+## Heroes
+
+The two hero sheets (`units/aegis_sentinel.png`, `units/ashfall_oracle.png`) are original
+models built in code in art/units.py like every other unit. Their roster portraits
+(`portraits/*.png`) are painted by the image model below from a description of the same
+invented characters; no real person and no existing character was named or shown to it.
 
 ## Buildings, landmarks and terrain
 
@@ -76,7 +111,12 @@ Every sprite below was generated on this machine by `make art` and reviewed by e
 - Runner: ComfyUI, sampler `euler`, Flux2Scheduler, 4 steps, guidance 1, 1024x1024
 - A ruin or a construction site is the same model redrawing the kept image of its building
   (the klein image-edit graph, a reference latent), so it stands exactly where the building does
-- Terrain tiles are made to repeat by cross-fading each edge into the far side of the picture
+- A construction stage is made the same way from the finished building, so every stage
+  stands in the building's own frame; a door is the same redraw with the door open, of which
+  only a patch around the door is kept and laid over the building
+- Terrain tiles are made to repeat by cross-fading each edge into the far side of the picture;
+  ice and rock are also evened out (their large light and dark patches are flattened), so the
+  eye finds no landmark that repeats
 - Background removal: BiRefNet (general), MIT, https://github.com/ZhengPeng7/BiRefNet, run through rembg
 
 No third-party artwork is included.
@@ -131,6 +171,67 @@ def make_tileable(image, size):
     return Image.fromarray(np.clip(tile, 0, 255).astype(np.uint8))
 
 
+def even_out(image):
+    """Flattens the broad light and dark patches of a ground texture, keeping its grain. A
+    tile with one bright drift or one dark crack repeats visibly; one with only grain does not."""
+    src = np.asarray(image.convert("RGB"), dtype=np.float32)
+    # The blur wraps round the edges, as the tile itself does.
+    tiled = np.tile(src, (3, 3, 1))
+    radius = image.width // 5
+    broad = np.asarray(Image.fromarray(np.clip(tiled, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius)), dtype=np.float32)
+    broad = broad[image.height : 2 * image.height, image.width : 2 * image.width]
+    flat = src - 0.85 * (broad - src.mean(axis=(0, 1), keepdims=True))
+    return Image.fromarray(np.clip(flat, 0, 255).astype(np.uint8))
+
+
+def door_patch(edit, box, grow):
+    """Cuts the door out of a redrawn building: the part of the picture inside `box`
+    (fractions of the frame) and `grow` beyond it, fading out toward its edges so that it
+    sits on the building with no visible border. Returns the patch and where it goes."""
+    w, h = edit.size
+    x0, y0 = max(0, round((box[0] - grow) * w)), max(0, round((box[1] - grow) * h))
+    x1, y1 = min(w, round((box[2] + grow) * w)), min(h, round((box[3] + grow) * h))
+    patch = edit.crop((x0, y0, x1, y1))
+    feather = max(2, round(grow * w))
+    mask = Image.new("L", patch.size, 0)
+    ImageDraw.Draw(mask).rectangle([feather, feather, patch.width - 1 - feather, patch.height - 1 - feather], fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(feather / 2))
+    alpha = np.asarray(patch.getchannel("A"), dtype=np.float32) * np.asarray(mask, dtype=np.float32) / 255
+    patch.putalpha(Image.fromarray(alpha.astype(np.uint8)))
+    return patch, [x0, y0]
+
+
+def lit_door(patch):
+    """The open door with the light on inside: the dark of the doorway is filled with warm
+    light, brightest in the middle, and a little of it falls on what is around the door."""
+    rgb = np.asarray(patch.convert("RGB"), dtype=np.float32)
+    alpha = np.asarray(patch.getchannel("A"), dtype=np.float32) / 255
+    h, w = alpha.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    centre = np.clip(1 - np.hypot((xx - w / 2) / (w / 2), (yy - h * 0.55) / (h / 2)), 0, 1)
+    dark = np.clip((95 - rgb.mean(axis=2)) / 60, 0, 1)  # how much a pixel is doorway and not wall
+    warm = np.array([255, 196, 104], dtype=np.float32)
+    inside = (dark * (0.35 + 0.65 * centre))[..., None]
+    out = rgb * (1 - 0.85 * inside) + warm * 0.85 * inside
+    spill = (0.22 * centre * (1 - dark))[..., None]
+    out = out + (warm - out) * spill
+    lit = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8)).convert("RGBA")
+    lit.putalpha(Image.fromarray((alpha * 255).astype(np.uint8)))
+    return lit
+
+
+def soften_frame(rgba, margin=5):
+    """Fades a picture out over its last few pixels on every side. A construction stage can
+    spread wider than the finished building whose frame it must fill; cut off sharp, the
+    edge would show as a straight line."""
+    alpha = np.asarray(rgba.getchannel("A"), dtype=np.float32)
+    h, w = alpha.shape
+    ramp_x = np.clip(np.minimum(np.arange(w), w - 1 - np.arange(w)) / margin, 0, 1)
+    ramp_y = np.clip(np.minimum(np.arange(h), h - 1 - np.arange(h)) / margin, 0, 1)
+    rgba.putalpha(Image.fromarray((alpha * ramp_x[None, :] * ramp_y[:, None]).astype(np.uint8)))
+    return rgba
+
+
 def contact_sheet(entries, path):
     """One picture of the whole set: each sprite at game size and at 48 px, on mid grey."""
     cell_w, cell_h = 400, 330
@@ -161,8 +262,10 @@ def main():
     kept = [s for s in spec["sprites"] if "keep" in s]
     session = None
     old = json.loads((OUT / "manifest.json").read_text()) if (OUT / "manifest.json").exists() else {}
-    manifest = {"units": old.get("units", {}), "buildings": {}, "landmarks": {}, "terrain": {},
-                "segments": old.get("segments", {}), "props": old.get("props", {}), "variants": {}}
+    # What art/props.py renders into "landmarks" (the sandbags) is its own and is kept.
+    manifest = {"units": old.get("units", {}), "buildings": {}, "landmarks": {k: v for k, v in old.get("landmarks", {}).items() if "ppm" in v},
+                "terrain": {}, "segments": old.get("segments", {}), "props": old.get("props", {}), "variants": {}, "portraits": {}}
+    by_id = {s["id"]: s for s in spec["sprites"]}
     credits = ["# Sprite credits", "", MODEL_NOTE, "| Sprite | Seed | Prompt |", "|---|---|---|"]
     sheet = []
     boxes = {}  # sprite id → the box its picture was trimmed to
@@ -177,12 +280,52 @@ def main():
         prompt = spec["styles"][sprite["style"]].replace("{subject}", sprite["subject"]).replace("|", "/")
         credits.append(f"| `{rel}` | {sprite['keep']} | {prompt} |")
 
+    def need_session():
+        nonlocal session
+        if session is None:
+            from rembg import new_session
+
+            session = new_session("birefnet-general")
+        return session
+
+    def box_of(source_id):
+        """The box a sprite's picture was trimmed to. When that sprite is not being made
+        again in this run, its raw image is cut out once more just to learn its box."""
+        if source_id not in boxes:
+            _, boxes[source_id] = cut_out(raw_image(by_id[source_id]), need_session())
+        return boxes[source_id]
+
     for sprite in kept:
         kind = sprite["kind"]
         group = FOLDER[kind]
         rel = f"{group}/{sprite['id']}.png"
         (OUT / group).mkdir(parents=True, exist_ok=True)
+        door = re.fullmatch(r"(.+)_(open)", sprite["id"]) if sprite["style"] == "door" else None
         skip = (args.ids and sprite["id"] not in args.ids) or not (RAW / f"{sprite['id']}__{sprite['keep']}.png").exists()
+        if door:
+            # A door belongs to its building's entry, which is made before it.
+            owner = manifest["buildings"].get(door[1])
+            spot = by_id[door[1]].get("door")
+            if owner is None or spot is None:
+                print(f"{rel}  left out: {door[1]} has no door box in sprites.json")
+                continue
+            was = old.get("buildings", {}).get(door[1], {}).get("door", {}).get("frames", {})
+            owner.setdefault("door", {"frames": {}, **{k: spot[k] for k in ("exit", "rally", "faces", "lift") if k in spot}})
+            lit_rel = rel.replace("_open.png", "_lit.png")
+            if skip and was.get("open") and (OUT / rel).exists() and (OUT / lit_rel).exists():
+                owner["door"]["frames"].update(was)
+                credit(rel, sprite)
+                print(f"{rel}  kept as it is")
+                continue
+            cut, _ = cut_out(raw_image(sprite), need_session(), box_of(sprite["from"]))
+            patch, at = door_patch(scale_to_height(cut, sprite["height"]), spot["box"], 0.03)
+            patch.save(OUT / rel, optimize=True)
+            lit_door(patch).save(OUT / lit_rel, optimize=True)
+            for name, path in (("open", rel), ("lit", lit_rel)):
+                owner["door"]["frames"][name] = {"name": name, "image": path, "at": at, "size": [patch.width, patch.height]}
+            credit(rel, sprite)
+            print(f"{rel}  {patch.width}x{patch.height} at {at}, and {lit_rel}")
+            continue
         if skip and (OUT / rel).exists() and sprite["id"] in old.get(group, {}):
             # Not asked for, or made on another machine: the picture stands as it is.
             manifest[group][sprite["id"]] = old[group][sprite["id"]]
@@ -193,16 +336,21 @@ def main():
         image = raw_image(sprite)
         if kind == "terrain":
             result = make_tileable(image, sprite["height"])
+            if sprite.get("even"):
+                result = even_out(result)
             manifest["terrain"][sprite["id"]] = rel
+        elif kind == "portrait":
+            # A portrait keeps its background: it is cropped square and scaled.
+            side = min(image.size)
+            left, top = (image.width - side) // 2, (image.height - side) // 2
+            result = image.convert("RGB").crop((left, top, left + side, top + side)).resize((sprite["height"], sprite["height"]), Image.LANCZOS)
+            manifest["portraits"][sprite["id"].removeprefix("portrait_")] = {"image": rel, "size": [result.width, result.height]}
         else:
-            if session is None:
-                from rembg import new_session
-
-                session = new_session("birefnet-general")
-            if "from" in sprite and sprite["from"] not in boxes:
-                raise SystemExit(f"{sprite['id']} must come after {sprite['from']} in sprites.json")
-            cut, boxes[sprite["id"]] = cut_out(image, session, boxes.get(sprite.get("from")))
+            need_session()
+            cut, boxes[sprite["id"]] = cut_out(image, session, box_of(sprite["from"]) if "from" in sprite else None)
             result = scale_to_height(cut, sprite["height"])
+            if sprite["style"] in ("stage", "site"):
+                result = soften_frame(result)
             manifest[group][sprite["id"]] = {
                 "image": rel, "size": [result.width, result.height],
                 "anchor": sprite.get("anchor", ANCHOR.get(sprite["style"], ANCHOR["building"])),
@@ -213,11 +361,22 @@ def main():
         sheet.append((sprite["id"], result))
         print(f"{rel}  {result.width}x{result.height}")
 
+    # A structure's stages, earliest first; `<id>_site` is another name for the first.
+    for entry in manifest["buildings"].values():
+        entry.pop("stages", None)  # an entry kept from the last run brings its old list
+    for key in sorted(manifest["buildings"]):
+        stage = re.fullmatch(r"(.+)_stage(\d+)", key)
+        if stage and stage[1] in manifest["buildings"]:
+            manifest["buildings"][stage[1]].setdefault("stages", []).append(key)
+    for key, entry in list(manifest["buildings"].items()):
+        if entry.get("stages"):
+            manifest["buildings"][f"{key}_site"] = dict(manifest["buildings"][entry["stages"][0]])
+
     # Different pictures of one thing: house_1, house_2 … are variants of "house".
     for group in ("landmarks", "props"):
         for key in manifest[group]:
             name, _, n = key.rpartition("_")
-            if n.isdigit():
+            if n.isdigit() and "ppm" not in manifest[group][key]:
                 manifest["variants"].setdefault(name, []).append(key)
     for sprite in kept:
         # A building that has not been painted again keeps its old drawn height.

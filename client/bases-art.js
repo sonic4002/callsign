@@ -3,7 +3,7 @@
 // otherwise each role has a code-drawn picture here, in the faction's colours, so a
 // missing sprite never leaves a gap.
 
-import { drawBuilding, isoBox, shadow, sprites, drawSegment } from "./art.js";
+import { drawBuilding, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
 import { toIso } from "./iso.js";
 
 const palettes = {
@@ -157,6 +157,12 @@ export function drawStructure(ctx, st, def, color, time) {
   // Going up: the building site, or a ghost of the whole thing, and the built part rising
   // from the ground.
   const h = heights[st.role] ?? 56;
+  // Painted construction stages: bare footing, frame, scaffolding, nearly done.
+  const stages = sprites.buildings[st.kind]?.stages ?? [];
+  if (stages.length && stages.every((key) => sprites.buildings[key])) {
+    drawBuilding(ctx, stages[stageOf(stages.length, st.building)], color, time);
+    return;
+  }
   if (sprites.buildings[`${st.kind}_site`]) {
     drawBuilding(ctx, `${st.kind}_site`, color, time);
     ctx.save();

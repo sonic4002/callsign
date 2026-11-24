@@ -16,7 +16,8 @@ const TAU = Math.PI * 2;
 // `landmarks` and `props` hold pictures in the same form as `buildings`. `segments` holds
 // the pieces of things laid end to end (walls, fences, the bridge): see CREDITS.md in
 // assets/sprites for how a run is drawn. `variants` names the pictures of one kind of thing.
-export const sprites = { units: {}, buildings: {}, landmarks: {}, props: {}, terrain: {}, segments: {}, variants: {} };
+// `portraits` are the roster pictures of the heroes, as addresses for an <img>.
+export const sprites = { units: {}, buildings: {}, landmarks: {}, props: {}, terrain: {}, segments: {}, variants: {}, portraits: {} };
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -46,6 +47,11 @@ export async function loadSprites(base = "/assets/sprites/") {
         Promise.all(images).then(([img, top]) => {
           if (!img || (entry.turret && !top)) return;
           sprites[group][id] = { ...entry, img, turret: entry.turret && { ...entry.turret, img: top } };
+          // A structure's door is two small patches drawn over it: open, and open with the
+          // light on. A patch that fails to load is simply never drawn.
+          for (const patch of Object.values(entry.door?.frames ?? {})) {
+            loadImage(base + patch.image).then((pic) => pic && (sprites[group][id].door.frames[patch.name].img = pic));
+          }
         }),
       );
     }
@@ -65,6 +71,7 @@ export async function loadSprites(base = "/assets/sprites/") {
     jobs.push(Promise.all(parts).then((imgs) => imgs.every(Boolean) && (sprites.segments[id] = tree)));
   }
   sprites.variants = manifest.variants ?? {};
+  for (const [id, entry] of Object.entries(manifest.portraits ?? {})) sprites.portraits[id] = { ...entry, src: base + entry.image };
   for (const [id, path] of Object.entries(manifest.terrain ?? {})) {
     jobs.push(loadImage(base + path).then((img) => img && (sprites.terrain[id] = img)));
   }
@@ -114,9 +121,42 @@ function drawFrame(ctx, entry, part, anim, index, row) {
   ctx.drawImage(part.img, col * fw, row * fh, fw, fh, -part.anchor[0] * fw * k, -part.anchor[1] * fh * k, fw * k, fh * k);
 }
 
-// Where the soldiers of one fireteam stand around its centre.
+// Where the soldiers of one fireteam stand around its centre, for the code-drawn figures.
 const spots = [[0, 0], [-8, -4], [8, 3], [-1, -9]];
 const spotsFor = (members) => spots.slice(0, Math.min(members, spots.length)).sort((a, b) => a[1] - b[1]);
+
+// A fireteam on the move is a loose wedge behind its first man; halted or in a firefight
+// it is a line abreast, facing the enemy. Slots are (ahead, to the right) in unit pixels.
+const wedge = [[9, 0], [-6, -15], [-7, 15], [-22, -4], [-24, 19], [-38, 6]];
+const abreast = [[0, 0], [1, -17], [-1, 17], [-16, -9], [-16, 9], [-30, 0]]; // a second rank behind the first three
+
+// formation gives each of `members` soldiers a place around the team's centre, in the same
+// pixels the unit is drawn in. `heading` is the map heading the team faces (0 = east,
+// clockwise), `go` runs from 0 (halted: line abreast) to 1 (marching: wedge), and `seed`
+// makes one team's spacing a little different from the next. Places are sorted far to near.
+export function formation(members, heading, go = 0, seed = 0) {
+  const n = Math.max(0, Math.min(members, wedge.length));
+  const [fx, fy] = [Math.cos(heading), Math.sin(heading)];
+  const k = Math.max(0, Math.min(1, go));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const ahead = wedge[i][0] * k + abreast[i][0] * (1 - k);
+    const right = wedge[i][1] * k + abreast[i][1] * (1 - k);
+    // A little raggedness, the same every frame for the same man.
+    const jx = Math.sin(seed * 12.9898 + i * 78.233) * 1.6;
+    const jy = Math.sin(seed * 39.3467 + i * 11.135) * 1.6;
+    const mx = ahead * fx - right * fy + jx;
+    const my = ahead * fy + right * fx + jy;
+    out.push({ x: (mx - my) * Math.SQRT1_2, y: ((mx + my) / 2) * Math.SQRT1_2, i });
+  }
+  return out.sort((a, b) => a.y - b.y);
+}
+
+// frameAt picks the frame of a looping animation from the distance covered (`stride`, in
+// world units) when the caller tracks it, so feet and wheels keep pace with the ground;
+// without it, from the clock.
+const cycle = (count, per, o, offset = 0) =>
+  o.stride === undefined ? null : (((Math.floor((o.stride / per) * count + offset) % count) + count) % count);
 
 // lift raises what flies to its height above its place on the ground, with a slow bob.
 // The shadow is drawn before this, so it stays on the ground.
@@ -128,12 +168,21 @@ function lift(ctx, entry, o, i = 0) {
 function animatedInfantry(ctx, entry, o) {
   const down = !entry.altitude && (o.action === "cover" || o.nerve === "pinned");
   const engaged = o.sinceShot < 0.35 || (o.action === "fire" && !o.moving);
-  const file = spotsFor(o.members);
-  for (const [i, [ox, oy]] of file.entries()) {
+  const go = o.go ?? (o.moving ? 1 : 0);
+  const file = formation(o.members, mapHeading(engaged ? (o.aim ?? o.turn) : o.turn), engaged ? 0 : go, o.seed);
+  const strideLength = entry.stride ?? 26; // world units one walk cycle covers
+  for (const { x: ox, y: oy, i } of file) {
     let anim = down ? "cover" : "idle";
     let index = 0;
     let turn = o.turn;
-    if (engaged) {
+    if (o.pose && entry.anims[o.pose]) {
+      // A pose the game asks for by name: a hero planting a charge, an engineer at work.
+      anim = o.pose;
+      const count = entry.anims[anim][1];
+      const walking = /walk$/i.test(anim);
+      index = walking ? (cycle(count, strideLength, o, i * 4) ?? Math.floor(o.time * (entry.fps?.[anim] ?? 10)) % count) : Math.floor(o.time * (entry.fps?.[anim] ?? 5)) % count;
+      if (o.aim !== undefined && !walking) turn = o.aim;
+    } else if (engaged) {
       // One soldier of the team fires each shot; the rest keep their aim.
       const flash = o.sinceShot < 0.09 && (o.shots + i) % file.length === 0;
       turn = o.aim ?? o.turn;
@@ -141,7 +190,10 @@ function animatedInfantry(ctx, entry, o) {
       index = flash ? 1 : 0;
     } else if (o.moving) {
       anim = "walk";
-      index = Math.floor(o.time * (entry.fps?.walk ?? 10) + o.seed * 3 + i * 3) % entry.anims.walk[1];
+      const count = entry.anims.walk[1];
+      index = cycle(count, strideLength, o, o.seed * 3 + i * 4) ?? Math.floor(o.time * (entry.fps?.walk ?? 10) + o.seed * 3 + i * 3) % count;
+    } else if (go > 0.08 && entry.anims.stop) {
+      anim = "stop"; // the last step of a halt
     } else if (entry.anims.idle[1] > 1) {
       index = Math.floor(o.time * (entry.fps?.idle ?? 8) + i) % entry.anims.idle[1]; // rotors keep turning
     }
@@ -154,26 +206,58 @@ function animatedInfantry(ctx, entry, o) {
   }
 }
 
-function wake(ctx, turn, moving) {
+// wake is the water a boat disturbs: foam round the hull, and behind it two lines that
+// lengthen and open with its speed (`go`, 0 to 1).
+function wake(ctx, turn, go, time = 0) {
   disc(ctx, "rgba(235,248,255,0.22)", 0, 2, 30, 9);
-  if (!moving) return;
+  if (go <= 0.05) return;
   const [dx, dy] = [Math.cos(turn), Math.sin(turn)];
+  const reach = 22 + 34 * go;
   for (const side of [-1, 1]) {
-    line(ctx, "rgba(235,248,255,0.5)", 1.6, -dx * 20 - dy * side * 5, -dy * 20 + dx * side * 5, -dx * 48 - dy * side * 13, -dy * 48 + dx * side * 13);
+    line(ctx, `rgba(235,248,255,${(0.2 + 0.36 * go).toFixed(2)})`, 1.2 + 0.8 * go, -dx * 20 - dy * side * 5, -dy * 20 + dx * side * 5, -dx * (20 + reach) - dy * side * (6 + 11 * go), -dy * (20 + reach) + dx * side * (6 + 11 * go));
+  }
+  // Churned water astern, drifting back and fading.
+  for (let k = 0; k < 3; k++) {
+    const age = (time * 1.4 + k / 3) % 1;
+    disc(ctx, `rgba(235,248,255,${(0.3 * go * (1 - age)).toFixed(2)})`, -dx * (22 + reach * age), -dy * (22 + reach * age), 3 + 6 * age, 1.5 + 3 * age);
+  }
+}
+
+// dust is what a vehicle's wheels or tracks throw up behind it, more of it the faster it goes.
+function dust(ctx, turn, go, time, seed) {
+  if (go <= 0.08) return;
+  const [dx, dy] = [Math.cos(turn), Math.sin(turn)];
+  for (let k = 0; k < 4; k++) {
+    const age = (time * 1.1 + k / 4 + seed) % 1;
+    const back = 20 + 34 * age * (0.5 + 0.5 * go);
+    const r = (4 + 10 * age) * (0.6 + 0.4 * go);
+    // Paler than any ground it is thrown up from, so it reads on sand as well as on grass.
+    disc(ctx, `rgba(236,226,200,${(0.5 * go * (1 - age)).toFixed(2)})`, -dx * back + Math.sin(seed * 7 + k * 2.1) * 3, -dy * back - 3 - 7 * age, r, r * 0.62);
   }
 }
 
 function animatedVehicle(ctx, entry, o) {
   const naval = o.cls === "naval";
   const row = rowOf(entry, o.turn);
-  if (naval) wake(ctx, o.turn, o.moving);
-  else shadow(ctx, 26, 11, entry.altitude ? 0.22 : 0.32);
+  const go = o.go ?? (o.moving ? 1 : 0);
+  if (naval) wake(ctx, o.turn, go, o.time + o.seed);
+  else {
+    shadow(ctx, 26, 11, entry.altitude ? 0.22 : 0.32);
+    if (!entry.altitude && !o.grounded) dust(ctx, o.turn, go, o.time, o.seed);
+  }
   ctx.save();
   // A boat rides the swell; an engine under way shakes its hull; an aircraft hangs in the air.
   if (entry.altitude) lift(ctx, entry, o);
-  else ctx.translate(0, naval ? Math.sin(o.time * 2 + o.seed) * 0.8 : o.moving ? Math.sin(o.time * 38 + o.seed) * 0.35 : 0);
-  const idle = entry.anims.idle[1];
-  drawFrame(ctx, entry, entry, "idle", idle > 1 ? Math.floor(o.time * (entry.fps?.idle ?? 12)) % idle : 0, row);
+  else ctx.translate(0, naval ? Math.sin(o.time * 2 + o.seed) * 0.8 : go * Math.sin(o.time * 38 + o.seed) * 0.35);
+  // Under way it shows its moving frames: tracks and wheels turning with the ground, a
+  // boat's bow up, an aircraft nose down or banked into its turn.
+  let anim = "idle";
+  if (go > 0.15 && entry.anims.move) anim = "move";
+  if (entry.altitude && go > 0.15 && Math.abs(o.turnRate ?? 0) > 0.7 && entry.anims.bankLeft) anim = o.turnRate < 0 ? "bankLeft" : "bankRight";
+  const count = entry.anims[anim][1];
+  const spun = Math.floor(o.time * (entry.fps?.[anim] ?? 12)) % count; // rotors turn by the clock
+  const index = count < 2 ? 0 : anim === "move" && !entry.altitude ? (cycle(count, naval ? 60 : 9, o) ?? spun) : spun;
+  drawFrame(ctx, entry, entry, anim, index, row);
   const top = entry.turret;
   if (!top) return ctx.restore();
   // The weapon sits on its pivot along the hull, and keeps pointing at what it last shot at.
@@ -586,6 +670,84 @@ export function drawSegment(ctx, id, axis, length, state = "") {
   const k = seg.scale * (length / seg.length);
   ctx.drawImage(node.img, -node.anchor[0] * node.size[0] * k, -node.anchor[1] * node.size[1] * k, node.size[0] * k, node.size[1] * k);
   return true;
+}
+
+// ---- structures under construction, their doors, and what comes out of them ----
+
+// stageOf picks which construction picture shows at `progress` (0 just begun, 1 finished)
+// when there are `count` pictures before the finished one. It returns `count` for the
+// finished building.
+export const stageOf = (count, progress) => (progress >= 1 ? count : Math.max(0, Math.min(count - 1, Math.floor(progress * count))));
+
+// doorAt says what a structure's door shows while a unit comes out of it, `t` running
+// from 0 (the order to deploy) to 1 (the unit at its rally point): the light comes on,
+// the door stands open while the unit passes, and it closes behind it.
+export const doorAt = (t) => (t < 0 || t >= 1 ? "closed" : t < 0.12 ? "lit" : t < 0.86 ? "open" : "lit");
+
+// structurePoint gives one of a structure's named points ("exit", "rally") as an offset
+// in pixels from where the structure stands, for a structure drawn `height` pixels tall.
+// The points are kept in the manifest as fractions of the picture.
+export function structurePoint(entry, name, height = entry.height) {
+  const at = entry?.door?.[name];
+  if (!at) return null;
+  const k = height / entry.size[1];
+  const [ax, ay] = entry.anchor ?? [0.5, 0.8];
+  return [(at[0] - ax) * entry.size[0] * k, (at[1] - ay) * entry.size[1] * k];
+}
+
+// emergence is where a unit leaving its structure is at `t` (0 to 1), as an offset in
+// pixels from where the structure stands, how much of it shows (`alpha`) and how large to
+// draw it (`scale`): it starts inside the doorway, hidden and small, and comes out to the
+// rally point at full size.
+export function emergence(entry, t, height = entry.height) {
+  const from = structurePoint(entry, "exit", height);
+  const to = structurePoint(entry, "rally", height) ?? from;
+  if (!from) return null;
+  const k = Math.max(0, Math.min(1, (t - 0.12) / 0.74)); // it moves while the door is open
+  const eased = k * k * (3 - 2 * k);
+  // Units are drawn larger than the buildings they come from, so one starts small in the
+  // doorway and grows to its full size as it clears it (`scale`).
+  return { x: from[0] + (to[0] - from[0]) * eased, y: from[1] + (to[1] - from[1]) * eased, alpha: Math.min(1, k * 4), scale: 0.55 + 0.45 * eased, turn: Math.atan2(to[1] - from[1], to[0] - from[0]) };
+}
+
+// drawStructurePicture draws a base structure or defence from its pictures: `progress` under 1
+// shows it going up in stages, and `door` ("open" or "lit") lays the door patch over the
+// finished building. It returns false when there is no picture for `kind`, so the caller
+// can draw its own stand-in.
+export function drawStructurePicture(ctx, kind, { progress = 1, door = "closed", ruin = false } = {}) {
+  const base = sprites.buildings[kind];
+  if (!base) return false;
+  const height = base.height ?? 70;
+  const stages = base.stages ?? [];
+  const stage = stageOf(stages.length, progress);
+  const entry = ruin ? sprites.buildings[`${kind}_ruin`] : stage < stages.length ? sprites.buildings[stages[stage]] : base;
+  shadow(ctx, 30, 13, 0.3);
+  drawSprite(ctx, entry ?? base, height, 0);
+  const patch = !ruin && stage >= stages.length && base.door?.frames?.[door];
+  if (patch?.img) {
+    const k = height / base.size[1];
+    const [ax, ay] = base.anchor ?? [0.5, 0.8];
+    ctx.drawImage(patch.img, (patch.at[0] - ax * base.size[0]) * k, (patch.at[1] - ay * base.size[1]) * k, patch.size[0] * k, patch.size[1] * k);
+  }
+  return true;
+}
+
+// drawSandbags draws a sandbag position facing `turn` (a direction on screen, as for a
+// unit). `state` is "whole", "damaged" or "flat".
+export function drawSandbags(ctx, turn, state = "whole") {
+  const entry = sprites.landmarks.sandbags;
+  if (!entry?.img) {
+    // No picture: a low arc of bags drawn in place.
+    for (let i = -2; i <= 2; i++) {
+      const a = turn + i * 0.45;
+      disc(ctx, i % 2 ? "#a8946b" : "#b9a57a", Math.cos(a) * 20, Math.sin(a) * 10 - 2, 5, 3);
+    }
+    return;
+  }
+  const [fw, fh] = entry.frame;
+  const k = METRE / entry.ppm;
+  const col = Math.max(0, entry.states.indexOf(state));
+  ctx.drawImage(entry.img, col * fw, rowOf(entry, turn) * fh, fw, fh, -entry.anchor[0] * fw * k, -entry.anchor[1] * fh * k, fw * k, fh * k);
 }
 
 // ---- ground props (baked into the terrain once) ----
