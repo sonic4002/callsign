@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-// heard is a stand-in for the listening service: it notes what reached it.
-type heard struct {
+// fakeListener is a stand-in for the listening service: it notes what reached it.
+type fakeListener struct {
 	mu    sync.Mutex
 	calls []*http.Request
 	sizes []int
 }
 
-func (s *heard) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *fakeListener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return // cut off on the way: not a recording
@@ -30,16 +30,16 @@ func (s *heard) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `{"text":"צפע 1, כאן פטיש, עבור"}`)
 }
 
-func (s *heard) count() int {
+func (s *fakeListener) count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.calls)
 }
 
 // listening starts a hub with a listening service behind it, and one match with a seat.
-func listening(t *testing.T, cfg HubConfig) (srv *httptest.Server, service *heard, h *Hub, code, token string) {
+func listening(t *testing.T, cfg HubConfig) (srv *httptest.Server, service *fakeListener, h *Hub, code, token string) {
 	t.Helper()
-	service = &heard{}
+	service = &fakeListener{}
 	upstream := httptest.NewServer(service)
 	t.Cleanup(upstream.Close)
 	cfg.Listen = upstream.URL
