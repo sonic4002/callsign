@@ -274,6 +274,15 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
     ["radio", { to: ["Viper 1", "Viper 2", "Viper 3"], body: "Attack Zulu", end: "over" }],
     ["radio", { to: ["Hammer"], body: "Attacking Zulu with 3 squads", end: "out" }],
   ]);
+  // A point the enemy holds is taken the same way: together, and to hold, never one squad at a time.
+  const kiloLost = (squads) => held({ squads, points: [{ id: "A", owner: 0 }, { id: "B", owner: 0 }, { id: "D", owner: 0 }, { id: "F", owner: 0 }, { id: "G", owner: 0 }, { id: "H", owner: 0 }, { id: "K", owner: 1 }, { id: "S", owner: -1 }, { id: "Z", owner: 1 }] });
+  assert.deepEqual(await on(kiloLost([squad(1), squad(2, { order: { kind: "hold", point: "B" } })]), { kind: "quiet" }), [["radio", { to: ["Viper 1"], body: "Hold Hotel", end: "over" }]], "one idle squad waits at the forward point");
+  assert.deepEqual(await on(kiloLost([1, 2, 3].map((n) => squad(n, { x: 1150 + 10 * n, y: 690, order: { kind: "hold", point: "H" } }))), { kind: "quiet" }), [
+    ["radio", { to: ["Viper 1", "Viper 2", "Viper 3"], body: "Hold Kilo", end: "over" }],
+    ["radio", { to: ["Hammer"], body: "Attacking Kilo with 3 squads", end: "out" }],
+  ]);
+  // A structure shot at away from the headquarters: the squads go to it, not home.
+  assert.deepEqual((await on(far, { kind: "structure_attacked", point: "B", structure: "s2", unit: "refinery" }))[0], ["radio", { to: ["Viper 1", "Viper 2"], body: "Hold Bravo", end: "over" }]);
   // With two squads it holds what it has and attacks nothing.
   const two = held({ squads: [1, 2].map((n) => squad(n, { x: 1150, y: 690, order: { kind: "hold", point: "H" } })) });
   assert.deepEqual(await on(two, { kind: "quiet" }), []);
