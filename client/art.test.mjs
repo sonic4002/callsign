@@ -233,10 +233,10 @@ test("spinFrame and lampOn: a dish turns once a period, and a dark building blin
   assert.deepEqual(structureSpot(base, [1, 0]), [50, -40]);
 });
 
-test("marks: two ranks and six panel icons, each a well-formed picture unlike the others", async () => {
+test("marks: two ranks and seven panel icons, each a well-formed picture unlike the others", async () => {
   const { iconSvg, icons, rankSvg, ranks } = await import("./marks.js");
   assert.deepEqual(Object.keys(ranks), ["seasoned", "elite"]);
-  assert.deepEqual(Object.keys(icons).sort(), ["cancel", "lowPower", "power", "rally", "repair", "sell"]);
+  assert.deepEqual(Object.keys(icons).sort(), ["cancel", "lock", "lowPower", "power", "rally", "repair", "sell"]);
   const all = [...Object.keys(ranks).map((r) => rankSvg(r, 14)), ...Object.keys(icons).map((i) => iconSvg(i, 14))];
   assert.equal(new Set(all).size, all.length, "no two marks are the same picture");
   for (const svg of all) {

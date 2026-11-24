@@ -603,3 +603,34 @@ func TestAnOrderOnAStructureOutranksTheHeadquartersBesideIt(t *testing.T) {
 		t.Fatalf("the headquarters was shot at while the order was on the refinery: health %.2f", got)
 	}
 }
+
+// A unit is made only by a finished structure of its own design. A captured airbase makes
+// its builders' aircraft, not ours; one still going up, or in ruins, makes nothing. The
+// purchase is refused whatever asked for it.
+func TestAUnitNeedsAStandingStructureOfItsOwnDesign(t *testing.T) {
+	s, err := sim.New(rules, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, FullBase: true, StartGold: 5000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ours, theirs *sim.Structure
+	for _, st := range s.Structures {
+		if st.Def().Role == "airbase" {
+			if st.Side == 0 {
+				ours = st
+			} else {
+				theirs = st
+			}
+		}
+	}
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "helicopter"})
+	// Ours in ruins, theirs in our hands: their swarm is ours to buy, our helicopter is not.
+	ours.Ruin = true
+	theirs.Side = 0
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "helicopter"}, sim.ErrNeedsStructure, "Airbase")
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "fpvSwarm"})
+	// Ours going up again: still nothing.
+	ours.Ruin, ours.BuildTicks = false, 50
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "helicopter"}, sim.ErrNeedsStructure, "Airbase")
+	ours.BuildTicks = 0
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "helicopter"})
+}

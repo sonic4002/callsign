@@ -485,7 +485,6 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   #gold-box strong { font-size: 1.6rem; }
   #radar-map { max-block-size: 8.5rem; }
   .panel.grow { flex: 1 1 12.5rem; min-block-size: 12.5rem; overflow-y: auto; }
-  #sidebar > .panel[data-sheet="build"] { flex: 0 1 auto; min-block-size: 9rem; max-block-size: 40%; overflow-y: auto; }
 }
 /* The structure a base usually builds next (the opening): a brass corner, nothing louder. */
 #structures button.next { border-color: var(--brass); }
@@ -516,3 +515,35 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #sidebar header #monitor-strip .agent > :not(.dot) { display: none; }
 #placer-run { font-size: .78rem; color: var(--brass); }
 #placer-run[hidden] { display: none; }
+
+/* ---- the build bar under the map (desktop) ----
+   Tabs at the start, one row of cards beside them, scrolling sideways when there are many.
+   Both tabs have the same fixed height and the same card, so switching moves nothing. */
+#build-panel.under-map {
+  --card-w: 6.6rem; --card-h: 7.3rem;
+  flex: none; display: flex; align-items: stretch; gap: .5rem; padding: .35rem .5rem;
+  block-size: calc(var(--card-h) + 1.3rem); border-inline: 0; border-block-end: 0; overflow: hidden;
+}
+#build-panel.under-map #build-tabs { flex: none; flex-direction: column; justify-content: center; gap: .3rem; inline-size: 9.5rem; margin: 0; border: 0; }
+#build-panel.under-map #build-tabs button { flex: none; padding: .45rem .4rem; border: 1px solid var(--edge-hi); font-size: .72rem; }
+#build-panel.under-map #build-tabs button[aria-selected="true"] { border-color: var(--brass); }
+#build-panel.under-map [data-build-pane] { flex: 1; min-inline-size: 0; display: flex; align-items: stretch; gap: .5rem; }
+#build-panel.under-map [data-build-pane][hidden] { display: none; }
+#build-panel.under-map #structures, #build-panel.under-map #build {
+  flex: 1; min-inline-size: 0; display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; padding-block-end: .25rem; scrollbar-width: thin;
+}
+#build-panel.under-map #structures > button, #build-panel.under-map #build > .unit { flex: 0 0 var(--card-w); inline-size: var(--card-w); block-size: var(--card-h); }
+#build-panel.under-map #structures > button, #build-panel.under-map #build .unit > button[data-unit] {
+  font-size: .76rem; line-height: 1.15; padding: .3rem .2rem .3rem; gap: .1rem; justify-content: flex-start; overflow: hidden;
+}
+#build-panel.under-map #build .unit > button[data-unit] { inline-size: 100%; block-size: 100%; }
+#build-panel.under-map #structures canvas, #build-panel.under-map #build canvas { inline-size: 84px; block-size: 56px; flex: none; }
+#build-panel.under-map #structures .why, #build-panel.under-map #build .needs { font-size: .64rem; inline-size: 100%; min-block-size: 0; max-block-size: 2.3em; white-space: normal; overflow: hidden; }
+#build-panel.under-map #rally { flex: 0 0 8.5rem; flex-direction: column; align-items: flex-start; justify-content: center; margin: 0; gap: .25rem; }
+#build-panel.under-map #rally button { margin: 0; }
+/* With the build bar under it, the radio log keeps four lines and the map the rest. */
+@media (min-width: 701px) and (min-height: 501px) and (max-height: 820px) { #radio { block-size: 11rem; } }
+/* A locked card: dim, a padlock on its picture, what it needs in the warning colour, no press. */
+#build button.locked, #structures button.needs { cursor: not-allowed; pointer-events: none; opacity: .5; filter: saturate(.4); }
+#build .lock { position: absolute; inset-block-start: .25rem; inset-inline-end: .25rem; line-height: 0; padding: .15rem; background: #10161ae6; border: 1px solid var(--warn); border-radius: 3px; }
+#build button.locked .needs { color: var(--warn); font-weight: 700; }

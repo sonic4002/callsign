@@ -141,7 +141,9 @@
     </section>
 
 
-    <section class="panel" data-sheet="build">
+    <!-- On a desktop the page moves this panel under the map (debug.js: seatBuildPanel);
+         on a phone it stays here and opens as the build sheet. -->
+    <section class="panel" id="build-panel" data-sheet="build">
       <!-- One panel, two tabs: what to build with, and what to buy with it. -->
       <div class="tabs" id="build-tabs" role="tablist">
         <button type="button" role="tab" data-build-tab="structures"><span data-i18n="structures"></span> <bdi dir="ltr" class="badge" id="structures-badge" hidden></bdi></button>

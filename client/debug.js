@@ -934,7 +934,12 @@ function buildButton(id, unit, enabled, lock) {
   count.hidden = true;
   // The fill rises behind the picture while a squad of this unit deploys.
   button.append(el("i", "fill"), icon, el("span", "", unit.name[lang]), el("span", "cost", String(unit.cost)), el("bdi", "left"), count);
-  if (lock) button.append(el("span", "needs", why));
+  if (lock) {
+    // Locked: a padlock on the picture and what it still needs, and it takes no press.
+    const mark = el("span", "lock");
+    mark.innerHTML = iconSvg("lock", 16);
+    button.append(mark, el("span", "needs", why));
+  }
   // Buying is a radio call to the operator like any other; the button only writes and sends it.
   button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
   // Beside it, while one of this unit is in a line: the last one taken back out, by a
@@ -1401,6 +1406,25 @@ function offerStructure(st, squad, box, sx, sy) {
   };
   offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
 }
+
+// ---- where the build panel sits ----
+//
+// On a desktop the Structures / Reinforcements panel is a bar directly under the map, both
+// tabs one fixed height, so pressing a tab moves nothing else. On a phone it stays in the
+// sidebar, where it opens as a sheet. The same element is moved; nothing is drawn twice.
+const buildPanel = $("build-panel");
+const buildHome = document.createComment("the build panel's place in the sidebar");
+buildPanel.before(buildHome);
+const phoneLayout = matchMedia("(max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px)");
+function seatBuildPanel() {
+  const under = !phoneLayout.matches;
+  if (under) $("radio").before(buildPanel);
+  else buildHome.after(buildPanel);
+  buildPanel.classList.toggle("under-map", under);
+  scene.resize();
+}
+phoneLayout.addEventListener("change", seatBuildPanel);
+seatBuildPanel();
 
 // ---- the sidebar's folding sections ----
 //

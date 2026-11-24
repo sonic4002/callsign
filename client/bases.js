@@ -29,11 +29,19 @@ const mine = (state, side) => (state.structures ?? []).filter((s) => s.side === 
 export const stands = (state, side, role) => mine(state, side).some((s) => s.role === role && s.building >= 1);
 
 // unitLock is the structure a side still has to build before it can buy a unit, or null
-// when the unit is unlocked.
+// when the unit is unlocked. The structure that makes a unit must be of the unit's own
+// design and finished: a captured airbase makes its builders' aircraft, not ours, and one
+// still going up or in ruins makes nothing. What a unit needs besides (a radar) may be
+// any finished structure of that role the side holds. This is the server's own rule
+// (sim: mayBuy), so a card never looks available when the purchase would be refused.
 export function unitLock(state, rules, faction, side, unitId) {
-  const u = rules.factions[faction]?.units[unitId];
-  if (!u?.requires || stands(state, side, u.requires)) return null;
-  return ofRole(rules, faction, u.requires);
+  const design = Object.keys(rules.factions).find((f) => rules.factions[f].units[unitId]);
+  const u = rules.factions[design]?.units[unitId];
+  if (!u) return null;
+  const held = mine(state, side).filter((s) => s.building >= 1);
+  if (u.requires && !held.some((s) => s.role === u.requires && s.faction === design)) return ofRole(rules, design, u.requires);
+  const missing = (u.needs ?? []).find((role) => !held.some((s) => s.role === role));
+  return missing ? ofRole(rules, faction, missing) : null;
 }
 
 // structureCards is the Structures half of the build panel: one card per structure the

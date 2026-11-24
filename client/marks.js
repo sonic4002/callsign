@@ -48,6 +48,12 @@ export const icons = {
     { d: "M4.6 2.2H12.8L10.6 5.2L12.8 8.2H4.6Z", fill: GOOD, stroke: INK, width: 0.9 },
     { d: "M1.8 14.8H6.4", stroke: SILVER, width: 1.5 },
   ],
+  // Lock: a padlock, on a card that cannot be bought yet.
+  lock: [
+    { d: "M5 7V5A3 3 0 0 1 11 5V7", stroke: SILVER, width: 1.6 },
+    { d: "M3.6 7H12.4V14H3.6Z", fill: WARN, stroke: INK, width: 0.9 },
+    { d: "M8 9.6V11.6", stroke: INK, width: 1.4 },
+  ],
   // Sell: a coin dropping out of a structure's outline (an arrow down onto a coin).
   sell: [
     { d: "M8 1.2V7.4M5.2 5L8 7.8L10.8 5", stroke: SILVER, width: 1.6 },
@@ -78,7 +84,7 @@ function svg(shapes, size, label) {
 
 // rankSvg("seasoned" | "elite") for the roster; an unknown or missing rank gives "".
 export const rankSvg = (rank, size = 14, label = "") => (ranks[rank] ? svg(ranks[rank], size, label) : "");
-// iconSvg("power" | "lowPower" | "rally" | "sell" | "repair" | "cancel") for the build panel.
+// iconSvg("power" | "lowPower" | "rally" | "lock" | "sell" | "repair" | "cancel") for the build panel.
 export const iconSvg = (name, size = 14, label = "") => (icons[name] ? svg(icons[name], size, label) : "");
 
 // draw paints a mark on a canvas with its top-left corner at (x, y), `size` pixels square.
