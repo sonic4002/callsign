@@ -132,5 +132,10 @@
   "help.full.say": "צפע 2, כאן פטיש. תחזיקו את פסל. עבור.",
   "event.deploying": "{squad} בדרך: בשטח בעוד {seconds} שנ׳.",
   "deployingIn": "בדרך לשטח · {seconds} שנ׳",
-  "seconds": "{seconds} שנ׳"
+  "seconds": "{seconds} שנ׳",
+  "tab.radio": "קשר",
+  "tab.build": "בנייה",
+  "tab.more": "עוד",
+  "noServer": "אין חיבור לשרת המשחק. מנסה שוב…",
+  "voice.insecure": "דיבור דורש https או localhost; הדף נפתח ב-http רגיל. אפשר להקליד."
 }

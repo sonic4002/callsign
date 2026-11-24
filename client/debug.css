@@ -99,7 +99,8 @@ button.primary:hover:not(:disabled) { background: #f4c552; }
   background: #0e1316; border-inline-start: 2px solid var(--brass-dim); min-block-size: 0; overflow-y: auto;
 }
 #sidebar header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-#controls { display: flex; gap: .35rem; }
+#sidebar header h1 { white-space: nowrap; } /* the buttons wrap, never the name */
+#controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
 #controls button { font-size: .75rem; padding: .25rem .5rem; }
 
 #treasury { display: grid; grid-template-columns: 1fr auto; gap: .5rem .8rem; align-items: center; }
@@ -172,14 +173,7 @@ footer.panel { font-size: .78rem; color: var(--muted); }
 #credits ul { margin: .4rem 0 0; padding-inline-start: 1.1rem; }
 #credits li { unicode-bidi: plaintext; overflow-wrap: anywhere; }
 
-/* ---- narrow screens: map, radio, then the console below ---- */
-@media (max-width: 820px) {
-  body { overflow: auto; }
-  main { flex-direction: column; height: auto; }
-  #map-wrap { flex: none; block-size: 46vh; }
-  #radio { block-size: 12rem; }
-  #sidebar { inline-size: auto; border-inline-start: 0; border-block-start: 2px solid var(--brass-dim); overflow: visible; }
-}
+/* Phones have their own layout: mobile.css. */
 
 /* ---- help ---- */
 #help { position: fixed; inset: 0; z-index: 11; display: grid; place-items: center; background: #05080ad9; }

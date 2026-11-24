@@ -132,5 +132,10 @@
   "help.full.say": "Viper 2, this is Hammer. Hold Foxtrot. Over.",
   "event.deploying": "{squad} is deploying: on the field in {seconds} s.",
   "deployingIn": "Deploying · {seconds} s",
-  "seconds": "{seconds} s"
+  "seconds": "{seconds} s",
+  "tab.radio": "Radio",
+  "tab.build": "Build",
+  "tab.more": "More",
+  "noServer": "No connection to the game server. Trying again…",
+  "voice.insecure": "Voice needs https or localhost; this page was opened over plain http. Typing works."
 }
