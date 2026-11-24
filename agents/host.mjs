@@ -19,8 +19,8 @@ const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).sli
 export class Host {
   // spawn(options) makes one agent: an object with start(), stop() and, once it has
   // joined, `me` (its station) and `name`. The default runs it in this thread.
-  constructor({ server, side = 0, brain, operator = true, log = console.log, standByMs, id = newId(), rank = RANK_SERVER, join = {}, spawn = (options) => new Agent(options) }) {
-    Object.assign(this, { server, side, brain, operator, log, standByMs, id, rank, join, spawn });
+  constructor({ server, side = 0, brain, operator = true, log = console.log, standByMs, id = newId(), rank = RANK_SERVER, join = {}, spawn = (options) => new Agent(options), link = (...args) => new Link(...args) }) {
+    Object.assign(this, { server, side, brain, operator, log, standByMs, id, rank, join, spawn, link });
     this.agents = new Map(); // squad id (0 for Anvil) → agent
     this.active = false;
     this.match = null;
@@ -31,7 +31,7 @@ export class Host {
     this.closed = new Promise((resolve) => (this.onClosed = resolve));
     // The control connection only listens: which squads exist, when the match restarts,
     // and whether this host is the one running the side.
-    this.control = new Link(
+    this.control = this.link(
       `${this.server}?${new URLSearchParams({ ...this.join, side: this.side, role: "host", host: this.id, rank: this.rank, state: "0" })}`,
       (frame) => this.#onFrame(frame),
       () => {
