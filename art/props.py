@@ -22,7 +22,7 @@ import math
 import bpy  # isort: skip
 from PIL import Image, ImageDraw
 
-from units import AEGIS, ASHFALL, CHARRED, OUT, PPM, RAW, _object, aim_camera, ball, box, cyl, gold_heap, holdout, joint, mat, outlined, prism_y, setup_scene
+from units import AEGIS, ASHFALL, CHARRED, FACINGS, OUT, PPM, RAW, _object, aim_camera, ball, box, cyl, gold_heap, holdout, joint, mat, outlined, prism_y, save_small, setup_scene
 
 LENGTH = 4.0  # metres of run one piece covers
 OVERLAP = 0.06  # each piece runs this far past its ends, so no gap shows between two
@@ -220,6 +220,45 @@ def gold_field(level):
 
 
 # name → (builder, states, cell in metres, height the camera looks at, both axes?)
+SAND = ["#b9a57a", "#a8946b", "#c7b48a", "#9d8a62"]
+ARC = 130  # degrees of front a sandbag position covers
+BAG_RADIUS = 1.5  # metres from the middle of the position to the bags
+
+
+def sandbags(state):
+    """A sandbag position: a low curved wall of bags, open at the back, facing +X. `state`
+    is "" (whole), "damaged" (a gap blown in it, bags thrown down) or "flat" (driven over
+    or shelled: a ring of burst bags and spilt sand)."""
+    root = joint(None, name="root")
+    r = rnd(11)
+    courses = {"": 3, "damaged": 3, "flat": 1}[state]
+    per = 7
+    for course in range(courses):
+        n = per - (course % 2)
+        for i in range(n):
+            a = math.radians(-ARC / 2 + ARC * (i + (0.5 if course % 2 else 0) + 0.5 * (course % 2 == 0) * 0) / (per - 1))
+            jitter = (r() - 0.5) * 0.08
+            if state == "damaged" and 2 <= i <= 3 and course >= 1:
+                continue  # the gap
+            if state == "flat" and r() < 0.35:
+                continue
+            rad = BAG_RADIUS + jitter + (0.25 * (r() - 0.3) if state == "flat" else 0)
+            z = 0.11 + 0.2 * course
+            squash = 0.5 if state == "flat" else 1.0
+            box(root, (0.3, 0.52, 0.2 * squash), (rad * math.cos(a), rad * math.sin(a), z * squash), SAND[(i + course) % 4],
+                rot=((r() - 0.5) * 0.12, (r() - 0.5) * 0.12, a + (r() - 0.5) * (0.9 if state == "flat" else 0.14)))
+    if state:
+        # Bags thrown down in front and behind, and sand spilt from the burst ones.
+        debris(root, SAND, 7 if state == "damaged" else 12, (1.7, 1.5), 5, size=0.34)
+        for i in range(5 if state == "flat" else 2):
+            # Each patch of sand lies a hair above the last, or two that overlap render black.
+            cyl(root, 0.3 + 0.25 * r(), 0.02, (0.6 + r() * 1.1, (r() - 0.5) * 2.2, 0.012 + 0.024 * i), "#c9b98f", sides=9)
+    return root
+
+
+# Things that face a way: rendered once for each of the eight map headings.
+FACED = {"sandbags": (sandbags, ["", "damaged", "flat"], 5.0, 0.35)}
+
 SEGMENTS = {
     "aegis_wall": (aegis_wall, ["", "ruin"], 6.4, 1.1),
     "ashfall_fence": (ashfall_fence, ["", "ruin"], 6.4, 1.0),
@@ -289,6 +328,38 @@ def main():
             entry["post"], cut = trimmed(image, origin, f"segments/{name}_post.png")
             page.append((f"{name}_post", cut))
         manifest["segments"][name] = entry
+
+    manifest.setdefault("landmarks", {})
+    for name, (build, states, cell, centre) in FACED.items():
+        if not want(name):
+            continue
+        # One sheet: a row for each heading (clockwise from east, as the units), a column
+        # for each state. Every frame is cropped to the one box that holds them all.
+        frames = []
+        for f in range(len(FACINGS)):
+            row = []
+            for state in states:
+                image, origin = render(f"{name}_{state or 'whole'}_{f}", lambda: build(state), cell, centre, -f * math.pi / 4)
+                row.append(outlined(image))
+            frames.append(row)
+        boxes = [im.getchannel("A").point(lambda a: 255 if a > 6 else 0).getbbox() for row in frames for im in row]
+        left, top = min(b[0] for b in boxes) - 1, min(b[1] for b in boxes) - 1
+        right, bottom = max(b[2] for b in boxes) + 1, max(b[3] for b in boxes) + 1
+        w, h = right - left, bottom - top
+        sheet = Image.new("RGBA", (w * len(states), h * len(FACINGS)), (0, 0, 0, 0))
+        for r_, row in enumerate(frames):
+            for c_, im in enumerate(row):
+                sheet.paste(im.crop((left, top, right, bottom)), (c_ * w, r_ * h))
+        rel = f"landmarks/{name}.png"
+        (OUT / rel).parent.mkdir(parents=True, exist_ok=True)
+        save_small(sheet, OUT / rel)
+        print(f"{rel}  {sheet.width}x{sheet.height}, frame {w}x{h}")
+        manifest["landmarks"][name] = {
+            "image": rel, "frame": [w, h], "anchor": [round((origin[0] - left) / w, 4), round((origin[1] - top) / h, 4)],
+            "facings": len(FACINGS), "order": FACINGS, "heading": "map", "ppm": PPM,
+            "states": [state or "whole" for state in states], "arc": ARC, "radius": round(BAG_RADIUS * UNITS_PER_METRE),
+        }
+        page.append((name, sheet))
 
     for name, (build, cell, centre, height) in PROPS.items():
         if not want(name):

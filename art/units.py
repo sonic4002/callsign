@@ -28,6 +28,7 @@ RAW = HERE.parent / "assets" / "raw" / "blender"
 
 PPM = 40  # rendered pixels per metre
 FACINGS = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]  # map headings, clockwise from east
+FACINGS16 = ["E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N", "NNE", "NE", "ENE"]
 ELEVATION = math.radians(30)  # gives the game's 2:1 diamond
 OUTLINE = (22, 26, 30)
 
@@ -259,14 +260,19 @@ ASHFALL = dict(cloth="#a88a57", dark="#4b3a27", armour="#6b6e42", head="#b8862f"
 
 class Soldier:
     cell, centre = 3.4, 0.75
-    sheets = {"": [("idle", [0]), ("walk", [i / 8 for i in range(8)]), ("fire", [0, 1]), ("cover", [0]),
-                   ("coverFire", [0]), ("die", [0.2, 0.45, 0.7, 0.9, 1])]}
-    manifest = {"per": "member", "fps": {"walk": 11, "die": 9}}
+    facings = FACINGS
+    scale = 1.0
+    # New animations go at the end of the row, so the columns older code knows stay put.
+    sheets = {"": [("idle", [0]), ("walk", [i / 12 for i in range(12)]), ("fire", [0, 1]), ("cover", [0]),
+                   ("coverFire", [0]), ("die", [0.2, 0.45, 0.7, 0.9, 1]), ("stop", [0])]}
+    manifest = {"per": "member", "fps": {"walk": 16, "die": 9}}
 
     def __init__(self, look, militia, rocket=False):
         c = look
         self.root = joint(None, name="root")
-        self.fall = joint(self.root)  # tips the whole body over when it dies
+        self.size = joint(self.root)  # a hero stands a little taller than the rank and file
+        self.size.scale = (self.scale,) * 3
+        self.fall = joint(self.size)  # tips the whole body over when it dies
         self.pelvis = joint(self.fall, (0, 0, 0.8))
         self.torso = joint(self.pelvis)
         box(self.torso, (0.3, 0.5, 0.52), (0, 0, 0.27), c["cloth"])
@@ -346,11 +352,23 @@ class Soldier:
         rifle, tilt = (0.3, -0.06, 0.26), 0.3
         arms = [(0.95, 0.5, 0.5), (0.45, 1.2, 0.35)]  # (swing forward, elbow bend, in toward the body)
         if anim == "walk":
+            # One stride over the cycle. A leg swings forward with its knee bent and lands
+            # almost straight; the body is lowest as the feet are furthest apart and rises
+            # over the standing leg; the shoulders turn against the hips and the head stays
+            # on the line of march.
             p = 2 * math.pi * t
-            legs = [(0.62 * math.sin(p), 0.9 * max(0, math.cos(p))), (-0.62 * math.sin(p), 0.9 * max(0, -math.cos(p)))]
-            z = 0.8 - 0.04 * abs(math.sin(p))
-            self.torso.rotation_euler = (0, 0.16, 0.08 * math.sin(p))
-            rifle = (0.3, -0.06, 0.26 + 0.02 * math.sin(2 * p))
+            sn, cs = math.sin(p), math.cos(p)
+            legs = [(0.74 * sn, 0.12 + 1.0 * max(0, cs) ** 1.3), (-0.74 * sn, 0.12 + 1.0 * max(0, -cs) ** 1.3)]
+            z = 0.775 + 0.03 * math.cos(2 * p)
+            self.torso.rotation_euler = (0.05 * cs, 0.2, -0.17 * sn)
+            self.head.rotation_euler = (0, -0.06, 0.13 * sn)
+            rifle = (0.3 + 0.02 * sn, -0.06, 0.26 + 0.025 * math.cos(2 * p))
+            arms = [(0.95 + 0.1 * sn, 0.5, 0.5), (0.45 - 0.1 * sn, 1.2, 0.35)]
+        if anim == "stop":
+            # The last step: the front foot planted, the weight held back.
+            legs = [(0.38, 0.3), (-0.22, 0.12)]
+            z = 0.77
+            self.torso.rotation_euler = (0, 0.02, 0)
         if anim in ("fire", "coverFire", "cover"):
             legs = [(0.3, 0.1), (-0.3, 0.15)]
             z = 0.78
@@ -406,21 +424,41 @@ class Vehicle:
     water = False
     pivot = 0.0  # where the weapon turns, in metres ahead of the unit's centre
     manifest = {}
+    facings = FACINGS16  # a hull turns through sixteen headings, so it does not snap round
 
     def __init__(self, look):
         self.look = look
         self.root = joint(None, name="root")
         self.body = joint(self.root, name="body")
         self.turret = joint(self.root, name="turret")
+        self.wheels = []  # joints that turn about their axle when the vehicle moves
+        self.links = []  # track links: (object, where it sits along the track, the track's length)
         self.build(look)
         if self.water:
             # Whatever is under the waterline is cut out of the picture.
             plane = _object("water", [(-30, -30, 0), (30, -30, 0), (30, 30, 0), (-30, 30, 0)], [(0, 1, 2, 3)], holdout(), None)
             plane.location = (0, 0, -0.001)
+        # "move" comes last, so the columns older code knows stay where they were.
         self.sheets = {
-            "": [("idle", [0]), ("sink", [0.3, 0.6, 0.85]) if self.water else ("wreck", [0])],
+            "": [("idle", [0]), ("sink", [0.3, 0.6, 0.85]) if self.water else ("wreck", [0]), ("move", [0, 1] if self.water else [0, 1, 2])],
             "_turret": [("idle", [0]), ("fire", [0, 1, 2])],
         }
+
+    def wheel(self, loc, radius, width, tyre, hub):
+        """A wheel on its own axle, with a hub bar across it so that its turning shows."""
+        axle = joint(self.body, loc)
+        cyl(axle, radius, width, (0, 0, 0), tyre, axis="Y", sides=10)
+        cyl(axle, radius * 0.46, width + 0.02, (0, 0, 0), hub, axis="Y", sides=6)
+        box(axle, (radius * 1.5, width + 0.04, radius * 0.22), (0, 0, 0), "#0f1113")
+        self.wheels.append(axle)
+        return axle
+
+    def roll(self, t):
+        """Turns the wheels and runs the tracks on by one step of three."""
+        for axle in self.wheels:
+            axle.rotation_euler = (0, t * math.pi / 3, 0)  # the hub bar repeats every half turn
+        for link, at, pitch in self.links:
+            link.location.x = at - pitch * t / 3
 
     def pose(self, anim, t, sheet):
         turret_only = sheet == "_turret"
@@ -433,6 +471,16 @@ class Vehicle:
         self.body.location = (0, 0, 0)
         self.recoil(([0.8, 1, 0.35][int(t)] if anim == "fire" else 0))
         char(self.root, anim == "wreck")
+        self.roll(t if anim == "move" else 0)
+        if anim == "move":
+            if self.water:
+                # Under way a boat lifts its bow and settles by the stern.
+                self.body.rotation_euler = (0, -0.075 - 0.02 * t, 0)
+                self.body.location = (0, 0, 0.05 + 0.03 * t)
+            else:
+                # The hull rocks on its springs as the ground passes under it.
+                self.body.rotation_euler = (0, 0.012 * (1 - t), 0)
+                self.body.location = (0, 0, 0.02 * (t % 2))
         if anim == "wreck":
             self.body.rotation_euler = (0.05, -0.03, 0)
             self.turret.rotation_euler = (0.12, 0.1, 0.7)
@@ -454,7 +502,10 @@ class Tank(Vehicle):
         for side in (1, -1):
             prism_y(b, tread, 0.5, c["track"], y=0.9 * side)
             for i in range(5):
-                cyl(b, 0.2, 0.06, (-1.4 + 0.7 * i, 1.16 * side, 0.26), c["low"], axis="Y", sides=8)
+                self.wheel((-1.4 + 0.7 * i, 1.16 * side, 0.26), 0.2, 0.06, c["low"], c["hull2"])
+            for i in range(11):
+                link = box(b, (0.07, 0.03, 0.2), (-1.6 + 0.32 * i, 1.165 * side, 0.52), "#33393f")
+                self.links.append((link, -1.6 + 0.32 * i, 0.32))
             box(b, (3.9, 0.6, 0.08), (0, 0.9 * side, 0.67), c["hull2"])  # fender
             box(b, (1.6, 0.5, 0.2), (-0.6, 0.93 * side, 0.82), c["hull"])  # side armour panel
         prism_y(b, [(-1.95, 0.42), (1.55, 0.42), (2.1, 0.68), (1.25, 1.02), (-1.95, 1.02)], 1.34, c["hull"])
@@ -487,8 +538,7 @@ class Technical(Vehicle):
         b = self.body
         for x in (1.3, -1.25):
             for side in (1, -1):
-                cyl(b, 0.4, 0.3, (x, 0.82 * side, 0.4), "#1a1917", axis="Y", sides=10)
-                cyl(b, 0.18, 0.32, (x, 0.82 * side, 0.4), c["hull2"], axis="Y", sides=6)
+                self.wheel((x, 0.82 * side, 0.4), 0.4, 0.3, "#1a1917", c["hull2"])
         box(b, (4.3, 1.5, 0.22), (0, 0, 0.62), c["low"])  # frame
         box(b, (1.0, 1.6, 0.42), (1.65, 0, 0.93), c["hull"])  # bonnet
         box(b, (0.12, 1.7, 0.2), (2.2, 0, 0.7), c["low"])  # bumper
@@ -596,8 +646,7 @@ class RocketLauncher(Vehicle):
         b = self.body
         for x in (1.75, -0.55, -1.75):
             for side in (1, -1):
-                cyl(b, 0.42, 0.34, (x, 0.9 * side, 0.42), "#17191b", axis="Y", sides=10)
-                cyl(b, 0.2, 0.36, (x, 0.9 * side, 0.42), c["hull2"], axis="Y", sides=6)
+                self.wheel((x, 0.9 * side, 0.42), 0.42, 0.34, "#17191b", c["hull2"])
         box(b, (5.0, 1.5, 0.26), (0, 0, 0.72), c["low"])  # frame
         # Armoured cab, sloped at the front, with a slit windscreen.
         prism_y(b, [(1.0, 0.85), (2.5, 0.85), (2.5, 1.35), (2.05, 1.95), (1.0, 1.95)], 1.7, c["hull"])
@@ -635,11 +684,12 @@ class Helicopter(Vehicle):
 
     cell, centre = 10.4, 1.5
     pivot = 1.5
-    manifest = {"altitude": 3.0, "fps": {"idle": 16}}
+    manifest = {"altitude": 3.0, "fps": {"idle": 16, "move": 16, "bankLeft": 16, "bankRight": 16}}
+    facings = FACINGS
 
     def __init__(self, look):
         super().__init__(look)
-        self.sheets[""] = [("idle", [0, 1, 2]), ("wreck", [0])]
+        self.sheets[""] = [("idle", [0, 1, 2]), ("wreck", [0]), ("move", [0, 1, 2]), ("bankLeft", [0, 1, 2]), ("bankRight", [0, 1, 2])]
 
     def build(self, c):
         b = self.body
@@ -679,7 +729,12 @@ class Helicopter(Vehicle):
 
     def pose(self, anim, t, sheet):
         super().pose(anim, t, sheet)
-        self.rotor.rotation_euler = (0, 0, (t * math.pi / 6) if anim == "idle" else 0.5)
+        self.rotor.rotation_euler = (0, 0, 0.5 if anim == "wreck" else t * math.pi / 6)
+        if anim == "move":
+            self.body.rotation_euler = (0, 0.15, 0)  # nose down, pulling itself forward
+        if anim in ("bankLeft", "bankRight"):
+            # Leaning into the turn: the left side drops in a turn to the left.
+            self.body.rotation_euler = (0.34 * (-1 if anim == "bankLeft" else 1), 0.1, 0)
         if anim == "wreck":
             # Down on its side with the boom broken and the blades bent to the ground.
             self.body.rotation_euler = (0.5, -0.1, 0)
@@ -693,6 +748,7 @@ class Drone:
     Rendered at ground level; the page lifts it to its height and lays the shadow."""
 
     cell, centre = 3.6, 0.8
+    facings = FACINGS
     sheets = {"": [("idle", [0, 1]), ("walk", [0, 1, 2, 3]), ("fire", [0, 1]), ("die", [0.2, 0.45, 0.7, 0.9, 1])]}
     manifest = {"per": "member", "altitude": 1.5, "fps": {"walk": 14, "idle": 10, "die": 9}}
     height = 1.5  # the height it flies at, which it falls from when it is shot down
@@ -766,6 +822,7 @@ class Hauler:
     the front that reaches down into the field. It carries no weapon."""
 
     cell, centre = 8.2, 1.0
+    facings = FACINGS
     sheets = {"": [("idle", [0]), ("move", [0, 1]), ("full", [0]), ("moveFull", [0, 1]),
                    ("load", [0.2, 0.55, 0.9]), ("unload", [0.35, 0.7, 1.0]), ("wreck", [0])]}
     manifest = {"fps": {"move": 6, "moveFull": 6, "load": 4, "unload": 4}}
@@ -863,7 +920,7 @@ class Engineer(Soldier):
     working pose down on one knee with a hammer."""
 
     sheets = {"": Soldier.sheets[""] + [("work", [0, 1])]}
-    manifest = {"per": "member", "fps": {"walk": 11, "die": 9, "work": 5}}
+    manifest = {"per": "member", "fps": {"walk": 16, "die": 9, "work": 5}}
 
     def __init__(self, look, militia):
         super().__init__({**look, "head": "#e0a82e" if not militia else "#c9682c"}, militia)
@@ -896,6 +953,178 @@ class Engineer(Soldier):
 
 
 
+def strip(parent):
+    """Takes away everything built under a joint, to build something else there."""
+    for child in list(parent.children):
+        strip(child)
+        bpy.data.objects.remove(child, do_unlink=True)
+
+
+class Sentinel(Soldier):
+    """The Aegis hero: a lone marksman under a hooded cloak, with a rifle as long as he is
+    tall and a satchel of demolition charges. A head taller than the rank and file."""
+
+    cell, centre, scale = 5.6, 0.9, 1.16
+    sheets = {"": Soldier.sheets[""] + [("prone", [0]), ("proneFire", [0, 1]), ("plant", [0, 1, 2])]}
+    manifest = {"per": "member", "hero": True, "fps": {"walk": 16, "die": 9, "plant": 4}}
+
+    def __init__(self):
+        c = {**AEGIS, "cloth": "#3c4d5e", "armour": "#5b7186", "head": "#2b3844", "dark": "#232e38"}
+        super().__init__(c, militia=False)
+        pale = "#d5e3ec"
+        # The hood, peaked at the back, and the cloak hanging in three ragged strips.
+        ball(self.head, 0.25, (-0.04, 0, 0.2), c["head"], squash=0.95)
+        box(self.head, (0.26, 0.3, 0.2), (-0.24, 0, 0.12), c["head"], rot=(0, 0.5, 0))
+        self.cloak = joint(self.torso, (-0.24, 0, 0.5))
+        for dy, length, lean in ((-0.2, 0.86, 0.16), (0.0, 1.02, 0.1), (0.2, 0.8, 0.2)):
+            box(self.cloak, (0.07, 0.2, length), (-0.04 - lean * length / 2, dy, -length / 2), c["dark"], rot=(0, -lean, 0))
+            box(self.cloak, (0.075, 0.2, 0.07), (-0.04 - lean * length, dy, -length), pale)  # the pale hem
+        box(self.torso, (0.34, 0.6, 0.12), (0.0, 0, 0.5), c["dark"])  # the cloak across the shoulders
+        box(self.torso, (0.1, 0.5, 0.1), (0.14, 0, 0.5), pale)  # a pale scarf at the throat
+        # The satchel of charges on the hip.
+        box(self.pelvis, (0.26, 0.14, 0.3), (-0.02, -0.3, -0.06), "#e0a82e")
+        box(self.pelvis, (0.27, 0.15, 0.06), (-0.02, -0.3, -0.02), "#1b1f22")
+        # The long rifle: a heavy barrel with a muzzle brake, a big sight, a folded bipod.
+        strip(self.rifle)
+        r = self.rifle
+        box(r, (0.5, 0.09, 0.15), (-0.28, 0, -0.02), c["dark"])  # stock
+        box(r, (0.5, 0.1, 0.13), (0.15, 0, 0), c["gun"])  # receiver
+        cyl(r, 0.035, 1.25, (1.0, 0, 0.02), c["gun"], axis="X", sides=6)  # barrel
+        cyl(r, 0.06, 0.22, (1.68, 0, 0.02), "#3a4148", axis="X", sides=6)  # muzzle brake
+        cyl(r, 0.065, 0.5, (0.2, 0, 0.15), "#3a4148", axis="X", sides=8)  # sight
+        cyl(r, 0.066, 0.03, (0.46, 0, 0.15), c["trim"], axis="X", sides=8, glow=1.6)  # its lens
+        box(r, (0.08, 0.07, 0.2), (0.05, 0, -0.14), c["gun"])  # grip
+        box(r, (0.3, 0.04, 0.04), (0.78, 0.05, -0.07), c["gun"])  # bipod, folded
+        box(r, (0.3, 0.04, 0.04), (0.78, -0.05, -0.07), c["gun"])
+        self.muzzle = flash(r, (1.92, 0, 0.02), 0.9)
+        # A charge, for the planting pose: it is put down a step in front of him.
+        self.charge = joint(self.size, (0.75, 0, 0.09))
+        box(self.charge, (0.34, 0.26, 0.16), (0, 0, 0), "#e0a82e")
+        box(self.charge, (0.36, 0.06, 0.17), (0, 0, 0), "#1b1f22")
+        self.lamp = ball(self.charge, 0.055, (0.08, 0.08, 0.1), "#ff5a3c")
+        self.lamp.active_material = mat("#ff5a3c", 12)
+
+    def pose(self, anim, t):
+        prone = anim in ("prone", "proneFire")
+        super().pose("cover" if anim == "plant" else "idle" if prone else anim, t)
+        show(self.charge, anim == "plant")
+        show(self.lamp, anim == "plant" and t == 2)
+        self.cloak.rotation_euler = (0, 0.5 if anim == "walk" else 0.12, 0)  # it streams out behind a walking man
+        if prone:
+            # Flat on his front along the line of fire, on his elbows behind the rifle.
+            self.fall.rotation_euler = (0, 1.42, 0)
+            self.fall.location = (-0.95, 0, 0.2)
+            self.pelvis.location = (0, 0, 0.8)
+            self.torso.rotation_euler = (0, -0.14, 0)
+            self.head.rotation_euler = (0, -1.0, 0)
+            self.cloak.rotation_euler = (0, -0.1, 0)
+            for (hip, knee), spread in zip(self.legs, (0.22, -0.22)):
+                hip.rotation_euler = (spread, 0.12, 0)
+                knee.rotation_euler = (0, 0.05, 0)
+            for (shoulder, elbow), side in zip(self.arms, (1, -1)):
+                shoulder.rotation_euler = (-0.5 * side, -2.3, 0)
+                elbow.rotation_euler = (0, -1.2, 0)
+            self.rifle.location = (0.2, -0.1, 0.72)
+            self.rifle.rotation_euler = (0, -1.3, 0)
+            show(self.muzzle, anim == "proneFire" and t == 1)
+        if anim == "plant":
+            # On one knee, the rifle slung, setting the charge down and arming it.
+            self.rifle.location = (-0.3, 0.0, 0.2)
+            self.rifle.rotation_euler = (0, -1.2, 0.3)
+            reach = [0.8, 1.25, 0.9][int(t)]
+            for (shoulder, elbow), side in zip(self.arms, (1, -1)):
+                shoulder.rotation_euler = (-0.25 * side, -reach, 0)
+                elbow.rotation_euler = (0, -0.5, 0)
+            self.torso.rotation_euler = (0, 0.3 + 0.18 * (t == 1), 0)
+            self.head.rotation_euler = (0, 0.4, 0)
+            self.charge.location = (0.75, 0, 0.42 if t == 0 else 0.09)
+
+
+class Oracle(Soldier):
+    """The Ashfall hero: a hooded figure in a long travelling robe. Seen plainly there is an
+    ochre scarf down the back, a lit amulet and a short carbine; in disguise there is only a
+    drab cloak, a bundle and a staff, and nothing to tell him from a traveller."""
+
+    cell, centre, scale = 4.4, 0.95, 1.16
+    sheets = {"": Soldier.sheets[""] + [("disguise", [0]), ("disguiseWalk", [i / 12 for i in range(12)]), ("seize", [0, 1, 2])]}
+    manifest = {"per": "member", "hero": True, "fps": {"walk": 16, "disguiseWalk": 13, "die": 9, "seize": 5}}
+
+    def __init__(self):
+        c = {**ASHFALL, "cloth": "#c9b488", "armour": "#b09a6e", "dark": "#6a5236", "head": "#c9b488"}
+        super().__init__(c, militia=True)
+        ochre, drab = "#d9772b", "#8b8474"
+        eight = [(0.3 * math.cos(i * math.pi / 4), 0.3 * math.sin(i * math.pi / 4)) for i in range(8)]
+        # The robe, to the ankles, and a deep hood.
+        prism_z(self.pelvis, eight, -0.74, 0.08, c["cloth"], bottom=1.45, top=0.95)
+        ball(self.head, 0.26, (-0.04, 0, 0.2), c["cloth"], squash=1.0)
+        box(self.head, (0.06, 0.24, 0.22), (0.17, 0, 0.16), "#2a2018")  # the face, lost in the hood's shadow
+        box(self.head, (0.24, 0.3, 0.26), (-0.24, 0, 0.1), c["cloth"], rot=(0, 0.6, 0))  # the hood's point
+        # What marks him out: a long ochre scarf, a sash, an amulet that glows.
+        self.marks = joint(self.torso)
+        box(self.marks, (0.07, 0.24, 0.95), (-0.25, 0.04, 0.08), ochre, rot=(0, -0.12, 0))
+        box(self.marks, (0.36, 0.56, 0.1), (0.0, 0, 0.5), ochre)
+        box(self.marks, (0.33, 0.52, 0.09), (0.0, 0, 0.02), ochre)  # sash
+        amulet = ball(self.marks, 0.06, (0.2, 0, 0.36), "#ffd27a")
+        amulet.active_material = mat("#ffd27a", 5)
+        # The disguise: a drab cloak over everything, a bundle on the back, a staff.
+        self.cover = joint(self.torso)
+        box(self.cover, (0.4, 0.62, 0.6), (-0.02, 0, 0.28), drab)
+        box(self.cover, (0.3, 0.44, 0.36), (-0.32, 0, 0.34), "#6f6656")  # bundle
+        cyl(self.cover, 0.09, 0.5, (-0.3, 0, 0.6), "#a39a84", axis="Y", sides=8)  # bedroll on it
+        self.skirt = prism_z(self.pelvis, [(x * 1.06, y * 1.06) for x, y in eight], -0.6, 0.1, drab, bottom=1.42, top=0.95)
+        self.staff = joint(self.torso, (0.34, -0.36, 0.0))
+        cyl(self.staff, 0.03, 1.7, (0, 0, 0.1), "#5b4127", sides=6)
+        # A short carbine in place of the rifle.
+        strip(self.rifle)
+        r = self.rifle
+        box(r, (0.42, 0.08, 0.13), (0.0, 0, 0), c["gun"])
+        box(r, (0.2, 0.06, 0.08), (-0.26, 0, -0.02), ASHFALL["wood"])
+        cyl(r, 0.035, 0.28, (0.34, 0, 0.02), c["gun"], axis="X", sides=6)
+        box(r, (0.07, 0.06, 0.24), (0.04, 0, -0.14), c["gun"], rot=(0, -0.3, 0))
+        self.muzzle = flash(r, (0.56, 0, 0.02), 0.5)
+        # The seizing: a ring of light opening over the raised hand.
+        self.orb = joint(self.torso, (0.62, 0.3, 0.86))
+        for i in range(8):
+            spark = ball(self.orb, 0.045, (0, 0.2 * math.cos(i * math.pi / 4), 0.2 * math.sin(i * math.pi / 4)), "#ffd27a")
+            spark.active_material = mat("#ffd27a", 14)
+        core = ball(self.orb, 0.07, (0, 0, 0), "#fff3c4")
+        core.active_material = mat("#fff3c4", 16)
+
+    def pose(self, anim, t):
+        hidden = anim in ("disguise", "disguiseWalk")
+        super().pose({"disguise": "idle", "disguiseWalk": "walk", "seize": "idle"}.get(anim, anim), t)
+        show(self.cover, hidden)
+        show(self.skirt, hidden)
+        show(self.staff, hidden)
+        show(self.marks, not hidden)
+        show(self.orb, anim == "seize")
+        if hidden:
+            show(self.rifle, False)
+            show(self.muzzle, False)
+            # Hands low, one on the staff, which swings with the stride.
+            swing = 0.3 * math.sin(2 * math.pi * t) if anim == "disguiseWalk" else 0
+            for (shoulder, elbow), (sw, bend, inward), side in zip(self.arms, [(0.35, 0.5, 0.2), (0.55 + swing, 0.7, 0.05)], (1, -1)):
+                shoulder.rotation_euler = (-inward * side, -sw, 0)
+                elbow.rotation_euler = (0, -bend, 0)
+            self.torso.rotation_euler = (0, 0.24 if anim == "disguiseWalk" else 0.14, 0)  # bent under the bundle
+            self.head.rotation_euler = (0, 0.25, 0)
+            self.staff.rotation_euler = (0, 0.16 + 0.5 * swing, 0)
+        if anim == "seize":
+            # The carbine drops to his side and the open hand comes up toward the machine.
+            self.rifle.location = (0.12, -0.3, 0.04)
+            self.rifle.rotation_euler = (0, 1.1, 0)
+            lift = [1.5, 2.0, 2.15][int(t)]
+            (ls, le), (rs, re) = self.arms
+            ls.rotation_euler = (-0.1, -lift, 0)
+            le.rotation_euler = (0, -0.25, 0)
+            rs.rotation_euler = (0.2, -0.3, 0)
+            re.rotation_euler = (0, -0.6, 0)
+            self.torso.rotation_euler = (0, -0.06, 0)
+            self.head.rotation_euler = (0, -0.2, 0)
+            self.orb.scale = ([0.45, 0.8, 1.15][int(t)],) * 3
+            self.orb.rotation_euler = (t * 0.35, 0, 0)
+
+
 UNITS = {
     "commandos": lambda: Soldier(AEGIS, militia=False),
     "militia": lambda: Soldier(ASHFALL, militia=True),
@@ -911,6 +1140,8 @@ UNITS = {
     "ashfall_hauler": lambda: Hauler(ASHFALL, improvised=True),
     "aegis_engineer": lambda: Engineer(AEGIS, militia=False),
     "ashfall_sapper": lambda: Engineer(ASHFALL, militia=True),
+    "aegis_sentinel": Sentinel,
+    "ashfall_oracle": Oracle,
 }
 
 # ---------------------------------------------------------------- render and pack
@@ -922,16 +1153,16 @@ def render_unit(name):
     size, origin = aim_camera(scene, model.cell, model.centre)
     frames = {}  # sheet suffix → rows of images, one row per heading
     for suffix, anims in model.sheets.items():
-        rows = [[] for _ in FACINGS]
+        rows = [[] for _ in model.facings]
         for anim, times in anims:
             for i, t in enumerate(times):
                 if isinstance(model, Vehicle):
                     model.pose(anim, t, suffix)
                 else:
                     model.pose(anim, t)
-                for f in range(len(FACINGS)):
+                for f in range(len(model.facings)):
                     # Map headings run clockwise seen from above; Blender's turn the other way.
-                    model.root.rotation_euler = (0, 0, -f * math.pi / 4)
+                    model.root.rotation_euler = (0, 0, -f * 2 * math.pi / len(model.facings))
                     path = RAW / name / f"{suffix or 'body'}_{anim}_{i}_{f}.png"
                     scene.render.filepath = str(path)
                     bpy.ops.render.render(write_still=True)
@@ -947,6 +1178,12 @@ def outlined(image):
     under = Image.new("RGBA", image.size, OUTLINE + (0,))
     under.putalpha(edge.point(lambda a: int(a * 0.85)))
     return Image.alpha_composite(under, image)
+
+
+def save_small(image, path):
+    """Saves a sheet with a palette of 256 colours. The models are flat-shaded, so this is
+    about a sixth of the size of full colour and differs from it by two levels in 255."""
+    image.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(path, optimize=True)
 
 
 def pack(name, suffix, rows, origin):
@@ -966,7 +1203,7 @@ def pack(name, suffix, rows, origin):
             sheet.paste(im.crop((left, top, right, bottom)), (c * w, r * h))
     rel = f"units/{name}{suffix}.png"
     (OUT / "units").mkdir(parents=True, exist_ok=True)
-    sheet.save(OUT / rel, optimize=True)
+    save_small(sheet, OUT / rel)
     anchor = [round((origin[0] - left) / w, 4), round((origin[1] - top) / h, 4)]
     print(f"{rel}  {sheet.width}x{sheet.height}, frame {w}x{h}")
     return rel, [w, h], anchor, sheet
@@ -1010,7 +1247,7 @@ def main():
     page = []
     for name in args.units or UNITS:
         model, _, origin, frames = render_unit(name)
-        entry = {"facings": len(FACINGS), "order": FACINGS, "heading": "map", "ppm": PPM, **model.manifest}
+        entry = {"facings": len(model.facings), "order": model.facings, "heading": "map", "ppm": PPM, **model.manifest}
         for suffix, rows in frames.items():
             rel, frame, anchor, sheet = pack(name, suffix, rows, origin)
             part = {"image": rel, "frame": frame, "anchor": anchor, "anims": anim_table(model.sheets[suffix])}
