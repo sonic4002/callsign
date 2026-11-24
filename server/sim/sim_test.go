@@ -585,6 +585,11 @@ func place(sq *sim.Squad, x, y float64) {
 	for i := range sq.Teams {
 		sq.Teams[i].X, sq.Teams[i].Y = x+float64(i)*6, y
 	}
+	// A squad fresh out of its structure is walking to where its kind gathers; staged
+	// somewhere else, it stays there.
+	if sq.Order.Kind == sim.OrderMove && sq.Order.Point == "" && sq.Order.Place == "" {
+		sq.Order = sim.Order{Kind: sim.OrderNone}
+	}
 }
 
 func buyFielded(t *testing.T, s *sim.Sim, side int, unit string) *sim.Squad {

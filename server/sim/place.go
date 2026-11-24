@@ -30,6 +30,7 @@ type Place struct {
 
 	Structure *Structure // set for a structure
 	Base      string     // "north", "south", "east" or "west" when the place is a side of one's own base
+	Exact     bool       // an exact spot ("N140 E60 of A"): what is built there stands just there
 }
 
 // PlaceFinder lets another part of the game add places of its own, such as structures.
@@ -76,7 +77,7 @@ func (s *Sim) ResolvePlace(text string) (Place, error) {
 	// "<N|S><metres> <E|W><metres> of <point>": an exact spot, as far north or south and
 	// as far east or west of a point. One of the two may be left out.
 	if x, y, id, ok := s.spotForm(text); ok {
-		return Place{Kind: PlaceOffset, ID: id, X: x, Y: y, Point: id[strings.LastIndex(id, " ")+1:]}, nil
+		return Place{Kind: PlaceOffset, ID: id, X: x, Y: y, Point: id[strings.LastIndex(id, " ")+1:], Exact: true}, nil
 	}
 	// "<bearing> of <point> [<metres>]"
 	if f := strings.Fields(text); (len(f) == 3 || len(f) == 4) && strings.EqualFold(f[1], "of") {

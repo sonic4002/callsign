@@ -32,6 +32,9 @@ const (
 func (s *Sim) CanPlace(side int, def *shared.Structure, x, y float64) error {
 	m := &s.R.Map
 	fp := def.Footprint
+	if !def.Base() {
+		return s.canPlaceWork(side, fp, x, y)
+	}
 	if x < fp+clearEdge || y < fp+clearEdge || x > m.Width-fp-clearEdge || y > m.Height-fp-clearEdge {
 		return fmt.Errorf("%w: too close to the edge of the map", ErrBadGround)
 	}
@@ -245,4 +248,52 @@ func (s *Sim) clearRuins(st *Structure) {
 			old.Gone = true
 		}
 	}
+}
+
+// Clearances of a defence or a fence run, which stand closer to things than a base
+// structure does.
+const (
+	clearWorkEdge = 4.0
+	clearWorkHQ   = 70.0 // from either headquarters
+	clearWork     = 6.0  // from another structure's footprint
+)
+
+// canPlaceWork is CanPlace for a defence, or for the middle of a fence run: on a side's
+// own ground (its headquarters, a structure of its own or a point it holds, within the
+// build radius), on open land, clear of landmarks, headquarters and structures.
+func (s *Sim) canPlaceWork(side int, fp, x, y float64) error {
+	m := &s.R.Map
+	if x < fp+clearWorkEdge || y < fp+clearWorkEdge || x > m.Width-fp-clearWorkEdge || y > m.Height-fp-clearWorkEdge {
+		return fmt.Errorf("%w: too close to the edge of the map", ErrBadGround)
+	}
+	if !s.ownGround(side, x, y) {
+		return fmt.Errorf("%w: build within %.0f of your base, a structure or a point you hold", ErrTooFar, s.R.Match.BuildRadius)
+	}
+	if m.TerrainAt(x, y) != 'L' {
+		return fmt.Errorf("%w: it must be open land", ErrBadGround)
+	}
+	for i := range m.Landmarks {
+		if dist(x, y, m.Landmarks[i].X, m.Landmarks[i].Y) < fp+clearLandmark {
+			return fmt.Errorf("%w: %s is in the way", ErrNoRoom, m.Landmarks[i].Name.En)
+		}
+	}
+	for i := range s.Sides {
+		if hq := s.R.HQPoint(i); dist(x, y, hq.X, hq.Y) < fp+clearWorkHQ {
+			return fmt.Errorf("%w: the headquarters is in the way", ErrNoRoom)
+		}
+	}
+	for _, st := range s.Structures {
+		if !st.Ruin && st.def.Role != shared.RoleFence && dist(x, y, st.X, st.Y) < fp+st.def.Footprint+clearWork {
+			return fmt.Errorf("%w: the %s is in the way", ErrNoRoom, st.def.Name.En)
+		}
+	}
+	return nil
+}
+
+// CanPlaceKind is CanPlace as an exact order is judged: a fence run by its middle.
+func (s *Sim) CanPlaceKind(side int, def *shared.Structure, x, y float64) error {
+	if def.Role == shared.RoleFence {
+		return s.canPlaceWork(side, 2, x, y)
+	}
+	return s.CanPlace(side, def, x, y)
 }

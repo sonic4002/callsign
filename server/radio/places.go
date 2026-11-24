@@ -26,6 +26,7 @@ var bearingWords = map[string]string{
 	"north": "N", "צפון": "N", "צפונית": "N", "south": "S", "דרום": "S", "דרומית": "S",
 	"east": "E", "מזרח": "E", "מזרחית": "E", "west": "W", "מערב": "W", "מערבית": "W",
 	"northeast": "NE", "northwest": "NW", "southeast": "SE", "southwest": "SW",
+	"צפונה": "N", "דרומה": "S", "מזרחה": "E", "מערבה": "W",
 }
 
 type namedPlace struct {
@@ -215,6 +216,10 @@ func (n *Net) ResolvePlace(text string) (place string, choices []string, ok bool
 	if len(points) != 1 {
 		return "", nil, false
 	}
+	// "140 metres north and 60 east of Alpha": an exact spot, a distance each way.
+	if spot, ok := spotIn(words(rest)); ok {
+		return spot + " of " + points[0], nil, true
+	}
 	if b := bearingIn(words(rest)); b != "" {
 		place = b + " of " + points[0]
 		if d := number.FindString(rest); d != "" {
@@ -239,4 +244,49 @@ func (n *Net) PlaceName(id, lang string) string {
 		}
 	}
 	return id
+}
+
+// spotIn reads an exact spot from the words around a point's name: two distances, one
+// north or south and one east or west, each beside its direction ("140 metres north and
+// 60 east", "צפונית 140 ומזרחית 60"). It writes them the way the simulation reads them,
+// "N140 E60". Anything else is not a spot: one direction, or two in a row with one
+// distance ("140 metres north-east"), stays a bearing.
+func spotIn(ws []string) (string, bool) {
+	type item struct {
+		bearing string
+		n       string
+	}
+	var seq []item
+	for _, w := range ws {
+		if number.MatchString(w) && number.FindString(w) == w {
+			seq = append(seq, item{n: w})
+			continue
+		}
+		for _, st := range stems(w) {
+			if b, ok := bearingWords[st]; ok && len(b) == 1 {
+				seq = append(seq, item{bearing: b})
+				break
+			}
+		}
+	}
+	if len(seq) != 4 {
+		return "", false
+	}
+	var parts [2]item
+	switch {
+	case seq[0].n != "" && seq[1].bearing != "" && seq[2].n != "" && seq[3].bearing != "":
+		parts = [2]item{{seq[1].bearing, seq[0].n}, {seq[3].bearing, seq[2].n}}
+	case seq[0].bearing != "" && seq[1].n != "" && seq[2].bearing != "" && seq[3].n != "":
+		parts = [2]item{{seq[0].bearing, seq[1].n}, {seq[2].bearing, seq[3].n}}
+	default:
+		return "", false
+	}
+	vertical := func(b string) bool { return b == "N" || b == "S" }
+	if vertical(parts[0].bearing) == vertical(parts[1].bearing) {
+		return "", false
+	}
+	if !vertical(parts[0].bearing) {
+		parts[0], parts[1] = parts[1], parts[0]
+	}
+	return parts[0].bearing + parts[0].n + " " + parts[1].bearing + parts[1].n, true
 }

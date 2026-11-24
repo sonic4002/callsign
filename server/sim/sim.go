@@ -395,7 +395,7 @@ func (s *Sim) field(sq *Squad) {
 // gathered reports whether every team of a squad has reached the place its order names.
 func (s *Sim) gathered(sq *Squad) bool {
 	for i := range sq.Teams {
-		if t := &sq.Teams[i]; t.Members > 0 && dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > s.R.Match.HoldRadius+30 {
+		if t := &sq.Teams[i]; t.Members > 0 && dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > 36 {
 			return false
 		}
 	}
@@ -827,7 +827,7 @@ func (s *Sim) squadEvents(live []*teamRef) {
 		if sq.Order.rally && s.gathered(sq) {
 			sq.Order = Order{Kind: OrderNone} // out of the door and in its place: awaiting orders
 		}
-		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived, 0
+		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived && !sq.Order.rally, 0
 		cx, cy := sq.Center()
 		for i := range sq.Teams {
 			t := &sq.Teams[i]

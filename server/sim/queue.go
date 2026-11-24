@@ -191,11 +191,11 @@ func (s *Sim) rallyBeside(st *Structure, sq *Squad) (float64, float64) {
 	col, row := float64((sq.Num-1)%3), float64(((sq.Num-1)/3)%2)
 	switch sq.unit.Domain {
 	case "air":
-		return ex + in*(70+col*40), ey + 70 + row*40
+		return ex + in*(90+col*44), ey + 90 + row*44
 	case "sea":
-		return s.nav.snapXY(navWater, ex+in*(40+col*40), ey+30+row*30)
+		return s.nav.snapXY(navWater, ex+in*(70+col*44), ey+50+row*40)
 	}
-	return s.nav.snapXY(navGround, ex+in*(10+col*44)-20, ey+46+row*40)
+	return s.nav.snapXY(navGround, ex+in*col*46, ey+84+row*44)
 }
 
 // comeOut puts a finished squad at its structure's exit and sends it to the rally place.
@@ -303,3 +303,6 @@ func (s *Sim) lineView(sq *Squad) (from string, pos, ahead int) {
 	}
 	return "s" + fmt.Sprint(sq.From), pos, ahead
 }
+
+// LineOf is lineView for the room, which tells an operator how long a purchase will take.
+func (s *Sim) LineOf(sq *Squad) (from string, pos, ahead int) { return s.lineView(sq) }

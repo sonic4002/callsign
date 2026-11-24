@@ -518,6 +518,14 @@ func (s *Sim) buildDefence(c Command, kind string, def *shared.Structure) (*Stru
 	}
 	x, y := pl.X, pl.Y
 	switch {
+	case pl.Exact:
+		// The commander chose the very spot: it stands there or the order is refused.
+		if err := s.CanPlace(c.Side, def, x, y); err != nil {
+			return nil, err
+		}
+		if !s.clear(x, y, def.Footprint) {
+			return nil, ErrNoRoom
+		}
 	case pl.Base != "":
 		d := compass[pl.Base]
 		x, y = x+d[0]*200, y+d[1]*200
@@ -606,6 +614,12 @@ func (s *Sim) buildFence(c Command, kind string, def *shared.Structure) (*Struct
 	default:
 		dx, dy := s.towardEnemy(c.Side, pl.X, pl.Y)
 		cx, cy := pl.X+dx*110, pl.Y+dy*110
+		if pl.Exact {
+			cx, cy = pl.X, pl.Y // the run is centred on the chosen spot, facing the enemy
+			if err := s.canPlaceWork(c.Side, 2, cx, cy); err != nil {
+				return nil, err
+			}
+		}
 		ax, ay, bx, by = cx-dy*length/2, cy+dx*length/2, cx+dy*length/2, cy-dx*length/2
 	}
 	if !s.ownGround(c.Side, (ax+bx)/2, (ay+by)/2) {
