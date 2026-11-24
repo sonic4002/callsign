@@ -323,7 +323,7 @@ test("placing a structure, a production line, a cancel and a rally point, end to
   const ask = async (text, answer) => {
     const mark = hammer.frames.length;
     hammer.say(text);
-    const heard = await since(`Anvil answering "${text}"`, mark, (f) => f.type === "radio" && f.message.from.en === "Anvil");
+    const heard = await since(`Anvil answering "${text}"`, mark, (f) => f.type === "radio" && f.message.from.en === "Anvil" && !f.message.cue); // a base cue is not an answer
     if (answer) assert.equal(heard.message.text, answer, text);
     return { mark, text: heard.message.text };
   };
