@@ -290,3 +290,64 @@ func onABridge(s *sim.Sim, x, y float64) bool {
 	}
 	return false
 }
+
+// A squad ordered to attack a bridge shoots it from the bank: when the bridge goes down,
+// nobody who was told to bring it down goes down with it.
+func TestASquadAttackingABridgeStandsOnTheBank(t *testing.T) {
+	for _, from := range [][2]float64{{1080, 760}, {560, 760}, {800, 760}} {
+		s := newSim(t, 1)
+		rpg := buyFielded(t, s, 1, "rpgTeam")
+		place(rpg, from[0], from[1])
+		must(t, s, sim.Command{Side: 1, Kind: sim.CmdAttack, Squad: rpg.ID, Place: "bridge-south"})
+		b := bridge(s, "bridge-south")
+		full := 0
+		for i := range rpg.Teams {
+			full += rpg.Teams[i].Members
+		}
+		for i := 0; i < 1500 && b.Standing; i++ {
+			s.Step()
+			if i < 150 {
+				continue // a squad that started on the deck has had time to walk off it
+			}
+			for j := range rpg.Teams {
+				if tm := &rpg.Teams[j]; tm.Members > 0 && onSouthBridge(tm.X, tm.Y) {
+					t.Fatalf("from (%.0f, %.0f): a fireteam shoots the bridge from its deck, at (%.0f, %.0f)", from[0], from[1], tm.X, tm.Y)
+				}
+			}
+		}
+		if b.Standing {
+			t.Fatalf("from (%.0f, %.0f): the bridge still stands, at %.0f%%", from[0], from[1], 100*b.Share())
+		}
+		left := 0
+		for i := range rpg.Teams {
+			left += rpg.Teams[i].Members
+		}
+		if left != full {
+			t.Fatalf("from (%.0f, %.0f): %d of %d went down with the bridge they were shooting", from[0], from[1], full-left, full)
+		}
+	}
+}
+
+// "Hold 150 metres north of Delta" names the ground. The bunker that stands there is not
+// what was asked for, and the squad stays outside; told to hold Delta, it takes the cover.
+func TestASquadHoldingNamedGroundStaysOutOfTheBuildingBesideIt(t *testing.T) {
+	inside := func(place string) int {
+		s := newSim(t, 1)
+		sq := s.Squads[0]
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: sq.ID, Place: place})
+		run(s, 60)
+		n := 0
+		for i := range sq.Teams {
+			if sq.Teams[i].In != "" {
+				n++
+			}
+		}
+		return n
+	}
+	if n := inside("N of D 60"); n != 0 {
+		t.Fatalf("%d fireteams went inside a building when the order named the ground beside it", n)
+	}
+	if n := inside("D-bunker-1"); n == 0 {
+		t.Fatal("a squad sent to the bunker by name stays outside it")
+	}
+}

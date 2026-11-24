@@ -163,7 +163,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	// the team shoots at it, whoever else is about.
 	var obj *objRef
 	if order == OrderAttack && u.Against("structure") > 0 {
-		if i := sq.Order.bridge; i > 0 && s.Bridges[i-1].Standing {
+		// Nobody shoots a bridge from its own deck: a team on it walks off to the bank first.
+		if i := sq.Order.bridge; i > 0 && s.Bridges[i-1].Standing && s.bridgeAt(t.X, t.Y) != &s.Bridges[i-1] {
 			if d := s.Bridges[i-1].distTo(t.X, t.Y); d <= u.Range && d >= u.MinRange {
 				obj = &objRef{bridge: i}
 			}
@@ -196,6 +197,11 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 			}
 		}
 		destX, destY = s.clamp(u.Domain, destX, destY)
+		// A team sent to shoot or mend a bridge keeps off its deck: a slot that falls on it
+		// gives way to the spot on the bank the order chose.
+		if i := sq.Order.bridge; i > 0 && (order == OrderAttack || order == OrderRepair) && s.bridgeAt(destX, destY) == &s.Bridges[i-1] {
+			destX, destY = sq.Order.X, sq.Order.Y
+		}
 	}
 	if t.In != "" {
 		_, in := s.landmarkByID(t.In)

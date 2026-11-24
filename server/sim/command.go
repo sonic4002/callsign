@@ -180,6 +180,7 @@ func (s *Sim) order(c Command) (*Squad, error) {
 		if pl.Kind == PlacePoint {
 			o.Point = pl.ID
 		}
+		o.ground = pl.Kind == PlaceOffset
 	case c.Kind == CmdRepair:
 		return nil, ErrNotBridge
 	case c.Kind == CmdHold:

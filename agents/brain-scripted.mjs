@@ -34,6 +34,14 @@ const eventLines = {
 const radio = (to, body, end) => ({ name: "radio", input: { to, body, end } });
 // placeName is what a landmark or bridge is called on the radio.
 const placeName = (rules, id, lang) => [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id)?.name[lang] ?? id;
+// structureName is what a structure is called on the radio: a tech building by its own
+// name on the map, any other by its kind's.
+function structureName(rules, status, id, lang) {
+  const st = id && (status?.structures ?? []).find((s) => s.id === id);
+  if (!st) return "";
+  const site = (rules.map.techBuildings ?? []).find((t) => t.id === st.site);
+  return site?.name?.[lang] ?? rules.techBuildings?.[st.kind]?.name[lang] ?? rules.factions[st.faction]?.structures[st.kind]?.name[lang] ?? "";
+}
 const verbOf = (text) => verbs.find(([, re]) => re.test(text.toLowerCase()))?.[0];
 
 function leaderPlan({ agent, wake, rules }) {
@@ -42,9 +50,10 @@ function leaderPlan({ agent, wake, rules }) {
     const e = wake.items.find((i) => i.kind === "event")?.event;
     const line = e && eventLines[e.kind]?.[agent.lang];
     if (!line) return [];
-    if (e.place) return [radio([agent.commander ?? "Hammer"], line(placeName(rules, e.place, agent.lang)), "over")];
-    const point = rules.map.points.find((p) => p.id === e.point);
-    return [radio([agent.commander ?? "Hammer"], line(point.callsign[agent.lang]), "over")];
+    // Where it is, by the name of the thing it was sent to: a landmark, a bridge, a
+    // structure or a tech building; the nearest point only when it was sent to none.
+    const where = (e.place && placeName(rules, e.place, agent.lang)) || structureName(rules, wake.status, e.structure, agent.lang) || rules.map.points.find((p) => p.id === e.point).callsign[agent.lang];
+    return [radio([agent.commander ?? "Hammer"], line(where), "over")];
   }
   if (call.from.key !== "player" && call.from.key !== "operator") return []; // squads do not order squads
   const lang = call.lang;

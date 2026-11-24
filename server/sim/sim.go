@@ -97,6 +97,9 @@ type Order struct {
 	Structure int
 	work      int // ticks an engineer squad has spent on its capture
 
+	// ground marks an order to a spot given by its distance from a point: the squad
+	// stands on that ground, and does not go into a building that happens to be near it.
+	ground   bool
 	landmark int // index+1 of the landmark named, 0 for none
 	bridge   int // index+1 of the bridge named, 0 for none
 }
@@ -858,7 +861,16 @@ func (s *Sim) squadEvents(live []*teamRef) {
 		}
 		if arrived && alive > 0 && sq.Order.Contact == 0 {
 			sq.Order.arrived = true
-			s.emit(Event{Side: sq.Side, Kind: EvArrived, Squad: sq.ID, Point: s.nearestPoint(cx, cy)})
+			// Where it was sent goes with the news: a landmark or a bridge by its id, a
+			// structure by its own. A squad at the clinic says so, not "at Delta".
+			e := Event{Side: sq.Side, Kind: EvArrived, Squad: sq.ID, Point: s.nearestPoint(cx, cy)}
+			if sq.Order.landmark > 0 || sq.Order.bridge > 0 {
+				e.Place = sq.Order.Place
+			}
+			if st := s.structure(sq.Order.Structure); st != nil {
+				e.Structure, e.Unit = "s"+fmt.Sprint(st.ID), st.Kind
+			}
+			s.emit(e)
 		}
 	}
 }

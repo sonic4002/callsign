@@ -347,7 +347,7 @@ function describe(item) {
     case "losses":
       return `Your squad lost a fireteam near ${e.point}; ${e.count} fireteams left.`;
     case "arrived":
-      return `Your squad arrived at ${e.point}.`;
+      return `Your squad arrived at ${item.place ?? (e.structure ? `the ${e.unit} (${e.structure}) near ${e.point}` : e.point)}.`;
     case "squad_lost":
       return `${who} was destroyed near ${e.point}.`;
     case "point_lost":

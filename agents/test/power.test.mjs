@@ -140,3 +140,14 @@ test("the tools, the status and the prompts carry power, the radar, selling and 
   assert.match(eventLine({ kind: "low_power", count: 15 }), /short of power by 15/);
   assert.match(eventLine({ kind: "repair_stopped", unit: "barracks", structure: "s2", point: "A" }), /no gold left/);
 });
+
+test("a scripted squad says where it is by the thing it was sent to, not by the nearest point", async () => {
+  const leader = { role: "squad", side: 0, squad: 1, tier: 1, station: { key: "squad-1", en: "Viper 1", he: "צפע 1" }, lang: "en", commander: "Hammer" };
+  const site = rules.map.techBuildings[2];
+  const status = { structures: [{ id: "s7", kind: site.kind, faction: "tech", role: "tech", side: -1, site: site.id }] };
+  const arrived = (event, lang = "en") => think({ agent: { ...leader, lang }, wake: { items: [{ kind: "event", event: { kind: "arrived", side: 0, point: "D", ...event } }], status } });
+  assert.deepEqual(await arrived({}), [["radio", { to: ["Hammer"], body: "In position at Delta", end: "over" }]]);
+  assert.deepEqual(await arrived({ place: "D-bunker-1" }), [["radio", { to: ["Hammer"], body: "In position at the bunker north of Delta", end: "over" }]]);
+  assert.deepEqual(await arrived({ structure: "s7", unit: site.kind }), [["radio", { to: ["Hammer"], body: `In position at ${site.name.en}`, end: "over" }]]);
+  assert.deepEqual(await arrived({ structure: "s7", unit: site.kind }, "he"), [["radio", { to: ["Hammer"], body: `בעמדה ב${site.name.he}`, end: "over" }]]);
+});
