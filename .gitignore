@@ -11,3 +11,4 @@ assets/models/
 # Radio voices: lines already spoken by the speech service (tts/server.py).
 assets/voice-cache/
 client/vendor/ort/
+.claude/worktrees/
