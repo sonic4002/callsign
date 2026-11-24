@@ -650,6 +650,26 @@ export function drawBuilding(ctx, kind, color, time) {
   drawn[kind]?.(ctx, color, time);
 }
 
+// landmarkKey is the picture a landmark of a kind wears: one of the kind's variants,
+// chosen by the landmark's id so that it never changes, and its ruin once it has fallen.
+export function landmarkKey(kind, id, fallen = false) {
+  const options = sprites.variants[kind] ?? [kind];
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  const key = options[h % options.length];
+  return fallen ? `${key}_ruin` : key;
+}
+
+// drawLandmark draws one of the map's own things (a house, a bunker, a grove, rocks) from
+// its painted picture. It returns false when there is none, so the caller draws its own.
+export function drawLandmark(ctx, kind, id, fallen = false) {
+  const entry = sprites.landmarks[landmarkKey(kind, id, fallen)];
+  if (!entry?.img) return false;
+  if (kind !== "grove" && kind !== "rocks") shadow(ctx, 26, 11, 0.28);
+  drawSprite(ctx, entry, entry.height ?? 46, 0);
+  return true;
+}
+
 // drawProp draws a flat thing lying on the ground (a patch of gold), `width` screen pixels
 // wide, centred on its own anchor. It returns false when there is no picture for it.
 export function drawProp(ctx, key, width) {

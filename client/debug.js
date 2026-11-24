@@ -1057,6 +1057,12 @@ function renderOverlay() {
 
 // renderChoices words the lobby's map cards and gold choices in the page language.
 function renderChoices() {
+  // The folded-away choices in one line: gold, length, pace, and whether Anvil holds the purse.
+  const gold = chosen("gold") === "other" ? chosen("goldOther") : chosen("gold");
+  const pace = chosen("speed") ?? "normal";
+  const now = [t("lobby.goldNow", { gold: gold ?? "" }), t("lobby.minutes", { minutes: Number(chosen("length") ?? 600) / 60 }), t(`lobby.speed.${pace}`)];
+  if (chosen("purse") === "on") now.push(t("lobby.purseNow"));
+  $("lobby-more-now").textContent = now.join(" · ");
   for (const card of $("lobby-map-cards").children) {
     const map = baseRules?.maps?.[card.dataset.map];
     if (!map) continue;
@@ -1325,6 +1331,14 @@ for (const id of mapIds) {
   card.append(pick, picture, el("strong"), el("small"));
   $("lobby-map-cards").append(card);
 }
+// A bigger map is given more time: picking a map sets the length it is usually played at,
+// and the player may still change it.
+const fitLength = () => {
+  const usualFor = baseRules?.maps?.[chosen("map")]?.lengthSeconds;
+  if (usualFor && [...$("lobby-length").options].some((o) => Number(o.value) === usualFor)) $("lobby-length").value = String(usualFor);
+};
+$("lobby-map-cards").addEventListener("change", fitLength);
+fitLength();
 for (const gold of [...(offer?.golds ?? [baseRules?.match.startGold ?? 1000]), "other"]) {
   const option = el("option");
   option.value = gold;
@@ -1347,7 +1361,7 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // For tests and screenshots: skip the lobby. A commander gets a match against the
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
-  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0 });
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "" });
 } else if (query.has("learn") && role !== "spectator") {
   startLesson(); // ?learn goes straight into the first lesson
 }

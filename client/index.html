@@ -185,23 +185,27 @@
         <legend data-i18n="lobby.map"></legend>
         <div id="lobby-map-cards"></div>
       </fieldset>
-      <label><span data-i18n="lobby.gold"></span>
-        <select name="gold" id="lobby-gold"></select>
-        <input name="goldOther" id="lobby-gold-other" type="number" inputmode="numeric" step="50" dir="ltr" hidden data-i18n-aria="lobby.gold">
-      </label>
-      <label><span data-i18n="lobby.length"></span>
-        <select name="length" id="lobby-length"></select>
-      </label>
-      <label id="lobby-speed-row"><span data-i18n="lobby.speed"></span>
-        <select name="speed" id="lobby-speed">
-          <option value="relaxed" data-i18n="lobby.speed.relaxed"></option>
-          <option value="normal" data-i18n="lobby.speed.normal" selected></option>
-          <option value="fast" data-i18n="lobby.speed.fast"></option>
-        </select>
-        <small id="lobby-speed-about"></small>
-      </label>
-      <label id="lobby-purse"><input type="checkbox" name="purse"> <span data-i18n="lobby.purse"></span></label>
-      <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
+      <!-- The less often changed choices fold away, with what they are set to in one line. -->
+      <details id="lobby-more">
+        <summary><span data-i18n="lobby.more"></span> <small id="lobby-more-now"></small></summary>
+        <label><span data-i18n="lobby.gold"></span>
+          <select name="gold" id="lobby-gold"></select>
+          <input name="goldOther" id="lobby-gold-other" type="number" inputmode="numeric" step="50" dir="ltr" hidden data-i18n-aria="lobby.gold">
+        </label>
+        <label><span data-i18n="lobby.length"></span>
+          <select name="length" id="lobby-length"></select>
+        </label>
+        <label id="lobby-speed-row"><span data-i18n="lobby.speed"></span>
+          <select name="speed" id="lobby-speed">
+            <option value="relaxed" data-i18n="lobby.speed.relaxed"></option>
+            <option value="normal" data-i18n="lobby.speed.normal" selected></option>
+            <option value="fast" data-i18n="lobby.speed.fast"></option>
+          </select>
+          <small id="lobby-speed-about"></small>
+        </label>
+        <label id="lobby-purse"><input type="checkbox" name="purse"> <span data-i18n="lobby.purse"></span></label>
+        <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
+      </details>
       <fieldset id="lobby-host" hidden>
         <legend data-i18n="lobby.hostKey"></legend>
         <p data-i18n="lobby.hostAbout"></p>
@@ -279,6 +283,10 @@
         <li><span data-i18n="help.hold"></span><code dir="auto" data-i18n="help.hold.say"></code></li>
         <li><span data-i18n="help.move"></span><code dir="auto" data-i18n="help.move.say"></code></li>
         <li><span data-i18n="help.fallBack"></span><code dir="auto" data-i18n="help.fallBack.say"></code></li>
+        <li><span data-i18n="help.place"></span><code dir="auto" data-i18n="help.place.say"></code></li>
+        <li><span data-i18n="help.inside"></span><code dir="auto" data-i18n="help.inside.say"></code></li>
+        <li><span data-i18n="help.repair"></span><code dir="auto" data-i18n="help.repair.say"></code></li>
+        <li><span data-i18n="help.seize"></span><code dir="auto" data-i18n="help.seize.say"></code></li>
         <li><span data-i18n="help.several"></span><code dir="auto" data-i18n="help.several.say"></code></li>
         <li><span data-i18n="help.report"></span><code dir="auto" data-i18n="help.report.say"></code></li>
         <li><span data-i18n="help.all"></span><code dir="auto" data-i18n="help.all.say"></code></li>

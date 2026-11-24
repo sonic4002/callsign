@@ -13,7 +13,11 @@ const numbers = {
 };
 
 // Ordinary words that sound like a map point but are not one.
-const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "out", "over", "tell", "dig", "fox", "see", "sir", "zero", "brave", "dealt", "דור", "גם", "כל", "סוף", "הגיע", "פסול", "כיתה", "כיתת", "כיתות", "זהב", "את", "אותה", "אותו", "אותם", "to", "it", "cell", "זהב", "שדה", "אחר", "אחרי", "כך"]);
+const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "out", "over", "tell", "dig", "fox", "see", "sir", "zero", "brave", "dealt", "דור", "גם", "כל", "סוף", "הגיע", "פסול", "כיתה", "כיתת", "כיתות", "זהב", "את", "אותה", "אותו", "אותם", "to", "it", "cell", "זהב", "שדה", "אחר", "אחרי", "כך",
+  // The words a place is described with: "the grove north of Foxtrot" is not "the Golf north of Foxtrot".
+  "grove", "trees", "tree", "wood", "woods", "house", "building", "bunker", "ruin", "ruins", "rocks", "rock", "wall", "rubble", "bridge", "field", "cover", "inside", "enemy",
+  "north", "south", "east", "west", "of", "metres", "meters",
+  "חורשה", "עצים", "עץ", "בית", "בניין", "בונקר", "חורבה", "סלעים", "סלע", "חומה", "הריסות", "גשר", "מחסה", "אויב", "צפון", "דרום", "מזרח", "מערב", "צפונית", "דרומית", "מזרחית", "מערבית", "מטר"]);
 
 // sound reduces a word to rough consonant classes, so "vapour" and "viper" come out alike.
 export function sound(word, lang) {

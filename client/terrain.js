@@ -109,7 +109,7 @@ export function paintGround(g, rules, rand, fills = {}) {
     for (let c = 0; c < cols; c++) {
       const k = at(c, r);
       if (k === "L") continue;
-      g.fillStyle = k === "W" && fills.water ? fills.water : terrainColors[k].fill;
+      g.fillStyle = (k === "W" && fills.water) || (k === "I" && fills.ice) || (k === "M" && fills.mountain) || terrainColors[k].fill;
       cellPath(g, cell, c, r);
       g.fill();
       if (k === "I") {

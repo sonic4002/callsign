@@ -24,7 +24,7 @@ const dynamic = {
   "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded", "hauler_attacked", "hauler_lost",
     "structure_started", "structure_built", "structure_attacked", "structure_lost", "structure_lost_theirs", "structure_captured", "structure_taken",
     "garrisoned", "building_fell", "bridge_under_attack", "bridge_fell", "bridge_repaired"],
-  "over.": ["won", "lost", "draw", "hq_destroyed", "timer"],
+  "over.": ["won", "lost", "draw", "hq_destroyed", "timer", "timer_hq", "timer_force"],
   "order.": ["none", "move", "hold", "attack", "repair"],
   "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "build", "buildAt", "attackStructure", "capture", "haul"],
   "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],

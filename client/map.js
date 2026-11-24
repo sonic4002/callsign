@@ -1,7 +1,7 @@
 // The battlefield: terrain baked once, then every frame the points, buildings, fireteams,
 // gunfire and labels, sorted by depth. It draws only what the server sent this side.
 
-import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, sprites } from "./art.js";
+import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawSegment, drawUnit, hasAnimation, sprites } from "./art.js";
 import { drawFence, drawStructure } from "./bases-art.js";
 import { structureAt, structureDef } from "./bases.js";
 import { advance, spreadOut } from "./motion.js";
@@ -277,6 +277,37 @@ export class Scene {
     }
   }
 
+
+  // paintedBridge lays a bridge from the painted deck pieces: whole pieces along a standing
+  // one (darkened when it is close to falling), a broken stub at each bank of a fallen one.
+  // It returns false when there are no pieces for it, and the caller draws the bridge itself.
+  paintedBridge(ctx, b, S, z) {
+    const seg = sprites.segments.bridge;
+    const [ax, ay] = b.from;
+    const [bx, by] = b.to;
+    const axis = Math.abs(by - ay) < 1 ? "x" : Math.abs(bx - ax) < 1 ? "y" : null;
+    if (!seg || !axis) return false;
+    const state = this.bridges.get(b.id);
+    const standing = state ? state.standing : true;
+    const length = Math.hypot(bx - ax, by - ay);
+    // A piece is painted wider than it is long: as many pieces as keep the deck near the bridge's width.
+    const n = Math.max(1, Math.round(length / ((seg.length * b.width) / seg.width)));
+    const piece = length / n;
+    const weak = standing && state && state.hp < (this.rules.bridgeRules?.dangerShare ?? 0.35);
+    for (let i = 0; i < n; i++) {
+      if (!standing && i > 0 && i < n - 1) continue; // the middle of a fallen bridge is water
+      const t = (i + 0.5) / n;
+      const [sx, sy] = S(ax + (bx - ax) * t, ay + (by - ay) * t);
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.scale(z, z);
+      if (weak) ctx.globalAlpha = 0.72;
+      const drawn = drawSegment(ctx, "bridge", axis, piece, standing ? "" : "broken");
+      ctx.restore();
+      if (!drawn) return false;
+    }
+    return true;
+  }
   // smoulder shows how hurt each headquarters is: smoke, then fire, then a burning ruin.
   // The enemy's is shown only while it is in sight; its health is as last seen.
   smoulder(now) {
@@ -366,7 +397,8 @@ export class Scene {
       }
       g.restore();
     }
-    paintGround(g, rules, rand, { water: sprites.terrain.sea ? g.createPattern(sprites.terrain.sea, "repeat") : null });
+    const tile = (name) => (sprites.terrain[name] ? g.createPattern(sprites.terrain[name], "repeat") : null);
+    paintGround(g, rules, rand, { water: tile("sea"), ice: tile("ice"), mountain: tile("mountain") });
     for (const s of scenery(rules, rand)) drawScenery(g, s, ...toIso(s.x, s.y));
 
     this.layer = layer;
@@ -433,8 +465,11 @@ export class Scene {
     // Sprites are drawn larger than true scale so they stay readable, less so when the
     // whole map is squeezed onto a small screen.
     const crowd = Math.max(0.5, Math.min(1, z / 0.3));
-    const unitScale = Math.max(0.95 * crowd, Math.min(2.4, z * 1.9));
-    const buildScale = Math.max(0.62 * crowd, Math.min(2.2, z * 1.55));
+    // One scale for units against everything that stands: a tank is smaller than the works
+    // it came out of and fits the deck of a bridge. Zoomed far out, units stop shrinking
+    // sooner than buildings so that a squad can still be found.
+    const unitScale = Math.max(0.78 * crowd, Math.min(2.0, z * 1.3));
+    const buildScale = Math.max(0.66 * crowd, Math.min(2.5, z * 1.8));
 
     // Move what is on screen toward where the server says it is: it gathers speed, turns
     // through the headings between, and eases to a halt (see motion.js).
@@ -455,7 +490,9 @@ export class Scene {
     this.sfx?.refresh();
 
     // Bridges lie on the water: standing, shot up or fallen, as this side last saw them.
-    for (const b of rules.map.bridges ?? []) drawBridge(ctx, b, S, z, this.bridges.get(b.id), rules.bridgeRules?.dangerShare);
+    for (const b of rules.map.bridges ?? []) {
+      if (!this.paintedBridge(ctx, b, S, z)) drawBridge(ctx, b, S, z, this.bridges.get(b.id), rules.bridgeRules?.dangerShare);
+    }
 
     // Ground markings: capture rings, order lines, team rings.
     const [rx, ry] = groundEllipse(rules.match.captureRadius);
@@ -577,7 +614,9 @@ export class Scene {
         x: l.x,
         y: l.y,
         scale: buildScale,
-        draw: () => (sprites.buildings[kind] ? drawBuilding(ctx, kind, sideColor[-1], time) : (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time)),
+        // The painted picture of that very landmark (a house keeps its look for the match,
+        // and falls into its own ruin), or the code-drawn stand-in.
+        draw: () => drawLandmark(ctx, l.kind, l.id, kind === "rubble" && l.kind !== "rubble") || (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time),
       });
     }
     for (const group of this.groups.values()) {

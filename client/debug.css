@@ -371,3 +371,9 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #lobby-seats li.bot { border-inline-start-color: #8b959b; }
 #lobby-seats .status::before { content: "● "; }
 #orders button[hidden] { display: none; }
+#lobby-more { margin-block: .5rem; text-align: start; }
+#lobby-more summary { cursor: pointer; color: var(--brass); font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; }
+#lobby-more summary small { color: var(--muted); text-transform: none; letter-spacing: 0; }
+#lobby-more[open] summary { margin-block-end: .4rem; }
+/* The squad list keeps room for four squads and scrolls in itself; the build panel never squeezes it out. */
+.panel.grow { flex: 1 1 13rem; min-block-size: 13rem; overflow-y: auto; }
