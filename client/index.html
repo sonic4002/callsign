@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest" id="manifest">
 <link rel="stylesheet" href="debug.css">
+<link rel="stylesheet" href="brains/monitor.css">
 <link rel="stylesheet" href="mobile.css">
 <link rel="stylesheet" href="tutorial.css">
 </head>
@@ -48,6 +49,7 @@
           <button type="button" data-order="move" data-i18n="act.move"></button>
           <button type="button" data-order="attack" data-i18n="act.attack"></button>
           <button type="button" data-order="cover" data-i18n="act.cover" hidden></button>
+          <button type="button" data-order="capture" data-i18n="act.capture" hidden></button>
         </div>
       </div>
     </div>
@@ -106,6 +108,12 @@
       <ul id="haulers" hidden></ul>
     </section>
 
+    <!-- The side's AI agents at a glance; the whole view opens from here or from "AI". -->
+    <section id="monitor-panel" class="panel" hidden>
+      <h2 data-i18n="monitor.title"></h2>
+      <ul id="monitor-strip" data-i18n-aria="monitor.open"></ul>
+    </section>
+
     <section class="panel" data-sheet="build">
       <!-- One panel, two tabs: what to build with, and what to buy with it. -->
       <div class="tabs" id="build-tabs" role="tablist">
@@ -150,7 +158,7 @@
 </nav>
 <p id="no-server" role="status" data-i18n="noServer"></p>
 
-<div id="overlay">
+<div id="overlay" class="booting">
   <div class="card">
     <h1 id="overlay-title"></h1>
     <p id="overlay-line"></p>
@@ -188,9 +196,9 @@
       <!-- The less often changed choices fold away, with what they are set to in one line. -->
       <details id="lobby-more">
         <summary><span data-i18n="lobby.more"></span> <small id="lobby-more-now"></small></summary>
-        <label><span data-i18n="lobby.gold"></span>
-          <select name="gold" id="lobby-gold"></select>
-          <input name="goldOther" id="lobby-gold-other" type="number" inputmode="numeric" step="50" dir="ltr" hidden data-i18n-aria="lobby.gold">
+        <label id="lobby-gold-row"><span data-i18n="lobby.startGold"></span>
+          <select id="lobby-gold"></select>
+          <input id="lobby-gold-other" type="number" inputmode="numeric" dir="ltr" hidden data-i18n-aria="lobby.startGold">
         </label>
         <label><span data-i18n="lobby.length"></span>
           <select name="length" id="lobby-length"></select>
@@ -227,6 +235,7 @@
       <p id="lobby-status"></p>
       <p id="lobby-note"></p>
     </section>
+    <p id="lobby-voice" aria-live="polite" hidden></p>
     <p id="lobby-error" role="alert" hidden></p>
     <div class="row">
       <button type="button" class="primary" id="start"></button>
@@ -315,6 +324,16 @@
 <dialog id="brains">
   <form method="dialog">
     <h1 data-i18n="brains.title"></h1>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-brains-tab="live" data-i18n="monitor.tab.live"></button>
+      <button type="button" role="tab" data-brains-tab="key" data-i18n="monitor.tab.key"></button>
+    </div>
+    <section data-brains-pane="live">
+      <p id="monitor-side"></p>
+      <ul id="monitor-list"></ul>
+      <p class="fine" data-i18n="monitor.about"></p>
+    </section>
+    <section data-brains-pane="key" hidden>
     <p id="brains-status" aria-live="polite"></p>
     <fieldset>
       <legend data-i18n="brains.key"></legend>
@@ -340,10 +359,27 @@
     <label class="check"><input type="checkbox" id="brains-demo"> <span data-i18n="brains.demoChoice"></span></label>
     <h2 data-i18n="brains.usage"></h2>
     <p id="brains-usage"></p>
+    </section>
     <div class="row"><button type="submit" data-i18n="brains.close"></button></div>
   </form>
 </dialog>
 <script type="module" src="mobile.js"></script>
+<script>
+  // Self-repair. If the start screen has not come up after a while (its button is still
+  // absent or disabled), the files kept on this device are probably a mix of versions:
+  // drop them and load the page once more, straight from the server.
+  setTimeout(async function () {
+    var start = document.getElementById("start");
+    var stuck = document.getElementById("overlay").classList.contains("booting") || (start && start.disabled);
+    if (!stuck || !navigator.onLine || sessionStorage.getItem("callsign.repair")) return;
+    sessionStorage.setItem("callsign.repair", "1");
+    try {
+      if (navigator.serviceWorker) for (var reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();
+      if (window.caches) for (var name of await caches.keys()) await caches.delete(name);
+    } catch (e) {}
+    location.reload();
+  }, 20000);
+</script>
 <script type="module" src="debug.js"></script>
 </body>
 </html>

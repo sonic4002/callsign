@@ -29,18 +29,32 @@ export class Voice {
       else if (data.type === "ready") {
         this.ready.add(data.lang);
         if (this.pending.size > 0) this.onState("working");
+        else if (!this.recorder && !this.held) this.onState("idle"); // fetched ahead of need
+        this.preparing = false;
       }
       else if (data.type === "result") this.pending.get(data.id)?.resolve(data.text);
       else if (data.type === "missing" || data.type === "error") {
         const err = Object.assign(new Error(data.message ?? "missing"), { state: data.type === "missing" ? "missing" : "failed" });
         if (data.id) this.pending.get(data.id)?.reject(err);
+        else if (this.preparing) this.onState("idle"); // fetching ahead failed quietly; the mic will say why
         else if (!this.recorder) this.onState(err.state, { message: err.message });
+        this.preparing = false;
       }
     });
     this.worker.addEventListener("error", (ev) => {
       for (const p of this.pending.values()) p.reject(Object.assign(new Error(ev.message), { state: "failed" }));
     });
     return this.worker;
+  }
+
+  // prepare fetches the model for `lang` ahead of need (in the lobby, before the match),
+  // so the first press of the talk button does not wait for a download. It asks for no
+  // microphone and says nothing when it cannot be done here.
+  prepare(lang) {
+    if (globalThis.isSecureContext === false || !this.supported || this.ready.has(lang) || this.held) return;
+    if (navigator.connection?.saveData) return; // the player asked their browser to save data
+    this.preparing = true;
+    this.#worker().postMessage({ type: "load", lang });
   }
 
   // start begins recording; the model for `lang` starts loading at the same moment.

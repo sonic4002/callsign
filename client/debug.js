@@ -3,6 +3,7 @@
 // it writes a radio call, in the page language, and the server routes it like any other.
 // Nerve shows in what the troops do; the "show nerve" switch is a debugging aid.
 
+import { Agents, mountMonitor } from "./brains/monitor.js";
 import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { wantedStructure } from "/agents/bases.mjs";
@@ -50,13 +51,28 @@ function t(key, vars = {}) {
   return text.replace(/\{(\w+)\}/g, (_, name) => vars[name]);
 }
 
-function applyLanguage() {
+// labels writes every fixed text of the page in the current language.
+function labels() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "he" ? "rtl" : "ltr";
   document.title = t("title");
   for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
   for (const node of document.querySelectorAll("[data-i18n-placeholder]")) node.placeholder = t(node.dataset.i18nPlaceholder);
   for (const node of document.querySelectorAll("[data-i18n-aria]")) node.setAttribute("aria-label", t(node.dataset.i18nAria));
+}
+
+// The start screen says what it is at once, while the pictures and the music list are
+// still on their way: on a slow connection that takes a while, and a screen of blank
+// buttons looks broken.
+labels();
+$("overlay").classList.remove("booting");
+$("overlay-title").textContent = t("title");
+$("overlay-line").textContent = t("loading");
+$("start").textContent = t("loading");
+$("start").disabled = true;
+
+function applyLanguage() {
+  labels();
   syncInputDirection();
   renderVoice();
   renderLog();
@@ -64,6 +80,7 @@ function applyLanguage() {
   renderSidebar();
   renderOverlay();
   brains.render();
+  monitor.sync(true);
   renderTrack();
   coach.render();
 }
@@ -79,6 +96,7 @@ function switchLanguage() {
   lang = lang === "he" ? "en" : "he";
   localStorage.setItem("callsign.lang", lang);
   applyLanguage();
+  voice.prepare(lang); // the other language has its own speech model
 }
 $("lang").addEventListener("click", switchLanguage);
 $("overlay-lang").addEventListener("click", switchLanguage);
@@ -105,7 +123,16 @@ scene.onFinale = () => renderOverlay();
 scene.sfx = new Sfx({ level: () => (music.muted ? 0 : music.volume) }); // guns and blasts follow the music's volume and mute
 const speech = new Speech({ volume: () => 0.6 + 0.4 * music.volume, duck: (on) => (music.duck(on), scene.sfx.duck(on)) });
 speech.bind($("speak"));
-await loadSprites();
+// What the page says by itself when the game goes away, kept ready while the server is there.
+speech.keep({ lost: { en: strings.en.declareLost, he: strings.he.declareLost } });
+let wasOnline = false; // the connection was up, so its loss is news
+let lostBefore = false;
+// The pictures arrive in their own time: the start screen does not wait for them, and the
+// map draws its plain stand-ins until they are here.
+loadSprites().then(() => {
+  drawn.roster = drawn.build = "";
+  if (rules) renderSidebar();
+});
 
 const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[lang] ?? id;
 // placeName is what an order's place is called: a landmark or bridge by its name, a spot
@@ -137,6 +164,29 @@ const brains = mountAgents({
   canAct: () => role === "hammer",
 });
 
+// The live view of this side's agents: model, context and state of each (brains/monitor.js).
+const watched = new Agents();
+const monitor = mountMonitor({
+  agents: watched,
+  list: $("monitor-list"),
+  strip: $("monitor-strip"),
+  side: $("monitor-side"),
+  t,
+  lang: () => lang,
+  tierName: (tier) => tierName(tier),
+  // Who should have an agent: the operator, and a leader for every squad of ours.
+  stations: () =>
+    !rules || !state || !me
+      ? []
+      : [{ squad: 0, callsign: rules.callsigns.operator, tier: 0 }, ...state.squads.filter((sq) => sq.side === side && sq.alive > 0).map((sq) => ({ squad: sq.id, callsign: sq.callsign, tier: sq.tier }))],
+  onOpen: () => brains.open("live"),
+});
+// A squad whose leader is thinking shows it in the roster.
+function markThinking() {
+  const busy = watched.thinking();
+  for (const li of $("roster").children) li.classList.toggle("thinking", busy.has(Number(li.dataset.squad)));
+}
+
 // The first lesson's coach (tutorial.js). It reads the match the way the player sees it.
 let enemyDown = false; // an enemy squad has been destroyed in this match
 const coach = new Coach({
@@ -155,10 +205,19 @@ function connect() {
   if (seat) params.set("token", seat.token);
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?${params}`);
   ws.addEventListener("message", (ev) => onFrame(JSON.parse(ev.data)));
-  ws.addEventListener("open", () => document.body.classList.remove("no-server"));
+  ws.addEventListener("open", () => {
+    document.body.classList.remove("no-server");
+    if (lostBefore && !wasOnline) system("reconnected");
+    wasOnline = true;
+    lostBefore = true;
+  });
   ws.addEventListener("close", (ev) => {
     if (ev.code === 1008) return turnedAway(ev.reason); // refused: knocking again will not help
     document.body.classList.add("no-server"); // the page says so until the server is back
+    // Radio still waiting to be spoken is about a net that is gone: drop it, and say so.
+    if (wasOnline) speech.declare("lost", lang);
+    else speech.silence();
+    wasOnline = false;
     system("disconnected", {}, "warn");
     setTimeout(connect, 1000);
   });
@@ -199,6 +258,8 @@ function onFrame(frame) {
       upgrading.clear();
       promoted.clear();
       system(me ? "matchStarted" : "spectating", { faction });
+      watched.hello(frame.agents);
+      monitor.sync();
       brains.agents.newMatch(frame.match);
       brains.agents.sync(); // the seat may be a new one: a match just made or joined
       scene.setRules(rules);
@@ -208,6 +269,11 @@ function onFrame(frame) {
       enemyDown = false;
       coach.enter(room, lobby?.tutorial);
       break;
+    case "telemetry":
+      // What one of this side's agents says about itself (client/brains/monitor.js).
+      monitor.update(watched.frame(frame));
+      markThinking();
+      return;
     case "state":
       state = frame.state;
       scene.setState(state);
@@ -459,6 +525,22 @@ function sendBox(spoken = false) {
   draft("");
 }
 
+// order transmits a call the page wrote itself (a squad, a place and an action picked on
+// the map; an upgrade button) at once, without passing through the box. It is kept with
+// the sent calls, so Up brings it back to change and send again.
+function order(text) {
+  if (!transmit(text)) return;
+  if (sent.at(-1) !== text) sent.push(text);
+  recall = sent.length;
+  // The opening that picking the squad put in the box has been said: take it out again,
+  // unless the player has typed on from it.
+  if ($("text").value === opening) {
+    $("text").value = "";
+    syncInputDirection();
+  }
+}
+let opening = ""; // the start of a call that picking a squad wrote into the box
+
 $("send").addEventListener("submit", (ev) => {
   ev.preventDefault();
   sendBox();
@@ -490,6 +572,10 @@ const voice = new Voice({
 });
 
 function renderVoice() {
+  // In the lobby the speech model is fetched ahead of the match; its progress shows there.
+  const fetching = voiceState === "loading";
+  $("lobby-voice").hidden = !fetching && !voice.ready.has(lang);
+  $("lobby-voice").textContent = fetching ? t("voice.loading", voiceDetail) : voice.ready.has(lang) ? t("voiceReady") : "";
   const status = $("voice-status");
   status.hidden = voiceState === "idle";
   status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
@@ -505,6 +591,7 @@ function talk() {
     wasMuted = music.muted; // the music would be heard as speech
     music.setMuted(true);
   }
+  speech.key(true); // keyed up: the set cannot receive
   voice.start(lang);
 }
 
@@ -517,6 +604,7 @@ function callsigns(spoke) {
 }
 
 async function talkEnd() {
+  speech.key(false);
   if (wasMuted !== null) music.setMuted(wasMuted);
   wasMuted = null;
   if (!voice.held) return;
@@ -600,6 +688,8 @@ function renderSidebar() {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
     $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
+    monitor.sync();
+    markThinking();
   }
   // The faction's own units, and any a captured structure lets this side build.
   const units = [...Object.entries(rules.factions[faction]?.units ?? {}), ...(state.foreignUnits ?? []).map((id) => [id, unitDef(rules, id)])];
@@ -696,6 +786,7 @@ function orderText(sq) {
 function rosterRow(sq, canAct) {
   const unit = unitDef(rules, sq.unit);
   const li = el("li", sq.id === scene.selected ? "selected" : "");
+  li.dataset.squad = sq.id;
   const name = el("span", "name", sq.callsign[lang]);
   name.append(el("span", "unit", unit.name[lang]));
   const pips = el("span", "pips");
@@ -713,7 +804,7 @@ function rosterRow(sq, canAct) {
     up.title = up.getAttribute("aria-label");
     up.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      draft(call("upgrade", { to: anvil(), squad: sq.callsign[lang] }));
+      order(call("upgrade", { to: anvil(), squad: sq.callsign[lang] }));
     });
     tier.append(up);
     if (asked) tier.append(el("small", "asked", t("upgradeAsked")));
@@ -876,7 +967,10 @@ function select(sq) {
   drawn.roster = "";
   renderSidebar();
   hideOrders();
-  if (me) draft(t("callPrefix", { to: sq.callsign[lang], from: me[lang] }));
+  if (me) {
+    opening = t("callPrefix", { to: sq.callsign[lang], from: me[lang] });
+    draft(opening);
+  }
   coach.update();
 }
 
@@ -935,15 +1029,19 @@ function mapClick(ev) {
   if (hit.contact) {
     const name = scene.contactName(hit.contact, lang);
     const mine = state.squads.find((sq) => sq.id === scene.selected);
-    return draft(mine ? call("attack", { to: mine.callsign[lang], point: name }) : $("text").value + name);
+    if (!mine) return draft($("text").value + name);
+    // With a squad picked, an enemy offers one action: attack it.
+    return offerOrders(mine, name, ["attack"], () => call("attack", { to: mine.callsign[lang], point: name }), box, sx, sy);
   }
   if (hit.structure) {
     // An enemy structure: engineers are sent to take it over, anyone else to attack it.
     const st = hit.structure;
     const mine = state.squads.find((sq) => sq.id === scene.selected);
     if (st.side === side || !mine) return draft($("text").value + structureName(st));
-    const kind = unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? "capture" : "attackStructure";
-    return draft(call(kind, { to: mine.callsign[lang], structure: structureName(st) }));
+    // Engineers may take it over; anyone may attack it. The action pressed is sent at once.
+    const actions = unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"];
+    const say = (action) => call(action === "capture" ? "capture" : "attackStructure", { to: mine.callsign[lang], structure: structureName(st) });
+    return offerOrders(mine, structureName(st), actions, say, box, sx, sy);
   }
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (hit.gusher && !hit.landmark && !hit.bridge) {
@@ -960,11 +1058,19 @@ function mapClick(ev) {
   const name = kind === "point" ? place.callsign[lang] : place.name[lang];
   if (kind !== "point") scene.showName(place.id);
   if (!squad) return draft($("text").value + name);
+  const said = kind === "point" ? name : placeName(place.id);
+  offerOrders(squad, name, ordersFor(kind), (action) => call(action, { to: squad.callsign[lang], point: said }), box, sx, sy);
+}
+
+// offerOrders opens the small menu of actions for a squad and a place, an enemy or a
+// structure. `say(action)` writes the call for the action pressed, and pressing one
+// transmits it at once.
+let orderCall = null;
+function offerOrders(squad, placeName, actions, say, box, sx, sy) {
   const menu = $("orders");
-  menu.dataset.point = place.id;
-  menu.dataset.kind = kind;
-  for (const button of menu.querySelectorAll("button")) button.hidden = !ordersFor(kind).includes(button.dataset.order);
-  $("orders-title").textContent = `${squad.callsign[lang]} → ${name}`;
+  orderCall = say;
+  $("orders-title").textContent = `${squad.callsign[lang]} → ${placeName}`;
+  for (const button of menu.querySelectorAll("button")) button.hidden = !actions.includes(button.dataset.order);
   menu.style.left = `${Math.max(90, Math.min(box.width - 90, sx))}px`;
   menu.style.top = `${Math.min(box.height - 90, sy)}px`;
   menu.hidden = false;
@@ -977,10 +1083,9 @@ function hideOrders() {
 for (const button of document.querySelectorAll("#orders button")) {
   button.addEventListener("click", () => {
     const squad = state.squads.find((sq) => sq.id === scene.selected);
-    const id = $("orders").dataset.point;
-    const known = $("orders").dataset.kind === "point" ? rules.map.points.some((p) => p.id === id) : [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].some((p) => p.id === id);
+    const say = orderCall;
     hideOrders();
-    if (squad && known) draft(call(button.dataset.order, { to: squad.callsign[lang], point: placeName(id) }));
+    if (squad && say) order(say(button.dataset.order));
   });
 }
 
@@ -1058,7 +1163,7 @@ function renderOverlay() {
 // renderChoices words the lobby's map cards and gold choices in the page language.
 function renderChoices() {
   // The folded-away choices in one line: gold, length, pace, and whether Anvil holds the purse.
-  const gold = chosen("gold") === "other" ? chosen("goldOther") : chosen("gold");
+  const gold = $("lobby-gold").value === "other" ? $("lobby-gold-other").value : $("lobby-gold").value;
   const pace = chosen("speed") ?? "normal";
   const now = [t("lobby.goldNow", { gold: gold ?? "" }), t("lobby.minutes", { minutes: Number(chosen("length") ?? 600) / 60 }), t(`lobby.speed.${pace}`)];
   if (chosen("purse") === "on") now.push(t("lobby.purseNow"));
@@ -1069,8 +1174,6 @@ function renderChoices() {
     card.querySelector("strong").textContent = map.name[lang];
     card.querySelector("small").textContent = t("lobby.mapSize", { width: map.width, height: map.height, points: map.points.length });
   }
-  for (const option of $("lobby-gold").options) option.textContent = option.value === "other" ? t("lobby.goldOther") : option.value;
-  $("lobby-gold-other").hidden = chosen("gold") !== "other";
 }
 
 // renderSeats shows a match between two people while it waits: its code, the link to
@@ -1206,7 +1309,7 @@ $("start").addEventListener("click", () => {
     return makeMatch({
       opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"),
       speed: chosen("speed"), purse: chosen("purse") === "on",
-      map: chosen("map") ?? "", startGold: startGold(chosen("gold"), chosen("goldOther"), { min: offer?.minGold, max: offer?.maxGold }),
+      map: chosen("map") ?? "", startGold: chosenGold(),
     });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
@@ -1301,6 +1404,39 @@ requestAnimationFrame(frame);
 
 // What the lobby can offer, and the match lengths to choose from.
 offer = await serverInfo().catch(() => null);
+// Starting gold: the server's amounts, or one the player types, kept for next time.
+const golds = offer?.startGolds ?? [];
+const [goldMin, goldMax] = offer?.goldLimits ?? [400, 20000];
+$("lobby-gold-row").hidden = golds.length === 0; // an older server has one amount only
+for (const amount of golds) {
+  const option = el("option");
+  option.value = String(amount);
+  option.textContent = amount.toLocaleString("en-US");
+  $("lobby-gold").append(option);
+}
+{
+  const other = el("option");
+  other.value = "other";
+  other.dataset.i18n = "lobby.goldOther";
+  other.textContent = t("lobby.goldOther");
+  $("lobby-gold").append(other);
+  const kept = Number(localStorage.getItem("callsign.startGold")) || offer?.startGold || golds[0];
+  $("lobby-gold").value = golds.includes(kept) ? String(kept) : "other";
+  $("lobby-gold-other").value = String(kept);
+  $("lobby-gold-other").min = String(goldMin);
+  $("lobby-gold-other").max = String(goldMax);
+  $("lobby-gold-other").step = "50";
+  const show = () => ($("lobby-gold-other").hidden = $("lobby-gold").value !== "other");
+  $("lobby-gold").addEventListener("change", show);
+  show();
+}
+// chosenGold is the amount chosen, held inside what the server takes; 0 leaves it to the server.
+function chosenGold() {
+  const gold = startGold($("lobby-gold").value, $("lobby-gold-other").value, { min: goldMin, max: goldMax });
+  if (gold) localStorage.setItem("callsign.startGold", String(gold));
+  return gold;
+}
+
 // Only the host makes matches on a locked server; a browser that has done so once is remembered.
 $("lobby-host").hidden = !offer?.locked || Boolean(localStorage.getItem("callsign.hostkey"));
 const usual = offer?.length ?? baseRules?.match.lengthSeconds ?? 600;
@@ -1339,13 +1475,6 @@ const fitLength = () => {
 };
 $("lobby-map-cards").addEventListener("change", fitLength);
 fitLength();
-for (const gold of [...(offer?.golds ?? [baseRules?.match.startGold ?? 1000]), "other"]) {
-  const option = el("option");
-  option.value = gold;
-  option.selected = gold === (offer?.gold ?? baseRules?.match.startGold);
-  $("lobby-gold").append(option);
-}
-Object.assign($("lobby-gold-other"), { min: offer?.minGold ?? 400, max: offer?.maxGold ?? 20000, value: 1500 });
 // The level the player chose last time, or the server's usual one.
 const levels = offer?.levels ?? ["easy", "normal", "standard"];
 $("lobby-level").value = [localStorage.getItem("callsign.level"), offer?.level, "easy"].find((level) => levels.includes(level));
@@ -1366,6 +1495,9 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   startLesson(); // ?learn goes straight into the first lesson
 }
 renderOverlay();
+// The speech model for the page's language is fetched now, in the lobby, so the talk
+// button answers at once when the match starts.
+voice.prepare(lang);
 
 // For debugging from the console.
 window.callsign = { scene, music, sideColor };

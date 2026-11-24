@@ -43,6 +43,18 @@ export class Speech {
     if (!on) this.silence();
   }
 
+  // key is the talk button going down or up. A radio that transmits does not receive:
+  // the voice playing is cut and is lost, and what is waiting is heard after the release.
+  key(down) {
+    this.keyed = down;
+    if (down) {
+      this.current?.stop();
+      globalThis.speechSynthesis?.cancel();
+    } else {
+      this.#pump();
+    }
+  }
+
   // silence drops everything waiting and cuts the voice that is playing.
   silence() {
     this.queue.clear();
@@ -86,6 +98,49 @@ export class Speech {
     } catch {
       this.voices = null;
     }
+    this.#prepare();
+  }
+
+  // keep names lines the page must be able to say with the server gone ("connection
+  // lost"): { key: { en, he } }. Their recordings are fetched while the server is there.
+  keep(lines) {
+    this.kept = lines;
+    this.ready = new Map(); // "key:lang" → AudioBuffer
+    this.#prepare();
+  }
+
+  async #prepare() {
+    if (!this.voices || !this.ctx || !this.kept) return;
+    const voice = [...this.voices].sort()[0];
+    for (const [key, texts] of Object.entries(this.kept)) {
+      for (const [lang, text] of Object.entries(texts)) {
+        if (this.ready.has(`${key}:${lang}`)) continue;
+        try {
+          const res = await fetch(`${this.base}/say?${new URLSearchParams({ lang, voice, text })}`);
+          if (res.ok) this.ready.set(`${key}:${lang}`, await this.ctx.decodeAudioData(await res.arrayBuffer()));
+        } catch {
+          // The next probe tries again.
+        }
+      }
+    }
+  }
+
+  // declare says a kept line at once, ahead of anything waiting: the recording made
+  // earlier through the radio effect, or else this device's own voice.
+  async declare(key, lang) {
+    if (!this.enabled || !this.ctx || !this.kept?.[key]) return;
+    this.silence();
+    const text = this.kept[key][lang] ?? this.kept[key].en;
+    const line = { text, lang, voice: { name: "net", rate: 1 } };
+    await this.ctx.resume?.().catch(() => {});
+    const buffer = this.ready?.get(`${key}:${lang}`);
+    this.duck(true);
+    try {
+      if (buffer) await this.#radio(buffer, line);
+      else await this.#browser(line);
+    } finally {
+      this.duck(false);
+    }
   }
 
   async #fetch(line, signal) {
@@ -108,9 +163,14 @@ export class Speech {
     if (this.busy) return;
     this.busy = true;
     try {
-      for (let line; (line = this.queue.next(performance.now())); ) {
+      for (;;) {
+        // While the player holds the talk key the set transmits and cannot receive.
+        while (this.keyed) await sleep(80);
+        const line = this.queue.next(performance.now());
+        if (!line) break;
         const buffer = await Promise.race([line.audio, sleep(WAIT_FOR_VOICE).then(() => null)]);
         if (!this.enabled) break;
+        while (this.keyed) await sleep(80); // keyed up while the recording was on its way
         await this.ctx.resume?.().catch(() => {});
         this.duck(true);
         if (buffer) await this.#radio(buffer, line);

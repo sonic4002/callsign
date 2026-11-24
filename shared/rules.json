@@ -627,9 +627,9 @@
       }
     },
     "ownPurchase": {
-      "bought": { "en": "Bought {unit} for {cost} gold, {squad} is deploying", "he": "נקנה {unit} ב-{cost} זהב, {squad} בדרך" },
-      "built": { "en": "Building {unit} for {cost} gold", "he": "מתחיל לבנות {unit} ב-{cost} זהב" },
-      "upgraded": { "en": "Upgraded {squad} to {tier} for {cost} gold", "he": "{squad} שודרג לדרגת {tier} ב-{cost} זהב" }
+      "bought": { "en": "Bought {unit}, {squad} is deploying", "he": "נקנה {unit}, {squad} בדרך" },
+      "built": { "en": "Building {unit}", "he": "מתחיל לבנות {unit}" },
+      "upgraded": { "en": "Upgraded {squad} to {tier}", "he": "{squad} שודרג לדרגת {tier}" }
     },
     "signOff": {
       "won": { "en": "Victory. The enemy is defeated", "he": "ניצחון. האויב הובס" },

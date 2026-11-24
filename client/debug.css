@@ -377,3 +377,15 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #lobby-more[open] summary { margin-block-end: .4rem; }
 /* The squad list keeps room for four squads and scrolls in itself; the build panel never squeezes it out. */
 .panel.grow { flex: 1 1 13rem; min-block-size: 13rem; overflow-y: auto; }
+/* Before the script has arrived the start screen has no words yet: a turning ring says the
+   page is alive, and the empty buttons stay out of sight. */
+#overlay.booting .card > * { visibility: hidden; }
+#overlay.booting .card { position: relative; min-block-size: 9rem; }
+#overlay.booting .card::after {
+  content: ""; position: absolute; inset: 0; margin: auto; inline-size: 2.4rem; block-size: 2.4rem;
+  border: 3px solid var(--edge-hi); border-block-start-color: var(--brass); border-radius: 50%;
+  animation: booting 0.9s linear infinite;
+}
+@keyframes booting { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #overlay.booting .card::after { animation: none; } }
+#lobby-voice { margin: .5rem 0 0; font-size: .78rem; color: var(--muted); }

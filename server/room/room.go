@@ -92,7 +92,9 @@ type Client struct {
 	Out       chan []byte
 	wantState bool
 	closed    bool
-	joined    int // order of arrival
+	joined    int       // order of arrival
+	told      time.Time // when this agent's last telemetry report came
+	allowance float64   // how many more it may send right now (telemetry.go)
 }
 
 type Room struct {
@@ -115,6 +117,9 @@ type Room struct {
 	seats     [2]seat
 	quiet     time.Time // since when no person has been connected; zero while one is
 	closed    bool
+
+	// What each side's agents last said about themselves; see telemetry.go.
+	tele [2]map[int]*agentReport
 }
 
 func New(r *shared.Rules, cfg Config) (*Room, error) {
@@ -144,6 +149,7 @@ func (rm *Room) reset() error {
 		return err
 	}
 	rm.sim, rm.started, rm.seq = s, rm.cfg.AutoStart, 0
+	rm.forgetAgents()
 	for side := 0; side < 2; side++ {
 		rm.logs[side] = nil
 		rm.lang[side] = map[string]string{}
@@ -201,9 +207,11 @@ func (rm *Room) Tick() {
 					rm.drop(c) // a lost squad has no leader left to talk
 				}
 			}
+			rm.forgetAgent(e.Side, e.Squad)
 		}
 	}
 	if rm.sim.Over {
+		rm.forgetAgents()
 		rm.signOff()
 		rm.tellLobby()
 	}
@@ -328,6 +336,9 @@ func (rm *Room) hello(c *Client) []byte {
 	if c.ID.Role == RoleHost {
 		h["active"] = rm.host[side] == c
 	}
+	if c.ID.Role == RoleHammer {
+		h["agents"] = rm.agentViews(side) // what this side's agents last reported (telemetry.go)
+	}
 	return encode(h)
 }
 
@@ -344,6 +355,7 @@ func (rm *Room) drop(c *Client) {
 	c.closed = true
 	close(c.Out)
 	delete(rm.clients, c)
+	rm.agentLeft(c)
 	if c.ID.Role == RoleHost {
 		rm.rehost(c.ID.Side, nil)
 	}

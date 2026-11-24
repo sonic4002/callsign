@@ -96,6 +96,27 @@ function run(bin, args, input, env, cwd, timeoutMs) {
   });
 }
 
+// reading takes from Claude Code's result what an agent reports about its thought: the
+// token counts (cached input included, and each request of the run under `iterations`),
+// the model that answered, and that model's context window, which the result names.
+export function reading(res, asked) {
+  const per = res.modelUsage && typeof res.modelUsage === "object" ? res.modelUsage : {};
+  // The model that answered is the one that did the work; a run may also list helpers.
+  const used = per[asked] ? asked : Object.keys(per).sort((a, b) => (per[b].outputTokens ?? 0) - (per[a].outputTokens ?? 0))[0] ?? asked;
+  const u = res.usage;
+  const usage = u && {
+    input_tokens: u.input_tokens,
+    output_tokens: u.output_tokens,
+    cache_read_input_tokens: u.cache_read_input_tokens,
+    cache_creation_input_tokens: u.cache_creation_input_tokens,
+    iterations: Array.isArray(u.iterations)
+      ? u.iterations.map((i) => ({ input_tokens: i.input_tokens, output_tokens: i.output_tokens, cache_read_input_tokens: i.cache_read_input_tokens, cache_creation_input_tokens: i.cache_creation_input_tokens }))
+      : undefined,
+  };
+  const window = per[used]?.contextWindow;
+  return { usage, model: used, window: Number.isFinite(window) ? window : undefined };
+}
+
 export function subscriptionBrain({ token, bin = "claude", operatorModel = models.operator, timeoutMs = 60_000, exec = run }) {
   // An empty directory of its own, so Claude Code finds no project files or instructions.
   const cwd = mkdtempSync(join(tmpdir(), "callsign-brain-"));
@@ -128,6 +149,8 @@ export function subscriptionBrain({ token, bin = "claude", operatorModel = model
   return {
     name: "subscription",
     slow: true,
+    // plan names the model the next thought of an agent will use.
+    plan: ({ role, tier }) => (role === "anvil" ? operatorModel : models.tiers[tier] ?? models.tiers[1]),
     // check makes one small call so a token that cannot be used is found before the match.
     async check() {
       const schema = { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"], additionalProperties: false };
@@ -145,13 +168,14 @@ export function subscriptionBrain({ token, bin = "claude", operatorModel = model
       const level = operator ? effort.operator : effort[agent.tier] ?? effort[1];
       const res = await ask(model, level, system + "\n" + toolGuide(tools), actionSchema(tools), transcript(messages));
       const actions = res.structured_output?.actions ?? [];
-      const usage = res.usage && { input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens };
-      if (actions.length === 0) return { content: [{ type: "text", text: "" }], stop_reason: "end_turn", usage, model };
+      const { usage, model: used, window } = reading(res, model);
+      if (actions.length === 0) return { content: [{ type: "text", text: "" }], stop_reason: "end_turn", usage, model: used, window };
       return {
         content: actions.map((a) => ({ type: "tool_use", id: `toolu_sub_${nextId++}`, name: a.tool, input: a.input })),
         stop_reason: "tool_use",
         usage,
-        model,
+        model: used,
+        window,
       };
     },
   };

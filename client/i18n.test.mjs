@@ -40,6 +40,13 @@ const dynamic = {
   "provider.": ["anthropic", "openrouter", "gemini", "openai"],
   "tut.": ["welcome", "select", "order", "answer", "orders", "refinery", "fog", "barracks", "buy", "deploy", "upgrade", "enemy", "voice", "win"],
   "tutTouch.": ["select", "order", "refinery", "barracks", "buy", "upgrade", "enemy"],
+  "monitor.state.": ["none", "idle", "thinking", "acting", "skipped", "stopped", "offline", "ended"],
+  "monitor.woke.": ["call", "heard", "event"],
+  "monitor.event.": ["contact", "pinned", "losses", "arrived", "squad_lost", "point_lost", "hq_under_attack", "other"],
+  "monitor.brain.": ["subscription", "claude", "relay", "scripted", "demo", "other"],
+  "monitor.where.": ["server", "browser"],
+  "monitor.reset.": ["match", "wakes", "tier", "unfinished"],
+  "monitor.why.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "timeout", "stopped", "failed"],
   "trouble.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "failed", "join"],
 };
 
@@ -60,6 +67,8 @@ test("every string the page uses exists, and every string is used", () => {
   for (const call of script.matchAll(/\b(?:t|system)\(([^,)]*)/g)) {
     for (const m of call[1].matchAll(/"([^"]+)"/g)) used.add(m[1]);
   }
+  // Lines the page speaks by itself, read from both tables at once and not through t().
+  for (const m of script.matchAll(/strings\.en\.(\w+)/g)) used.add(m[1]);
   for (const [prefix, values] of Object.entries(dynamic)) {
     assert.ok(script.includes(`\`${prefix}\${`), `debug.js no longer builds ${prefix} keys`);
     for (const v of values) used.add(prefix + v);

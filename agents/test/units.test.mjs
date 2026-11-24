@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { compactStatus, renderWake } from "../agent.mjs";
+import { callsFor, compactStatus, renderWake } from "../agent.mjs";
 import { claudeBrain, models } from "../brain-claude.mjs";
 import { scriptedBrain } from "../brain-scripted.mjs";
 import { makeBrain } from "../main.mjs";
@@ -396,4 +396,18 @@ test("status and prompts: the operator is told about haulers, fields and income 
   assert.match(prompt, /on your own you build only while command\.buy is true/);
   assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);
   assert.doesNotMatch(prompt, /oil rigs; there are/);
+});
+
+test("an order ending with Out still wakes the squad when it comes from Hammer or Anvil", () => {
+  const me = { key: "infantry-1" };
+  const call = (from, end, to = "infantry-1") => ({ from: { key: from }, to: [{ key: to }], end });
+  assert.equal(callsFor(call("operator", "out"), me), true, "Anvil's order");
+  assert.equal(callsFor(call("player", "out"), me), true, "Hammer's order");
+  assert.equal(callsFor(call("operator", "out", "all"), me), true, "an order to all stations");
+  assert.equal(callsFor(call("infantry-2", "out"), me), false, "another squad signing off");
+  assert.equal(callsFor(call("infantry-2", "over"), me), true, "another squad asking");
+  assert.equal(callsFor(call("operator", "out", "infantry-2"), me), false, "an order to someone else");
+  assert.equal(callsFor(call("infantry-1", "out", "all"), me), false, "its own transmission");
+  // The operator is not woken as an addressee by a squad's Wilco, Out.
+  assert.equal(callsFor(call("infantry-1", "out", "operator"), { key: "operator" }), false);
 });

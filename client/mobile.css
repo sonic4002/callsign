@@ -22,7 +22,7 @@ body.no-server #no-server {
     --strip: 46px; /* treasury */
     --send: 54px; /* the radio box */
     --tabs: 64px; /* the bar of sheets, with the talk button */
-    --tick: 30px; /* the last line of the radio log */
+    --tick: 96px; /* the last four lines of the radio log */
     --rail: 0px; /* the bar's width when it stands on the edge (landscape) */
     --kb: 0px; /* height of the on-screen keyboard, set by mobile.js */
     --safe-t: env(safe-area-inset-top, 0px);
@@ -105,13 +105,15 @@ body.no-server #no-server {
   #ptt:hover:not(:disabled) { background: var(--brass); }
   #ptt.live { background: var(--warn); transform: translateX(-50%) scale(1.14); box-shadow: 0 0 0 6px #f0a04a55, 0 2px 10px #000b; }
 
-  /* ---- radio log: its last line always, the whole of it as a sheet ---- */
+  /* ---- radio log: its last four lines always, the whole of it as a sheet ---- */
   #log {
     position: fixed; z-index: 4; inset-inline: 0; inset-block-end: calc(var(--send) + var(--tabs) + var(--safe-b));
     block-size: var(--tick); flex: none; overflow: hidden; border-inline: 0; font-size: .86rem;
     padding-block: 4px; padding-inline: max(.6rem, var(--safe-s)) max(.6rem, var(--safe-e));
   }
-  html:not([data-sheet="radio"]) #log li:not(:last-child) { display: none; }
+  html:not([data-sheet="radio"]) #log { justify-content: flex-end; gap: 0; }
+  html:not([data-sheet="radio"]) #log li:not(:nth-last-child(-n+4)) { display: none; }
+  html:not([data-sheet="radio"]) #log li { block-size: 22px; line-height: 22px; flex: none; }
   html:not([data-sheet="radio"]) #log .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
   html:not([data-sheet="radio"]) #log .who { min-inline-size: 0; }
   html[data-sheet="radio"] #log {
@@ -209,7 +211,9 @@ body.no-server #no-server {
 
 /* ---- held sideways: the bar stands on the edge, sheets open beside it ---- */
 @media (max-height: 500px) and (orientation: landscape) {
-  :root { --strip: 38px; --send: 46px; --tick: 26px; --tabs: 0px; --rail: 76px; }
+  :root { --strip: 38px; --send: 46px; --tick: 52px; --tabs: 0px; --rail: 76px; }
+  /* Sideways there is little height: two lines of the log, not four. */
+  html:not([data-sheet="radio"]) #log li:not(:nth-last-child(-n+2)) { display: none; }
 
   #map-wrap {
     inset-inline: 0 calc(var(--rail) + var(--safe-e));

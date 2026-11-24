@@ -446,35 +446,34 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		length = h.r.Match.LengthSeconds
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"factions": h.cfg.Factions, // side 0, side 1
-		"bot":      h.cfg.Bot != "",
-		"levels":   BotLevels,    // the scripted enemies on offer, easiest first
-		"level":    h.usualBot(), // the one the lobby starts on
-		"length":   length,
-		"speeds":   Speeds,      // the paces on offer, slowest first
-		"speed":    SpeedNormal, // the one the lobby starts on
-		"maps":     h.mapList(), // the maps on offer, smallest first
-		"gold":     h.r.Match.StartGold,
-		"golds":    StartGolds, // what the lobby offers; a typed number may be minGold…maxGold
-		"minGold":  MinStartGold,
-		"maxGold":  MaxStartGold,
-		"share":    strings.TrimRight(h.cfg.Share, "/"),
-		"open":     h.open != nil,       // the open room of a server without an agent key
-		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
+		"factions":   h.cfg.Factions, // side 0, side 1
+		"bot":        h.cfg.Bot != "",
+		"levels":     BotLevels,    // the scripted enemies on offer, easiest first
+		"level":      h.usualBot(), // the one the lobby starts on
+		"length":     length,
+		"startGolds": StartGolds, // the starting gold on offer; any amount within the limits is taken
+		"startGold":  h.r.Match.StartGold,
+		"goldLimits": []int{MinStartGold, MaxStartGold},
+		"speeds":     Speeds,      // the paces on offer, slowest first
+		"speed":      SpeedNormal, // the one the lobby starts on
+		"maps":       h.mapList(), // the maps on offer, smallest first
+		"share":      strings.TrimRight(h.cfg.Share, "/"),
+		"open":       h.open != nil,       // the open room of a server without an agent key
+		"locked":     h.cfg.HostKey != "", // making a match needs the host's password
 	})
 }
 
 func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Opponent string `json:"opponent"`
-		Side     *int   `json:"side"`
-		Length   int    `json:"length"`
-		Watch    bool   `json:"watch"`
-		Bot      string `json:"bot"`
-		Speed    string `json:"speed"`
-		Purse    bool   `json:"purse"`
-		Map      string `json:"map"`
-		Gold     int    `json:"startGold"`
+		Opponent  string `json:"opponent"`
+		Side      *int   `json:"side"`
+		Length    int    `json:"length"`
+		Watch     bool   `json:"watch"`
+		Bot       string `json:"bot"`
+		Speed     string `json:"speed"`
+		Purse     bool   `json:"purse"`
+		Map       string `json:"map"`
+		StartGold int    `json:"startGold"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -487,7 +486,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.Gold}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

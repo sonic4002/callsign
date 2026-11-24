@@ -208,6 +208,10 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		length = r.Match.LengthSeconds
 	}
 	s.lengthTicks = length * r.TickRate
+	gold := cfg.StartGold
+	if gold <= 0 {
+		gold = r.Match.StartGold
+	}
 	for i := range r.Map.Points {
 		p := &r.Map.Points[i]
 		s.Points = append(s.Points, PointState{Point: p, Owner: p.Owner, CapSide: NoSide})
@@ -215,10 +219,6 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 	s.initBridges()
 	s.initNav()
 	s.initLandmarks()
-	gold := cfg.StartGold
-	if gold <= 0 {
-		gold = r.Match.StartGold
-	}
 	for side := 0; side < 2; side++ {
 		f, ok := r.Factions[cfg.Factions[side]]
 		if !ok {

@@ -17,8 +17,8 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := rm.Lobby()
-	if l.Map != "medium" || l.Gold != 2500 || l.Length != 1200 {
-		t.Fatalf("the lobby shows map %q, %d gold, %d s", l.Map, l.Gold, l.Length)
+	if l.Map != "medium" || l.StartGold != 2500 || l.Length != 1200 {
+		t.Fatalf("the lobby shows map %q, %d gold, %d s", l.Map, l.StartGold, l.Length)
 	}
 	rm.View(func(s *sim.Sim) {
 		if s.Gold(0) != 2500 || s.Gold(1) != 2500 || len(s.Points) != 12 || s.R.Map.ID != "medium" {
@@ -50,8 +50,8 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 	if err := rm.reset(); err != nil {
 		t.Fatal(err)
 	}
-	if l := rm.lobby(); l.Map != "medium" || l.Gold != 2500 {
-		t.Fatalf("after a rematch the lobby shows %q and %d gold", l.Map, l.Gold)
+	if l := rm.lobby(); l.Map != "medium" || l.StartGold != 2500 {
+		t.Fatalf("after a rematch the lobby shows %q and %d gold", l.Map, l.StartGold)
 	}
 
 	// Left alone, a match is the small map with the rules' gold.
@@ -59,8 +59,8 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l := rm.Lobby(); l.Map != "small" || l.Gold != rules.Match.StartGold {
-		t.Fatalf("the default lobby shows %q and %d gold", l.Map, l.Gold)
+	if l := rm.Lobby(); l.Map != "small" || l.StartGold != rules.Match.StartGold {
+		t.Fatalf("the default lobby shows %q and %d gold", l.Map, l.StartGold)
 	}
 	for _, o := range []Options{
 		{Opponent: OpponentBot, Side: 0, Map: "huge"},

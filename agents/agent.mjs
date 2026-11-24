@@ -6,6 +6,7 @@
 
 import { Link } from "./link.mjs";
 import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
+import { Telemetry, troubleCode } from "./telemetry.mjs";
 import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
 import { compactStructures } from "./bases.mjs";
 
@@ -16,8 +17,11 @@ const standBy = { en: "Stand by", he: "המתן" };
 export class Agent {
   // `join` is added to the address the agent joins with: its host's id, and { room, key } or
   // { room, token } for a server that holds rooms.
-  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, join = {} }) {
+  // `where` says where this agent runs, for its commander's view: "server" or "browser".
+  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
     Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, join });
+    // What this agent tells its own commander about itself; see telemetry.mjs.
+    this.tele = new Telemetry({ role, squad, brain: brain?.name ?? "", where, limit: wakesPerConversation, send: (report) => this.link.send({ type: "telemetry", telemetry: report }) });
     this.inbox = [];
     this.traffic = []; // the last few transmissions on the net, ours included
     this.history = [];
@@ -44,7 +48,8 @@ export class Agent {
     return this;
   }
 
-  stop() {
+  stop(why = "stopped") {
+    if (!this.stopped) this.tele.stopped(why);
     this.stopped = true;
     this.link?.close();
   }
@@ -74,14 +79,19 @@ export class Agent {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
     }
+    this.tele.joined({ tier: this.tier, planned: this.#planned() });
     // A call made just before this station came on the net is answered now: a commander
     // who sits down and gives an order at once would otherwise be met with silence.
     const fresh = hello.state.tick - 15 * this.rules.tickRate;
     const spoke = hello.log.findLastIndex((m) => m.from.key === this.me.key);
     for (const m of hello.log.slice(spoke + 1)) {
-      const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
-      if (m.tick >= fresh && forMe && m.from.key !== this.me.key && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
+      if (m.tick >= fresh && m.from.key !== this.me.key && callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
     }
+  }
+
+  // The model the brain means to use for the next thought, when it chooses one itself.
+  #planned() {
+    return this.brain?.plan?.({ role: this.role, tier: this.tier }) ?? null;
   }
 
   #onFrame(frame) {
@@ -92,10 +102,7 @@ export class Agent {
       if (this.traffic.length > 8) this.traffic.shift();
       if (m.from.key === "player") this.netLang = m.lang; // the net follows the commander's language
       if (m.from.key === this.me.key) return;
-      const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
-      // "Out" means no reply is expected, so it wakes nobody; it stays in the traffic the
-      // next wake shows. Hammer is the exception: a commander may end an order with Out.
-      if (forMe && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
+      if (callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
       // The operator runs the fight, so every other transmission on the net wakes it too.
       else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
       return;
@@ -144,24 +151,33 @@ export class Agent {
       // An upgrade changes the model. A new brain starts a fresh conversation.
       this.tier = status.you.tier;
       this.history = [];
+      this.tele.reset("tier");
+      this.tele.tier(this.tier, this.#planned());
     }
     const call = items.findLast((i) => i.kind === "radio")?.msg ?? null;
     if (call) this.commander = call.from.en;
     this.lang = this.netLang ?? call?.lang ?? this.lang;
     this.history.push({ role: "user", content: renderWake(items, compactStatus(status, this.side), this.traffic, this.lang) });
+    this.tele.conversation(this.history.length, this.wakes);
+    this.tele.thinking(items);
 
     let answered = false;
     const timer =
       call && this.brain.slow
         ? setTimeout(() => {
             // Thinking takes a moment; say so, the way a real operator would.
-            if (!answered) this.link.tool("radio", { to: [call.from.en], body: standBy[this.lang] ?? standBy.en, end: "out" }).catch(() => {});
+            if (answered) return;
+            this.link.tool("radio", { to: [call.from.en], body: standBy[this.lang] ?? standBy.en, end: "out" }).catch(() => {});
+            this.tele.saidStandBy();
           }, this.standByMs)
         : null;
 
     let finished = false;
+    let trouble = null;
     try {
       for (let turn = 0; turn < 6 && !finished; turn++) {
+        if (turn > 0) this.tele.thinking(null);
+        const began = Date.now();
         const res = await this.brain.think({
           agent: { role: this.role, side: this.side, squad: this.squad, tier: this.tier, station: this.me, lang: this.lang, commander: this.commander, unit: this.unit },
           system: this.system,
@@ -171,6 +187,7 @@ export class Agent {
           rules: this.rules,
         });
         this.history.push({ role: "assistant", content: res.content });
+        this.tele.thought(res, Date.now() - began);
         if (res.usage) this.log(`${this.name}: ${res.model} in=${res.usage.input_tokens} out=${res.usage.output_tokens}`);
         if (res.stop_reason === "refusal") {
           this.log(`${this.name}: the model declined this wake (${res.stop_details?.category ?? "no category"})`);
@@ -184,11 +201,14 @@ export class Agent {
         const results = [];
         for (const c of calls) {
           if (c.name === "radio") answered = true;
+          this.tele.acting(c.name);
           try {
             const data = await this.link.tool(c.name, normalize(c.name, c.input));
+            this.tele.acted(c.name, c.input, true);
             this.log(`${this.name}: ${c.name} ${JSON.stringify(c.input)}`);
             results.push({ type: "tool_result", tool_use_id: c.id, content: JSON.stringify(data ?? {}) });
           } catch (err) {
+            this.tele.acted(c.name, c.input, false);
             this.log(`${this.name}: ${c.name} ${JSON.stringify(c.input)} refused: ${err.message}`);
             results.push({ type: "tool_result", tool_use_id: c.id, content: err.message, is_error: true });
           }
@@ -196,6 +216,7 @@ export class Agent {
         this.history.push({ role: "user", content: results });
       }
     } catch (err) {
+      trouble = err;
       // The wake is skipped. The squad keeps its last order and the fireteams keep fighting.
       this.log(`${this.name}: thinking failed: ${err.message}`);
       this.onTrouble?.(err);
@@ -207,7 +228,12 @@ export class Agent {
     if (!finished || ++this.wakes >= this.wakesPerConversation) {
       this.history = [];
       this.wakes = 0;
+      this.tele.reset(finished ? "wakes" : "unfinished");
+    } else {
+      this.tele.conversation(this.history.length, this.wakes);
     }
+    if (trouble) this.tele.skipped(troubleCode(trouble), trouble.message);
+    else this.tele.idle();
   }
 }
 
@@ -316,6 +342,16 @@ function describe(item) {
       return `${item.place} stands again.`;
   }
   return `Event: ${e.kind}.`;
+}
+
+// callsFor reports whether a transmission is a call this station must act on. "Out" means
+// no reply is expected, so an Out from a squad wakes nobody; it stays in the traffic the
+// next wake shows. Those who give orders are the exception: Hammer and the operator may
+// end an order with Out, and it is still an order.
+export function callsFor(m, me) {
+  const forMe = m.to.some((t) => t.key === me.key || t.key === "all");
+  const commander = m.from.key === "player" || m.from.key === "operator";
+  return forMe && m.from.key !== me.key && (m.end !== "out" || commander);
 }
 
 export function renderWake(items, status, traffic, lang) {

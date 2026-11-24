@@ -169,6 +169,7 @@ export class Coach {
       cost3: tier(3)?.upgradeCost ?? "",
       // The page's own words for its buttons and panels, so a line names what is on screen.
       hold: this.t("act.hold"),
+      attack: this.t("act.attack"),
       send: this.t("send"),
       squads: this.t("roster"),
       build: this.t("build"),

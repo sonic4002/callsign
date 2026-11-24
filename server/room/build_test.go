@@ -241,7 +241,7 @@ func TestBuildingFollowsThePurse(t *testing.T) {
 		t.Fatalf("a build on the purse: %v %v", out, err)
 	}
 	log := rm.Log(0)
-	if len(log) != before+1 || !strings.Contains(log[len(log)-1].Text, "Building Vehicle Works for") || log[len(log)-1].From.Key != "operator" {
+	if len(log) != before+1 || !strings.Contains(log[len(log)-1].Text, "Building Vehicle Works") || log[len(log)-1].From.Key != "operator" {
 		t.Fatalf("the net did not announce the build: %+v", log[len(log)-1])
 	}
 	// An ordered build is not announced: Hammer asked for it.
