@@ -72,9 +72,15 @@ export function wantedUnit(text, units) {
 // ownMoves is the scripted operator running the fight after Hammer handed it over: one
 // purchase when gold allows, and a point to hold for every squad that has no orders. In
 // the default mode it is never called: the operator acts on Hammer's orders only.
+const tasked = new Map(); // "side:callsign" → seconds left in the match when the operator last tasked it
 function ownMoves({ wake, rules, agent }) {
   const s = wake.status;
   if (s?.command?.mode !== "fight") return [];
+  // A squad just told where to go still shows no order for a moment; it is not told twice.
+  const fresh = (sq) => {
+    const at = tasked.get(`${agent.side}:${sq.callsign.en}`);
+    return typeof s.timeLeft === "number" && at !== undefined && at - s.timeLeft >= 0 && at - s.timeLeft < 6;
+  };
   const lang = agent.lang === "he" ? "he" : "en";
   const moves = [];
   const units = Object.entries(rules.factions[s.faction ?? ""]?.units ?? {});
@@ -88,7 +94,8 @@ function ownMoves({ wake, rules, agent }) {
   }
   const mine = (p) => s.points.find((q) => q.id === p.id)?.owner === agent.side;
   const taken = new Set(s.squads.map((q) => q.order?.point).filter(Boolean)); // one squad per point
-  for (const sq of s.squads.filter((q) => q.order?.kind === "none").slice(0, 2)) {
+  for (const sq of s.squads.filter((q) => q.order?.kind === "none" && !fresh(q)).slice(0, 2)) {
+    tasked.set(`${agent.side}:${sq.callsign.en}`, s.timeLeft);
     const domain = units.find(([id]) => id === sq.unit)?.[1].domain;
     const goal = rules.map.points
       .filter((p) => p.kind !== "hq" && !mine(p) && !taken.has(p.id) && (domain === "air" || (domain === "sea") === p.y >= rules.map.waterY))

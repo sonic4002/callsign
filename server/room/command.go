@@ -23,6 +23,7 @@ import (
 //     "Ordered" is deliberately simple: Hammer spoke to the operator (or to all stations)
 //     within the last orderSeconds of the match. What Hammer meant is the operator's to
 //     read; the rule only stops it spending long after Hammer last said anything to it.
+//     Handing over the fight, or taking it back, is not an order to buy.
 //   - A purchase the operator makes on its own is announced to Hammer by the net itself.
 const (
 	ModeOrders = "orders" // the operator acts on Hammer's orders only
@@ -88,8 +89,10 @@ func (rm *Room) heardHammer(side int, p radio.Parsed) {
 	switch {
 	case says("take"):
 		rm.setCommand(side, false, false)
+		rm.cmd[side].asked = -1
 	case says("give"):
 		rm.setCommand(side, true, rm.cmd[side].fight && rm.cmd[side].noBuy)
+		rm.cmd[side].asked = -1
 	}
 }
 
@@ -113,11 +116,13 @@ func (rm *Room) toolCommand(side int, a toolArgs) (any, error) {
 	case "":
 	case ModeOrders:
 		rm.setCommand(side, false, false)
+		rm.cmd[side].asked = -1
 	case ModeFight:
 		if !rm.cmd[side].fight && !rm.ordered(side) {
 			return nil, ErrNotHanded
 		}
 		rm.setCommand(side, true, a.MayBuy != nil && !*a.MayBuy)
+		rm.cmd[side].asked = -1 // what Hammer said was the hand-over, not an order to buy
 	default:
 		return nil, errors.New(`mode is "orders" or "fight"`)
 	}

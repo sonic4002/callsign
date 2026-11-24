@@ -89,7 +89,8 @@ func TestOperatorBuysOnlyOnOrdersUntilHandedTheFight(t *testing.T) {
 	if len(got) != 1 || got[0]["command"].(map[string]any)["mode"] != ModeFight {
 		t.Fatalf("after the hand-over the page was told %v", got)
 	}
-	later()
+	// The hand-over is not an order to buy: what the operator buys from here on is its own
+	// doing, at once and long after alike, and the net says so.
 	before = len(rm.Log(0))
 	if err := buyErr(rm, anvil, `{"unit":"commandos"}`); err != nil {
 		t.Fatalf("the operator runs the fight but could not buy: %v", err)
@@ -103,6 +104,7 @@ func TestOperatorBuysOnlyOnOrdersUntilHandedTheFight(t *testing.T) {
 	if m.From.Key != radio.Operator || m.To[0].Key != radio.Player || !strings.Contains(m.Text, "Bought Commandos for 100 gold") || !strings.Contains(m.Text, "Viper 3") {
 		t.Fatalf("announcement = %q", m.Text)
 	}
+	later()
 	if err := buyErr(rm, anvil, `{"upgrade":"Viper 1"}`); err != nil {
 		t.Fatal(err)
 	}
@@ -115,9 +117,8 @@ func TestOperatorBuysOnlyOnOrdersUntilHandedTheFight(t *testing.T) {
 	if v := rm.cmd[0].view(); v.Mode != ModeOrders {
 		t.Fatalf("after taking command back: %+v", v)
 	}
-	later()
 	if err := buyErr(rm, anvil, `{"unit":"commandos"}`); !errors.Is(err, ErrNotOrdered) {
-		t.Fatalf("a purchase after command was taken back: err = %v", err)
+		t.Fatalf("a purchase right after command was taken back: err = %v", err)
 	}
 	// The other side was never touched, and a new match starts on orders.
 	if rm.cmd[1].view().Mode != ModeOrders {
@@ -161,7 +162,6 @@ func TestOperatorSetsTheModeWithTheCommandTool(t *testing.T) {
 	if err != nil || v.Mode != ModeFight || v.Buy {
 		t.Fatalf("hand-over with a limit: %+v %v", v, err)
 	}
-	rm.sim.Tick += (orderSeconds + 1) * rules.TickRate
 	if err := buyErr(rm, anvil, `{"unit":"commandos"}`); !errors.Is(err, ErrNoBuying) {
 		t.Fatalf("a purchase against Hammer's limit: err = %v", err)
 	}
