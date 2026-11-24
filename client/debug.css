@@ -520,7 +520,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
    Tabs at the start, one row of cards beside them, scrolling sideways when there are many.
    Both tabs have the same fixed height and the same card, so switching moves nothing. */
 #build-panel.under-map {
-  --card-w: 6.6rem; --card-h: 7.3rem;
+  --card-w: 6.8rem; --card-h: 8.9rem;
   flex: none; display: flex; align-items: stretch; gap: .5rem; padding: .35rem .5rem;
   block-size: calc(var(--card-h) + 1.3rem); border-inline: 0; border-block-end: 0; overflow: hidden;
 }
