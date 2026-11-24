@@ -2534,8 +2534,8 @@
       ],
       "height": 38
     },
-    "aegis_powerPlant": {
-      "image": "buildings/aegis_powerPlant.png",
+    "powerPlant": {
+      "image": "buildings/powerPlant.png",
       "size": [
         197,
         176
@@ -2550,14 +2550,14 @@
         0.385
       ],
       "stages": [
-        "aegis_powerPlant_stage1",
-        "aegis_powerPlant_stage2",
-        "aegis_powerPlant_stage3",
-        "aegis_powerPlant_stage4"
+        "powerPlant_stage1",
+        "powerPlant_stage2",
+        "powerPlant_stage3",
+        "powerPlant_stage4"
       ]
     },
-    "aegis_powerPlant_ruin": {
-      "image": "buildings/aegis_powerPlant_ruin.png",
+    "powerPlant_ruin": {
+      "image": "buildings/powerPlant_ruin.png",
       "size": [
         197,
         176
@@ -2568,8 +2568,8 @@
       ],
       "height": 68
     },
-    "aegis_powerPlant_stage1": {
-      "image": "buildings/aegis_powerPlant_stage1.png",
+    "powerPlant_stage1": {
+      "image": "buildings/powerPlant_stage1.png",
       "size": [
         197,
         176
@@ -2580,8 +2580,8 @@
       ],
       "height": 68
     },
-    "aegis_powerPlant_stage2": {
-      "image": "buildings/aegis_powerPlant_stage2.png",
+    "powerPlant_stage2": {
+      "image": "buildings/powerPlant_stage2.png",
       "size": [
         197,
         176
@@ -2592,8 +2592,8 @@
       ],
       "height": 68
     },
-    "aegis_powerPlant_stage3": {
-      "image": "buildings/aegis_powerPlant_stage3.png",
+    "powerPlant_stage3": {
+      "image": "buildings/powerPlant_stage3.png",
       "size": [
         197,
         176
@@ -2604,8 +2604,8 @@
       ],
       "height": 68
     },
-    "aegis_powerPlant_stage4": {
-      "image": "buildings/aegis_powerPlant_stage4.png",
+    "powerPlant_stage4": {
+      "image": "buildings/powerPlant_stage4.png",
       "size": [
         197,
         176
@@ -2616,8 +2616,8 @@
       ],
       "height": 68
     },
-    "ashfall_generatorYard": {
-      "image": "buildings/ashfall_generatorYard.png",
+    "generatorYard": {
+      "image": "buildings/generatorYard.png",
       "size": [
         191,
         156
@@ -2632,14 +2632,14 @@
         0.2
       ],
       "stages": [
-        "ashfall_generatorYard_stage1",
-        "ashfall_generatorYard_stage2",
-        "ashfall_generatorYard_stage3",
-        "ashfall_generatorYard_stage4"
+        "generatorYard_stage1",
+        "generatorYard_stage2",
+        "generatorYard_stage3",
+        "generatorYard_stage4"
       ]
     },
-    "ashfall_generatorYard_ruin": {
-      "image": "buildings/ashfall_generatorYard_ruin.png",
+    "generatorYard_ruin": {
+      "image": "buildings/generatorYard_ruin.png",
       "size": [
         191,
         156
@@ -2650,8 +2650,8 @@
       ],
       "height": 60
     },
-    "ashfall_generatorYard_stage1": {
-      "image": "buildings/ashfall_generatorYard_stage1.png",
+    "generatorYard_stage1": {
+      "image": "buildings/generatorYard_stage1.png",
       "size": [
         191,
         156
@@ -2662,8 +2662,8 @@
       ],
       "height": 60
     },
-    "ashfall_generatorYard_stage2": {
-      "image": "buildings/ashfall_generatorYard_stage2.png",
+    "generatorYard_stage2": {
+      "image": "buildings/generatorYard_stage2.png",
       "size": [
         191,
         156
@@ -2674,8 +2674,8 @@
       ],
       "height": 60
     },
-    "ashfall_generatorYard_stage3": {
-      "image": "buildings/ashfall_generatorYard_stage3.png",
+    "generatorYard_stage3": {
+      "image": "buildings/generatorYard_stage3.png",
       "size": [
         191,
         156
@@ -2686,8 +2686,8 @@
       ],
       "height": 60
     },
-    "ashfall_generatorYard_stage4": {
-      "image": "buildings/ashfall_generatorYard_stage4.png",
+    "generatorYard_stage4": {
+      "image": "buildings/generatorYard_stage4.png",
       "size": [
         191,
         156
@@ -2698,8 +2698,8 @@
       ],
       "height": 60
     },
-    "aegis_radar": {
-      "image": "buildings/aegis_radar.png",
+    "radar": {
+      "image": "buildings/radar.png",
       "size": [
         177,
         190
@@ -2717,21 +2717,21 @@
         ],
         "height": 20,
         "period": 6,
-        "body": "aegis_radar_bare"
+        "body": "radar_bare"
       },
       "lamp": [
         0.325,
         0.165
       ],
       "stages": [
-        "aegis_radar_stage1",
-        "aegis_radar_stage2",
-        "aegis_radar_stage3",
-        "aegis_radar_stage4"
+        "radar_stage1",
+        "radar_stage2",
+        "radar_stage3",
+        "radar_stage4"
       ]
     },
-    "aegis_radar_bare": {
-      "image": "buildings/aegis_radar_bare.png",
+    "radar_bare": {
+      "image": "buildings/radar_bare.png",
       "size": [
         177,
         190
@@ -2742,8 +2742,8 @@
       ],
       "height": 73
     },
-    "aegis_radar_ruin": {
-      "image": "buildings/aegis_radar_ruin.png",
+    "radar_ruin": {
+      "image": "buildings/radar_ruin.png",
       "size": [
         177,
         190
@@ -2754,8 +2754,8 @@
       ],
       "height": 73
     },
-    "aegis_radar_stage1": {
-      "image": "buildings/aegis_radar_stage1.png",
+    "radar_stage1": {
+      "image": "buildings/radar_stage1.png",
       "size": [
         177,
         190
@@ -2766,8 +2766,8 @@
       ],
       "height": 73
     },
-    "aegis_radar_stage2": {
-      "image": "buildings/aegis_radar_stage2.png",
+    "radar_stage2": {
+      "image": "buildings/radar_stage2.png",
       "size": [
         177,
         190
@@ -2778,8 +2778,8 @@
       ],
       "height": 73
     },
-    "aegis_radar_stage3": {
-      "image": "buildings/aegis_radar_stage3.png",
+    "radar_stage3": {
+      "image": "buildings/radar_stage3.png",
       "size": [
         177,
         190
@@ -2790,8 +2790,8 @@
       ],
       "height": 73
     },
-    "aegis_radar_stage4": {
-      "image": "buildings/aegis_radar_stage4.png",
+    "radar_stage4": {
+      "image": "buildings/radar_stage4.png",
       "size": [
         177,
         190
@@ -2802,8 +2802,8 @@
       ],
       "height": 73
     },
-    "ashfall_listeningPost": {
-      "image": "buildings/ashfall_listeningPost.png",
+    "listeningPost": {
+      "image": "buildings/listeningPost.png",
       "size": [
         173,
         176
@@ -2827,14 +2827,14 @@
         0.3
       ],
       "stages": [
-        "ashfall_listeningPost_stage1",
-        "ashfall_listeningPost_stage2",
-        "ashfall_listeningPost_stage3",
-        "ashfall_listeningPost_stage4"
+        "listeningPost_stage1",
+        "listeningPost_stage2",
+        "listeningPost_stage3",
+        "listeningPost_stage4"
       ]
     },
-    "ashfall_listeningPost_ruin": {
-      "image": "buildings/ashfall_listeningPost_ruin.png",
+    "listeningPost_ruin": {
+      "image": "buildings/listeningPost_ruin.png",
       "size": [
         173,
         176
@@ -2845,8 +2845,8 @@
       ],
       "height": 68
     },
-    "ashfall_listeningPost_stage1": {
-      "image": "buildings/ashfall_listeningPost_stage1.png",
+    "listeningPost_stage1": {
+      "image": "buildings/listeningPost_stage1.png",
       "size": [
         173,
         176
@@ -2857,8 +2857,8 @@
       ],
       "height": 68
     },
-    "ashfall_listeningPost_stage2": {
-      "image": "buildings/ashfall_listeningPost_stage2.png",
+    "listeningPost_stage2": {
+      "image": "buildings/listeningPost_stage2.png",
       "size": [
         173,
         176
@@ -2869,8 +2869,8 @@
       ],
       "height": 68
     },
-    "ashfall_listeningPost_stage3": {
-      "image": "buildings/ashfall_listeningPost_stage3.png",
+    "listeningPost_stage3": {
+      "image": "buildings/listeningPost_stage3.png",
       "size": [
         173,
         176
@@ -2881,8 +2881,8 @@
       ],
       "height": 68
     },
-    "ashfall_listeningPost_stage4": {
-      "image": "buildings/ashfall_listeningPost_stage4.png",
+    "listeningPost_stage4": {
+      "image": "buildings/listeningPost_stage4.png",
       "size": [
         173,
         176
@@ -3145,8 +3145,8 @@
       ],
       "height": 38
     },
-    "aegis_powerPlant_site": {
-      "image": "buildings/aegis_powerPlant_stage1.png",
+    "powerPlant_site": {
+      "image": "buildings/powerPlant_stage1.png",
       "size": [
         197,
         176
@@ -3157,8 +3157,8 @@
       ],
       "height": 68
     },
-    "ashfall_generatorYard_site": {
-      "image": "buildings/ashfall_generatorYard_stage1.png",
+    "generatorYard_site": {
+      "image": "buildings/generatorYard_stage1.png",
       "size": [
         191,
         156
@@ -3169,8 +3169,8 @@
       ],
       "height": 60
     },
-    "aegis_radar_site": {
-      "image": "buildings/aegis_radar_stage1.png",
+    "radar_site": {
+      "image": "buildings/radar_stage1.png",
       "size": [
         177,
         190
@@ -3181,8 +3181,8 @@
       ],
       "height": 73
     },
-    "ashfall_listeningPost_site": {
-      "image": "buildings/ashfall_listeningPost_stage1.png",
+    "listeningPost_site": {
+      "image": "buildings/listeningPost_stage1.png",
       "size": [
         173,
         176
@@ -3793,29 +3793,29 @@
     }
   },
   "icons": {
-    "aegis_powerPlant": {
-      "image": "icons/aegis_powerPlant.png",
+    "powerPlant": {
+      "image": "icons/powerPlant.png",
       "size": [
         144,
         96
       ]
     },
-    "ashfall_generatorYard": {
-      "image": "icons/ashfall_generatorYard.png",
+    "generatorYard": {
+      "image": "icons/generatorYard.png",
       "size": [
         144,
         96
       ]
     },
-    "aegis_radar": {
-      "image": "icons/aegis_radar.png",
+    "radar": {
+      "image": "icons/radar.png",
       "size": [
         144,
         96
       ]
     },
-    "ashfall_listeningPost": {
-      "image": "icons/ashfall_listeningPost.png",
+    "listeningPost": {
+      "image": "icons/listeningPost.png",
       "size": [
         144,
         96
