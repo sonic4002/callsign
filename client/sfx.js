@@ -24,6 +24,11 @@ const weapons = {
   rocketLauncher: { sound: "cannon", rounds: 4, gap: 260, impact: "shell", travel: 1100, heavy: true, rocket: 1 },
   fpvSwarm: { sound: "boomS", rounds: 1, gap: 0, impact: "pop", travel: 40 },
   rpgTeam: { sound: "cannon", rounds: 1, gap: 0, impact: "shell", travel: 480, heavy: true, rocket: 0.25 },
+  // Defences fire on their own, and are seen and heard doing it (map.js: defenceFire).
+  sentryGun: { sound: "hmg", rounds: 4, gap: 100, impact: "pop", travel: 80, heavy: true },
+  gunNest: { sound: "mg", rounds: 5, gap: 80, impact: "dust", travel: 70 },
+  flakBattery: { sound: "autocannon", rounds: 4, gap: 110, impact: "pop", travel: 110, heavy: true },
+  rocketNest: { sound: "cannon", rounds: 2, gap: 320, impact: "shell", travel: 620, heavy: true, rocket: 0.45 },
 };
 const byClass = { infantry: weapons.commandos, vehicle: weapons.technical, naval: weapons.speedboat, air: weapons.helicopter };
 export const weaponOf = (unit, cls) => weapons[unit] ?? byClass[cls] ?? weapons.commandos;

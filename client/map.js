@@ -666,6 +666,7 @@ export class Scene {
       spreadOut(group.visuals, kind === "foot" ? 1.75 : 1);
     }
     this.gunfire(now);
+    this.defenceFire(now);
     this.smoulder(now);
     this.gush(now);
     if (this.state) this.building(now);
@@ -958,6 +959,9 @@ export class Scene {
     const { rules, state } = this;
     const place = group.view?.order?.kind === "attack" ? group.view.order.place : null;
     if (place) {
+      // A structure the order named, whoever holds it: a tech building is shot at only so.
+      const named = (state.structures ?? []).find((st) => st.id === place && !st.ruin && st.side !== group.side);
+      if (named && Math.hypot(named.x - v.x, named.y - v.y) < reach * 1.6) return { x: named.x, y: named.y };
       const b = (rules.map.bridges ?? []).find((x) => x.id === place);
       if (b) {
         // The nearest part of the deck, so that the rounds land on the bridge itself.
@@ -971,11 +975,43 @@ export class Scene {
     }
     let best = null;
     for (const st of state.structures ?? []) {
-      if (st.side === group.side || st.ruin) continue;
+      // The enemy's own only: a building of no army is nobody's target unless ordered.
+      if (st.side !== 1 - group.side || st.ruin) continue;
       const d = Math.hypot(st.x - v.x, st.y - v.y);
       if (d < reach) [best, reach] = [{ x: st.x, y: st.y }, d];
     }
     return best;
+  }
+
+  // defenceFire shows the defences at work: a gun, a flak battery or a rocket nest that
+  // stands, has power and has an enemy it can hit in its range fires at the nearest one,
+  // at its own weapon's pace. Ours and the enemy's alike, when they are in sight.
+  defenceFire(now) {
+    const { rules, state } = this;
+    this.guns ??= new Map();
+    const all = [...this.groups.values()];
+    for (const st of state.structures ?? []) {
+      if (st.role !== "defence" || st.ruin || st.building < 1 || st.dark || st.visible === false) continue;
+      const def = rules.factions[st.faction]?.structures[st.kind];
+      if (!def?.range) continue;
+      let target = null;
+      let bd = def.range;
+      for (const other of all) {
+        if (other.side === st.side || (def.vs?.[other.cls] ?? 1) === 0) continue;
+        for (const o of other.visuals) {
+          const d = Math.hypot(o.x - st.x, o.y - st.y);
+          if (d < bd) [target, bd] = [o, d];
+        }
+      }
+      if (!target) continue;
+      const gun = this.guns.get(st.id) ?? { nextShot: 0 };
+      this.guns.set(st.id, gun);
+      if (now < gun.nextShot) continue;
+      gun.nextShot = now + (def.cooldownTicks / rules.tickRate) * 1000 * (0.8 + Math.random() * 0.4);
+      target.hitAt = now;
+      const turn = Math.atan2(...toIso(target.x - st.x, target.y - st.y).reverse());
+      this.shoot({ unit: st.kind, cls: "vehicle" }, { px: st.x, py: st.y - 6, turn }, target, now);
+    }
   }
 
   // gunfire turns "this team is firing" into tracers. The server says which of our own
