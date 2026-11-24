@@ -395,3 +395,4 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   #monitor-strip { max-block-size: 5.2rem; overflow-y: auto; }
   .panel.grow { flex: 1 1 10rem; min-block-size: 10rem; }
 }
+#orders-about { display: block; max-inline-size: 17rem; font-size: .7rem; line-height: 1.35; color: var(--muted); text-align: center; }
