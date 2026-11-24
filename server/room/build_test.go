@@ -3,6 +3,7 @@ package room
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -256,4 +257,145 @@ func TestBuildingFollowsThePurse(t *testing.T) {
 	if m, _ := out2.(map[string]any); err != nil || m["announced"] != false {
 		t.Fatalf("an ordered build: %v %v", out2, err)
 	}
+}
+
+// The page places a structure by writing an exact spot into the call; the operator
+// passes the words on, and the structure stands just there.
+func TestAStructureIsBuiltOnTheSpotTheWordsName(t *testing.T) {
+	rm := baseRoom(t)
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	ticks(rm, 60)
+	hq := rules.HQPoint(0)
+	var dx, dy int
+	rm.View(func(s *sim.Sim) {
+		def := rules.Factions["aegis"].Structures["vehicleWorks"]
+		for d := 20; d <= 280 && dx == 0; d += 20 {
+			for e := 20; e <= 280 && dx == 0; e += 20 {
+				if s.CanPlace(0, &def, hq.X+float64(e), hq.Y-float64(d)) == nil {
+					dx, dy = e, d
+				}
+			}
+		}
+	})
+	if dx == 0 {
+		t.Fatal("no ground north-east of the headquarters")
+	}
+	for i, words := range []string{
+		fmt.Sprintf("%d metres north and %d metres east of %s", dy, dx, hq.Callsign.En),
+		fmt.Sprintf("%d מטר צפונית ו-%d מטר מזרחית ל%s", dy, dx, hq.Callsign.He),
+	} {
+		if i == 1 {
+			// The same spot again, in Hebrew: the works already stands there.
+			args, _ := json.Marshal(map[string]string{"structure": "barracks", "place": words})
+			if _, err := rm.Tool(anvil, ToolBuild, args); !errors.Is(err, sim.ErrNoRoom) {
+				t.Fatalf("building on the works: err = %v", err)
+			}
+			continue
+		}
+		args, _ := json.Marshal(map[string]string{"structure": "Vehicle Works", "place": words})
+		res, err := rm.Tool(anvil, ToolBuild, args)
+		if err != nil {
+			t.Fatalf("build at %q: %v", words, err)
+		}
+		rm.View(func(s *sim.Sim) {
+			for _, st := range s.Snapshot(0).Structures {
+				if st.ID == res.(map[string]any)["id"] && (st.X != hq.X+float64(dx) || st.Y != hq.Y-float64(dy)) {
+					t.Fatalf("the works stands at (%v, %v), want (%v, %v)", st.X, st.Y, hq.X+float64(dx), hq.Y-float64(dy))
+				}
+			}
+		})
+		ticks(rm, rules.Factions["aegis"].Structures["vehicleWorks"].BuildSeconds+1)
+	}
+	// Somewhere it cannot go: the refusal says why, and nothing is spent.
+	var before int
+	rm.View(func(s *sim.Sim) { before = s.Gold(0) })
+	_, err := rm.Tool(anvil, ToolBuild, json.RawMessage(`{"structure":"sentryGun","place":"100 metres north and 100 metres east of Foxtrot"}`))
+	if !errors.Is(err, sim.ErrTooFar) {
+		t.Fatalf("a gun in the middle of the map: err = %v", err)
+	}
+	rm.View(func(s *sim.Sim) {
+		if s.Gold(0) != before {
+			t.Fatal("a refused structure was paid for")
+		}
+	})
+}
+
+func TestTheOperatorCancelsAndSetsRallyPoints(t *testing.T) {
+	rm := baseRoom(t)
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	viper1 := join(t, rm, 0, RoleSquad, 1)
+	ticks(rm, 90)
+	for _, tool := range []string{ToolCancel, ToolRally} {
+		if _, err := rm.Tool(viper1, tool, json.RawMessage(`{"place":"D"}`)); err == nil || !strings.Contains(err.Error(), "may not use") {
+			t.Errorf("a squad leader using %s: err = %v", tool, err)
+		}
+	}
+	if _, err := rm.Tool(anvil, ToolCancel, nil); !errors.Is(err, sim.ErrNothingDue) {
+		t.Fatalf("cancel with nothing on the way: err = %v", err)
+	}
+	// Three in line at the one barracks: each waits for those ahead.
+	var waits []float64
+	for i := 0; i < 3; i++ {
+		res, err := rm.Tool(anvil, ToolBuy, json.RawMessage(`{"unit":"commandos"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := res.(map[string]any)
+		waits = append(waits, out["deploySeconds"].(float64))
+		if out["inLine"] != i || out["from"] == "" {
+			t.Fatalf("purchase %d: %+v", i+1, out)
+		}
+	}
+	if !(waits[0] < waits[1] && waits[1] < waits[2]) || waits[2] != 3*waits[0] {
+		t.Fatalf("waits %v, want one, two and three times the deploy time", waits)
+	}
+	cost := rules.Factions["aegis"].Units["commandos"].Cost
+	for _, args := range []string{`{"unit":"Commandos"}`, `{"unit":"קומנדו"}`} {
+		res, err := rm.Tool(anvil, ToolCancel, json.RawMessage(args))
+		if err != nil {
+			t.Fatalf("cancel %s: %v", args, err)
+		}
+		if out := res.(map[string]any); out["refund"] != cost || out["unit"] != "commandos" {
+			t.Fatalf("cancel %s = %+v, want a refund of %d", args, out, cost)
+		}
+	}
+	if _, err := rm.Tool(anvil, ToolCancel, json.RawMessage(`{"unit":"tank"}`)); !errors.Is(err, sim.ErrNothingDue) {
+		t.Fatalf("cancel a tank that was never bought: err = %v", err)
+	}
+	if _, err := rm.Tool(anvil, ToolCancel, json.RawMessage(`{"unit":"a spaceship"}`)); !errors.Is(err, sim.ErrNoUnit) {
+		t.Fatalf("cancel an unknown unit: err = %v", err)
+	}
+
+	// Rally: every structure, one structure by name, and back home.
+	for args, want := range map[string]string{
+		`{"place":"Delta"}`:                            "D",
+		`{"place":"דוד"}`:                              "D",
+		`{"place":"100 metres north of Alpha"}`:        "N of A 100",
+		`{"place":"Bravo","structure":"the barracks"}`: "B",
+		`{"place":"home"}`:                             sim.RallyDefault,
+		`{"place":"ליד המבנה"}`:                        sim.RallyDefault,
+	} {
+		res, err := rm.Tool(anvil, ToolRally, json.RawMessage(args))
+		if err != nil {
+			t.Fatalf("rally %s: %v", args, err)
+		}
+		if out := res.(map[string]any); out["place"] != want {
+			t.Fatalf("rally %s = %+v, want %q", args, out, want)
+		}
+	}
+	for _, args := range []string{`{}`, `{"place":"the moon"}`, `{"place":"D","structure":"the spaceport"}`} {
+		if _, err := rm.Tool(anvil, ToolRally, json.RawMessage(args)); err == nil {
+			t.Errorf("rally %s was accepted", args)
+		}
+	}
+	if _, err := rm.Tool(anvil, ToolRally, json.RawMessage(`{"place":"Delta"}`)); err != nil {
+		t.Fatal(err)
+	}
+	rm.View(func(s *sim.Sim) {
+		for _, st := range s.Snapshot(0).Structures {
+			if st.Side == 0 && st.Role == shared.RoleBarracks && (st.Rally == nil || st.Rally.Place != "D") {
+				t.Fatalf("the barracks gathers at %+v, want D", st.Rally)
+			}
+		}
+	})
 }

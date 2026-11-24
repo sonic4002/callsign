@@ -71,6 +71,11 @@ func TestResolvePlace(t *testing.T) {
 		{"מצפון לפסל", "N of F", 0},
 		{"150 מטר דרומית-מערבית לדוד", "SW of D 150", 0},
 		{"N of F 200", "N of F 200", 0},
+		// An exact spot: a distance each way, as the page writes it when a structure is placed.
+		{"140 metres north and 60 metres east of Alpha", "N140 E60 of A", 0},
+		{"60 metres west and 20 metres south of Delta", "S20 W60 of D", 0},
+		{"140 מטר צפונית ו-60 מטר מזרחית לאלף", "N140 E60 of A", 0},
+		{"80 מטר דרומית ו-40 מטר מערבית לדוד", "S80 W40 of D", 0},
 		{"sw of d", "SW of D", 0},
 		// More than one landmark fits: the caller is told which, and asks.
 		{"the house at Foxtrot", "", 4},
