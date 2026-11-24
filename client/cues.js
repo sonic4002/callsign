@@ -61,6 +61,21 @@ function foldKey(e) {
 
 const tickOf = (e) => (e.kind === "radio" ? e.message.tick : e.kind === "event" ? e.event.tick : e.tick) ?? 0;
 
+// ---- one line for one piece of news ----
+
+// The events the operator's base cue already tells the commander (server/room/cues.go),
+// under the names the page gives them. The cue is the line that is kept: the page does
+// not write its own line for the same news beside it.
+const cuedAlways = ["structure_built", "hq_under_attack", "structure_attacked", "hauler_attacked", "hauler_lost", "structure_lost", "structure_captured", "structure_captured_tech", "structure_taken"];
+
+// cued reports whether a base cue tells of an event, so that the log leaves it to the cue.
+// Squads on the field when a match starts have no cue; every later one does.
+export function cued(rules, ev) {
+  if (cuedAlways.includes(ev.kind)) return true;
+  if (ev.kind === "squad_spawned") return (ev.tick ?? 0) >= (rules.tickRate ?? 10);
+  return Object.values(rules.radio?.cues ?? {}).some((c) => (c.events ?? []).includes(ev.kind));
+}
+
 // ---- the phone's strip ----
 
 // How far back the strip looks for something better than the newest lines.

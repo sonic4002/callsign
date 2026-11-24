@@ -78,11 +78,20 @@ func TestTheOperatorSellsAndRepairsAndIsToldOfPower(t *testing.T) {
 	if err != nil || m["back"] != int(float64(plant.Cost)*rules.Match.SellShare) || float64(m["gold"].(int)) <= gold-200 {
 		t.Fatalf("selling the power plant: %v %v", res, err)
 	}
-	log = rm.Log(0)
-	if !strings.Contains(log[len(log)-1].Text, "Sold the Power Plant") {
-		t.Fatalf("the net did not say what was sold: %+v", log[len(log)-1])
-	}
+	// The sale is told once, by the base cue for it.
 	ticks(rm, 0.3)
+	sold := 0
+	for _, m := range rm.Log(0) {
+		if m.Cue == "structureSold" && strings.Contains(m.Text, "Power Plant sold") {
+			sold++
+		}
+		if strings.Contains(m.Text, "Sold the") {
+			t.Fatalf("the sale was announced a second time: %q", m.Text)
+		}
+	}
+	if sold != 1 {
+		t.Fatalf("the net said the sale %d times, want once: %+v", sold, rm.Log(0))
+	}
 	st = status()
 	if power := st["power"].(map[string]any); power["low"] != true || st["radar"] != false {
 		t.Fatalf("with the power plant sold: power=%v radar=%v", power, st["radar"])
@@ -108,7 +117,7 @@ func TestSellingFollowsThePurse(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := rm.Tool(anvil, ToolSell, json.RawMessage(`{"place":"dockyard"}`))
-	if m, _ := res.(map[string]any); err != nil || m["announced"] != false {
+	if m, _ := res.(map[string]any); err != nil || m["announced"] != true { // the base cue tells it
 		t.Fatalf("an ordered sale: %v %v", res, err)
 	}
 }

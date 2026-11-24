@@ -35,8 +35,7 @@ func (rm *Room) toolSell(side int, a toolArgs) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	own, err := rm.mayActAlone(side, ToolSell)
-	if err != nil {
+	if _, err := rm.mayActAlone(side, ToolSell); err != nil {
 		return nil, err
 	}
 	def, before := st.Def(), rm.sim.Gold(side)
@@ -44,10 +43,9 @@ func (rm *Room) toolSell(side int, a toolArgs) (any, error) {
 		return nil, err
 	}
 	back := rm.sim.Gold(side) - before
-	if own {
-		rm.announceStructure(side, "sold", def.Name.In, back)
-	}
-	return map[string]any{"announced": own, "sold": place, "name": def.Name.En, "back": back, "gold": rm.sim.Gold(side)}, nil
+	// The sale is told to Hammer by the base cue for it (radio.cues.structureSold), asked
+	// for or not: nothing more is announced here.
+	return map[string]any{"announced": true, "sold": place, "name": def.Name.En, "back": back, "gold": rm.sim.Gold(side)}, nil
 }
 
 // toolMend is the operator's repair: the side pays, and the structure mends over time.

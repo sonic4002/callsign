@@ -693,7 +693,6 @@
     "ownPurchase": {
       "bought": { "en": "Bought {unit}, {squad} is deploying", "he": "נקנה {unit}, {squad} בדרך" },
       "built": { "en": "Building {unit}", "he": "מתחיל לבנות {unit}" },
-      "sold": { "en": "Sold the {unit}", "he": "נמכר: {unit}" },
       "repairing": { "en": "Repairing the {unit}", "he": "מתקן את {unit}" },
       "upgraded": { "en": "Upgraded {squad} to {tier}", "he": "{squad} שודרג לדרגת {tier}" }
     },
@@ -714,6 +713,10 @@
       "haulerLost": { "gap": 2, "line": { "en": "We lost {unit} near {point}", "he": "איבדנו את {unit} ליד {point}" } },
       "structureLost": { "gap": 2, "line": { "en": "We lost {structure}", "he": "איבדנו את {structure}" } },
       "structureTaken": { "gap": 2, "line": { "en": "{structure} is ours", "he": "{structure} בידינו" } },
+      "structureSold": { "gap": 1, "events": ["structure_sold"], "line": { "en": "{structure} sold", "he": "{structure} נמכר" } },
+      "repairStopped": { "gap": 10, "events": ["repair_stopped"], "line": { "en": "Repairs stopped: not enough gold", "he": "התיקון נעצר: אין מספיק זהב" } },
+      "deployLost": { "gap": 2, "events": ["deploy_lost"], "line": { "en": "We lost a {unit} with the structure that was making it", "he": "איבדנו {unit} עם המבנה שייצר אותו" } },
+      "queueFull": { "gap": 8, "line": { "en": "The line is full", "he": "התור מלא" } },
       "heroReady": { "gap": 2, "events": ["hero_fielded"], "line": { "en": "{squad} has taken the field", "he": "{squad} יצא לשטח" } },
       "heroFallen": { "gap": 2, "events": ["hero_fallen", "hero_lost"], "line": { "en": "We lost {squad}", "he": "איבדנו את {squad}" } },
       "enemyHero": { "gap": 2, "events": ["enemy_hero_fielded"], "line": { "en": "Warning: the enemy's champion is in the field", "he": "אזהרה: גיבור האויב יצא לשטח" } }

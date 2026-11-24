@@ -199,9 +199,13 @@ func (rm *Room) cueEvent(e sim.Event) {
 	}
 }
 
-// cueRefusal says "not enough gold" when that is why a purchase or a build was refused.
+// cueRefusal says why a purchase or a build was refused, when the reason is one the
+// operator has a fixed line for: not enough gold, or a production line that is full.
 func (rm *Room) cueRefusal(side int, err error) {
-	if errors.Is(err, sim.ErrNoGold) {
+	switch {
+	case errors.Is(err, sim.ErrNoGold):
 		rm.cue(side, "noGold", nil)
+	case errors.Is(err, sim.ErrLineFull):
+		rm.cue(side, "queueFull", nil)
 	}
 }

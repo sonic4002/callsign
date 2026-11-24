@@ -3,7 +3,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { FOLD_TICKS, foldLog, spoken, stripPick } from "./cues.js";
+import { readFileSync } from "node:fs";
+
+import { cued, FOLD_TICKS, foldLog, spoken, stripPick } from "./cues.js";
 import { fieldSeen } from "./gold.js";
 import { DEPTH_BIAS, Fx } from "./fx.js";
 
@@ -96,4 +98,19 @@ test("smoke and fire are listed with the depth of the ground they rise from", ()
   const near = live.filter((l) => l.depth > wall).length;
   const far = live.filter((l) => l.depth < wall).length;
   assert.ok(near > 0 && far > 0, "one blast is behind the wall and one in front of it");
+});
+
+test("news a base cue tells is left to the cue; the rest keeps the page's own line", () => {
+  const rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url)));
+  for (const kind of ["structure_built", "structure_lost", "hauler_lost", "low_power", "power_restored", "structure_sold", "repair_stopped", "deploy_lost"]) {
+    assert.ok(cued(rules, { kind, tick: 500 }), kind);
+  }
+  for (const kind of ["captured", "point_lost", "structure_started", "deploy_cancelled", "rally_set", "structure_repaired", "structure_lost_theirs", "upgraded"]) {
+    assert.ok(!cued(rules, { kind, tick: 500 }), kind);
+  }
+  // The squads a match starts with have no cue; one fielded later has.
+  assert.ok(!cued(rules, { kind: "squad_spawned", tick: 0 }));
+  assert.ok(cued(rules, { kind: "squad_spawned", tick: 300 }));
+  // Every cue named by an event in the rules has its line in both languages.
+  for (const [name, cue] of Object.entries(rules.radio.cues)) assert.ok(cue.line.en && cue.line.he && cue.gap > 0, name);
 });

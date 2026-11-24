@@ -9,7 +9,7 @@ import { drawUnit, loadSprites } from "./art.js";
 import { wantedStructure } from "/agents/bases.mjs";
 import { drawIcon } from "./bases-art.js";
 import { ofRole, structureCards, structureDef, structureRows, techSite, unitDef, unitLock } from "./bases.js";
-import { cueMark, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
+import { cueMark, cued, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
@@ -353,6 +353,9 @@ function onFrame(frame) {
       // A rally point put back beside the structures reads differently from one that was set.
       if (frame.event.kind === "rally_set" && !frame.event.place) frame.event.kind = "rally_home";
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
+      // News the operator's base cue tells is left to the cue: one line, not two. Someone
+      // watching hears no cues and reads the page's own lines.
+      if (me && frame.event.side === side && cued(rules, frame.event)) break;
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
       }
