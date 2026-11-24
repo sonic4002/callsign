@@ -271,3 +271,29 @@ and picture is original to Callsign.
 - Snapshot: structures carry their construction stage; deployments carry the structure they come from; squads carry `fortified` and heroes their ability state.
 - Tests stay at the same seams: placement rule and refusals, deployment from the right structure and its loss, hero abilities and their counters, sandbag arc and destruction, all through commands and snapshots; placement tinting and call writing as pure page functions.
 - Pictures: construction stages for every structure, doors and bays, the two heroes (sheets in the infantry form plus ability poses), sandbags, and the improved movement frames, through the same two pipelines.
+
+---
+
+## Addendum 2 (2026-11-24): the opening
+
+Requested by the owner; it replaces story 18 and the `startStructures` decision above.
+
+- **A match starts with the headquarters and the starting squads only.** No barracks, no
+  refinery and no hauler are given. The first thing a commander does is build the
+  refinery.
+- **A finished refinery comes with one hauler**, free, which leaves its bay and goes to
+  work. A rebuilt or second refinery brings one too.
+- **More haulers are built at the works**, not at the refinery: the hauler requires the
+  works role. The hauler cap stays.
+- **Starting gold has to carry the opening.** The lobby default becomes enough for a
+  refinery, a barracks and a first squad with a little to spare (set it by play; about
+  1,000), and the lowest preset is not below the refinery's cost. The headquarters trickle
+  stays as the safety net for a side with no refinery.
+- **The usual opening** is refinery, then barracks, then works; nothing forces the order
+  except the requirements (the works still needs a barracks).
+- The scripted enemy, Anvil with the purse, the tutorial and Help all follow this opening.
+  The tutorial's economy step becomes "build your refinery" and watching the first hauler
+  leave it.
+
+Story 18 now reads: As a commander, I want to open by building my refinery and receive my
+first hauler from it, so that every match begins with a real choice of build order.
