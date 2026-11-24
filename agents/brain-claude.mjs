@@ -20,6 +20,8 @@ export function claudeBrain({ apiKey, client = new Anthropic({ apiKey }), operat
   return {
     name: "claude",
     slow: true,
+    // plan names the model the next thought of an agent will use.
+    plan: ({ role, tier }) => (role === "anvil" ? operatorModel : models.tiers[tier] ?? models.tiers[1]),
     // check makes one tiny call so a key that cannot be used is found before the match,
     // not as squads that never answer.
     async check() {

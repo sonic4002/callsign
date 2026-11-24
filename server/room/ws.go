@@ -15,6 +15,7 @@ import (
 //	{"type":"restart"}
 //	{"type":"ready","ready":true}
 //	{"type":"leave"}
+//	{"type":"telemetry","telemetry":{…}}
 type inbound struct {
 	Type   string          `json:"type"`
 	Text   string          `json:"text"`
@@ -23,6 +24,8 @@ type inbound struct {
 	Name   string          `json:"name"`
 	Args   json.RawMessage `json:"args"`
 	Ready  *bool           `json:"ready"` // ready frames; absent means true
+	// telemetry frames: what an agent says about itself, relayed unread (telemetry.go)
+	Telemetry json.RawMessage `json:"telemetry"`
 }
 
 // ServeWS is the WebSocket endpoint of one room. The Hub picks the room by ?room=<code>.
@@ -103,6 +106,10 @@ func (rm *Room) handle(c *Client, in inbound) {
 	case "lesson":
 		// The first lesson has reached the fight: its enemy may move now.
 		if err := rm.Release(c); err != nil {
+			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
+		}
+	case "telemetry":
+		if err := rm.Report(c, in.Telemetry); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
 		}
 	case "restart":
