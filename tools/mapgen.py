@@ -251,11 +251,11 @@ def medium():
     m.rect(400, 0, 1040, 160, "M")           # the northern range, open at the pass
     m.rect(0, 1280, 2400, 1520, "W")         # the sea
     m.rect(1120, 160, 1200, 1280, "W")       # the river
-    m.rect(1120, 280, 1200, 520, "I")        # its frozen stretch
+    m.rect(1120, 240, 1200, 600, "I")        # its frozen stretch
     m.rect(1160, 360, 1200, 440, "L")        # the islet in the ice
     m.rect(1000, 640, 1200, 920, "W")        # the river widens around the town island
     m.rect(1120, 680, 1200, 880, "L")        # the island
-    m.rect(640, 440, 760, 680, "M")          # the inner hills
+    m.rect(640, 480, 760, 640, "M")          # the inner hills
     m.rect(280, 1040, 400, 1120, "I")        # a frozen pond
     m.mirror()
     hqs(m, 160, 760)
@@ -288,9 +288,9 @@ def medium():
 def large():
     m = Map("large", ("Mountain Passes", "מעברי ההרים"), 80, 50)
     m.rect(1440, 0, 1600, 1400, "M")         # the central range
-    m.rect(1440, 160, 1600, 280, "L")        # north pass
-    m.rect(1440, 560, 1600, 680, "L")        # middle pass
-    m.rect(1440, 960, 1600, 1160, "L")       # the wide pass with the town
+    m.rect(1440, 120, 1600, 320, "L")        # north pass
+    m.rect(1440, 520, 1600, 720, "L")        # middle pass
+    m.rect(1440, 920, 1600, 1200, "L")       # the wide pass with the town
     m.rect(0, 1400, 1600, 1520, "W")         # the river
     m.rect(1200, 1400, 1600, 1840, "W")      # the lake
     m.rect(800, 520, 920, 720, "M")          # western hills

@@ -411,7 +411,7 @@ func TestInfantryGoInsideABuilding(t *testing.T) {
 			covered++
 		}
 	}
-	room := rules.LandmarkKinds["bunker"].Garrison
+	room := min(3, rules.LandmarkKinds["bunker"].Garrison) // the squad has three fireteams
 	if in != room || covered != 3 {
 		t.Fatalf("%d fireteams inside (room for %d), %d of 3 in cover", in, room, covered)
 	}
@@ -474,8 +474,8 @@ func TestAGarrisonIsHiddenUntilCloseOrFiring(t *testing.T) {
 			seen++
 		}
 	}
-	if seen != 1 {
-		t.Fatalf("the enemy sees %d fireteams, want only the one outside the bunker", seen)
+	if outside := 3 - min(3, rules.LandmarkKinds["bunker"].Garrison); seen != outside {
+		t.Fatalf("the enemy sees %d fireteams, want only the %d outside the bunker", seen, outside)
 	}
 	for _, l := range s.Snapshot(1).Landmarks {
 		if l.Garrison != nil {

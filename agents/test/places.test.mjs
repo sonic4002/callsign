@@ -51,7 +51,7 @@ test("prompts list the map's landmarks and bridges in both languages, and say ho
   const text = leaderPrompt({ rules, side: 0, faction: "aegis", station: viper2, unit });
   for (const l of rules.map.landmarks) assert.ok(text.includes(l.id) && text.includes(l.name.en) && text.includes(l.name.he), l.id);
   for (const b of rules.map.bridges) assert.ok(text.includes(b.id) && text.includes(b.name.en) && text.includes(b.name.he), b.id);
-  assert.match(text, /room for 2 fireteams/);
+  assert.match(text, new RegExp(`room for ${rules.landmarkKinds.bunker.garrison} fireteams`));
   assert.match(text, /ice can be crossed but slowly/);
   assert.match(text, /fit more than one landmark/);
   assert.doesNotMatch(text, /waterY|undefined/);

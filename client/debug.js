@@ -10,6 +10,8 @@ import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
 import { Speech } from "./speech/speech.js";
+import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
+import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { tidy } from "./voice/normalize.js";
 import { Voice } from "./voice/voice.js";
@@ -100,6 +102,15 @@ speech.bind($("speak"));
 await loadSprites();
 
 const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[lang] ?? id;
+// placeName is what an order's place is called: a landmark or bridge by its name, a spot
+// off a point in words, a point by its callsign.
+function placeName(id) {
+  const named = [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id);
+  if (named) return named.name[lang];
+  const off = parseOffset(id);
+  if (off) return t("place.offset", { metres: off.metres, bearing: t(`bearing.${off.bearing}`), point: pointName(off.point) });
+  return pointName(id);
+}
 const clock = (tick) => {
   if (!rules) return "--:--"; // before the server's greeting
   const s = Math.floor(tick / rules.tickRate);
@@ -239,7 +250,7 @@ function renderLog() {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count });
+        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count });
       } else {
         time.textContent = clock(e.tick);
         text.textContent = t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" });
@@ -531,7 +542,8 @@ function deployRow(d) {
 
 function orderText(sq) {
   if (sq.order.contact) return t("order.contact");
-  return t(`order.${sq.order.kind}`, { point: sq.order.point ? pointName(sq.order.point) : t("order.here") });
+  const where = sq.order.place ? placeName(sq.order.place) : sq.order.point ? pointName(sq.order.point) : t("order.here");
+  return t(`order.${sq.order.kind}`, { point: where });
 }
 
 function rosterRow(sq, canAct) {
@@ -609,6 +621,13 @@ attachGestures(canvas, {
   onEnd: () => canvas.classList.remove("dragging"),
   onTap: mapClick,
 });
+// Under a mouse, a landmark or a bridge shows its name.
+canvas.addEventListener("pointermove", (ev) => {
+  if (ev.pointerType !== "mouse") return;
+  const box = canvas.getBoundingClientRect();
+  scene.hover = { x: ev.clientX - box.left, y: ev.clientY - box.top };
+});
+canvas.addEventListener("pointerleave", () => (scene.hover = null));
 canvas.addEventListener(
   "wheel",
   (ev) => {
@@ -642,12 +661,20 @@ function mapClick(ev) {
     const mine = state.squads.find((sq) => sq.id === scene.selected);
     return draft(mine ? call("attack", { to: mine.callsign[lang], point: name }) : $("text").value + name);
   }
-  if (!hit.point) return;
+  // A landmark, a bridge or a point: with a squad selected the orders it can be given
+  // there, with none its name goes into the message.
+  const place = hit.landmark ?? hit.bridge ?? hit.point;
+  if (!place) return;
+  const kind = hit.landmark ? "landmark" : hit.bridge ? "bridge" : "point";
+  const name = kind === "point" ? place.callsign[lang] : place.name[lang];
+  if (kind !== "point") scene.showName(place.id);
   const squad = state.squads.find((sq) => sq.id === scene.selected);
-  if (!squad) return draft($("text").value + hit.point.callsign[lang]);
+  if (!squad) return draft($("text").value + name);
   const menu = $("orders");
-  menu.dataset.point = hit.point.id;
-  $("orders-title").textContent = `${squad.callsign[lang]} → ${hit.point.callsign[lang]}`;
+  menu.dataset.point = place.id;
+  menu.dataset.kind = kind;
+  for (const button of menu.querySelectorAll("button")) button.hidden = !ordersFor(kind).includes(button.dataset.order);
+  $("orders-title").textContent = `${squad.callsign[lang]} → ${name}`;
   menu.style.left = `${Math.max(90, Math.min(box.width - 90, sx))}px`;
   menu.style.top = `${Math.min(box.height - 90, sy)}px`;
   menu.hidden = false;
@@ -660,9 +687,10 @@ function hideOrders() {
 for (const button of document.querySelectorAll("#orders button")) {
   button.addEventListener("click", () => {
     const squad = state.squads.find((sq) => sq.id === scene.selected);
-    const point = rules.map.points.find((p) => p.id === $("orders").dataset.point);
+    const id = $("orders").dataset.point;
+    const known = $("orders").dataset.kind === "point" ? rules.map.points.some((p) => p.id === id) : [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].some((p) => p.id === id);
     hideOrders();
-    if (squad && point) draft(call(button.dataset.order, { to: squad.callsign[lang], point: point.callsign[lang] }));
+    if (squad && known) draft(call(button.dataset.order, { to: squad.callsign[lang], point: placeName(id) }));
   });
 }
 
@@ -701,6 +729,7 @@ function renderOverlay() {
   const level = chosen("bot") ?? "easy";
   $("lobby-level-about").textContent = t(`lobby.about.${level}`);
   for (const option of $("lobby-length").options) option.textContent = t("lobby.minutes", { minutes: option.value / 60 });
+  renderChoices();
 
   const view = lobby ?? found?.lobby ?? null;
   const withFriend = Boolean(room) && view?.opponent === "friend" && !over;
@@ -729,6 +758,18 @@ function renderOverlay() {
   );
 }
 
+// renderChoices words the lobby's map cards and gold choices in the page language.
+function renderChoices() {
+  for (const card of $("lobby-map-cards").children) {
+    const map = baseRules?.maps?.[card.dataset.map];
+    if (!map) continue;
+    card.querySelector("strong").textContent = map.name[lang];
+    card.querySelector("small").textContent = t("lobby.mapSize", { width: map.width, height: map.height, points: map.points.length });
+  }
+  for (const option of $("lobby-gold").options) option.textContent = option.value === "other" ? t("lobby.goldOther") : option.value;
+  $("lobby-gold-other").hidden = chosen("gold") !== "other";
+}
+
 // renderSeats shows a match between two people while it waits: its code, the link to
 // send, and who sits where.
 function renderSeats(view) {
@@ -739,11 +780,21 @@ function renderSeats(view) {
     ...view.seats.map((s) => {
       const status = s.bot ? t("lobby.seatBot") : !s.taken ? t("lobby.seatFree") : !s.online ? t("lobby.seatOffline") : s.ready ? t("lobby.seatReady") : t("lobby.seatWaiting");
       const mine = Boolean(me) && s.side === side;
-      const li = el("li", [`side-${s.side}`, mine ? "mine" : "", s.ready ? "ready" : ""].filter(Boolean).join(" "));
+      // Coloured by state, so a glance says whether the other commander is there and ready.
+      const li = el("li", [`side-${s.side}`, mine ? "mine" : "", seatState(s)].filter(Boolean).join(" "));
       li.append(el("strong", "", `${t(`side.${s.side}`)} · ${factionName(s.faction)}`), el("span", "who", mine ? t("lobby.seatYou") : ""), el("span", "status", status));
       return li;
     }),
   );
+  // What both commanders agreed to by pressing Ready: the map, the gold and the length.
+  const chosenMap = baseRules?.maps?.[view.map];
+  $("lobby-match").hidden = !chosenMap;
+  if (chosenMap) {
+    const g = $("lobby-match-map").getContext("2d");
+    g.clearRect(0, 0, 160, 100);
+    drawMiniMap(g, baseRules, chosenMap, 160, 100, { points: true, sides: [sideColor[0], sideColor[1]] });
+    $("lobby-options").textContent = t("lobby.options", { map: chosenMap.name[lang], gold: view.startGold, minutes: Math.round(view.length / 60) });
+  }
   const both = view.seats.every((s) => s.taken);
   const full = !inRoom() && found && !freeSeat(found.lobby);
   $("lobby-status").textContent = full ? t("lobby.full") : !both ? t("lobby.waitFriend") : view.phase === "lobby" ? t("lobby.waitReady") : "";
@@ -834,7 +885,11 @@ $("start").addEventListener("click", () => {
   if (!room) {
     const friend = chosen("opponent") === "friend";
     localStorage.setItem("callsign.level", chosen("bot"));
-    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot") });
+    localStorage.setItem("callsign.map", chosen("map") ?? "");
+    return makeMatch({
+      opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"),
+      map: chosen("map") ?? "", startGold: startGold(chosen("gold"), chosen("goldOther"), { min: offer?.minGold, max: offer?.maxGold }),
+    });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
   if (found && freeSeat(found.lobby)) return takeFreeSeat();
@@ -909,13 +964,36 @@ offer = await serverInfo().catch(() => null);
 // Only the host makes matches on a locked server; a browser that has done so once is remembered.
 $("lobby-host").hidden = !offer?.locked || Boolean(localStorage.getItem("callsign.hostkey"));
 const usual = offer?.length ?? baseRules?.match.lengthSeconds ?? 600;
-for (const seconds of [...new Set([300, 600, 900, usual])].sort((a, b) => a - b)) {
+for (const seconds of matchLengths(usual)) {
   const option = el("option");
   option.value = seconds;
   option.selected = seconds === usual;
   $("lobby-length").append(option);
 }
 $("lobby-new").elements.side.value = String(side);
+// The maps on offer, each with a small drawing of itself, and the gold a match starts with.
+const mapIds = offer?.maps?.map((m) => m.id) ?? Object.keys(baseRules?.maps ?? {});
+const lastMap = localStorage.getItem("callsign.map");
+for (const id of mapIds) {
+  const map = baseRules?.maps?.[id];
+  if (!map) continue;
+  const card = el("label");
+  const pick = el("input");
+  Object.assign(pick, { type: "radio", name: "map", value: id, checked: id === (mapIds.includes(lastMap) ? lastMap : mapIds[0]) });
+  const picture = el("canvas");
+  Object.assign(picture, { width: 160, height: 100, dir: "ltr" });
+  drawMiniMap(picture.getContext("2d"), baseRules, map, 160, 100, { points: true, sides: [sideColor[0], sideColor[1]] });
+  card.dataset.map = id;
+  card.append(pick, picture, el("strong"), el("small"));
+  $("lobby-map-cards").append(card);
+}
+for (const gold of [...(offer?.golds ?? [baseRules?.match.startGold ?? 300]), "other"]) {
+  const option = el("option");
+  option.value = gold;
+  option.selected = gold === (offer?.gold ?? baseRules?.match.startGold);
+  $("lobby-gold").append(option);
+}
+Object.assign($("lobby-gold-other"), { min: offer?.minGold ?? 100, max: offer?.maxGold ?? 20000, value: 1500 });
 // The level the player chose last time, or the server's usual one.
 const levels = offer?.levels ?? ["easy", "normal", "standard"];
 $("lobby-level").value = [localStorage.getItem("callsign.level"), offer?.level, "easy"].find((level) => levels.includes(level));
@@ -931,7 +1009,7 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // For tests and screenshots: skip the lobby. A commander gets a match against the
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
-  else makeMatch({ opponent: "bot", side, length: 0, watch: true });
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0 });
 }
 renderOverlay();
 

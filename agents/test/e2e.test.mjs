@@ -205,11 +205,11 @@ test("a squad goes to a place Hammer describes, takes cover there, and asks when
   await hammer.next("Viper 2 ordered into the bunker", (f) => squadIn(f, 2)?.order.place === "D-bunker-1");
   await hammer.next("Viper 2 going inside", (f) => f.type === "event" && f.event.kind === "garrisoned" && f.event.place === "D-bunker-1");
   assert.equal(await hammer.hears("Viper 2"), "Hammer, this is Viper 2. Inside the bunker north of Delta. Over.");
-  const inside = await hammer.next("two fireteams inside and all three in cover", (f) => {
+  const inside = await hammer.next("all three fireteams inside, in cover", (f) => {
     const teams = squadIn(f, 2)?.teams ?? [];
-    return teams.filter((tm) => tm.in === "D-bunker-1").length === 2 && teams.length === 3 && teams.every((tm) => tm.cover > 0 && tm.cover < 1);
+    return teams.length === 3 && teams.every((tm) => tm.in === "D-bunker-1" && tm.cover > 0 && tm.cover < 1);
   });
-  assert.deepEqual(inside.state.landmarks.find((l) => l.id === "D-bunker-1").garrison, { side: 0, teams: 2 });
+  assert.deepEqual(inside.state.landmarks.find((l) => l.id === "D-bunker-1").garrison, { side: 0, teams: 3 });
 
   // The same in Hebrew, to a spot off a point.
   hammer.say("צפע 1, החזיקו 150 מטר מצפון לדוד");

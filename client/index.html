@@ -31,6 +31,7 @@
           <button type="button" data-order="hold" data-i18n="act.hold"></button>
           <button type="button" data-order="move" data-i18n="act.move"></button>
           <button type="button" data-order="attack" data-i18n="act.attack"></button>
+          <button type="button" data-order="cover" data-i18n="act.cover" hidden></button>
         </div>
       </div>
     </div>
@@ -144,6 +145,14 @@
         <label><input type="radio" name="side" value="1"> <span id="lobby-side-1"></span></label>
         <label><input type="radio" name="side" value="-1"> <span data-i18n="lobby.random"></span></label>
       </fieldset>
+      <fieldset id="lobby-maps">
+        <legend data-i18n="lobby.map"></legend>
+        <div id="lobby-map-cards"></div>
+      </fieldset>
+      <label><span data-i18n="lobby.gold"></span>
+        <select name="gold" id="lobby-gold"></select>
+        <input name="goldOther" id="lobby-gold-other" type="number" inputmode="numeric" step="50" dir="ltr" hidden data-i18n-aria="lobby.gold">
+      </label>
       <label><span data-i18n="lobby.length"></span>
         <select name="length" id="lobby-length"></select>
       </label>
@@ -160,6 +169,10 @@
         <input id="lobby-link" type="text" dir="ltr" readonly data-i18n-aria="lobby.link">
         <button type="button" id="lobby-copy" data-i18n="lobby.copy"></button>
       </p>
+      <div id="lobby-match">
+        <canvas id="lobby-match-map" width="160" height="100" dir="ltr"></canvas>
+        <p id="lobby-options"></p>
+      </div>
       <ul id="lobby-seats"></ul>
       <p id="lobby-status"></p>
       <p id="lobby-note"></p>

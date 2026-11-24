@@ -83,15 +83,17 @@ export class Fx {
     this.pool = new Pool(LIMITS.particles);
     this.decals = new Pool(LIMITS.decals);
     this.emitters = new Pool(LIMITS.emitters);
-    this.waterY = Infinity;
+    this.water = () => false; // (x, y) → whether that spot of the map is open water
     this.kick = 0; // pixels of screen shake still to play out
     this.kicks = []; // jolts waiting for their blast
     this.view = null; // { w, h, screen(x, y) } of the last frame, for culling and shake
     this.smolders = new Map(); // id → when that fire next puts out smoke
   }
 
-  reset(waterY = Infinity) {
-    this.waterY = waterY;
+  // reset clears everything for a new map. `water` says where a shell makes a splash:
+  // a function of (x, y), or, as before there was terrain, the y the sea starts at.
+  reset(water = () => false) {
+    this.water = typeof water === "function" ? water : (x, y) => y >= water;
     this.pool.clear();
     this.decals.clear();
     this.emitters.clear();
@@ -100,8 +102,8 @@ export class Fx {
     this.smolders.clear();
   }
 
-  onWater(y) {
-    return y >= this.waterY;
+  onWater(x, y) {
+    return this.water(x, y);
   }
 
   // onScreen says whether a point is in or near the view. Effects elsewhere are skipped.
@@ -142,7 +144,7 @@ export class Fx {
   // dust is a bullet striking the ground, or a soldier going down.
   dust(x, y, now, s = 1) {
     if (!this.onScreen(x, y)) return;
-    if (this.onWater(y)) return this.spray(x, y, now, 0.35 * s);
+    if (this.onWater(x, y)) return this.spray(x, y, now, 0.35 * s);
     for (let i = 0; i < 2; i++) {
       this.blob("dust", x + rand(-3, 3), y + rand(-3, 3), { t0: now + i * 30, ttl: rand(320, 520), r0: 2 * s, r1: rand(6, 9) * s, a: 0.6, vh: rand(8, 18), h: 1, pri: 0 });
     }
@@ -197,7 +199,7 @@ export class Fx {
   // pop is a small round bursting: a heavy machine gun or a boat's cannon.
   pop(x, y, now) {
     if (!this.onScreen(x, y)) return;
-    if (this.onWater(y)) return this.spray(x, y, now, 0.3);
+    if (this.onWater(x, y)) return this.spray(x, y, now, 0.3);
     this.blob("flash", x, y, { t0: now, ttl: 90, r0: 3, r1: 9, a: 0.95, add: true, h: 3 });
     this.blob("fire", x, y, { t0: now, ttl: rand(180, 260), r0: 2.5, r1: 6, a: 0.9, add: true, vh: 14, h: 3 });
     this.blob("dust", x, y, { t0: now + 60, ttl: rand(500, 800), r0: 3, r1: rand(8, 11), a: 0.55, vh: rand(10, 20), h: 3, pri: 0 });
@@ -206,7 +208,7 @@ export class Fx {
 
   // shell is where a round lands: a burst on the ground, a plume in the sea.
   shell(x, y, now, s = 1) {
-    if (this.onWater(y)) {
+    if (this.onWater(x, y)) {
       this.spray(x, y, now, 1.1 * s);
       this.shake(x, y, 1.2 * s, now);
     } else {

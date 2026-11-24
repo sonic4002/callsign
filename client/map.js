@@ -1,18 +1,20 @@
 // The battlefield: terrain baked once, then every frame the points, buildings, fireteams,
 // gunfire and labels, sorted by depth. It draws only what the server sent this side.
 
-import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, house, isoBox, rock, sprites, tree } from "./art.js";
+import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, sprites } from "./art.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
+import { coverPercent, drawBridge, drawMiniMap, drawScenery, isWater, landmarkFallbacks, paintGround, placeAt, scenery } from "./terrain.js";
 import { pixelRatio, smoothing } from "./touch.js";
 
 export const sideColor = { [-1]: "#cfd3c8", 0: "#4da3ff", 1: "#ff6b4a" };
 const nerveColor = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
 const TAU = Math.PI * 2;
-const RES = 1.5; // terrain is baked at this many pixels per iso unit
+const RES = 1.5; // terrain is baked at this many pixels per iso unit, less on a big map
+const BAKE_PIXELS = 11e6; // the most pixels the baked terrain may have: phones refuse more
 const MARGIN = 90;
 
 // A small seeded generator, so the terrain looks the same on every load.
@@ -52,7 +54,12 @@ export class Scene {
     this.rules = rules;
     this.groups.clear();
     this.effects = [];
-    this.fx.reset(rules.map.waterY);
+    this.fx.reset((x, y) => isWater(rules, x, y, (id) => this.bridges.get(id)?.standing ?? true));
+    this.lands = new Map(); // landmark id → its state when it differs from the map's
+    this.bridges = new Map(); // bridge id → { hp, standing } as last seen
+    this.hover = null; // { x, y } of the pointer over the view, in CSS pixels
+    this.named = null; // { id, until }: a landmark or bridge whose name is shown for a moment
+    this.radarBase = null;
     this.hqSeen = null;
     this.finale = null;
     this.ruined = [false, false];
@@ -95,6 +102,10 @@ export class Scene {
 
   setState(state) {
     this.state = state;
+    this.lands = new Map((state.landmarks ?? []).map((l) => [l.id, l]));
+    const bridges = new Map((state.bridges ?? []).map((b) => [b.id, b]));
+    if ([...bridges].some(([id, b]) => this.bridges.get(id)?.standing !== b.standing)) this.radarBase = null;
+    this.bridges = bridges;
     const seen = new Set();
     const groups = [
       ...state.squads.map((s) => ({ ...s, own: true })),
@@ -126,11 +137,12 @@ export class Scene {
         }
         if (best) free.delete(best);
         else best = { x: tm.x, y: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
-        if (tm.members < best.members) {
+        // Losses inside a building are not seen from outside.
+        if (tm.members < best.members && !tm.in) {
           this.lose(group, best, false);
           if (group.small) this.fall(group, best, best.members - tm.members);
         }
-        Object.assign(best, { tx: tm.x, ty: tm.y, members: tm.members, action: tm.action, nerve: tm.nerve });
+        Object.assign(best, { tx: tm.x, ty: tm.y, members: tm.members, action: tm.action, nerve: tm.nerve, in: tm.in ?? "", cover: tm.cover ?? 0 });
         next.push(best);
       }
       for (const lost of free) {
@@ -289,18 +301,22 @@ export class Scene {
       else if (i % 2 === 0) this.fx.dust(x2, y2, at, 0.8);
     }
     this.sound(w.sound, v.x, v.y);
-    if (w.impact === "shell") this.sound(this.fx.onWater(target.y) ? "splash" : "boomS", target.x, target.y, w.travel);
+    if (w.impact === "shell") this.sound(this.fx.onWater(target.x, target.y) ? "splash" : "boomS", target.x, target.y, w.travel);
   }
 
   // ---- terrain ----
 
   bake() {
-    const { width: W, height: H, waterY, points } = this.rules.map;
+    const { rules } = this;
+    const { width: W, height: H } = rules.map;
+    // A big map is baked coarser, so the picture stays a size every browser will hold.
+    const res = Math.min(RES, Math.sqrt(BAKE_PIXELS / ((W + H + 2 * MARGIN) * ((W + H) / 2 + 2 * MARGIN))));
+    this.res = res;
     const layer = document.createElement("canvas");
-    layer.width = Math.round((W + H + 2 * MARGIN) * RES);
-    layer.height = Math.round(((W + H) / 2 + 2 * MARGIN) * RES);
+    layer.width = Math.round((W + H + 2 * MARGIN) * res);
+    layer.height = Math.round(((W + H) / 2 + 2 * MARGIN) * res);
     const g = layer.getContext("2d");
-    g.setTransform(RES, 0, 0, RES, (H + MARGIN) * RES, MARGIN * RES);
+    g.setTransform(res, 0, 0, res, (H + MARGIN) * res, MARGIN * res);
     const path = (pts, dy = 0) => {
       g.beginPath();
       pts.forEach(([x, y], i) => {
@@ -309,8 +325,6 @@ export class Scene {
       });
       g.closePath();
     };
-    const land = [[0, 0], [W, 0], [W, waterY], [0, waterY]];
-    const sea = [[0, waterY], [W, waterY], [W, H], [0, H]];
     const whole = [[0, 0], [W, 0], [W, H], [0, H]];
     const rand = rng(20261124);
 
@@ -322,81 +336,36 @@ export class Scene {
     path(whole, 10);
     g.fill();
 
-    const blotches = (clip, n, colors, size) => {
-      g.save();
-      path(clip);
-      g.clip();
-      for (let i = 0; i < n; i++) {
-        const [ix, iy] = toIso(rand() * W, rand() * H);
-        g.fillStyle = colors[Math.floor(rand() * colors.length)];
-        g.beginPath();
-        g.ellipse(ix, iy, size * (0.4 + rand()), size * (0.2 + rand() * 0.4), 0, 0, TAU);
-        g.fill();
-      }
-      g.restore();
-    };
-
+    // Land under everything, then the map's own water, ice and mountains.
     g.fillStyle = sprites.terrain.land ? g.createPattern(sprites.terrain.land, "repeat") : "#5e6b43";
-    path(land);
+    path(whole);
     g.fill();
     if (!sprites.terrain.land) {
-      blotches(land, 900, ["rgba(120,124,78,0.20)", "rgba(58,74,44,0.22)", "rgba(142,132,88,0.14)"], 46);
-      blotches(land, 2600, ["rgba(30,40,24,0.20)", "rgba(190,186,130,0.12)"], 3);
-    }
-    g.fillStyle = sprites.terrain.sea ? g.createPattern(sprites.terrain.sea, "repeat") : "#1d5c78";
-    path(sea);
-    g.fill();
-    if (!sprites.terrain.sea) blotches(sea, 260, ["rgba(16,58,82,0.35)", "rgba(52,128,150,0.16)"], 50);
-    // Beach and surf along the shore.
-    g.fillStyle = "rgba(196,180,128,0.85)";
-    path([[0, waterY - 26], [W, waterY - 26], [W, waterY], [0, waterY]]);
-    g.fill();
-    g.fillStyle = "rgba(226,243,246,0.5)";
-    path([[0, waterY], [W, waterY], [W, waterY + 7], [0, waterY + 7]]);
-    g.fill();
-
-    // Props, drawn back to front. Each named place gets something that says what it is.
-    const props = [];
-    const clear = (x, y, r) => y < waterY - 40 && y > 20 && x > 20 && x < W - 20 && points.every((p) => Math.hypot(p.x - x, p.y - y) > r);
-    const put = (x, y, draw) => props.push({ depth: x + y, draw: () => draw(...toIso(x, y)) });
-    const around = (p, n, r0, r1, draw) => {
-      for (let i = 0; i < n; i++) {
-        const a = rand() * TAU;
-        const r = r0 + rand() * (r1 - r0);
-        const x = p.x + Math.cos(a) * r;
-        const y = p.y + Math.sin(a) * r;
-        if (clear(x, y, 80)) put(x, y, draw);
-      }
-    };
-    for (const p of points) {
-      const what = p.name.en.toLowerCase();
-      if (what.includes("forest")) around(p, 70, 85, 210, (ix, iy) => tree(g, ix, iy, 0.9 + rand() * 0.5, rand() < 0.5));
-      if (what.includes("town")) around(p, 9, 95, 170, (ix, iy) => house(g, ix, iy, 26 + rand() * 10, 22 + rand() * 8, rand() < 0.5 ? "#8e4f3a" : "#7a5a3c"));
-      if (what.includes("ridge")) around(p, 26, 85, 190, (ix, iy) => rock(g, ix, iy, 0.8 + rand() * 1.1));
-      if (what.includes("bridge")) {
-        for (const dy of [-34, 34]) put(p.x - 110, p.y + dy, (ix, iy) => isoBox(g, ix, iy, 90, 8, 9, "#9a968a", "#6d6a60", "#55524a"));
-      }
-      if (what.includes("airfield")) {
-        g.fillStyle = "rgba(58,60,58,0.9)";
-        path([[p.x - 210, p.y + 95], [p.x + 210, p.y + 95], [p.x + 210, p.y + 135], [p.x - 210, p.y + 135]]);
-        g.fill();
-        g.fillStyle = "rgba(230,230,220,0.75)";
-        for (let x = -190; x < 190; x += 44) {
-          path([[p.x + x, p.y + 113], [p.x + x + 22, p.y + 113], [p.x + x + 22, p.y + 117], [p.x + x, p.y + 117]]);
+      g.save();
+      path(whole);
+      g.clip();
+      for (const [n, colors, size] of [[Math.round((W * H) / 1800), ["rgba(120,124,78,0.20)", "rgba(58,74,44,0.22)", "rgba(142,132,88,0.14)"], 46], [Math.round((W * H) / 620), ["rgba(30,40,24,0.20)", "rgba(190,186,130,0.12)"], 3]]) {
+        for (let i = 0; i < n; i++) {
+          const [ix, iy] = toIso(rand() * W, rand() * H);
+          g.fillStyle = colors[Math.floor(rand() * colors.length)];
+          g.beginPath();
+          g.ellipse(ix, iy, size * (0.4 + rand()), size * (0.2 + rand() * 0.4), 0, 0, TAU);
           g.fill();
         }
-        put(p.x + 150, p.y + 60, (ix, iy) => isoBox(g, ix, iy, 46, 30, 16, "#8b9197", "#5f656b", "#494e53"));
       }
+      g.restore();
     }
-    for (let i = 0; i < 90; i++) {
-      const x = rand() * W;
-      const y = rand() * waterY;
-      if (clear(x, y, 120)) put(x, y, (ix, iy) => (rand() < 0.75 ? tree(g, ix, iy, 0.8 + rand() * 0.5, rand() < 0.5) : rock(g, ix, iy, 0.7 + rand() * 0.6)));
-    }
-    props.sort((a, b) => a.depth - b.depth).forEach((p) => p.draw());
+    paintGround(g, rules, rand, { water: sprites.terrain.sea ? g.createPattern(sprites.terrain.sea, "repeat") : null });
+    for (const s of scenery(rules, rand)) drawScenery(g, s, ...toIso(s.x, s.y));
 
     this.layer = layer;
-    this.waves = Array.from({ length: 70 }, () => ({ x: rand() * W, y: waterY + 14 + rand() * (H - waterY - 20), phase: rand() * TAU, len: 14 + rand() * 26 }));
+    // Glints on open water, wherever the map has any.
+    this.waves = [];
+    for (let i = 0; i < 4000 && this.waves.length < Math.round((W * H) / 23000); i++) {
+      const x = rand() * W;
+      const y = rand() * H;
+      if (isWater(rules, x, y) && isWater(rules, x - 30, y) && isWater(rules, x + 30, y)) this.waves.push({ x, y, phase: rand() * TAU, len: 14 + rand() * 26 });
+    }
   }
 
   // ---- frame ----
@@ -436,7 +405,7 @@ export class Scene {
     const gx = (-rules.map.height - MARGIN - cam.cx) * z + cam.w / 2;
     const gy = (-MARGIN - cam.cy) * z + cam.h / 2;
     ctx.imageSmoothingQuality = smoothing();
-    ctx.drawImage(this.layer, gx, gy, (this.layer.width / RES) * z, (this.layer.height / RES) * z);
+    ctx.drawImage(this.layer, gx, gy, (this.layer.width / this.res) * z, (this.layer.height / this.res) * z);
     ctx.lineCap = "round";
     for (const w of this.waves) {
       const glint = 0.5 + 0.5 * Math.sin(time * 1.3 + w.phase);
@@ -475,6 +444,9 @@ export class Scene {
     this.smoulder(now);
     this.fx.update(now, dt);
     this.sfx?.refresh();
+
+    // Bridges lie on the water: standing, shot up or fallen, as this side last saw them.
+    for (const b of rules.map.bridges ?? []) drawBridge(ctx, b, S, z, this.bridges.get(b.id), rules.bridgeRules?.dangerShare);
 
     // Ground markings: capture rings, order lines, team rings.
     const [rx, ry] = groundEllipse(rules.match.captureRadius);
@@ -516,6 +488,7 @@ export class Scene {
       }
       const wide = group.small ? 13 : 24;
       for (const v of group.visuals) {
+        if (v.in) continue; // inside a building: the building shows who holds it
         const [sx, sy] = S(v.x, v.y);
         ctx.beginPath();
         ctx.ellipse(sx, sy, wide * unitScale, (wide / 2) * unitScale, 0, 0, TAU);
@@ -550,8 +523,20 @@ export class Scene {
       const kind = p.kind === "hq" ? `hq_${this.hqFaction[p.owner] ?? (p.owner === 0 ? "aegis" : "ashfall")}${this.ruined[p.owner] ? "_ruin" : ""}` : p.kind;
       things.push({ depth: p.x + p.y, x: p.x, y: p.y, scale: buildScale, draw: () => drawBuilding(ctx, kind, sideColor[live.owner], time) });
     }
+    for (const l of rules.map.landmarks ?? []) {
+      // A fallen building is drawn as the rubble it has become.
+      const kind = this.lands.get(l.id)?.kind ?? l.kind;
+      things.push({
+        depth: l.x + l.y,
+        x: l.x,
+        y: l.y,
+        scale: buildScale,
+        draw: () => (sprites.buildings[kind] ? drawBuilding(ctx, kind, sideColor[-1], time) : (landmarkFallbacks[kind] ?? landmarkFallbacks.rubble)(ctx, time)),
+      });
+    }
     for (const group of this.groups.values()) {
       for (const v of group.visuals) {
+        if (v.in) continue;
         things.push({
           depth: v.x + v.y + (group.air ? 90 : 0), // what flies is drawn over what stands under it
           x: v.x,
@@ -696,6 +681,7 @@ export class Scene {
       if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55 });
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner] });
     }
+    this.landmarkLabels(buildScale, lang);
     for (const group of this.groups.values()) {
       if (!group.visuals.length) continue;
       const cx = group.visuals.reduce((a, v) => a + v.x, 0) / group.visuals.length;
@@ -706,12 +692,67 @@ export class Scene {
         this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88` });
         continue;
       }
-      this.plate(group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
+      // A squad in cover says so on its plate, with how much harder it is to hit.
+      const cover = Math.max(0, ...group.visuals.map((v) => coverPercent(v.cover)));
+      this.plate(cover ? `${group.view.callsign[lang]}  ⛨ ⁦${cover}%⁩` : group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
         size: 12,
         color: sideColor[group.side],
         border: group.id === this.selected ? "#ffffff" : `${sideColor[group.side]}88`,
       });
     }
+  }
+
+  // landmarkLabels shows what the side knows about the buildings (who is inside, how
+  // badly hit), and the name of the landmark or bridge under the pointer or just tapped.
+  landmarkLabels(buildScale, lang) {
+    const { rules, cam, ctx } = this;
+    for (const l of rules.map.landmarks ?? []) {
+      const seen = this.lands.get(l.id);
+      if (!seen) continue;
+      const [sx, sy] = cam.screen(l.x, l.y);
+      const top = sy - 30 * buildScale;
+      if (seen.garrison) {
+        // One pip for every fireteam inside, in its side's colour.
+        const n = seen.garrison.teams;
+        const w = 7;
+        for (let i = 0; i < n; i++) {
+          ctx.fillStyle = sideColor[seen.garrison.side];
+          ctx.strokeStyle = "#0b0f10";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.rect(sx - (n * (w + 2)) / 2 + i * (w + 2), top - 6, w, w);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+      if (seen.kind !== "rubble" && seen.hp < 1) {
+        ctx.fillStyle = "rgba(10,14,16,0.75)";
+        ctx.fillRect(sx - 15, top + 4, 30, 4);
+        ctx.fillStyle = seen.hp < 0.35 ? "#ff5a5a" : "#f0c04a";
+        ctx.fillRect(sx - 14, top + 5, 28 * seen.hp, 2);
+      }
+    }
+    const now = performance.now();
+    const shown = this.named && now < this.named.until ? this.named.id : this.hover && this.placeUnder(this.hover.x, this.hover.y);
+    if (!shown) return;
+    const place = typeof shown === "string" ? [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === shown) : shown.landmark ?? shown.bridge;
+    if (!place) return;
+    const [x, y] = place.from ? [(place.from[0] + place.to[0]) / 2, (place.from[1] + place.to[1]) / 2] : [place.x, place.y];
+    const [sx, sy] = cam.screen(x, y);
+    this.plate(place.name[lang], sx, sy - 44 * buildScale, { size: 12, color: "#f2f4ee", border: "#c9a44c" });
+  }
+
+  // placeUnder is the landmark or bridge under a point of the view, as { landmark } or
+  // { bridge }, or null.
+  placeUnder(sx, sy) {
+    if (!this.rules) return null;
+    const hit = placeAt(this.rules.map, ...this.cam.world(sx, sy), Math.max(26, 20 / this.cam.zoom));
+    return hit.landmark || hit.bridge ? hit : null;
+  }
+
+  // showName shows a landmark's or bridge's name for a few seconds, as after a tap.
+  showName(id) {
+    this.named = { id, until: performance.now() + 3500 };
   }
 
   // ---- radar ----
@@ -722,10 +763,14 @@ export class Scene {
     const h = this.radar.height;
     const k = w / rules.map.width;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.fillStyle = "#33412a";
-    g.fillRect(0, 0, w, h);
-    g.fillStyle = "#16455b";
-    g.fillRect(0, rules.map.waterY * k, w, h);
+    // The terrain, drawn once for this size and redrawn when a bridge falls or stands again.
+    if (!this.radarBase || this.radarBase.width !== w || this.radarBase.height !== h) {
+      this.radarBase = document.createElement("canvas");
+      this.radarBase.width = w;
+      this.radarBase.height = h;
+      drawMiniMap(this.radarBase.getContext("2d"), rules, rules.map, w, h, { standing: (id) => this.bridges.get(id)?.standing ?? true });
+    }
+    g.drawImage(this.radarBase, 0, 0);
     g.strokeStyle = "rgba(160,220,190,0.10)";
     g.lineWidth = 1;
     for (let x = 200; x < rules.map.width; x += 200) {
@@ -766,7 +811,8 @@ export class Scene {
 
   // ---- picking ----
 
-  // pick says what is under a point of the view: one of our squads, or a map point.
+  // pick says what is under a point of the view: one of our squads, an enemy in sight,
+  // a landmark, a bridge, or a map point.
   // contactName is what the player calls an enemy squad in sight, e.g. "Target 3".
   contactName(view, lang) {
     return `${this.rules.callsigns.contact[lang]} ${view.id}`;
@@ -787,6 +833,9 @@ export class Scene {
     }
     if (squad) return { squad };
     if (contact) return { contact };
+    // A landmark or a bridge before the point it stands beside: it is the smaller target.
+    const place = this.placeUnder(sx, sy);
+    if (place) return place;
     const [wx, wy] = this.cam.world(sx, sy);
     const point = this.rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= this.rules.match.captureRadius * 1.15);
     return point ? { point } : {};
