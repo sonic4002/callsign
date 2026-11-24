@@ -55,21 +55,22 @@ export function leaderHeroes(unit, rules, { seized = false } = {}) {
   return out.join("\n\n");
 }
 
-// operatorHeroes is the operator's paragraph.
-export function operatorHeroes(rules, faction) {
-  const m = rules.match;
+// heroLines is what the operator is told about its own hero, in the part on production.
+export function heroLines(rules, faction) {
   const mine = heroOf(rules, faction);
-  const theirs = Object.keys(rules.factions).filter((f) => f !== faction).map((f) => heroOf(rules, f)).filter(Boolean);
+  if (!mine) return "";
+  const [id, u] = mine;
+  const cs = callsign(rules, u);
   const structure = (role) => Object.values(rules.factions[faction].structures ?? {}).find((s) => s.role === role)?.name.en ?? role;
+  return `Your hero. ${u.name.en} (${u.name.he}), unit id "${id}", ${u.cost} gold, needs a ${structure(u.requires)}${(u.needs ?? []).map((role) => `, a ${structure(role)}`).join("")} and takes ${u.deploySeconds} seconds to arrive. It is ${heroFacts(u)}. Its callsign is ${cs.en} (${cs.he}) with a number, and it starts one brain tier up. A second one is refused while the first lives. A hero is costly and fragile: send it with a task, not into a firefight.`;
+}
+
+// fightLines is what the operator is told about the enemy's hero, digging in, armour
+// against infantry, and ranks, in the part on the fight.
+export function fightLines(rules, faction) {
+  const m = rules.match;
   const out = [];
-  if (mine) {
-    const [id, u] = mine;
-    const cs = callsign(rules, u);
-    out.push(
-      `Your hero. ${u.name.en} (${u.name.he}), unit id "${id}", ${u.cost} gold, needs a ${structure(u.requires)}${(u.needs ?? []).map((role) => `, a ${structure(role)}`).join("")} and takes ${u.deploySeconds} seconds to arrive. It is ${heroFacts(u)}. Its callsign is ${cs.en} (${cs.he}) with a number, and it starts one brain tier up. A second one is refused while the first lives. The net itself tells Hammer when your hero takes the field or falls, and when the enemy's does, so do not announce those again. A hero is costly and fragile: send it with a task, not into a firefight.`,
-    );
-  }
-  for (const [, u] of theirs) {
+  for (const [, u] of Object.keys(rules.factions).filter((f) => f !== faction).map((f) => heroOf(rules, f)).filter(Boolean)) {
     out.push(
       `The enemy's hero is the ${u.name.en} (${u.name.he}): ${heroFacts(u)}.${u.stealth ? " A defence by what you want to keep finds it." : ""}${u.seizeRadius ? " A squad it has seized comes back when it dies or is driven off, so kill the hero rather than the vehicle; your status counts squads it holds as `taken`." : ""}`,
     );

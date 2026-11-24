@@ -101,7 +101,7 @@ export const operatorTools = [
     unit: { type: "string", description: 'Unit id or name; the last one of that kind bought is cancelled. "" cancels the last unit bought, whatever it is.' },
   }),
   tool("rally", "Set where new units gather when they come out of the structure that makes them. They go there and hold it.", {
-    place: { type: "string", description: 'A point, a landmark, or a spot such as "100 metres north of Alpha". "home" puts them back beside their structure.' },
+    place: { type: "string", description: 'A point, a landmark, a tech building by its id or name, or a spot such as "100 metres north of Alpha". "home" puts them back beside their structure.' },
     structure: { type: "string", description: 'One structure of yours, by id or name, to set only its rally point; "" for every structure.' },
   }),
   tool("haul", "Tell your gold haulers which field to work. They keep working it until told otherwise, even under threat, so use it on purpose.", {

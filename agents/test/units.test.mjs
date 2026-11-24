@@ -392,7 +392,7 @@ test("status and prompts: the operator is told about haulers, fields and income 
   assert.deepEqual(status.goldFields, [{ field: "B", full: 0.5, inSight: true }]);
   const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
   assert.match(prompt, /haulers drive out, load, and bring it home to your refinery/);
-  assert.match(prompt, /opens with the headquarters alone: the refinery is built early/);
+  assert.match(prompt, /A match opens with the headquarters alone/);
   assert.match(prompt, /crawler: Ore crawler \(זחל כרייה\), hauler, 150 gold, needs a Vehicle Works; an unarmed gold hauler/);
   assert.match(prompt, /on your own you build only while command\.buy is true/);
   assert.match(prompt, /- B: Bravo \/ בועז .*a gold field/);

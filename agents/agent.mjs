@@ -321,6 +321,8 @@ export function compactStatus(status, side) {
     // What the structures supply and use; low power slows building and silences defences.
     power: status.power,
     radar: status.radar,
+    // The role a base usually builds next, "" once the opening is complete.
+    opening: status.opening ?? "",
     squads: status.squads.map((s) => ({ callsign: s.callsign.en, unit: s.unit, class: s.class, ...squad(s) })),
     // Bought and on their way: they count toward the cap and cannot be ordered yet.
     deploying: (status.deploying ?? []).map((d) => ({ callsign: d.callsign.en, unit: d.unit, secondsLeft: Math.ceil(d.ticksLeft / 10) })),

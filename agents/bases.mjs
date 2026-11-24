@@ -2,11 +2,11 @@
 // status, and how the scripted brain reads a call about building or about a structure.
 // It runs in Node and in a Web Worker alike, like the rest of the agent core.
 
-import { leaderMend, leaderSiege, operatorPower, powerFact, powerWords, radarWords } from "./power.mjs";
+import { leaderMend, leaderSiege, powerFact, powerWords, radarWords } from "./power.mjs";
 
 const names = (ids, table) => ids.map((id) => table[id]?.name.en ?? id).join(", ");
 
-// structureLines lists a faction's structures for the operator's prompt.
+// structureLines lists a faction's structures for the operator's prompt (prompts.mjs).
 export function structureLines(rules, faction) {
   const f = rules.factions[faction];
   const ofRole = (role) => Object.values(f.structures).find((s) => s.role === role)?.name.en ?? role;
@@ -26,18 +26,6 @@ export function structureLines(rules, faction) {
       return `- ${id}: ${s.name.en} (${s.name.he}), ${facts.join("; ")}`;
     })
     .join("\n");
-}
-
-// operatorBases is the operator's paragraph on bases.
-export function operatorBases(rules, faction) {
-  const m = rules.match;
-  return `Your base. Structures decide what you can buy: a unit whose structure does not stand is refused, and the refusal names what to build. Build with the build tool. Structures you can build:
-${structureLines(rules, faction)}
-Base structures (everything that is not a defence or a fence) are placed: on open land, clear of what stands there, within ${m.baseRadius} of your headquarters or ${m.baseReach} of a finished base structure of yours, so a base grows outward one structure at a time; a dockyard stands on the shore. When Hammer names a spot ("build a Vehicle Works 140 metres north and 60 metres east of Alpha"), pass those words as \`place\` and it stands exactly there, or is refused with the reason; with \`place\` empty the game picks a place by your headquarters. You may hold ${m.baseCap} base structures, and more than one of a kind. One base structure goes up at a time; gold is taken when work begins and a structure does nothing until it stands. A defence or a fence takes a \`place\` too: an exact spot the same way, a point you hold, a structure of yours by id, or a side of your base ("base:north", "base:south", "base:east", "base:west", "base:front" toward the enemy, "base:rear"); it must be within ${m.buildRadius} of your headquarters, a structure of yours or a point you hold.
-Production. A unit is made by the structure it needs and comes out of that structure's door. Each structure makes one unit at a time and up to ${m.queueLimit} wait in its line, so three tanks from one works take three times as long as one; a second structure of the kind is a second line. A purchase is paid when ordered; the buy result says how long until it comes out and which structure makes it, and your status lists what is on the way. If the structure falls, everything in its line is lost with it. The cancel tool takes the last unit of a kind out of its line and returns the gold not yet spent on it: use it when Hammer says "cancel the tank". New units gather beside their structure and await orders; when Hammer says "new squads rally at Delta", call the rally tool, and from then on they go there and hold it ("rally at home" puts them back). Rally can be set for one structure. You may hold ${m.defenceCap} defences and ${m.fenceRuns} fence runs, and one defence or fence goes up at a time beside the base structure. A fence run can also go between two places: give \`place\` and \`place2\`.
-Your status lists structures: yours with their health and whether they are still going up, and the enemy's as your side last saw them. An enemy structure can be attacked by any squad that can hurt it (tell the squad its id, for example "attack s7, the enemy works") and taken over by an engineer squad. Losing a structure takes away what it lets you buy until you rebuild it; squads already in the field stay. Tell Hammer when a structure of yours is lost or taken.
-Build when Hammer asks, and confirm what you started and its cost. Building is spending: on your own you build only while command.buy is true, exactly as with buying, and the net tells Hammer what you started, so do not announce it again. With the purse, build what your next unit needs, and put back a lost refinery or barracks before anything else. If the build is refused, tell Hammer why.
-${operatorPower(rules, faction)}`;
 }
 
 // leaderBases is a squad leader's paragraph on structures.
