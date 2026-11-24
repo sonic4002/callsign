@@ -258,7 +258,10 @@ func TestRolesLimitTools(t *testing.T) {
 		t.Errorf("attack on an unseen contact: err = %v", err)
 	}
 
-	// Only the operator spends gold, and the simulation still checks the price.
+	// Only the operator spends gold, on Hammer's word, and the simulation still checks the price.
+	if _, err := rm.Say(hammer, "Anvil, buy a tank"); err != nil {
+		t.Fatal(err)
+	}
 	tool(t, rm, anvil, ToolBuy, `{"unit":"tank"}`)
 	if _, err := rm.Tool(anvil, ToolBuy, json.RawMessage(`{"upgrade":"Viper 1"}`)); !errors.Is(err, sim.ErrNoGold) {
 		t.Errorf("upgrade with 50 gold: err = %v", err)
@@ -410,6 +413,9 @@ func TestRestart(t *testing.T) {
 	}
 	if err := rm.Restart(anvil); err == nil {
 		t.Fatal("an agent restarted the match")
+	}
+	if _, err := rm.Say(hammer, "Anvil, buy a tank"); err != nil {
+		t.Fatal(err)
 	}
 	tool(t, rm, anvil, ToolBuy, `{"unit":"tank"}`)
 	if n := len(rm.sim.Snapshot(0).Deploying); n != 1 {

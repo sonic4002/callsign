@@ -141,11 +141,15 @@ type Rules struct {
 	} `json:"callsigns"`
 	Factions map[string]Faction `json:"factions"`
 	Radio    struct {
-		Marker   Text             `json:"marker"`
-		Over     Text             `json:"over"`
-		Out      Text             `json:"out"`
-		SignOff  map[string]Text  `json:"signOff"` // the operator's last word: won, lost, draw
-		Prowords map[string]Words `json:"prowords"`
+		Marker  Text            `json:"marker"`
+		Over    Text            `json:"over"`
+		Out     Text            `json:"out"`
+		SignOff map[string]Text `json:"signOff"` // the operator's last word: won, lost, draw
+		// What Hammer says to hand the operator the fight ("give") or to take it back
+		// ("take"), and how the net announces a purchase the operator made on its own.
+		Command     map[string]Words `json:"command"`
+		OwnPurchase map[string]Text  `json:"ownPurchase"`
+		Prowords    map[string]Words `json:"prowords"`
 	} `json:"radio"`
 }
 

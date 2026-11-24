@@ -69,14 +69,49 @@ export function wantedUnit(text, units) {
   return entries.filter(([, u]) => u.class === cls).sort((a, b) => a[1].cost - b[1].cost)[0]?.[0];
 }
 
-function operatorPlan({ wake, rules, agent }) {
+// ownMoves is the scripted operator running the fight after Hammer handed it over: one
+// purchase when gold allows, and a point to hold for every squad that has no orders. In
+// the default mode it is never called: the operator acts on Hammer's orders only.
+function ownMoves({ wake, rules, agent }) {
+  const s = wake.status;
+  if (s?.command?.mode !== "fight") return [];
+  const lang = agent.lang === "he" ? "he" : "en";
+  const moves = [];
+  const units = Object.entries(rules.factions[s.faction ?? ""]?.units ?? {});
+  const fielded = s.squads.length + (s.deploying?.length ?? 0);
+  if (s.command.buy && fielded < Math.min(rules.match.populationCap, 8)) {
+    const infantry = [...s.squads, ...(s.deploying ?? [])].filter((q) => q.class === "infantry").length;
+    const cls = infantry < 4 ? "infantry" : "vehicle";
+    const pick = units.filter(([, u]) => u.class === cls).sort((a, b) => a[1].cost - b[1].cost)[0];
+    // The net announces a purchase made on the operator's own, so nothing is said here.
+    if (pick && s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
+  }
+  const mine = (p) => s.points.find((q) => q.id === p.id)?.owner === agent.side;
+  const taken = new Set(s.squads.map((q) => q.order?.point).filter(Boolean)); // one squad per point
+  for (const sq of s.squads.filter((q) => q.order?.kind === "none").slice(0, 2)) {
+    const domain = units.find(([id]) => id === sq.unit)?.[1].domain;
+    const goal = rules.map.points
+      .filter((p) => p.kind !== "hq" && !mine(p) && !taken.has(p.id) && (domain === "air" || (domain === "sea") === p.y >= rules.map.waterY))
+      .sort((a, b) => Math.hypot(a.x - sq.x, a.y - sq.y) - Math.hypot(b.x - sq.x, b.y - sq.y))[0];
+    if (goal) taken.add(goal.id);
+    if (goal) moves.push(radio([sq.callsign.en], lang === "he" ? `תחזיקו את ${goal.callsign.he}` : `Hold ${goal.callsign.en}`, "over"));
+  }
+  return moves;
+}
+
+function operatorPlan(ctx) {
+  const { wake, rules, agent } = ctx;
   const call = wake.call;
-  if (!call || call.from.key !== "player") return []; // Anvil answers to Hammer only
+  if (!call || call.from.key !== "player") return ownMoves(ctx); // otherwise Anvil answers to Hammer only
   const lang = call.lang;
   const back = [call.from.en];
   const text = call.body.toLowerCase();
   const negative = (why) => radio(back, `${say.negative[lang]}, ${why}`, "over");
   if (call.prowords?.includes("radioCheck")) return [radio(back, say.fiveByFive[lang], "out")];
+  // Handing over the fight, or taking command back: the net has already switched the mode
+  // on the fixed words, so the operator only acknowledges, and gets to work if it is its fight.
+  const says = (kind) => [...rules.radio.command[kind].en, ...rules.radio.command[kind].he].some((phrase) => text.includes(phrase.toLowerCase()));
+  if (says("take") || says("give")) return [radio(back, say.wilco[lang], "out"), ...ownMoves(ctx)];
 
   if (/\bupgrade\b|שדרג/.test(text)) {
     const squad = (wake.status?.squads ?? []).find((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));

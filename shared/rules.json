@@ -188,6 +188,20 @@
     "marker": { "en": "this is", "he": "כאן" },
     "over": { "en": "Over", "he": "עבור" },
     "out": { "en": "Out", "he": "סוף" },
+    "command": {
+      "give": {
+        "en": ["run the fight", "run the battle", "manage the fight", "take over the fight", "you have command", "the fight is yours"],
+        "he": ["נהל את הקרב", "תנהל את הקרב", "נהלי את הקרב", "הפיקוד אצלך", "קח פיקוד", "הקרב שלך"]
+      },
+      "take": {
+        "en": ["i have command", "i am taking command", "i'm taking command", "i take command", "on my orders only"],
+        "he": ["הפיקוד אצלי", "אני לוקח פיקוד", "אני לוקחת פיקוד", "רק בפקודה שלי"]
+      }
+    },
+    "ownPurchase": {
+      "bought": { "en": "Bought {unit} for {cost} gold, {squad} is deploying", "he": "נקנה {unit} ב-{cost} זהב, {squad} בדרך" },
+      "upgraded": { "en": "Upgraded {squad} to {tier} for {cost} gold", "he": "{squad} שודרג לדרגת {tier} ב-{cost} זהב" }
+    },
     "signOff": {
       "won": { "en": "Victory. The enemy is defeated", "he": "ניצחון. האויב הובס" },
       "lost": { "en": "We have been defeated", "he": "הובסנו" },

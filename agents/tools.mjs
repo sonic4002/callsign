@@ -54,12 +54,24 @@ export const operatorTools = [
     unit: { type: "string", description: 'Unit id to buy, or "".' },
     upgrade: { type: "string", description: 'Callsign of the squad to upgrade, for example "Viper 2", or "".' },
   }),
+  tool(
+    "command",
+    'Set who has the initiative, after Hammer handed you the fight or took command back in words of their own. The fixed phrases ("run the fight", "I have command") switch it without you; your status always shows the current mode.',
+    {
+      mode: { type: "string", enum: ["orders", "fight"], description: '"fight" when Hammer handed you the fight, "orders" when Hammer took command back.' },
+      buy: { type: "boolean", description: "With \"fight\": false when Hammer told you not to spend on your own, otherwise true." },
+    },
+  ),
 ];
 
 // normalize drops the empty placeholders strict schemas force the model to send.
 export function normalize(name, input) {
   const args = {};
   for (const [key, value] of Object.entries(input ?? {})) {
+    if (name === "command" && key === "buy") {
+      args[key] = value; // false is the whole point of this one
+      continue;
+    }
     if (value === "" || value === 0 || value == null) continue;
     if (name === "hold" && key === "point" && String(value).trim().toLowerCase() === "here") continue;
     args[key] = value;

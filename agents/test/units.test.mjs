@@ -16,7 +16,7 @@ const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 test("the game tools are exactly the six in the design, buy for the operator only", () => {
   const names = (tools) => tools.map((t) => t.name).sort();
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
-  assert.deepEqual(names(operatorTools), ["buy", "radio", "report"]);
+  assert.deepEqual(names(operatorTools), ["buy", "command", "radio", "report"]);
   for (const t of [...leaderTools, ...operatorTools]) {
     assert.equal(t.strict, true);
     assert.equal(t.input_schema.additionalProperties, false);
@@ -239,4 +239,51 @@ test("subscription brain: actions become tool calls, and it thinks again only on
   assert.equal((await brain.think(ctx)).stop_reason, "tool_use");
   assert.equal(runs.length, 2);
   assert.match(transcript(ctx.messages), /hold was refused: no such point/);
+});
+
+test("scripted operator: acts on orders only until Hammer hands it the fight, and stops when command is taken back", async () => {
+  const brain = scriptedBrain();
+  const anvil = { role: "anvil", side: 0, squad: 0, tier: 1, station: { key: "operator", en: "Anvil", he: "סדן" }, lang: "en" };
+  const status = (mode, extra = {}) => ({
+    faction: "aegis",
+    gold: 900,
+    command: { mode, buy: mode === "fight" },
+    points: [{ id: "A", owner: 0 }, { id: "B", owner: -1 }, { id: "D", owner: -1 }, { id: "Z", owner: 1 }],
+    squads: [
+      { callsign: { en: "Viper 1" }, class: "infantry", unit: "commandos", x: 150, y: 480, order: { kind: "none" } },
+      { callsign: { en: "Viper 2" }, class: "infantry", unit: "commandos", x: 150, y: 480, order: { kind: "hold", point: "D" } },
+    ],
+    deploying: [],
+    ...extra,
+  });
+  const heard = (mode, extra) => ({ items: [{ kind: "heard", msg: call("Wilco", { from: viper2, end: "out" }) }], call: null, status: status(mode, extra) });
+  // On orders: gold piles up, a squad sits idle, and the operator does nothing about either.
+  assert.deepEqual(await think(brain, { agent: anvil, wake: heard("orders") }), []);
+  assert.deepEqual(await think(brain, { agent: anvil, wake: { items: [{ kind: "event", event: { kind: "point_lost", point: "B" } }], call: null, status: status("orders") } }), []);
+  // Hammer hands over the fight: acknowledge, then buy and task without being asked.
+  const give = call("Run the fight", { to: [anvil.station] });
+  assert.deepEqual(await think(brain, { agent: anvil, wake: { items: [{ kind: "radio", msg: give }], call: give, status: status("fight") } }), [
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+    ["buy", { unit: "commandos", upgrade: "" }],
+    ["radio", { to: ["Viper 1"], body: "Hold Bravo", end: "over" }],
+  ]);
+  // It keeps going on later traffic, in Hebrew when that is the net's language.
+  assert.deepEqual(await think(brain, { agent: { ...anvil, lang: "he" }, wake: heard("fight") }), [
+    ["buy", { unit: "commandos", upgrade: "" }],
+    ["radio", { to: ["Viper 1"], body: "תחזיקו את בועז", end: "over" }],
+  ]);
+  // Told not to spend: it still tasks squads but buys nothing.
+  assert.deepEqual(await think(brain, { agent: anvil, wake: heard("fight", { command: { mode: "fight", buy: false } }) }), [["radio", { to: ["Viper 1"], body: "Hold Bravo", end: "over" }]]);
+  // Hammer takes command back: one Wilco and nothing more, now or on later traffic.
+  const take = call("I have command", { to: [anvil.station] });
+  assert.deepEqual(await think(brain, { agent: anvil, wake: { items: [{ kind: "radio", msg: take }], call: take, status: status("orders") } }), [["radio", { to: ["Hammer"], body: "Wilco", end: "out" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil, wake: heard("orders") }), []);
+});
+
+test("command tool: the operator's own switch keeps a false `buy`", () => {
+  assert.deepEqual(normalize("command", { mode: "fight", buy: false }), { mode: "fight", buy: false });
+  assert.deepEqual(normalize("command", { mode: "orders", buy: true }), { mode: "orders", buy: true });
+  const prompt = operatorPrompt({ rules, side: 0, faction: "aegis" });
+  assert.match(prompt, /never buy, upgrade or give a squad a new task on your own/);
+  assert.match(prompt, /only Hammer hands it over/);
 });
