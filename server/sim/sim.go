@@ -146,12 +146,15 @@ type Team struct {
 	pdx, pdy   float64 // the step it made last tick
 	hx, hy     float64 // the way it last wanted to go, as a unit vector; 0 when it wanted to stand
 	jam        int     // ticks in a row it has wanted to move and been blocked
+	stuck      int     // of those, the ticks in a row behind a friend standing in its own place
 	lean       int     // the side it goes round what blocks it: +1 or -1, 0 when not chosen
 	leanTick   int     // tick it last went round something
 	yield      int     // it stands aside for a friend until this tick
+	aside      int     // the side of that friend's line it stepped to: +1 or -1
 	detour     int     // its path goes round the bodies in its way until this tick
 	detourNext int     // it does not look for a way round again before this tick
 	detourAll  bool    // the way round avoids standing friends too
+	held       int     // an enemy body holds it up until this tick: it fights before it pushes on
 	// The spot it has claimed to stand on (post): for which place, where, since when (the
 	// older claim wins), the tick after it last asked for it, and when it may look again
 	// after finding no spot.
@@ -651,7 +654,14 @@ func (s *Sim) move(tr *teamRef) {
 	t, p := tr.t, tr.plan
 	t.Action = p.act
 	if (p.act != ActAdvance && p.act != ActFallBack) || t.In != "" {
-		t.hx, t.hy, t.jam = 0, 0, 0
+		t.hx, t.hy = 0, 0
+		if s.Tick < t.held && t.In == "" {
+			// It has stopped to fight what holds it up; it is still blocked (bodies.go).
+			t.jam++
+			s.lookRound(tr, false)
+		} else {
+			t.jam, t.stuck, t.detour = 0, 0, 0 // where it meant to be, or busy with something else
+		}
 		return
 	}
 	if s.Tick < t.yield {

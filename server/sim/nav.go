@@ -487,6 +487,9 @@ func (s *Sim) steer(tr *teamRef, x, y float64) (float64, float64, bool) {
 			rx, ry, ok := s.steerOn(tr, x, y, true)
 			n.avoid = false
 			if t.pathOpen {
+				// There is a way round: keep to it, or the team would turn back to the
+				// blocked way as soon as it had walked off.
+				t.detour = s.Tick + detourSeconds*s.R.TickRate
 				return rx, ry, ok
 			}
 		}

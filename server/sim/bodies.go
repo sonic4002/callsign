@@ -29,14 +29,17 @@ import (
 // Enemies block. Bodies of the two sides on the ground or on the water are kept a
 // standoff (Match.BodyStandoff) farther apart than touching, so nobody squeezes past an
 // enemy: one fireteam on a bridge, in the gap of a fence or in a pass holds it until it
-// is destroyed or leaves. What cannot hold ground (a hauler, a hero: one man or one
-// truck) neither keeps that standoff nor is kept at it; its body blocks like any other.
+// is destroyed or leaves. One man or one truck holds no ground: a hero or a hauler
+// neither keeps that standoff nor is kept at it; its body blocks like any other.
 //
 // A team whose step is taken goes round on one side and keeps to that side; when it
 // cannot, it closes up and waits. After a second and a half of waiting on an enemy (four
-// seconds on friends) its path is found again around the bodies standing in the way; if
-// there is no way round it stays and waits for the way to clear. A team never moves
-// unless the step brings it nearer to where it is going, so it does not jitter.
+// seconds on friends) its path is found again around the bodies standing in the way, and
+// it keeps to that way for as long as there is one (another bridge, the long way about);
+// if there is no way round it stays and waits for the way to clear. A team never moves
+// unless the step brings it nearer to where it is going, so it does not jitter. And a
+// team an enemy holds up fights: even ordered to move, it shoots what is in range
+// rather than push on against a body that will not give.
 //
 // Where teams end up: a team ordered to a place claims the spot it will stand on. The
 // oldest claim wins; a team whose slot is claimed or stood on takes the nearest free
@@ -57,14 +60,20 @@ const (
 
 	yieldTicks        = 5  // a team that made way stands aside this long after the last push
 	followTicks       = 5  // a team behind a slower friend waits this long before overtaking
+	heldAfter         = 5  // blocked by an enemy this long, a team turns to shooting what it can
 	swapAfter         = 10 // friends blocking each other change places after this many ticks
 	detourAfter       = 15 // blocked by an enemy this long, a team looks for a way round
 	detourAfterFriend = 40 // the same when it is friends that stand in the way
-	detourSeconds     = 8  // how long a way round is kept to
+	detourSeconds     = 8  // how long a way round is kept to after it was last found
 	detourRetry       = 3  // seconds before looking for a way round again after finding none
+	settleAfter       = 15 // blocked this long within reach of its spot, a team stands where it is
 	postSlack         = 2  // room left between two bodies standing at their posts
 	postRings         = 8  // how far out a free spot is looked for, in rings
 )
+
+// settled is the age of a claim to the spot a team stands on because it could get no
+// nearer: older than any other.
+const settled = -1
 
 // The angles a blocked team tries to go round at, as cosine and sine.
 var slideAngles = [3][2]float64{
@@ -172,7 +181,7 @@ func runsDown(a, b *teamRef) bool {
 }
 
 // holdsGround reports whether a body is one that enemies are kept a standoff from.
-func holdsGround(a *teamRef) bool { return a.sq.haul == nil && !a.u.NoCapture }
+func holdsGround(a *teamRef) bool { return a.sq.haul == nil && !a.u.Hero }
 
 // touch is how far apart the centres of two bodies must be for them not to overlap, 0
 // when they take no room from each other.
@@ -345,9 +354,29 @@ func (s *Sim) step(tr *teamRef, nx, ny, tx, ty float64) {
 		return // keeping up with the friend ahead is not being blocked
 	}
 	t.jam++
+	if t.jam == 1 {
+		t.stuck = 0
+	}
+	if friend && s.standing(b) {
+		t.stuck++ // behind a friend that is where it means to be, and cannot make way
+	} else {
+		t.stuck = 0
+	}
+	if !friend && t.jam >= heldAfter {
+		// Held up by an enemy: for a while the team would sooner shoot than push on (decide).
+		t.held = s.Tick + 2*s.R.TickRate
+	}
 	if friend && t.jam >= swapAfter && s.swap(tr, b, ux, uy) {
 		return
 	}
+	s.lookRound(tr, friend)
+}
+
+// lookRound has a team that has been blocked long enough find its path again around
+// the bodies standing in its way: the enemy's, and its friends' too when it is friends
+// it has been waiting on.
+func (s *Sim) lookRound(tr *teamRef, friend bool) {
+	t := tr.t
 	wait := detourAfter
 	if friend {
 		wait = detourAfterFriend
@@ -358,23 +387,35 @@ func (s *Sim) step(tr *teamRef, nx, ny, tx, ty float64) {
 }
 
 // makeWay has a standing team f step out of the way of its friend m, which is heading
-// along (ux, uy): off m's line on the side f already stands, or the other side, or
-// ahead of m when the passage is too narrow for either. A pinned team stays down.
+// along (ux, uy): off m's line on the side f already stands, or ahead of m when there is
+// no room there (a narrow passage, a neighbour), or else to the other side. Pushed again
+// while it is still standing aside, it keeps to the side it took: a team is never sent
+// back and forth across the line of the friend it makes way for. A pinned team stays down.
 func (s *Sim) makeWay(f, m *teamRef, ux, uy float64) {
 	t := f.t
 	if s.Nerve(t) == Pinned {
 		return
 	}
 	l := s.stride(f)
+	again := s.Tick < t.yield && t.aside != 0
 	side := 1.0
 	if ux*(t.Y-m.t.Y)-uy*(t.X-m.t.X) < 0 {
 		side = -1
 	}
-	for _, d := range [3][2]float64{{-uy * side, ux * side}, {uy * side, -ux * side}, {ux, uy}} {
+	if again {
+		side = float64(t.aside)
+	}
+	for k, d := range [3][2]float64{{-uy * side, ux * side}, {ux, uy}, {uy * side, -ux * side}} {
+		if k == 2 && again {
+			break
+		}
 		x, y := t.X+d[0]*l, t.Y+d[1]*l
 		if s.canStand(f, x, y) && s.hit(f, x, y, nil) == nil {
 			s.shift(f, x, y)
-			t.yield, t.path = s.Tick+yieldTicks, nil
+			if k == 2 {
+				side = -side
+			}
+			t.yield, t.aside, t.path = s.Tick+yieldTicks, int(side), nil
 			return
 		}
 	}
@@ -567,6 +608,11 @@ func (s *Sim) room(sq *Squad, self *Team, x, y float64) (float64, float64) {
 // body has it. The team claims the spot, and keeps it while it wants the same place.
 // Among friends the oldest claim wins; whoever stands still where no claim says is in
 // possession. A team that loses its spot takes the nearest free one around (x, y).
+//
+// A team that the others keep from the last steps to its spot does not push for ever:
+// blocked for a while within reach of its place, it stands where it is, and that is its
+// spot from then on, before any other claim. So does a team kept farther out by friends
+// that stand in their own places: it stays at the edge of the crowd.
 func (s *Sim) post(tr *teamRef, x, y float64) (float64, float64) {
 	t := tr.t
 	if t.In != "" {
@@ -584,6 +630,15 @@ func (s *Sim) post(tr *teamRef, x, y float64) (float64, float64) {
 		s.spots.put(tr, &tr.spot, t.claimX, t.claimY) // a claim let go a while ago, and taken up again
 	}
 	t.claimSeen = s.Tick + 1
+	sp := 2*tr.r + postSlack
+	near := dist(t.X, t.Y, t.claimX, t.claimY) <= 2*sp || dist(t.X, t.Y, x, y) <= s.R.Match.HoldRadius
+	// Farther out, only behind friends that have their own places and cannot make way:
+	// the crowd around the point is full on this side, and the team stands at its edge.
+	edge := t.stuck >= 2*settleAfter && dist(t.X, t.Y, x, y) <= postRings*sp
+	if t.jam >= settleAfter && (near || edge) {
+		claim(t.X, t.Y)
+		t.claimTick = settled
+	}
 	if s.Tick < t.claimWait || s.postFree(tr, t.claimX, t.claimY, false) {
 		return t.claimX, t.claimY
 	}
@@ -603,9 +658,15 @@ func (s *Sim) claims(t *Team) bool { return t.claimed && s.Tick-t.claimSeen <= 0
 
 // postFree reports whether a team may take (x, y) as its spot. A friend's claim stands
 // in the way when it is older (any claim, when the team is choosing a new spot: all);
-// so does any body standing still there that is at its own spot or has none.
+// so does any body standing still there that is at its own spot or has none. A new
+// spot is chosen with a little room to spare; a spot already held is given up only when
+// the other body would truly overlap it.
 func (s *Sim) postFree(tr *teamRef, x, y float64, all bool) bool {
 	t, g := tr.t, &s.spots
+	slack := -0.01
+	if all {
+		slack = postSlack
+	}
 	reach := tr.r + g.reach + postSlack
 	c0, c1, r0, r1 := g.col(x-reach), g.col(x+reach), g.row(y-reach), g.row(y+reach)
 	for r := r0; r <= r1; r++ {
@@ -616,7 +677,7 @@ func (s *Sim) postFree(tr *teamRef, x, y float64, all bool) bool {
 					continue
 				}
 				if (all || ot.claimTick < t.claimTick || (ot.claimTick == t.claimTick && o.i < tr.i)) &&
-					dist(x, y, ot.claimX, ot.claimY) < tr.r+o.r+postSlack {
+					dist(x, y, ot.claimX, ot.claimY) < tr.r+o.r+slack {
 					return false
 				}
 			}
@@ -633,8 +694,8 @@ func (s *Sim) postFree(tr *teamRef, x, y float64, all bool) bool {
 				if need == 0 {
 					continue
 				}
-				if friend {
-					need += postSlack
+				if friend || !all {
+					need += slack
 				}
 				if dist(x, y, ot.X, ot.Y) < need {
 					return false
@@ -675,6 +736,15 @@ func (s *Sim) shutBodies(tr *teamRef, x, y float64) bool {
 					n.shut[r*n.cols+c] = n.shutID
 				}
 			}
+		}
+	}
+	// The team itself stands pressed against what blocks it, inside the ground just
+	// closed: the cells right around it stay open, so that it can walk away.
+	c0, r0 := n.cellOf(t.X-1.5*NavCell, t.Y-1.5*NavCell)
+	c1, r1 := n.cellOf(t.X+1.5*NavCell, t.Y+1.5*NavCell)
+	for r := r0; r <= r1; r++ {
+		for c := c0; c <= c1; c++ {
+			n.shut[r*n.cols+c] = 0
 		}
 	}
 	return n.shut[n.index(x, y)] != n.shutID
