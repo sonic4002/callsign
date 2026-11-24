@@ -20,6 +20,7 @@ var (
 	ErrNoSeat     = errors.New("you do not hold that seat")
 	ErrNoWatching = errors.New("this match is not open to spectators")
 	ErrNotAgent   = errors.New("agents need the server's agent key or their side's seat token")
+	ErrNoHost     = errors.New("an agent joins through its host: name the host it belongs to")
 )
 
 // A seat is one side's commander. There are no accounts: whoever holds the token the
@@ -134,6 +135,9 @@ func (rm *Room) holds(side int, token string) bool {
 	return t != "" && subtle.ConstantTimeCompare([]byte(t), []byte(token)) == 1
 }
 
+// Seated reports whether the room's sides are held by seat tokens.
+func (rm *Room) Seated() bool { return rm.cfg.Seats }
+
 // Holds is holds for callers outside the room, such as the model relay's lookup.
 func (rm *Room) Holds(side int, token string) bool {
 	rm.mu.Lock()
@@ -145,15 +149,22 @@ func (rm *Room) Holds(side int, token string) bool {
 // be who it says it is. In a room without seats and without an agent key everyone is
 // trusted, as in Phase 0.
 func (rm *Room) Enter(id Identity, auth Auth, wantState bool) (*Client, error) {
-	if err := rm.admit(id, auth); err != nil {
+	id, err := rm.admit(id, auth)
+	if err != nil {
 		return nil, err
 	}
 	return rm.Join(id, wantState)
 }
 
-func (rm *Room) admit(id Identity, auth Auth) error {
+// admit checks a connection and returns its identity as the room will know it: what a
+// host may claim is decided here, by what it showed, and not by what it asked for.
+func (rm *Room) admit(id Identity, auth Auth) (Identity, error) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
+	return id, rm.check(&id, auth)
+}
+
+func (rm *Room) check(id *Identity, auth Auth) error {
 	if id.Side != 0 && id.Side != 1 {
 		return errors.New("side must be 0 or 1")
 	}
@@ -167,17 +178,30 @@ func (rm *Room) admit(id Identity, auth Auth) error {
 		if rm.cfg.Seats && !rm.cfg.Watch {
 			return ErrNoWatching
 		}
-	case RoleAnvil, RoleSquad:
-		// An agent sees its side's fog and speaks on its net. With an agent key set it
-		// must come from the server's own agent host (the key) or from the browser of
-		// the commander it serves (that seat's token). Without a key the server is in
-		// its trusting, this-machine-only mode.
+	case RoleAnvil, RoleSquad, RoleHost:
+		// An agent sees its side's fog and speaks on its net, and a host decides who runs
+		// a side's agents. With an agent key set they must come from the server's own
+		// agent host (the key) or from the browser of the commander they serve (that
+		// seat's token). Without a key the server is in its trusting, this-machine-only
+		// mode, and a host's rank is whatever it says.
 		key := rm.cfg.AgentKey
 		if key == "" {
 			return nil
 		}
-		if subtle.ConstantTimeCompare([]byte(key), []byte(auth.Key)) != 1 && !rm.holds(id.Side, auth.Token) {
+		rank := RankServer
+		switch {
+		case subtle.ConstantTimeCompare([]byte(key), []byte(auth.Key)) == 1:
+		case rm.holds(id.Side, auth.Token):
+			rank = RankBrowser // the commander's own browser outranks agents run for them
+		default:
 			return ErrNotAgent
+		}
+		if id.Role == RoleHost {
+			id.Rank = rank
+		} else if id.Host == "" {
+			// An agent on its own would think beside the side's host. Every agent
+			// belongs to one, so that a side is never run twice.
+			return ErrNoHost
 		}
 	}
 	return nil

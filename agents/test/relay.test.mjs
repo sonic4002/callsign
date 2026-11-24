@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { Agent } from "../agent.mjs";
-import { RelayError, relayBrain, relayKeys } from "../brain-relay.mjs";
+import { RelayError, newPlayer, relayBrain, relayKeys } from "../brain-relay.mjs";
 import { fakeRelay } from "../fake-relay.mjs";
 import { Host, RANK_BROWSER, RANK_SERVER } from "../host.mjs";
 import { scriptedBrain } from "../brain-scripted.mjs";
@@ -37,7 +37,7 @@ function scripted(...answers) {
 test("relay brain: sends the seat and the prompt, never a key, and returns the model's answer", async () => {
   const net = scripted(reply(200, good));
   const used = [];
-  const brain = relayBrain({ base: "http://relay/relay/v1", room: "ALPHA", token: "seat-1", onUsage: (...a) => used.push(a), ...net });
+  const brain = relayBrain({ base: "http://relay/relay/v1", room: "ALPHA", token: "p1.player", seat: "seat-1", onUsage: (...a) => used.push(a), ...net });
   const res = await brain.think(ask);
   assert.deepEqual(res.content, good.content);
   assert.equal(res.stop_reason, "tool_use");
@@ -45,7 +45,8 @@ test("relay brain: sends the seat and the prompt, never a key, and returns the m
   const [req] = net.requests;
   assert.equal(req.url, "http://relay/relay/v1/think");
   assert.equal(req.method, "POST");
-  assert.equal(req.headers.Authorization, "Bearer seat-1");
+  assert.equal(req.headers.Authorization, "Bearer p1.player");
+  assert.equal(req.headers["X-Callsign-Seat"], "seat-1");
   assert.deepEqual(req.body, { room: "ALPHA", side: 0, role: "squad", squad: 2, system: ask.system, tools: ask.tools, messages: ask.messages });
   assert.deepEqual(used, [[good.usage, "claude-haiku-5-5", "anthropic"]]);
   assert.equal(brain.slow, true, "a relay thought is slow enough for a Stand by");
@@ -202,7 +203,9 @@ test("a browser-ranked host on the relay takes the side from the server's agents
   await eventually("the server-side agents", () => node.agents.size === 3 && node.ready);
 
   // The player sets a key, and their own host starts thinking through the relay.
-  const keys = relayKeys({ base, token: "seat-west" });
+  const player = await newPlayer({ base });
+  await assert.rejects(relayKeys({ base, token: "a-made-up-token" }).get(), (err) => err.code === "not_your_seat");
+  const keys = relayKeys({ base, token: player });
   assert.deepEqual(await keys.get(), { provider: "", set: false, hint: "" });
   await assert.rejects(keys.set("anthropic", "sk-bad-key"), (err) => err.code === "bad_key");
   assert.deepEqual(await keys.set("anthropic", "sk-test-0000abcd"), { provider: "anthropic", set: true, hint: "abcd" });
@@ -210,7 +213,7 @@ test("a browser-ranked host on the relay takes the side from the server's agents
 
   const troubles = [];
   const usage = { calls: 0, in: 0 };
-  const brain = relayBrain({ base, room: "main", token: "seat-west", backoffMs: 1, onUsage: (u) => ((usage.calls += 1), (usage.in += u.input_tokens)) });
+  const brain = relayBrain({ base, room: "main", token: player, seat: "seat-west", backoffMs: 1, onUsage: (u) => ((usage.calls += 1), (usage.in += u.input_tokens)) });
   const page = new Host({
     server, side: 0, brain, rank: RANK_BROWSER, log: () => {}, standByMs: 60_000,
     spawn: (o) => Object.assign(new Agent(o), { onTrouble: (err) => troubles.push(`${o.role}${o.squad}:${err.code}`) }),
@@ -226,6 +229,7 @@ test("a browser-ranked host on the relay takes the side from the server's agents
   assert.equal(hammer.radio().filter((l) => l.startsWith("Hammer, this is Viper 2. Wilco")).length, 1, "one host answered, not two");
   const thought = relay.calls.find((c) => c.role === "squad" && c.squad === 2);
   assert.equal(thought.room, "main");
+  assert.ok(relay.seats.length > 0 && relay.seats.every((seat) => seat === "seat-west"), "every thought carries the seat's token, apart from the player's");
   assert.match(thought.system, /You lead squad Viper 2/);
   assert.ok(usage.calls >= 1 && usage.in > 0, "the relay's usage reached the host");
 

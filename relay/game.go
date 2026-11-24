@@ -28,14 +28,15 @@ var ErrNotYourSeat = errors.New("that seat is not yours")
 // HTTPGame asks the game server over HTTP:
 //
 //	GET <URL>?room=<code>&side=<0|1>&squad=<id, 0 for the operator>
-//	Authorization: Bearer <seat token>
-//	X-Callsign-Internal: <Secret>      (only when Secret is set)
+//	Authorization: Bearer <Secret>     the game server's agent key, when it has one
+//	X-Callsign-Seat: <seat token>      the player's seat in that room
 //
-// and expects 200 {"tier": 1|2|3}. 401, 403 and 404 all mean the token does not hold that
-// seat, or the room or squad does not exist: the relay does not tell them apart to callers.
+// and expects 200 {"tier": 1|2|3} (0 for the operator). 403 and 404 mean the token does
+// not hold that seat, or the room or squad does not exist: the relay does not tell them
+// apart to callers. 401 means the relay's own secret is wrong, which is a set-up fault.
 type HTTPGame struct {
 	URL    string // for example http://server:8080/internal/tier
-	Secret string // shared with the game server, so only the relay can ask
+	Secret string // the game server's agent key, so only its own services can ask
 	Client *http.Client
 }
 
@@ -45,9 +46,9 @@ func (g *HTTPGame) Tier(ctx context.Context, token, room string, side, squad int
 	if err != nil {
 		return 0, err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Callsign-Seat", token)
 	if g.Secret != "" {
-		req.Header.Set("X-Callsign-Internal", g.Secret)
+		req.Header.Set("Authorization", "Bearer "+g.Secret)
 	}
 	client := g.Client
 	if client == nil {
@@ -60,8 +61,10 @@ func (g *HTTPGame) Tier(ctx context.Context, token, room string, side, squad int
 	defer res.Body.Close()
 	switch res.StatusCode {
 	case http.StatusOK:
-	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+	case http.StatusForbidden, http.StatusNotFound:
 		return 0, ErrNotYourSeat
+	case http.StatusUnauthorized:
+		return 0, errors.New("the game server refused the relay's agent key")
 	default:
 		return 0, fmt.Errorf("the game server answered %d to the tier question", res.StatusCode)
 	}

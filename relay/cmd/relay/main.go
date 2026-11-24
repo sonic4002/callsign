@@ -7,7 +7,8 @@
 //
 //	CALLSIGN_RELAY_MASTER_KEY  32 bytes in hex or base64 that seal the stored keys. Without
 //	                           it the relay makes <data>/master.key on first start.
-//	CALLSIGN_INTERNAL_SECRET   shared with the game server, sent with every tier question.
+//	CALLSIGN_AGENT_KEY         the game server's agent key (its -agent-key), shown with
+//	                           every tier question so that only its own services can ask.
 package main
 
 import (
@@ -61,8 +62,9 @@ func main() {
 		}
 	}
 	r, err := relay.New(relay.Config{
-		Game:      &relay.HTTPGame{URL: *game, Secret: os.Getenv("CALLSIGN_INTERNAL_SECRET")},
+		Game:      &relay.HTTPGame{URL: *game, Secret: os.Getenv("CALLSIGN_AGENT_KEY")},
 		Keys:      keys,
+		TokenKey:  relay.TokenKey(master),
 		Models:    models,
 		Rules:     rules,
 		Providers: provider.All(nil),

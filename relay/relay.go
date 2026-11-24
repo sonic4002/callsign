@@ -45,6 +45,7 @@ const (
 type Config struct {
 	Game      Game
 	Keys      *KeyStore
+	TokenKey  []byte // signs player tokens; see TokenKey
 	Models    *shared.Models
 	Rules     *shared.Rules
 	Providers map[string]provider.Provider
@@ -68,14 +69,17 @@ type Relay struct {
 	}
 }
 
-// newKeysPerMinute bounds how fast seats that have never stored a key can add one, across
-// all callers, so the store cannot be filled in a hurry with made-up tokens.
+// newKeysPerMinute bounds how fast player tokens are handed out, across all callers. A
+// key can only be stored under a token the relay made, so this also bounds how fast the
+// store can grow.
 const newKeysPerMinute = 30
 
 func New(cfg Config) (*Relay, error) {
 	switch {
 	case cfg.Game == nil, cfg.Keys == nil, cfg.Models == nil, cfg.Rules == nil:
 		return nil, errors.New("relay: Game, Keys, Models and Rules are all required")
+	case len(cfg.TokenKey) < 32:
+		return nil, errors.New("relay: TokenKey must be at least 32 bytes")
 	case len(cfg.Providers) == 0:
 		return nil, errors.New("relay: no providers")
 	}
@@ -112,6 +116,7 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 
 func (r *Relay) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/relay/v1/player", r.page(r.player, http.MethodPost))
 	mux.HandleFunc("/relay/v1/think", r.guard(r.think, http.MethodPost))
 	mux.HandleFunc("/relay/v1/key", r.guard(r.key, http.MethodGet, http.MethodPut, http.MethodDelete))
 	mux.HandleFunc("/relay/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -141,9 +146,23 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// guard is what every endpoint shares: the origin check, the method, the seat token and a
-// request id. The handler gets the token and the id.
+// guard is page plus the player token: the handler gets the token and the request id. A
+// token the relay did not make is refused here, before anything is read or stored.
 func (r *Relay) guard(next func(http.ResponseWriter, *http.Request, string, string), methods ...string) http.HandlerFunc {
+	return r.page(func(w http.ResponseWriter, req *http.Request) {
+		token, found := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
+		token = strings.TrimSpace(token)
+		if !found || len(token) > 512 || !r.isPlayer(token) {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			r.fail(w, apiError{status: http.StatusUnauthorized, code: codeNotYourSeat, message: "send your player token as a bearer token; POST /relay/v1/player gives one"})
+			return
+		}
+		next(w, req, token, w.Header().Get("X-Request-Id"))
+	}, methods...)
+}
+
+// page is what every endpoint shares: the origin check, the method and a request id.
+func (r *Relay) page(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	allowed := strings.Join(methods, ", ")
 	return func(w http.ResponseWriter, req *http.Request) {
 		id := requestID()
@@ -163,7 +182,7 @@ func (r *Relay) guard(next func(http.ResponseWriter, *http.Request, string, stri
 			}
 			if req.Method == http.MethodOptions {
 				w.Header().Set("Access-Control-Allow-Methods", allowed)
-				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Callsign-Seat")
 				w.Header().Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -178,14 +197,7 @@ func (r *Relay) guard(next func(http.ResponseWriter, *http.Request, string, stri
 			r.fail(w, apiError{status: http.StatusMethodNotAllowed, code: codeBadRequest, message: "use " + allowed})
 			return
 		}
-		token, found := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
-		token = strings.TrimSpace(token)
-		if !found || len(token) < 16 || len(token) > 512 || strings.ContainsAny(token, " \t\r\n") {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			r.fail(w, apiError{status: http.StatusUnauthorized, code: codeNotYourSeat, message: "send your seat token as a bearer token"})
-			return
-		}
-		next(w, req, token, id)
+		next(w, req)
 	}
 }
 
@@ -238,7 +250,13 @@ func (r *Relay) think(w http.ResponseWriter, req *http.Request, token, id string
 	defer cancel()
 
 	operator := in.Role == "anvil"
-	tier, err := r.cfg.Game.Tier(ctx, token, in.Room, *in.Side, in.Squad)
+	held, ok := seatHeader(req)
+	if !ok {
+		r.log(id, seat, in, "", "", "", nil, started, codeNotYourSeat)
+		r.fail(w, apiError{status: http.StatusUnauthorized, code: codeNotYourSeat, message: "send the token of your seat in this match as X-Callsign-Seat"})
+		return
+	}
+	tier, err := r.cfg.Game.Tier(ctx, held, in.Room, *in.Side, in.Squad)
 	switch {
 	case errors.Is(err, ErrNotYourSeat):
 		r.log(id, seat, in, "", "", "", nil, started, codeNotYourSeat)
@@ -371,10 +389,6 @@ func (r *Relay) key(w http.ResponseWriter, req *http.Request, token, id string) 
 		in.Key = strings.TrimSpace(in.Key)
 		if msg := checkKey(in.Provider, in.Key, r.cfg.Providers); msg != "" {
 			r.fail(w, apiError{status: http.StatusBadRequest, code: codeBadRequest, message: msg})
-			return
-		}
-		if _, err := r.cfg.Keys.Get(seat); errors.Is(err, ErrNoKey) && !r.admitNewSeat() {
-			r.fail(w, apiError{status: http.StatusTooManyRequests, code: codeRateLimited, message: "too many new keys are being stored right now; try again in a minute", retry: 30 * time.Second})
 			return
 		}
 		switch err := r.cfg.Keys.Put(seat, Stored{Provider: in.Provider, Key: in.Key}); {

@@ -393,8 +393,10 @@ func (h *Hub) getWork(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"rooms": h.AgentWork()})
 }
 
-// getTier answers /internal/tier?room=<code>&side=<0|1>&squad=<id>[&token=<seat token>].
-// Squad 0 is the operator. With a token, it also checks that the token holds that seat.
+// getTier answers the model relay: /internal/tier?room=<code>&side=<0|1>&squad=<id> with
+// the player's seat token in the X-Callsign-Seat header. Squad 0 is the operator. In a
+// room with seats the token must hold that side's seat: a thought is only ever paid for
+// by the commander it serves. The open room of a server without an agent key has no seats.
 func (h *Hub) getTier(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	rm := h.Room(q.Get("room"))
@@ -408,7 +410,7 @@ func (h *Hub) getTier(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "side must be 0 or 1"})
 		return
 	}
-	if q.Has("token") && !rm.Holds(side, q.Get("token")) {
+	if rm.Seated() && !rm.Holds(side, r.Header.Get("X-Callsign-Seat")) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrNoSeat.Error()})
 		return
 	}

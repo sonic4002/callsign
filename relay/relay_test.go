@@ -67,6 +67,7 @@ type rig struct {
 	game   *FakeGame
 	keys   *KeyStore
 	brains map[string]*brain
+	player map[string]string // seat token → the player token of whoever holds that seat
 	dir    string
 	logs   *bytes.Buffer
 	logMu  sync.Mutex
@@ -96,7 +97,7 @@ func newRig(t *testing.T, limits Limits) *rig {
 		providers[name] = r.brains[name]
 	}
 	r.relay, err = New(Config{
-		Game: r.game, Keys: r.keys, Models: models, Rules: rules, Providers: providers, Limits: limits,
+		Game: r.game, Keys: r.keys, TokenKey: TokenKey(master), Models: models, Rules: rules, Providers: providers, Limits: limits,
 		Origins: []string{"https://play.example"},
 		Logf: func(format string, args ...any) {
 			r.logMu.Lock()
@@ -111,6 +112,12 @@ func newRig(t *testing.T, limits Limits) *rig {
 	r.srv = httptest.NewServer(r.relay.Handler())
 	t.Cleanup(r.srv.Close)
 
+	r.player = map[string]string{}
+	for _, seat := range []string{seatToken, otherToken} {
+		if r.player[seat], err = r.relay.Mint(); err != nil {
+			t.Fatal(err)
+		}
+	}
 	r.game.Seat("ROOM1", 0, seatToken)
 	r.game.Seat("ROOM1", 1, otherToken)
 	r.game.Squad("ROOM1", 0, 1, 1)
@@ -133,8 +140,14 @@ func (r result) code() string {
 	return s
 }
 
+// do makes a call as the person holding a seat: their player token as the bearer and the
+// seat's token beside it. Any other `token` is sent as the bearer as it is.
 func (r *rig) do(method, path, token string, body any, header ...string) result {
 	r.t.Helper()
+	if player, ok := r.player[token]; ok {
+		header = append([]string{"X-Callsign-Seat", token}, header...)
+		token = player
+	}
 	var reader io.Reader
 	switch b := body.(type) {
 	case nil:
@@ -415,12 +428,12 @@ func TestKeys(t *testing.T) {
 
 	// On disk: one file named by a hash, holding neither the key nor the token.
 	files, _ := os.ReadDir(filepath.Join(r.dir, "keys"))
-	if len(files) != 1 || files[0].Name() != SeatID(seatToken)+".json" {
+	if len(files) != 1 || files[0].Name() != SeatID(r.player[seatToken])+".json" {
 		t.Fatalf("key files: %v", files)
 	}
 	path := filepath.Join(r.dir, "keys", files[0].Name())
 	data, _ := os.ReadFile(path)
-	if bytes.Contains(data, []byte(apiKey)) || bytes.Contains(data, []byte("ABCD")) || bytes.Contains(data, []byte(seatToken)) || bytes.Contains(data, []byte("anthropic")) {
+	if bytes.Contains(data, []byte(apiKey)) || bytes.Contains(data, []byte("ABCD")) || bytes.Contains(data, []byte(seatToken)) || bytes.Contains(data, []byte(r.player[seatToken])) || bytes.Contains(data, []byte("anthropic")) {
 		t.Fatalf("the stored file is not sealed: %s", data)
 	}
 	for _, name := range []string{path, filepath.Join(r.dir, "master.key")} {
@@ -670,13 +683,13 @@ func TestTheLogSaysWhoAndHowMuchNeverWhat(t *testing.T) {
 	r.logMu.Lock()
 	logs := r.logs.String()
 	r.logMu.Unlock()
-	for _, secret := range []string{apiKey, "ABCD", seatToken, otherToken, "SECRET-SYSTEM-PROMPT", "SECRET-ORDER", "Wilco"} {
+	for _, secret := range []string{apiKey, "ABCD", seatToken, otherToken, r.player[seatToken], r.player[otherToken], "SECRET-SYSTEM-PROMPT", "SECRET-ORDER", "Wilco"} {
 		if strings.Contains(logs, secret) {
 			t.Errorf("the log holds %q:\n%s", secret, logs)
 		}
 	}
 	for _, want := range []string{
-		"req=" + res.header.Get("X-Request-Id"), "seat=" + SeatID(seatToken)[:8], "room=ROOM1 side=0 role=squad squad=2 tier=2",
+		"req=" + res.header.Get("X-Request-Id"), "seat=" + SeatID(r.player[seatToken])[:8], "room=ROOM1 side=0 role=squad squad=2 tier=2",
 		"provider=anthropic model=claude-sonnet-5-5 in=100 out=7", "result=end_turn", "result=not_your_seat",
 	} {
 		if !strings.Contains(logs, want) {
@@ -707,7 +720,7 @@ func TestHTTPGame(t *testing.T) {
 		t.Fatalf("tier = %d, %v", tier, err)
 	}
 	if got.Method != "GET" || got.URL.Path != "/internal/tier" || got.URL.RawQuery != "room=ROOM1&side=1&squad=3" ||
-		got.Header.Get("Authorization") != "Bearer "+seatToken || got.Header.Get("X-Callsign-Internal") != "shared-secret" {
+		got.Header.Get("X-Callsign-Seat") != seatToken || got.Header.Get("Authorization") != "Bearer shared-secret" {
 		t.Fatalf("asked %s %s with %v", got.Method, got.URL, got.Header)
 	}
 	for squad, want := range map[int]error{7: ErrNotYourSeat, 8: ErrNotYourSeat} {
@@ -789,5 +802,48 @@ func TestModelsFileCoversEveryTier(t *testing.T) {
 	}
 	if len(models.Providers) != len(provider.Names) {
 		t.Errorf("models.json names providers the relay does not have: %v", models.Providers)
+	}
+}
+
+// A player token is the relay's own: it signs the ones it hands out and takes no other, so
+// a key cannot be stored under a made-up name, and thinking needs a seat's token as well.
+func TestPlayerTokens(t *testing.T) {
+	r := newRig(t, Limits{})
+	res := r.do("POST", "/relay/v1/player", "", nil)
+	token, _ := res.body["token"].(string)
+	if res.status != 200 || !strings.HasPrefix(token, "p1.") || !r.relay.isPlayer(token) {
+		t.Fatalf("asking for a player token: %d %s", res.status, res.raw)
+	}
+	key := map[string]string{"provider": "anthropic", "key": apiKey}
+	forged := token[:len(token)-2] + "xx"
+	for name, bearer := range map[string]string{"made up": "a-made-up-token-of-decent-length", "forged": forged, "a seat token": seatToken + "x", "none": ""} {
+		if res := r.do("PUT", "/relay/v1/key", bearer, key); res.status != 401 || res.code() != codeNotYourSeat {
+			t.Errorf("%s: storing a key gave %d %s", name, res.status, res.raw)
+		}
+	}
+	if files, _ := os.ReadDir(filepath.Join(r.dir, "keys")); len(files) != 0 {
+		t.Fatalf("a refused token left %d files in the store", len(files))
+	}
+	if res := r.do("PUT", "/relay/v1/key", token, key); res.status != 200 {
+		t.Fatalf("a minted token could not store a key: %d %s", res.status, res.raw)
+	}
+	// The key alone thinks for nobody: without a seat, or with a seat that is not theirs.
+	if res := r.do("POST", "/relay/v1/think", token, thought("squad", 1)); res.status != 401 || res.code() != codeNotYourSeat {
+		t.Errorf("thinking with no seat token: %d %s", res.status, res.raw)
+	}
+	if res := r.do("POST", "/relay/v1/think", token, thought("squad", 1), "X-Callsign-Seat", "a-seat-token-nobody-was-given"); res.status != 403 || res.code() != codeNotYourSeat {
+		t.Errorf("thinking with a wrong seat token: %d %s", res.status, res.raw)
+	}
+	// The same player keeps the key from one match to the next: a new seat, the same token.
+	r.game.Seat("ROOM2", 1, "the-seat-of-the-next-match-0003")
+	r.game.Squad("ROOM2", 1, 5, 1)
+	next := thought("squad", 5)
+	next["room"], next["side"] = "ROOM2", 1
+	if res := r.do("POST", "/relay/v1/think", token, next, "X-Callsign-Seat", "the-seat-of-the-next-match-0003"); res.status != 200 {
+		t.Errorf("thinking in the next match on the stored key: %d %s", res.status, res.raw)
+	}
+	// Tokens survive a restart: another relay on the same master key takes them.
+	if !(&Relay{cfg: Config{TokenKey: r.relay.cfg.TokenKey}}).isPlayer(token) || (&Relay{cfg: Config{TokenKey: bytes.Repeat([]byte{7}, 32)}}).isPlayer(token) {
+		t.Error("a player token must be good under the same token key and no other")
 	}
 }

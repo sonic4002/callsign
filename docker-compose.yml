@@ -65,7 +65,7 @@ services:
     environment:
       HOME: /tmp
       CALLSIGN_RELAY_MASTER_KEY: "${CALLSIGN_RELAY_MASTER_KEY:-}"
-      CALLSIGN_INTERNAL_SECRET: "${CALLSIGN_INTERNAL_SECRET:-}"
+      CALLSIGN_AGENT_KEY: "${CALLSIGN_AGENT_KEY:-}"
     volumes:
       - .:/src:ro
       - callsign-gocache:/gocache

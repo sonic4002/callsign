@@ -64,12 +64,15 @@ function ctxFrom(body, rules, key) {
 // fakeRelay returns a server that is not listening yet, with a few test levers:
 //   relay.failNext(code, times)   answer the next thoughts with this error
 //   relay.calls                   every think request body received
-//   relay.keys                    seat token → { provider, hint }
+//   relay.keys                    player token → { provider, hint }
+//   relay.seats                   the X-Callsign-Seat header of every thought
 export function fakeRelay({ rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8")), tokens = null } = {}) {
   const brain = scriptedBrain();
   const sent = new Map(); // tool_use id → the block as the brain made it (with its fallback)
   const keys = new Map();
   const calls = [];
+  const seats = [];
+  let players = 0;
   let failing = { code: "", times: 0 };
 
   const answer = (res, code, body, headers = {}) => {
@@ -107,10 +110,16 @@ export function fakeRelay({ rules = JSON.parse(readFileSync(new URL("../shared/r
   const server = createServer(async (req, res) => {
     const path = new URL(req.url, "http://relay").pathname.replace(/^\/relay/, "");
     if (req.method === "OPTIONS") {
-      return answer(res, 204, {}, { "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE" });
+      return answer(res, 204, {}, { "Access-Control-Allow-Headers": "authorization, content-type, x-callsign-seat", "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE" });
+    }
+    // Like the real relay, it hands out player tokens and takes no others.
+    if (path === "/v1/player" && req.method === "POST") {
+      const made = `p1.fake-player-${++players}`;
+      tokens?.add(made);
+      return answer(res, 200, { token: made });
     }
     const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1] ?? "";
-    if (!token || (tokens && !tokens.has(token))) return refuse(res, "not_your_seat", "this seat token is not known here");
+    if (!token.startsWith("p1.") || (tokens && !tokens.has(token))) return refuse(res, "not_your_seat", "this player token is not known here");
     let body = {};
     if (req.method === "PUT" || req.method === "POST") {
       let text = "";
@@ -136,13 +145,18 @@ export function fakeRelay({ rules = JSON.parse(readFileSync(new URL("../shared/r
       keys.delete(token);
       return answer(res, 200, { provider: "", set: false, hint: "" });
     }
-    if (path === "/v1/think" && req.method === "POST") return think(res, token, body);
+    if (path === "/v1/think" && req.method === "POST") {
+      seats.push(req.headers["x-callsign-seat"] ?? "");
+      if (!req.headers["x-callsign-seat"]) return refuse(res, "not_your_seat", "a thought needs the seat's token");
+      return think(res, token, body);
+    }
     refuse(res, "bad_request", `no such relay call: ${req.method} ${path}`);
   });
 
   return Object.assign(server, {
     keys,
     calls,
+    seats,
     failNext: (code, times = 1) => (failing = { code, times }),
     // up resolves with the base address once the server is up.
     up: (port = 0, host = "127.0.0.1") => new Promise((resolve) => server.listen(port, host, () => resolve(`http://${host}:${server.address().port}/relay/v1`))),

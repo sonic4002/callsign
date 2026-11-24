@@ -196,10 +196,44 @@ func TestAgentsNeedTheKeyOrTheirSidesToken(t *testing.T) {
 			t.Errorf("an agent with %s: err = %v, want %v", name, err, ErrNotAgent)
 		}
 	}
-	for name, auth := range map[string]Auth{"the key": {Key: "s3cret"}, "its side's token": {Token: token}} {
-		if _, err := rm.Enter(anvil, auth, false); err != nil {
-			t.Errorf("an agent with %s was refused: %v", name, err)
+	// An agent comes in through a host, and the host's claim on the side is decided by
+	// what it shows: the key makes it the server's, the seat token the commander's own.
+	if _, err := rm.Enter(anvil, Auth{Key: "s3cret"}, false); err != ErrNoHost {
+		t.Errorf("an agent naming no host: err = %v, want %v", err, ErrNoHost)
+	}
+	for name, auth := range map[string]Auth{"no proof": {}, "a wrong key": {Key: "guess"}, "the enemy's token": {Token: ftoken}} {
+		if _, err := rm.Enter(Identity{Side: 0, Role: RoleHost, Host: "x", Rank: RankBrowser}, auth, false); err != ErrNotAgent {
+			t.Errorf("a host with %s: err = %v, want %v", name, err, ErrNotAgent)
 		}
+	}
+	// The server's host claims the top rank and is put back in its place.
+	node, err := rm.Enter(Identity{Side: 0, Role: RoleHost, Host: "node", Rank: 99}, Auth{Key: "s3cret"}, false)
+	if err != nil || node.ID.Rank != RankServer {
+		t.Fatalf("the server's host: %+v %v", node, err)
+	}
+	served := Identity{Side: 0, Role: RoleAnvil, Host: "node"}
+	first, err := rm.Enter(served, Auth{Key: "s3cret"}, false)
+	if err != nil {
+		t.Fatalf("the server host's agent was refused: %v", err)
+	}
+	// The commander's browser shows the seat token, claims nothing, and takes the side.
+	page, err := rm.Enter(Identity{Side: 0, Role: RoleHost, Host: "page"}, Auth{Token: token}, false)
+	if err != nil || page.ID.Rank != RankBrowser {
+		t.Fatalf("the commander's host: %+v %v", page, err)
+	}
+	if !first.closed {
+		t.Error("the server's agent kept running after the commander's browser took the side")
+	}
+	if _, err := rm.Enter(served, Auth{Key: "s3cret"}, false); err != ErrNotActiveHost {
+		t.Errorf("the standby host's agent: err = %v, want %v", err, ErrNotActiveHost)
+	}
+	if _, err := rm.Enter(Identity{Side: 0, Role: RoleAnvil, Host: "page"}, Auth{Token: token}, false); err != nil {
+		t.Errorf("the commander's own agent was refused: %v", err)
+	}
+	// When the browser goes, the side falls back to the server's host.
+	rm.Leave(page)
+	if _, err := rm.Enter(served, Auth{Key: "s3cret"}, false); err != nil {
+		t.Errorf("the server's agent after the browser left: %v", err)
 	}
 }
 
@@ -555,25 +589,47 @@ func TestLobbyOverHTTPAndWebSocket(t *testing.T) {
 	if status != http.StatusOK || len(work["rooms"].([]any)) != 1 {
 		t.Fatalf("agent work: %d %v", status, work)
 	}
+	// The relay shows the agent key and, apart from it, the seat token of the player it
+	// is thinking for. The tier is only given for that player's own side.
+	tier := func(query, seat string) (int, map[string]any) {
+		t.Helper()
+		req, _ := http.NewRequest("GET", srv.URL+"/internal/tier?"+query, nil)
+		req.Header.Set("Authorization", "Bearer s3cret")
+		if seat != "" {
+			req.Header.Set("X-Callsign-Seat", seat)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		out := map[string]any{}
+		json.NewDecoder(res.Body).Decode(&out)
+		return res.StatusCode, out
+	}
+	friend := sat["token"].(string)
 	tiers := []struct {
 		query  string
+		seat   string
 		status int
 		tier   float64
 	}{
-		{"room=" + code + "&side=0&squad=1", http.StatusOK, 1},
-		{"room=" + code + "&side=0&squad=0", http.StatusOK, 0},
-		{"room=" + code + "&side=0&squad=1&token=" + token, http.StatusOK, 1},
-		{"room=" + code + "&side=1&squad=1", http.StatusNotFound, 0},                 // squad 1 is side 0's
-		{"room=" + code + "&side=1&squad=3&token=" + token, http.StatusForbidden, 0}, // side 0's token
-		{"room=NOPE2&side=0&squad=1", http.StatusNotFound, 0},
+		{"room=" + code + "&side=0&squad=1", token, http.StatusOK, 1},
+		{"room=" + code + "&side=0&squad=0", token, http.StatusOK, 0},
+		{"room=" + code + "&side=0&squad=1", "", http.StatusForbidden, 0},                // no seat shown
+		{"room=" + code + "&side=0&squad=1", friend, http.StatusForbidden, 0},            // the other side's seat
+		{"room=" + code + "&side=0&squad=1&token=" + token, "", http.StatusForbidden, 0}, // a token in the address counts for nothing
+		{"room=" + code + "&side=1&squad=1", friend, http.StatusNotFound, 0},             // squad 1 is side 0's
+		{"room=" + code + "&side=1&squad=3", token, http.StatusForbidden, 0},             // side 0's token
+		{"room=NOPE2&side=0&squad=1", token, http.StatusNotFound, 0},
 	}
 	for _, tc := range tiers {
-		status, got := call("GET", "/internal/tier?"+tc.query, "", "s3cret")
+		status, got := tier(tc.query, tc.seat)
 		if status != tc.status || (status == http.StatusOK && got["tier"].(float64) != tc.tier) {
 			t.Errorf("/internal/tier?%s: %d %v, want %d tier %v", tc.query, status, got, tc.status, tc.tier)
 		}
 	}
-	if _, got := call("GET", "/internal/tier?room="+code+"&side=0&squad=0", "", "s3cret"); got["operator"] != true {
+	if _, got := tier("room="+code+"&side=0&squad=0", token); got["operator"] != true {
 		t.Errorf("squad 0 should be the operator: %v", got)
 	}
 

@@ -1,9 +1,9 @@
 // One agent in a Web Worker: the operator or a squad leader, in the player's browser.
 // The page's host (client/brains/host.js) starts one Worker per station and talks to it
-// in small messages. The Worker holds the seat token, never the player's key.
+// in small messages. The Worker holds the player and seat tokens, never the player's key.
 //
 //   page → worker   { type: "start", server, side, role, squad, join, standByMs,
-//                     brain: { kind: "relay", base, room, token } | { kind: "scripted" } }
+//                     brain: { kind: "relay", base, room, token, seat } | { kind: "scripted" } }
 //                   { type: "stop" }
 //   worker → page   { type: "joined", station }      on the net
 //                   { type: "log", text }
@@ -21,7 +21,7 @@ let agent = null;
 function makeBrain(spec) {
   if (spec.kind === "scripted") return scriptedBrain();
   if (spec.kind === "relay") {
-    return relayBrain({ base: spec.base, room: spec.room, token: spec.token, onUsage: (usage, model, provider) => post({ type: "usage", usage, model, provider }) });
+    return relayBrain({ base: spec.base, room: spec.room, token: spec.token, seat: spec.seat, onUsage: (usage, model, provider) => post({ type: "usage", usage, model, provider }) });
   }
   throw new Error(`unknown brain "${spec.kind}"`);
 }

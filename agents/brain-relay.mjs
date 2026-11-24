@@ -1,9 +1,11 @@
 // The relay brain: the way agents think in the shipped game. An agent never calls a model
 // itself. It posts its prompt to the model relay, which looks up the squad's brain tier on
 // the game server, picks the model, and calls the provider with the player's own key.
-// This side holds only the seat token, never the key.
+// This side holds two tokens and never the key: the player token, which the relay made and
+// files the key under, and the token of the player's seat in this match, which the game
+// server checks before the relay spends the key on a thought.
 //
-//   POST {base}/think   Authorization: Bearer <seat token>
+//   POST {base}/think   Authorization: Bearer <player token>   X-Callsign-Seat: <seat token>
 //        { room, side, role, squad, system, tools, messages }
 //     →  { content, stop_reason, usage: { input_tokens, output_tokens }, model, provider }
 //     or { error: { code, message } }
@@ -39,7 +41,7 @@ const plain = {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // call makes one request to the relay and returns the parsed answer, or throws RelayError.
-export async function call(fetcher, url, { method = "GET", token, body, timeoutMs = 45_000 } = {}) {
+export async function call(fetcher, url, { method = "GET", token, seat, body, timeoutMs = 45_000 } = {}) {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
   let res;
@@ -47,7 +49,7 @@ export async function call(fetcher, url, { method = "GET", token, body, timeoutM
   try {
     res = await fetcher(url, {
       method,
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(seat ? { "X-Callsign-Seat": seat } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: abort.signal,
     });
@@ -76,7 +78,7 @@ export async function call(fetcher, url, { method = "GET", token, body, timeoutM
 
 // relayBrain is a brain like the others: think() returns { content, stop_reason, usage, model }.
 // onUsage(usage, model, provider) is told what every answered call cost.
-export function relayBrain({ base = "/relay/v1", room, token, fetch: fetcher = (...a) => globalThis.fetch(...a), retries = 2, backoffMs = 500, timeoutMs, onUsage, sleep = wait }) {
+export function relayBrain({ base = "/relay/v1", room, token, seat, fetch: fetcher = (...a) => globalThis.fetch(...a), retries = 2, backoffMs = 500, timeoutMs, onUsage, sleep = wait }) {
   return {
     name: "relay",
     slow: true,
@@ -84,7 +86,7 @@ export function relayBrain({ base = "/relay/v1", room, token, fetch: fetcher = (
       const body = { room, side: agent.side, role: agent.role, squad: agent.squad ?? 0, system, tools, messages };
       for (let attempt = 0; ; attempt++) {
         try {
-          const res = await call(fetcher, `${base}/think`, { method: "POST", token, body, timeoutMs });
+          const res = await call(fetcher, `${base}/think`, { method: "POST", token, seat, body, timeoutMs });
           if (!Array.isArray(res.content)) throw new RelayError("provider_error", "the relay's answer has no content");
           if (res.usage) onUsage?.(res.usage, res.model, res.provider);
           return { content: res.content, stop_reason: res.stop_reason, stop_details: res.stop_details, usage: res.usage, model: res.model };
@@ -96,6 +98,14 @@ export function relayBrain({ base = "/relay/v1", room, token, fetch: fetcher = (
       }
     },
   };
+}
+
+// newPlayer asks the relay for a player token. A browser asks once and keeps it, so the
+// key stored under it stays with that browser from one match to the next.
+export async function newPlayer({ base = "/relay/v1", fetch: fetcher = (...a) => globalThis.fetch(...a) } = {}) {
+  const got = await call(fetcher, `${base}/player`, { method: "POST", timeoutMs: 8000 });
+  if (typeof got.token !== "string" || !got.token) throw new RelayError("provider_error", "the relay gave no player token");
+  return got.token;
 }
 
 // The player's key on the relay. The key goes up once and never comes back: the relay
