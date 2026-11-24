@@ -22,6 +22,8 @@
     <div id="map-wrap">
       <!-- The map never mirrors: the canvas is always drawn west on the left. -->
       <canvas id="map" dir="ltr"></canvas>
+      <!-- The mini map sits on the map itself, beside the zoom buttons. -->
+      <div id="radar-box" data-i18n-aria="radar"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
       <div id="zoom" dir="ltr">
         <button type="button" id="zoom-in" data-i18n-aria="zoomIn">+</button>
         <button type="button" id="zoom-out" data-i18n-aria="zoomOut">−</button>
@@ -124,11 +126,6 @@
       </div>
       <!-- What the side's structures supply and use; it turns to a warning when power is low. -->
       <div id="power" hidden><span class="icon"></span><span class="label" data-i18n="power"></span><bdi dir="ltr" class="figures"></bdi><i class="bar"><b></b></i><small class="state"></small></div>
-    </section>
-
-    <section class="panel" data-sheet="more">
-      <h2 data-fold="radar"><span data-i18n="radar"></span></h2>
-      <div id="radar-box"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
     </section>
 
     <section class="panel grow" data-sheet="squads">
