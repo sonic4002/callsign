@@ -104,8 +104,10 @@ func (s *Sim) coverSpot(tr *teamRef, slotX, slotY float64) (x, y float64, landma
 	if u.Class != "infantry" || (sq.Order.Kind != OrderHold && sq.Order.Kind != OrderRepair && sq.Order.landmark == 0) {
 		return slotX, slotY, -1
 	}
-	if sq.Order.ground {
-		return slotX, slotY, -1 // the order named the ground itself
+	if sq.Order.ground || (u.Hero && sq.Order.landmark == 0) {
+		// The order named the ground itself. And a hero goes inside only the building it
+		// was sent to: it is one soldier with work to do, not a squad looking for a post.
+		return slotX, slotY, -1
 	}
 	// How far from the post cover may be. At a map point the squad must stay inside the
 	// capture radius, or it would hold the cover and lose the point.

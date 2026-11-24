@@ -774,3 +774,50 @@ func TestMatchesWithHeroesAreDeterministic(t *testing.T) {
 		t.Fatal("no scripted player fielded a hero in a whole match")
 	}
 }
+
+// A hero sent to plant keeps walking while it is shaken and shot at; pinned, it stops.
+// And a hero told to hold ground does not walk into the building beside it.
+func TestAHeroOnItsTaskKeepsGoingUnlessPinnedAndDoesNotGarrisonUnasked(t *testing.T) {
+	walked := func(stress float64) float64 {
+		s := heroSim(t, 3)
+		aside(s)
+		ghost := buyFielded(t, s, 0, "sentinel")
+		var target *sim.Structure
+		for _, st := range s.Structures {
+			if st.Side == 1 && st.Def().Role == "barracks" {
+				target = st
+			}
+		}
+		stand(ghost, target.X-260, target.Y)
+		run(s, 0.3)
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdPlant, Squad: ghost.ID, Place: target.PlaceID()})
+		x0, _ := ghost.Center()
+		for i := 0; i < 3*rules.TickRate; i++ {
+			ghost.Teams[0].Stress, ghost.Teams[0].HP = stress, 1e6
+			s.ShotAt(ghost)
+			s.Step()
+		}
+		x1, _ := ghost.Center()
+		return x1 - x0
+	}
+	if d := walked((rules.Nerve.ShakenAt + rules.Nerve.PinnedAt) / 2); d < 40 {
+		t.Fatalf("a shaken hero under fire went %.0f toward the structure it was sent to in three seconds", d)
+	}
+	if d := walked(1); d > 5 {
+		t.Fatalf("a pinned hero went on %.0f", d)
+	}
+
+	s := heroSim(t, 3)
+	aside(s)
+	ghost := buyFielded(t, s, 0, "sentinel")
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: ghost.ID, Point: "D"})
+	run(s, 60)
+	if in := ghost.Teams[0].In; in != "" {
+		t.Fatalf("a hero told to hold Delta went inside %s", in)
+	}
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: ghost.ID, Place: "D-bunker-1"})
+	run(s, 30)
+	if in := ghost.Teams[0].In; in != "D-bunker-1" {
+		t.Fatalf("a hero sent into the bunker is in %q", in)
+	}
+}

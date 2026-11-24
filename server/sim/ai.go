@@ -91,6 +91,9 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	}
 	sq, t, u := tr.sq, tr.t, tr.u
 	order := sq.Order.Kind
+	// A hero sent to plant a charge or to seize a vehicle keeps going under fire: being
+	// shaken does not stop it or turn it back, only being pinned does.
+	onTask := sq.unit.Hero && (order == OrderPlant || order == OrderSeize)
 	if order == OrderCapture || order == OrderPlant || order == OrderSeize {
 		order = OrderMove // engineers and heroes walk to their work and do not stop to fight
 	}
@@ -263,12 +266,12 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if needMove {
 		v := 0.5 + b(order == OrderMove, 0.4) + b(order == OrderAttack, 0.1) +
 			b(order == OrderHold && !canFire, 0.2) + b(enRoute, 0.4) - b(underFire, 0.1) -
-			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7)
+			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7) + b(onTask && !pinned, 0.7)
 		if v > score {
 			best, score = plan{act: ActAdvance, x: destX, y: destY}, v
 		}
 	}
-	if nearest < math.MaxFloat64 || underFire {
+	if (nearest < math.MaxFloat64 || underFire) && (!onTask || pinned) {
 		v := 0.1 + b(shaken && outnumbered, 0.45) + b(underFire && !canFire && !needMove, 0.3) +
 			b(tooClose && !canFire, 0.6)
 		if v > score {
