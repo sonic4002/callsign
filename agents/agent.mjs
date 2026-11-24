@@ -136,6 +136,16 @@ export class Agent {
       else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
       return;
     }
+    if (frame.type === "direct") {
+      // Hammer built, bought, cancelled, sold, repaired or set a rally point by hand, from
+      // the panel. The operator keeps it in its picture of the net; it is not a call, and
+      // nobody is woken for it.
+      if (this.role === "anvil") {
+        this.traffic.push(directLine(frame));
+        if (this.traffic.length > 8) this.traffic.shift();
+      }
+      return;
+    }
     if (frame.type === "event") {
       const e = frame.event;
       if (e.kind === "match_end") {
@@ -389,6 +399,20 @@ function describe(item) {
       return `${item.place} stands again.`;
   }
   return powerEventLine(e) || `Event: ${e.kind}.`;
+}
+
+// directLine says, for the operator's picture of the net, what Hammer did by hand.
+export function directLine(frame) {
+  const r = frame.result ?? {};
+  const what = {
+    build: `started a ${r.name ?? "structure"}${r.near ? ` near ${r.near}` : ""}`,
+    buy: `bought ${r.unit ?? "a unit"}${r.squad?.en ? ` (${r.squad.en})` : ""}`,
+    cancel: `cancelled ${r.unit ?? "a unit"} in its line`,
+    sell: `sold the ${r.name ?? "structure"}`,
+    repair: `began repairing the ${r.name ?? "structure"}`,
+    rally: "set a rally point",
+  }[frame.act];
+  return `(no call) Hammer, from the panel, ${what ?? frame.act}.`;
 }
 
 // callsFor reports whether a transmission is a call this station must act on. "Out" means

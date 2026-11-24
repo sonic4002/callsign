@@ -547,3 +547,9 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #build button.locked, #structures button.needs { cursor: not-allowed; pointer-events: none; opacity: .5; filter: saturate(.4); }
 #build .lock { position: absolute; inset-block-start: .25rem; inset-inline-end: .25rem; line-height: 0; padding: .15rem; background: #10161ae6; border: 1px solid var(--warn); border-radius: 3px; }
 #build button.locked .needs { color: var(--warn); font-weight: 700; }
+/* A direct action the game refused: the card says why for a moment. */
+#structures button.refused, #build button.refused, #roster li.refused { border-color: var(--warn); }
+#structures button.refused::after, #build button.refused::after {
+  content: attr(data-refused); position: absolute; inset: auto 0 0 0; padding: .15rem .2rem; font-size: .62rem; line-height: 1.15;
+  color: #1a1206; background: var(--warn); white-space: normal; text-align: center;
+}

@@ -8,6 +8,8 @@ import { test } from "node:test";
 const read = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 const en = JSON.parse(read("i18n/en.json"));
 const he = JSON.parse(read("i18n/he.json"));
+// What the panel does directly can still be said on the radio; those calls are kept for the tests.
+const radio = JSON.parse(read("testdata/radio-calls.json"));
 const page = read("index.html");
 // Every script of the page, one after the other.
 const script = [...readdirSync(new URL(".", import.meta.url)), ...readdirSync(new URL("brains/", import.meta.url)).map((name) => `brains/${name}`)]
@@ -32,14 +34,13 @@ const dynamic = {
   "radar.": ["none", "rising", "dark"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer", "timer_hq", "timer_force"],
   "order.": ["none", "move", "hold", "attack", "repair", "fortify", "plant", "seize"],
-  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "buildSpot", "buildRun", "cancel", "rally", "rallyHome", "rallyFrom", "rallyFromHome", "sell", "repairStructure", "mend", "fortify", "plant", "plantStructure", "seize"],
+  "call.": ["hold", "move", "attack", "cover", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "mend", "fortify", "plant", "plantStructure", "seize"],
   "eventMany.": ["squad_spawned", "squad_lost", "enemy_destroyed", "structure_built"],
   "placer.why.": ["far", "ground", "shore", "room", "edge"],
   "run.": ["ns", "ew", "nesw", "nwse"],
   "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],
   "bearing.": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
-  "class.": classes,
   "side.": ["0", "1"],
   "brains.": ["server", "relay", "demo", "standby"],
   "lobby.about.": ["easy", "normal", "standard"],
@@ -99,7 +100,7 @@ test("the calls the page writes are proper procedure in both languages", async (
     const names = { to: rules.callsigns.classes.infantry[lang] + " 2", from: rules.callsigns.player[lang], point: rules.map.points[5].callsign[lang], squad: rules.callsigns.classes.infantry[lang] + " 1" };
     const end = rules.radio.over[lang].toLowerCase();
     for (const kind of dynamic["call."]) {
-      const text = fill(strings[`call.${kind}`], { ...names, class: strings["class.vehicle"], unit: "x" });
+      const text = fill(strings[`call.${kind}`], { ...names, unit: "x" });
       assert.ok(text.startsWith(`${names.to}, ${rules.radio.marker[lang]} ${names.from}`), `${lang} call.${kind} does not open with the call: ${text}`);
       assert.ok(text.toLowerCase().replace(/[.\s]+$/, "").endsWith(end), `${lang} call.${kind} does not end with Over: ${text}`);
     }
@@ -109,11 +110,11 @@ test("the calls the page writes are proper procedure in both languages", async (
 
 // The buttons are only useful if the agents understand what they write. The scripted
 // brains are the strictest readers, so every call is run through them.
-test("the scripted operator and squad leaders understand the calls the page writes", async () => {
+test("the scripted operator and squad leaders understand the calls the page writes, and the calls for what the panel does directly", async () => {
   const { scriptedBrain } = await import("../agents/brain-scripted.mjs");
   const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   const hammer = { key: "player", en: rules.callsigns.player.en };
-  for (const [lang, strings] of [["en", en], ["he", he]]) {
+  for (const [lang, strings] of [["en", { ...en, ...radio.en }], ["he", { ...he, ...radio.he }]]) {
     const from = rules.callsigns.player[lang];
     // The body is what the server hands the agent: the call without its opening and its Over.
     const body = (text) => text.slice(text.indexOf(from) + from.length).replace(/^[\s,.]+/, "").replace(new RegExp(`[\\s,.]*${rules.radio.over[lang]}[\\s.]*$`), "");

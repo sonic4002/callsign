@@ -12,7 +12,8 @@ const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url)));
 const rules = read("../shared/rules.json");
 rules.map = rules.maps.small;
 const table = read("./testdata/placement-small.json");
-const strings = { en: read("./i18n/en.json"), he: read("./i18n/he.json") };
+const radio = read("./testdata/radio-calls.json"); // calls for what the panel does directly
+const strings = { en: { ...read("./i18n/en.json"), ...radio.en }, he: { ...read("./i18n/he.json"), ...radio.he } };
 const tr = (lang) => (key, vars = {}) => strings[lang][key].replace(/\{(\w+)\}/g, (_, k) => vars[k]);
 const defOf = (kind) => Object.values(rules.factions).map((f) => f.structures[kind]).find(Boolean);
 
@@ -128,7 +129,7 @@ test("a fence run turns through four ways, and each segment knows its own ground
   assert.ok(through.segs.some((g) => !g.ok) && through.segs.some((g) => g.ok));
 });
 
-test("the call for a turned fence says which way it runs, in both languages", () => {
+test("a turned fence can be asked for on the radio: the call says which way it runs, in both languages", () => {
   const alpha = rules.map.points.find((p) => p.id === "A");
   const spot = spotAt(rules, alpha.x + 60, alpha.y - 140);
   const en = tr("en")("call.buildRun", { to: "Anvil", from: "Hammer", structure: "Barrier Wall", run: tr("en")("run.nesw"), place: spotWords(tr("en"), spot, "Alpha") });

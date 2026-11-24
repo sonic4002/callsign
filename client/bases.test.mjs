@@ -11,7 +11,8 @@ import { ofRole, stands, structureAt, structureCards, structureRows, unitDef, un
 const read = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 const rules = JSON.parse(read("../shared/rules.json"));
 rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
-const strings = { en: JSON.parse(read("i18n/en.json")), he: JSON.parse(read("i18n/he.json")) };
+const radio = JSON.parse(read("testdata/radio-calls.json")); // calls for what the panel does directly
+const strings = { en: { ...JSON.parse(read("i18n/en.json")), ...radio.en }, he: { ...JSON.parse(read("i18n/he.json")), ...radio.he } };
 const t = (lang, key, vars) => strings[lang][key].replace(/\{(\w+)\}/g, (_, name) => vars[name]);
 
 const st = (id, kind, role, extra = {}) => ({ id, kind, role, faction: "aegis", side: 0, x: 100, y: 100, hp: 1, building: 1, visible: true, ...extra });

@@ -20,7 +20,7 @@ import { iconSvg } from "./marks.js";
 import { canDigIn, digProgress, eventNames, heroEventKind, heroLock, heroOrders, heroRow, rankBadge, syncHero, withBuilt } from "./heroes.js";
 import { Speech } from "./speech/speech.js";
 import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
-import { RUNS, canPlace, parseSpot, runSegments, spotAt, spotWords, tint, unitLine } from "./placement.js";
+import { RUNS, canPlace, parseSpot, runSegments, spotAt, spotForm, spotWords, tint, unitLine } from "./placement.js";
 import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
@@ -347,6 +347,11 @@ function onFrame(frame) {
       // A base cue is always written; whether it is also spoken is the player's choice.
       if (spoken(frame.message)) speech.say(frame.message, { rules, faction });
       break;
+    case "acted":
+      acted(frame);
+      return;
+    case "direct":
+      return; // a line for the side's agents; the page reads the state
     case "refused":
       buyAnswered();
       upgrading.clear();
@@ -585,6 +590,39 @@ function sendBox(spoken = false) {
 // order transmits a call the page wrote itself (a squad, a place and an action picked on
 // the map; an upgrade button) at once, without passing through the box. It is kept with
 // the sent calls, so Up brings it back to change and send again.
+// ---- the commander's own hand ----
+//
+// Building, buying, cancelling, selling, repairing and setting a rally point from the
+// panel and the menus do not go over the radio: they go straight to the game, which does
+// them at once or refuses with its reason (server/room/act.go). Orders to squads are
+// never sent this way. A refusal is shown on the card or button it came from, and in the log.
+let actSeq = 0;
+const acting = new Map(); // id of an action sent → the element to show a refusal on
+function act(name, args, at = null) {
+  if (!me || !open()) return false;
+  const id = ++actSeq;
+  acting.set(id, at);
+  ws.send(JSON.stringify({ type: "act", id, name, args }));
+  return true;
+}
+
+// acted takes the game's answer to a direct action: nothing to do when it was done (the
+// state shows it), the reason on the card when it was refused.
+function acted(frame) {
+  const at = acting.get(frame.id);
+  acting.delete(frame.id);
+  if (frame.ok) return;
+  system("refused", { reason: frame.error }, "warn");
+  if (!at?.isConnected) return;
+  at.classList.add("refused");
+  at.dataset.refused = frame.error;
+  at.title = frame.error;
+  setTimeout(() => {
+    at.classList.remove("refused");
+    delete at.dataset.refused;
+  }, 4000);
+}
+
 function order(text) {
   if (!transmit(text)) return;
   if (sent.at(-1) !== text) sent.push(text);
@@ -851,14 +889,14 @@ function deployRow(d, i, all) {
   const bar = el("span", "deploy-bar");
   bar.append(el("b"));
   li.append(name, bar, el("span", "order", deployText(d)));
-  // The last one bought of a unit can be taken out of its line: a radio call like any other.
+  // The last one bought of a unit can be taken out of its line.
   if (!all.slice(i + 1).some((o) => o.unit === d.unit)) {
     const cancel = el("button", "cancel", "×");
     cancel.type = "button";
     cancel.title = t("deploy.cancel");
     cancel.setAttribute("aria-label", t("deploy.cancel"));
     cancel.disabled = !me || Boolean(state.over);
-    cancel.addEventListener("click", () => order(call("cancel", { to: anvil(), unit: unit.name[lang] })));
+    cancel.addEventListener("click", () => act("cancel", { unit: d.unit }, li));
     li.append(cancel);
   }
   return li;
@@ -940,16 +978,15 @@ function buildButton(id, unit, enabled, lock) {
     mark.innerHTML = iconSvg("lock", 16);
     button.append(mark, el("span", "needs", why));
   }
-  // Buying is a radio call to the operator like any other; the button only writes and sends it.
-  button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
-  // Beside it, while one of this unit is in a line: the last one taken back out, by a
-  // radio call like the purchase was.
+  // A press buys at once: the unit joins the line of the structure that makes it.
+  button.addEventListener("click", () => act("buy", { unit: id }, button));
+  // Beside it, while one of this unit is in a line: the last one taken back out.
   const cancel = el("button", "cancel", "×");
   cancel.type = "button";
   cancel.hidden = true;
   cancel.title = t("deploy.cancel");
   cancel.setAttribute("aria-label", t("deploy.cancel"));
-  cancel.addEventListener("click", () => order(call("cancel", { to: anvil(), unit: unit.name[lang] })));
+  cancel.addEventListener("click", () => act("cancel", { unit: id }, button));
   const cell = el("div", "unit");
   cell.append(button, cancel);
   return cell;
@@ -1063,8 +1100,8 @@ function structureButton(card, canAct) {
 //
 // Pressing a structure puts a ghost of it on the map. Under a mouse it follows the
 // pointer and a click on green ground confirms; under a finger a tap moves it and the
-// button confirms. Confirming writes the call with the spot in it and sends it: the
-// operator and the server decide, and the server's refusal comes back on the net.
+// button confirms. Confirming sends the structure and its spot straight to the game: it
+// starts going up at once, or the refusal comes back with its reason.
 let placing = null; // { mode: "build", id, def, faction, spot, why, touch } or { mode: "rally" }
 let pointerKind = "mouse"; // what last touched the map
 
@@ -1154,12 +1191,11 @@ function confirmPlacing() {
   if (placing?.mode !== "build" || !placing.spot || !me) return;
   // The base may have changed since the ghost was put down.
   if (judge()) return renderPlacer();
-  const { def, spot, run } = placing;
+  const { def, spot, run, id: placing_id } = placing;
   stopPlacing();
-  const place = spotWords(t, spot, pointName(spot.point));
-  // A fence's call says which way it runs, in words: the radio is the only way to act.
-  if (def.role === "fence") order(call("buildRun", { to: anvil(), structure: def.name[lang], run: t(`run.${run}`), place }));
-  else order(call("buildSpot", { to: anvil(), structure: def.name[lang], place }));
+  // It starts at once, on that spot; a fence the way it was turned.
+  const card = $("structures").querySelector(`[data-structure="${placing_id}"]`);
+  act("build", { structure: placing_id, place: spotForm(spot), run: def.role === "fence" ? run : "" }, card);
 }
 
 $("placer-ok").addEventListener("click", confirmPlacing);
@@ -1172,7 +1208,7 @@ $("placer-cancel").addEventListener("click", stopPlacing);
 $("placer-home").addEventListener("click", () => {
   const from = placing?.structure;
   stopPlacing();
-  order(from ? call("rallyFromHome", { to: anvil(), structure: saidStructure(from) }) : call("rallyHome", { to: anvil() }));
+  act("rally", { place: "home", structure: from?.id ?? "" });
 });
 // startRally asks where new squads gather: all of them, or those one structure makes.
 function startRally(structure = null) {
@@ -1188,7 +1224,7 @@ addEventListener("pointerdown", (ev) => {
   if (placing && !ev.target.closest?.('#map-wrap, #placer, [data-sheet="build"]')) stopPlacing();
 });
 
-// placeRally sends the rally call for what is under a tap: a named point, a tech building
+// placeRally sets the rally point to what is under a tap: a named point, a tech building
 // or a landmark. A tap on open ground asks for nothing.
 function placeRally(wx, wy) {
   const [sx, sy] = scene.cam.screen(wx, wy);
@@ -1196,11 +1232,11 @@ function placeRally(wx, wy) {
   const near = rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= rules.match.captureRadius * 1.15);
   const tech = hit.structure?.role === "tech" ? hit.structure : null;
   const mark = hit.landmark ?? hit.bridge;
-  const name = tech ? structureName(tech) : mark ? placeName(mark.id) : (hit.point ?? near)?.callsign[lang];
-  if (!name) return;
+  const where = tech?.id ?? mark?.id ?? (hit.point ?? near)?.id;
+  if (!where) return;
   const from = placing?.structure;
   stopPlacing();
-  order(from ? call("rallyFrom", { to: anvil(), structure: saidStructure(from), point: name }) : call("rally", { to: anvil(), point: name }));
+  act("rally", { place: where, structure: from?.id ?? "" });
 }
 
 // renderRally says where new squads gather now, as the side's structures have it.
@@ -1338,8 +1374,9 @@ function mapClick(ev) {
 // enemy or a structure, or what can be done with one of the player's own structures.
 //   title, facts: what the menu is about; actions: the buttons to show, by name;
 //   gold: what a button costs or gives back, by action; say(action): the call to send.
-// Pressing a button transmits its call at once. `say` may instead start something that
-// needs one more choice (where a rally point goes) and return nothing.
+// Pressing an order transmits its call at once. `say` may instead do the thing itself (a
+// sale, a repair) or start something that needs one more choice (where a rally point
+// goes), and return nothing.
 let orderCall = null;
 function offerOrders({ title, facts = "", actions, gold = {}, say }, box, sx, sy) {
   const menu = $("orders");
@@ -1398,11 +1435,14 @@ function offerStructure(st, squad, box, sx, sy) {
   if (st.dark) facts.push(t("structure.dark"));
   if (st.rally) facts.push(`${t("rally.label")} ${placeName(st.rally.place)}`);
   const last = line.at(-1);
-  const say = (act) => {
-    if (act === "rally") return startRally(st);
-    if (act === "cancel") return call("cancel", { to: anvil(), unit: unitDef(rules, last.unit)?.name[lang] ?? last.unit });
-    if (act === "mend") return call("mend", { to: squad.callsign[lang], structure: saidStructure(st) });
-    return call(act === "sell" ? "sell" : "repairStructure", { to: anvil(), structure: saidStructure(st) });
+  // Sending engineers in is an order to a squad, so it is a radio call; the rest is the
+  // commander's own hand and happens at once.
+  const say = (what) => {
+    if (what === "rally") return startRally(st);
+    if (what === "mend") return call("mend", { to: squad.callsign[lang], structure: saidStructure(st) });
+    if (what === "cancel") act("cancel", { unit: last.unit });
+    else act(what, { place: st.id });
+    return null;
   };
   offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
 }

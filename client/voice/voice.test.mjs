@@ -197,7 +197,9 @@ test("tidy leaves the calls the page writes alone, typed or spoken", () => {
   const cs = rules.callsigns;
   const words = (text) => text.split(/[\s,.:;!?]+/).filter(Boolean).join(" ");
   for (const lang of ["he", "en"]) {
-    const s = JSON.parse(readFileSync(new URL(`../i18n/${lang}.json`, import.meta.url), "utf8"));
+    // The page's strings, with the radio wording of what its panel does directly (a test fixture now).
+    const radio = JSON.parse(readFileSync(new URL("../testdata/radio-calls.json", import.meta.url), "utf8"))[lang];
+    const s = { ...JSON.parse(readFileSync(new URL(`../i18n/${lang}.json`, import.meta.url), "utf8")), ...radio };
     const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
     const calls = Object.keys(s).filter((k) => /^help\..*\.say$/.test(k)).map((k) => s[k]);
     for (const p of rules.map.points) for (const kind of ["hold", "move", "attack"]) calls.push(fill(s[`call.${kind}`], { to: `${cs.classes.infantry[lang]} 1`, from: cs.player[lang], point: p.callsign[lang] }));

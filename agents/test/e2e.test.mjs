@@ -304,7 +304,9 @@ test("a squad goes to a place Hammer describes, takes cover there, and asks when
 // the structure stands, and the lines, the refund and the rally order are the server's.
 test("placing a structure, a production line, a cancel and a rally point, end to end", { skip }, async (t) => {
   const { canPlace, spotAt, spotWords, tint } = await import("../../client/placement.js");
-  const strings = Object.fromEntries(["en", "he"].map((l) => [l, JSON.parse(readFileSync(new URL(`../../client/i18n/${l}.json`, import.meta.url)))]));
+  // The page's strings, and the calls for what its panel now does directly: here they are said on the radio.
+  const radio = JSON.parse(readFileSync(new URL("../../client/testdata/radio-calls.json", import.meta.url)));
+  const strings = Object.fromEntries(["en", "he"].map((l) => [l, { ...JSON.parse(readFileSync(new URL(`../../client/i18n/${l}.json`, import.meta.url))), ...radio[l] }]));
   const tr = (lang) => (key, vars = {}) => strings[lang][key].replace(/\{(\w+)\}/g, (_, k) => vars[k]);
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
   rules.map = rules.maps.small;
