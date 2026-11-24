@@ -1,6 +1,7 @@
 package sim_test
 
 import (
+	"math"
 	"testing"
 
 	"callsign/server/sim"
@@ -183,4 +184,109 @@ func TestACapturedRefineryServesItsNewOwner(t *testing.T) {
 			t.Fatal("the refinery still serves the side that lost it")
 		}
 	}
+}
+
+// On every map, both sides' base slots, dockyard and unloading spots are open land:
+// never water, ice, a mountain, a landmark, a gold field or a point's ring. The two
+// sides' layouts mirror each other.
+func TestTheBaseLayoutIsOpenLandOnEveryMap(t *testing.T) {
+	for _, id := range rules.MapIDs() {
+		r, err := rules.ForMap(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := sim.New(r, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, FullBase: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var at [2]map[string][2]float64
+		for side := 0; side < 2; side++ {
+			at[side] = map[string][2]float64{}
+			for _, st := range s.Snapshot(side).Structures {
+				if st.Side != side {
+					continue
+				}
+				at[side][st.Role] = [2]float64{st.X, st.Y}
+				if k := r.Map.TerrainAt(st.X, st.Y); k != 'L' {
+					t.Errorf("%s: side %d's %s stands on %q at (%.0f, %.0f)", id, side, st.Kind, k, st.X, st.Y)
+				}
+				for _, l := range r.Map.Landmarks {
+					if math.Hypot(l.X-st.X, l.Y-st.Y) < 40 {
+						t.Errorf("%s: side %d's %s stands on %s", id, side, st.Kind, l.ID)
+					}
+				}
+				for _, g := range r.Map.Gushers {
+					if math.Hypot(g.X-st.X, g.Y-st.Y) < g.FieldRadius {
+						t.Errorf("%s: side %d's %s stands in the %s gold field", id, side, st.Kind, g.ID)
+					}
+				}
+			}
+			if len(at[side]) < len(shared.BaseRoles) {
+				t.Errorf("%s: side %d has only %d of the base structures", id, side, len(at[side]))
+			}
+		}
+		for role, w := range at[0] {
+			if e := at[1][role]; math.Abs(w[0]-(r.Map.Width-e[0])) > 1 || math.Abs(w[1]-e[1]) > 1 {
+				t.Errorf("%s: the %s is not mirrored: west (%.0f, %.0f), east (%.0f, %.0f)", id, role, w[0], w[1], e[0], e[1])
+			}
+		}
+	}
+}
+
+// Haulers find their way on the map like any ground unit: sent to the rich field on the
+// town island they cross a bridge to it, come back the same way, and go down with a
+// bridge that falls under them.
+func TestHaulersCrossBridgesAndFallWithThem(t *testing.T) {
+	s, _ := simOn(t, rules, "small", sim.Config{StartGold: 2000})
+	hauler := haulersOf(s.Snapshot(0), 0)[0]
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdHaul, Field: "F"}); err != nil {
+		t.Fatal(err)
+	}
+	gold := s.Gold(0)
+	loaded, home := false, false
+	for i := 0; i < 240*rules.TickRate && !home; i++ {
+		s.Step()
+		h := haulersOf(s.Snapshot(0), 0)[0]
+		if k := rules.Map.TerrainAt(h.X, h.Y); k != 'L' && !onABridge(s, h.X, h.Y) {
+			t.Fatalf("the hauler is on %q at (%.0f, %.0f)", k, h.X, h.Y)
+		}
+		loaded = loaded || (h.State == sim.HaulLoading && h.X > 720 && h.X < 880)
+		home = loaded && h.State == sim.HaulUnloading
+	}
+	if !loaded || !home || s.Gold(0) <= gold {
+		t.Fatalf("the hauler never brought a load back from the island: loaded there %v, unloading %v", loaded, home)
+	}
+	// On the south bridge when it falls: lost with it, and its side is told.
+	sq := s.SquadAny(hauler.ID)
+	all := wreck(t, s, 0.5) // half down
+	rpg := s.Squads[len(s.Squads)-1]
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdAttack, Squad: rpg.ID, Place: "bridge-south"})
+	for i := 0; i < 200 && bridge(s, "bridge-south").Standing; i++ {
+		place(sq, 800, 760) // caught on the deck
+		all = append(all, s.Step()...)
+	}
+	if s.SquadAny(hauler.ID) != nil && s.SquadAny(hauler.ID).Alive {
+		x, y := sq.Center()
+		t.Fatalf("the hauler on the bridge survived its fall: bridge standing %v, hauler at (%.0f, %.0f), walkable %v", bridge(s, "bridge-south").Standing, x, y, s.Walkable(x, y))
+	}
+	if !has(all, sim.EvHaulerLost, 0) {
+		t.Error("no hauler_lost for the hauler that went down with the bridge")
+	}
+}
+
+func onABridge(s *sim.Sim, x, y float64) bool {
+	for _, b := range s.Snapshot(sim.Spectator).Bridges {
+		if b.Standing {
+			for _, m := range rules.Map.Bridges {
+				if m.ID == b.ID {
+					ax, ay, bx, by := m.From[0], m.From[1], m.To[0], m.To[1]
+					t := ((x-ax)*(bx-ax) + (y-ay)*(by-ay)) / ((bx-ax)*(bx-ax) + (by-ay)*(by-ay))
+					if t >= -0.2 && t <= 1.2 && math.Hypot(x-ax-t*(bx-ax), y-ay-t*(by-ay)) <= m.Width/2+20 {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }

@@ -722,7 +722,7 @@ func TestPlaces(t *testing.T) {
 }
 
 func TestBlockedGroundIsWalkedRound(t *testing.T) {
-	s, _ := simOn(t, rules, "small", sim.Config{})
+	s, _ := simOn(t, rules, "small", sim.Config{Base: []string{}})
 	// A wall across the straight way from the headquarters to Bravo.
 	s.SetBlocked("test-wall", 335, 340, 240, 20, true)
 	if s.Walkable(335, 340) {

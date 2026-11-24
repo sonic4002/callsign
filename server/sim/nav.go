@@ -14,9 +14,26 @@ const (
 	navGround   = iota // land units: land, ice and standing bridges
 	navCautious        // the same, but never onto a bridge that is about to fall
 	navWater           // boats: water, also under bridges
+	// The same two ground modes as one side's own units move: also closed where the
+	// other side's fences stand. A side's own fence never stops its own troops.
+	navGround0
+	navCautious0
+	navGround1
+	navCautious1
 	navModes
 	navAir = -1 // aircraft cross everything and need no grid
 )
+
+// sided is a ground mode as one side's units use it.
+func sided(mode, side int) int { return navGround0 + 2*side + mode }
+
+// plain takes a side's mode back to the mode itself, and says whose it was (-1: nobody's).
+func plain(mode int) (base, side int) {
+	if mode >= navGround0 {
+		return (mode - navGround0) % 2, (mode - navGround0) / 2
+	}
+	return mode, -1
+}
 
 type cell struct{ c, r int }
 
@@ -26,10 +43,11 @@ type cell struct{ c, r int }
 type nav struct {
 	s          *Sim
 	cols, rows int
-	ground     []bool   // terrain a land unit walks on
-	water      []bool   // terrain a boat sails on
-	bridge     []int16  // index+1 of the bridge whose deck covers the cell, 0 for none
-	blocked    []uint16 // how many obstacles stand on the cell
+	ground     []bool      // terrain a land unit walks on
+	water      []bool      // terrain a boat sails on
+	bridge     []int16     // index+1 of the bridge whose deck covers the cell, 0 for none
+	blocked    []uint16    // how many obstacles stand on the cell
+	foe        [2][]uint16 // how many fences of the other side stand on the cell, per side they stop
 	blocks     map[string][]int
 	ver        int // grows whenever a cell changes, so cached paths know they are stale
 
@@ -54,6 +72,7 @@ func (s *Sim) initNav() {
 	size := n.cols * n.rows
 	n.ground, n.water = make([]bool, size), make([]bool, size)
 	n.bridge, n.blocked = make([]int16, size), make([]uint16, size)
+	n.foe = [2][]uint16{make([]uint16, size), make([]uint16, size)}
 	for r := 0; r < n.rows; r++ {
 		for c := 0; c < n.cols; c++ {
 			x, y := n.center(c, r)
@@ -93,11 +112,12 @@ func (n *nav) index(x, y float64) int {
 
 // passable reports whether a unit moving in a mode may stand on a cell.
 func (n *nav) passable(mode, i int) bool {
+	mode, side := plain(mode)
 	switch mode {
 	case navWater:
 		return n.water[i]
 	}
-	if n.blocked[i] > 0 {
+	if n.blocked[i] > 0 || (side >= 0 && n.foe[side][i] > 0) {
 		return false
 	}
 	if b := n.bridge[i]; b > 0 {
@@ -125,6 +145,33 @@ func (s *Sim) SetBlocked(key string, x, y, w, h float64, blocked bool) {
 			for c := c0; c <= c1; c++ {
 				n.blocked[r*n.cols+c]++
 				cells = append(cells, r*n.cols+c)
+			}
+		}
+		n.blocks[key] = cells
+	}
+	n.ver++
+}
+
+// SetFenced closes the ground along a segment to one side's land units, or opens it
+// again: a fence stops the troops of the side it was built against and nobody else.
+// The key works as in SetBlocked.
+func (s *Sim) SetFenced(key string, against int, ax, ay, bx, by float64, closed bool) {
+	n := s.nav
+	for _, i := range n.blocks[key] {
+		n.foe[against][i]--
+	}
+	delete(n.blocks, key)
+	if closed {
+		seen := map[int]bool{}
+		var cells []int
+		steps := int(dist(ax, ay, bx, by)/(NavCell/2)) + 1
+		for k := 0; k <= steps; k++ {
+			t := float64(k) / float64(steps)
+			i := n.index(ax+(bx-ax)*t, ay+(by-ay)*t)
+			if !seen[i] {
+				seen[i] = true
+				n.foe[against][i]++
+				cells = append(cells, i)
 			}
 		}
 		n.blocks[key] = cells
@@ -411,9 +458,9 @@ func (s *Sim) modeFor(sq *Squad) int {
 		return navWater
 	}
 	if sq.Order.Kind == OrderMove {
-		return navGround
+		return sided(navGround, sq.Side)
 	}
-	return navCautious
+	return sided(navCautious, sq.Side)
 }
 
 // steer returns where a team should head this tick to get to (x, y): the place itself
@@ -423,13 +470,13 @@ func (s *Sim) steer(tr *teamRef, x, y float64) (float64, float64, bool) {
 	mode := s.modeFor(tr.sq)
 	t, n := tr.t, s.nav
 	if mode == navAir || n.lineClear(mode, t.X, t.Y, x, y) {
-		t.path = nil
+		t.path, t.pathOpen = nil, true
 		return x, y, true
 	}
 	goal := n.index(x, y)
 	stale := t.path == nil || t.pathVer != n.ver || t.pathMode != mode
 	if stale || (t.pathGoal != goal && s.Tick-t.pathTick >= s.R.TickRate/2) {
-		t.path, _ = n.path(mode, t.X, t.Y, x, y)
+		t.path, t.pathOpen = n.path(mode, t.X, t.Y, x, y)
 		t.pathGoal, t.pathVer, t.pathMode, t.pathTick = goal, n.ver, mode, s.Tick
 	}
 	// Skip the corners that can already be walked past in a straight line.
@@ -448,13 +495,16 @@ func (s *Sim) steer(tr *teamRef, x, y float64) (float64, float64, bool) {
 	return t.path[0][0], t.path[0][1], true
 }
 
-// Reachable reports whether a squad's unit could get from where it stands to (x, y).
+// Reachable reports whether a squad's unit could get from where it stands to (x, y),
+// by a bridge if need be, and through an enemy fence once it is breached.
 func (s *Sim) Reachable(sq *Squad, x, y float64) bool {
 	mode := s.modeFor(sq)
 	if mode == navAir {
 		return true
 	}
-	if mode == navCautious {
+	if mode != navWater {
+		// Whatever bridge still stands counts, and so does ground behind an enemy fence:
+		// a fence can be shot down, so it never makes a place one that cannot be reached.
 		mode = navGround
 	}
 	n := s.nav

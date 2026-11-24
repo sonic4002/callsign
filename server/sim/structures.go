@@ -129,9 +129,80 @@ func (s *Sim) inward(side int) float64 {
 // are taken. Offsets are for a western base; an eastern one is mirrored.
 var baseSlots = [][2]float64{{-60, -170}, {-60, 170}, {80, -280}, {200, -160}, {200, 160}}
 
+// baseSlot is where a base slot lies on this map: its place in the layout when that is
+// open land, otherwise the nearest open land to it. It depends on the map alone, so it is
+// the same for the whole match and mirrored for the two sides.
 func (s *Sim) baseSlot(side, slot int) (x, y float64) {
-	hq := s.R.HQPoint(side)
-	return hq.X + s.inward(side)*baseSlots[slot][0], hq.Y + baseSlots[slot][1]
+	if s.slots[side] == nil {
+		s.slots[side] = make([][2]float64, len(baseSlots))
+		hq := s.R.HQPoint(side)
+		for i, off := range baseSlots {
+			sx, sy := s.siteNear(side, hq.X+s.inward(side)*off[0], hq.Y+off[1], 50, s.slots[side][:i])
+			s.slots[side][i] = [2]float64{sx, sy}
+		}
+	}
+	return s.slots[side][slot][0], s.slots[side][slot][1]
+}
+
+// siteNear is the open land nearest to (x, y) where something of a footprint can be
+// built for the whole match: land, clear of the map's own buildings and cover, of gold
+// fields, of the points' capture rings and of the sites already chosen. The search goes
+// outward ring by ring, and within a ring in a fixed order mirrored for the east side.
+func (s *Sim) siteNear(side int, x, y, footprint float64, chosen [][2]float64) (float64, float64) {
+	m := &s.R.Map
+	ok := func(px, py float64) bool {
+		for _, d := range [][2]float64{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			qx, qy := px+d[0]*footprint, py+d[1]*footprint
+			if qx < 20 || qy < 20 || qx > m.Width-20 || qy > m.Height-20 || m.TerrainAt(qx, qy) != 'L' {
+				return false
+			}
+		}
+		for i := range m.Landmarks {
+			if dist(px, py, m.Landmarks[i].X, m.Landmarks[i].Y) < footprint+34 {
+				return false
+			}
+		}
+		for i := range m.Bridges {
+			b := &m.Bridges[i]
+			if segDist(px, py, b.From[0], b.From[1], b.To[0], b.To[1]) < footprint+b.Width {
+				return false
+			}
+		}
+		for i := range m.Gushers {
+			if dist(px, py, m.Gushers[i].X, m.Gushers[i].Y) < footprint+m.Gushers[i].FieldRadius+10 {
+				return false
+			}
+		}
+		for i := range m.Points {
+			if dist(px, py, m.Points[i].X, m.Points[i].Y) < footprint+s.R.Match.CaptureRadius {
+				return false
+			}
+		}
+		for _, c := range chosen {
+			if dist(px, py, c[0], c[1]) < 2*footprint+20 {
+				return false
+			}
+		}
+		return true
+	}
+	if ok(x, y) {
+		return x, y
+	}
+	const step = 20.0
+	in := s.inward(side)
+	for ring := 1; ring <= 20; ring++ {
+		for dy := -ring; dy <= ring; dy++ {
+			for dx := -ring; dx <= ring; dx++ {
+				if max(abs(dx), abs(dy)) != ring {
+					continue
+				}
+				if px, py := x+in*float64(dx)*step, y+float64(dy)*step; ok(px, py) {
+					return px, py
+				}
+			}
+		}
+	}
+	return x, y
 }
 
 // dockSlot is where a dockyard stands: on the shore nearest the headquarters.
@@ -211,11 +282,42 @@ func (s *Sim) DropOffs(side int) []Site {
 }
 
 // blockGround is the one place the simulation says "this ground is now closed (or open
-// again) to ground units". Workstream 1 owns the navigation grid and connects it here;
-// until then only fences stop anything, by the straight-line check in fenceStops.
+// again) to ground units". A structure closes the ground it stands on to everybody, so
+// troops walk round a base; a fence closes its line to the other side only, so its
+// owner's troops are never walled in and the enemy goes round it, or through it once it
+// is breached. The headquarters is a map point, not a structure; initStructures closes
+// the ground under it for both sides.
 func (s *Sim) blockGround(st *Structure, closed bool) {
-	_ = st
-	_ = closed
+	key := "s" + strconv.Itoa(st.ID)
+	if st.def.Role == shared.RoleFence {
+		if st.def.Blocks == "ground" {
+			s.SetFenced(key, 1-st.Side, st.AX, st.AY, st.BX, st.BY, closed)
+		}
+		return
+	}
+	// A little less than the footprint, so that a squad told to stand beside it can.
+	size := math.Max(NavCell, 2*st.def.Footprint-NavCell)
+	s.SetBlocked(key, st.X, st.Y, size, size, closed)
+	if closed {
+		s.stepOff()
+	}
+}
+
+// stepOff moves every ground team that stands where it no longer can (a structure has
+// just gone up under it) to the nearest ground it can stand on.
+func (s *Sim) stepOff() {
+	for _, sq := range s.Squads {
+		if !sq.Alive || sq.unit.Domain != "land" {
+			continue
+		}
+		for i := range sq.Teams {
+			t := &sq.Teams[i]
+			if t.Members > 0 && t.In == "" && !s.Walkable(t.X, t.Y) && s.bridgeAt(t.X, t.Y) == nil {
+				t.X, t.Y = s.nav.snapXY(navGround, t.X, t.Y)
+				t.path = nil
+			}
+		}
+	}
 }
 
 // initStructures puts up what each side starts with.
@@ -1047,6 +1149,27 @@ func (s *Sim) fenceStops(tr *teamRef, nx, ny float64) *Structure {
 		}
 	}
 	return nil
+}
+
+// fenceInTheWay is the standing hostile fence nearest to a ground team that has no way
+// to where it is going: the one to shoot down. The lowest id breaks a tie.
+func (s *Sim) fenceInTheWay(tr *teamRef, x, y float64) *Structure {
+	if tr.u.Domain != "land" {
+		return nil
+	}
+	var best *Structure
+	bd := math.MaxFloat64
+	for _, st := range s.Structures {
+		if st.def.Role != shared.RoleFence || st.Ruin || st.Side == tr.sq.Side || st.def.Blocks != "ground" {
+			continue
+		}
+		// Near the team, and not behind it: on the goal's side.
+		d := segDist(tr.t.X, tr.t.Y, st.AX, st.AY, st.BX, st.BY)
+		if d < bd && d <= 400 && dist(st.X, st.Y, x, y) <= dist(tr.t.X, tr.t.Y, x, y)+st.def.SegmentLength {
+			best, bd = st, d
+		}
+	}
+	return best
 }
 
 // segDist is the distance from a point to a segment.

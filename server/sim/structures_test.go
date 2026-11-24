@@ -2,6 +2,7 @@ package sim_test
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"testing"
 
@@ -234,18 +235,24 @@ func TestDefencesAndFencesNeedOwnGround(t *testing.T) {
 	}
 }
 
-func TestAFenceStopsGroundUnitsUntilItIsBreached(t *testing.T) {
+func TestAFenceIsWalkedRoundAndBreachedOnlyWhenItClosesTheWay(t *testing.T) {
 	s := newSim(t, 1)
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: "base:front"}); err != nil {
 		t.Fatal(err)
 	}
 	wall := rules.Factions["aegis"].Structures["barrierWall"]
-	var fence []sim.StructureView
-	for _, st := range s.Snapshot(0).Structures {
-		if st.Role == shared.RoleFence {
-			fence = append(fence, st)
+	fenceOf := func() (fence []sim.StructureView, ruins int) {
+		for _, st := range s.Snapshot(0).Structures {
+			if st.Role == shared.RoleFence {
+				fence = append(fence, st)
+				if st.Ruin {
+					ruins++
+				}
+			}
 		}
+		return
 	}
+	fence, _ := fenceOf()
 	// The run goes north to south; where a bunker of the map stands in its line it leaves a gap.
 	if len(fence) < wall.Segments-1 || len(fence) > wall.Segments || fence[0].Run == 0 || fence[0].AX != fence[0].BX {
 		t.Fatalf("a run on the front of a western base should be about %d segments north to south: %+v", wall.Segments, fence)
@@ -257,22 +264,44 @@ func TestAFenceStopsGroundUnitsUntilItIsBreached(t *testing.T) {
 	}
 	run(s, wall.BuildSeconds+1)
 	line := fence[0].AX
-	// Militia come from the east, straight at the middle of the run.
+	// Militia come from the east, straight at the middle of the run, with open ground at
+	// both ends of it: they walk round and shoot nothing down.
 	militia := s.Squad(3)
 	place(militia, line+120, 480)
-	must(t, s, sim.Command{Side: 1, Kind: sim.CmdMove, Squad: militia.ID, Point: "A"})
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdMove, Squad: militia.ID, Place: "W of F 420"})
+	for i := 0; i < 900; i++ {
+		s.Step()
+		for _, tm := range militia.Teams {
+			for _, f := range fence {
+				if tm.Members > 0 && math.Abs(tm.X-line) < 4 && tm.Y > math.Min(f.AY, f.BY) && tm.Y < math.Max(f.AY, f.BY) {
+					t.Fatalf("a militia team walked through a standing wall at (%.0f, %.0f)", tm.X, tm.Y)
+				}
+			}
+		}
+	}
+	if x, _ := militia.Center(); x >= line {
+		t.Fatalf("with open ground round the wall the militia never got past it: at x=%.0f, wall at %.0f", x, line)
+	}
+	if _, ruins := fenceOf(); ruins != 0 {
+		t.Fatalf("%d segments fell to militia that could walk round", ruins)
+	}
+	// Close the ground at both ends of the run and they have no way round: they stop at
+	// the wall, shoot it down and go through the breach.
+	top, bottom := math.MaxFloat64, 0.0
+	for _, f := range fence {
+		top, bottom = math.Min(top, math.Min(f.AY, f.BY)), math.Max(bottom, math.Max(f.AY, f.BY))
+	}
+	s.SetBlocked("test-north", line, top/2, 40, top, true)
+	s.SetBlocked("test-south", line, (bottom+rules.Map.Height)/2, 40, rules.Map.Height-bottom, true)
+	place(militia, line+120, 480)
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdMove, Squad: militia.ID, Place: "W of F 420"})
 	run(s, 12)
 	x, _ := militia.Center()
 	if x <= line {
 		t.Fatalf("the militia walked through a standing wall: at x=%.0f, wall at %.0f", x, line)
 	}
-	if x > line+40 {
-		t.Fatalf("the militia never reached the wall: at x=%.0f", x)
-	}
-	// Stopped, they shoot it down and go on.
-	var events []sim.Event
 	for i := 0; i < 6000; i++ {
-		events = append(events, s.Step()...)
+		s.Step()
 		if x, _ = militia.Center(); x < line-20 {
 			break
 		}
@@ -280,19 +309,13 @@ func TestAFenceStopsGroundUnitsUntilItIsBreached(t *testing.T) {
 	if x >= line-20 {
 		t.Fatalf("the militia never breached the wall: at x=%.0f", x)
 	}
-	ruins := 0
-	for _, st := range s.Snapshot(0).Structures {
-		if st.Role == shared.RoleFence && st.Ruin {
-			ruins++
-		}
-	}
-	if ruins == 0 || ruins == len(fence) {
-		t.Fatalf("%d of %d segments fell; a breach is some, not none and not all", ruins, wall.Segments)
+	if _, ruins := fenceOf(); ruins == 0 || ruins == len(fence) {
+		t.Fatalf("%d of %d segments fell; a breach is some, not none and not all", ruins, len(fence))
 	}
 	// Its owner's own squads were never stopped by it.
 	own := s.Squad(1)
 	place(own, line-60, 400)
-	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: own.ID, Point: "F"})
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: own.ID, Place: "E of B 100"})
 	run(s, 8)
 	if x, _ := own.Center(); x <= line {
 		t.Fatalf("a side's own wall stopped its own squad at x=%.0f", x)

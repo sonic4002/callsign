@@ -117,6 +117,7 @@ type Team struct {
 	pathVer  int
 	pathMode int
 	pathTick int
+	pathOpen bool // the path gets all the way to where the team is going
 	atPost   bool // standing where its orders put it
 
 	// scratch for the tick being resolved
@@ -179,7 +180,8 @@ type Sim struct {
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
-	landIdx         map[string]int // landmark id → index
+	slots           [2][][2]float64 // where each side's base slots lie on this map (structures.go)
+	landIdx         map[string]int  // landmark id → index
 	rng             *rand.Rand
 	events          []Event
 	lengthTicks     int
@@ -550,7 +552,15 @@ func (s *Sim) move(tr *teamRef) {
 		speed *= s.R.TerrainKinds[string(s.R.Map.TerrainAt(t.X, t.Y))].Speed
 	}
 	// Around water, mountains and whatever has been built: head for the next corner.
+	goalX, goalY := p.x, p.y
 	x, y, ok := s.steer(tr, p.x, p.y)
+	// With no way through, the fence that closes the way is what stops the team: it goes
+	// as near as it can and shoots the fence down (structureTarget).
+	if !t.pathOpen {
+		if st := s.fenceInTheWay(tr, goalX, goalY); st != nil {
+			t.blocked = st.ID
+		}
+	}
 	if !ok {
 		return
 	}
@@ -571,7 +581,10 @@ func (s *Sim) move(tr *teamRef) {
 		t.blocked = st.ID
 		return
 	}
-	t.X, t.Y, t.blocked = nx, ny, 0
+	t.X, t.Y = nx, ny
+	if t.pathOpen {
+		t.blocked = 0
+	}
 }
 
 func (s *Sim) fire(tr *teamRef) {

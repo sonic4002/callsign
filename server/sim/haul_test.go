@@ -39,19 +39,19 @@ func TestHaulersCollectGoldOnTheirOwn(t *testing.T) {
 		t.Fatalf("haulers must not be listed as squads: %d squads", len(start.Squads))
 	}
 	states := map[string]bool{}
-	for i := 0; i < 70*rules.TickRate; i++ {
+	for i := 0; i < 90*rules.TickRate; i++ {
 		s.Step()
 		states[haulersOf(s.Snapshot(0), 0)[0].State] = true
 	}
 	for _, want := range []string{sim.HaulOut, sim.HaulLoading, sim.HaulReturning, sim.HaulUnloading} {
 		if !states[want] {
-			t.Errorf("in 70 s the hauler was never %q; it was %v", want, states)
+			t.Errorf("in 90 s the hauler was never %q; it was %v", want, states)
 		}
 	}
 	_, u := rules.HaulerOf("aegis")
-	trickle := rules.Match.StartGold + 70*rules.Match.HQTrickle
+	trickle := rules.Match.StartGold + 90*rules.Match.HQTrickle
 	if got := s.Gold(0); got < trickle+int(u.Capacity) {
-		t.Fatalf("gold after 70 s = %d, want the trickle (%d) plus at least one load of %.0f", got, trickle, u.Capacity)
+		t.Fatalf("gold after 90 s = %d, want the trickle (%d) plus at least one load of %.0f", got, trickle, u.Capacity)
 	}
 	if h := haulersOf(s.Snapshot(0), 0)[0]; h.Field != "B" {
 		t.Errorf("the west hauler works field %q, want its home field B", h.Field)
