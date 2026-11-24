@@ -106,8 +106,10 @@ export function choose(answer, options, threshold = THRESHOLD) {
 }
 
 // jevBrain makes the brain. `fetch`, `base`, `room`, `token` and `seat` are the relay brain's.
-// onDecision({ ms, model, choice, p, acted }) is told of every call made, for measuring.
-export function jevBrain({ base = "/relay/v1", room, token, seat, fetch: fetcher = (...a) => globalThis.fetch(...a), threshold = THRESHOLD, timeoutMs = 2500, operatorLevel = 3, onUsage, onDecision } = {}) {
+// `threshold` is the least probability the model must give an order for the squad to act
+// on it. onDecision({ ms, model, choice, p, acted }) is told of every call made, and
+// `grammar: false` sends every order to the model, both for measuring the model alone.
+export function jevBrain({ base = "/relay/v1", room, token, seat, fetch: fetcher = (...a) => globalThis.fetch(...a), threshold = THRESHOLD, timeoutMs = 2500, operatorLevel = 3, grammar = true, onUsage, onDecision } = {}) {
   const steps = stepper("jev");
   const memory = memories();
   let offUntil = 0; // after "decide_off" the relay is left alone for a while
@@ -141,7 +143,10 @@ export function jevBrain({ base = "/relay/v1", room, token, seat, fetch: fetcher
         const mem = memory(ctx.agent);
         seen = { model: "grammar" };
         if (!ctx.wake.call) return leaderEvent(ctx, mem);
-        let intent = understandLeader({ call: ctx.wake.call, status: ctx.wake.status, rules: ctx.rules, agent: ctx.agent, level: levelOf(ctx.agent) });
+        const commanded = ["player", "operator"].includes(ctx.wake.call.from.key);
+        // A radio check, and a call from another squad, are settled by code either way.
+        const byCode = grammar || !commanded || ctx.wake.call.prowords?.includes("radioCheck");
+        let intent = byCode ? understandLeader({ call: ctx.wake.call, status: ctx.wake.status, rules: ctx.rules, agent: ctx.agent, level: levelOf(ctx.agent) }) : intents.unclear();
         if (intent.kind === "unclear" && Date.now() >= offUntil) {
           const options = optionsFor(ctx);
           const began = Date.now();

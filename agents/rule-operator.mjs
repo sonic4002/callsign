@@ -34,6 +34,7 @@ const loose = {
   give: /\b(take it from here|handle it|handle the fight|you're in charge|you are in charge|take charge|it's your fight)\b|תטפל בזה|קח את זה מכאן|אתה מנהל|קח אחריות/,
   take: /\b(i'll take it from here|i will take it from here|give me back command|i'm back in command|stand down)\b|אני ממשיך מכאן|תחזיר לי את הפיקוד|אני חוזר לפקד/,
 };
+const sendVerb = /\b(send|dispatch|get|tell|order)\b|שלח|שלחו|תשלח/;
 const then = /\s*(?:[,;.]\s*)?(?:\band then\b|\bthen\b|\bafter that\b|\bafterwards\b|ואז|אחר כך|ואחרי זה|ולאחר מכן|ואחריו|ואחריה)\s*/i;
 const and = /\s+(?:and|&|וגם)\s+/i;
 
@@ -346,7 +347,11 @@ function clause(text, ctx, part, mem) {
   const wanted = wantedStructure(text, structures);
   const fixed = wanted && ["defence", "fence"].includes(structures[wanted].role);
   const found = scan(tidy(text), lang, leaderWords, rules).found.filter((f) => !f.negated);
-  const verb = ["attack", "hold", "move"].find((v) => found.some((f) => f.cls === v)) ?? (found.some((f) => ["cover", "enter"].includes(f.cls)) ? "hold" : found.some((f) => f.cls === "fallBack") ? "move" : null);
+  const named = squads.filter((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));
+  // "Send Viper 2 to Golf" is a move, though it has no word for moving.
+  const verb =
+    ["attack", "hold", "move"].find((v) => found.some((f) => f.cls === v)) ??
+    (found.some((f) => ["cover", "enter"].includes(f.cls)) ? "hold" : found.some((f) => f.cls === "fallBack") || (named.length && sendVerb.test(text)) ? "move" : null);
   if (wanted && (buildVerb.test(text) || part.inherit === "build" || (fixed && !verb))) {
     // An exact spot in the call ("140 metres north and 60 metres east of Alpha") is passed
     // on as it was said; the game reads it. A base structure with no spot takes a point
@@ -395,7 +400,6 @@ function clause(text, ctx, part, mem) {
     return { steps: [radio(fit, say("opAttack", { place: pointName(rules, goal.id, lang) }), "over")] };
   }
   const point = rules.map.points.find((p) => p.id === points[0]);
-  const named = squads.filter((sq) => text.includes(sq.callsign.en.toLowerCase()) || (sq.callsign.he && text.includes(sq.callsign.he)));
   if (verb && (point || marks.length === 1)) {
     // A task for squads Hammer named goes to them, in the operator's own words; one for
     // nobody in particular goes, as Hammer said it, to every squad that can reach the place.

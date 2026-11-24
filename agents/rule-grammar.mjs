@@ -37,7 +37,7 @@ export const leaderWords = {
       "=נו", "נוא", "=נועה"],
   },
   hold: {
-    en: ["hold", "defend", "secure", "guard", "keep", "protect", "occupy", "take", "capture", "stay at", "stay on", "sit on", "set up at", "cover", "watch",
+    en: ["hold", "defend", "secure", "guard", "keep", "protect", "occupy", "take", "capture", "stay at", "stay on", "sit on", "set up at", "watch",
       "hole", "holed", "holds", "holding", "holt", "hauled"],
     he: ["החזק", "החזיק", "תחזיק", "להחזיק", "=הגן", "הגנו", "תגן", "תגנו", "להגן", "אבטח", "תאבטח", "לאבטח", "=שמור", "שמרו", "תשמר", "לשמור", "תפוס", "תפסו", "תתפס", "לתפוס", "כבוש", "כבשו", "תכבש", "לכבוש", "=קח", "=קחו", "תיקח", "הישאר", "תישאר", "השתלט"],
   },
@@ -47,7 +47,7 @@ export const leaderWords = {
     he: ["נסוג", "=סגו", "תיסוג", "לסגת", "נסיגה", "=חזור", "חזרו", "תחזר", "לחזור", "חזרה ל", "חזרה הביתה", "התקפל", "תתקפל", "הביתה", "צאו משם", "צא משם", "התנתק"],
   },
   cover: {
-    en: ["take cover", "find cover", "find some cover", "get cover", "get to cover", "into cover", "seek cover", "get down", "hide", "heads down", "shelter", "take shelter"],
+    en: ["take cover", "find cover", "find some cover", "get cover", "get to cover", "into cover", "seek cover", "cover", "covers", "get down", "hide", "heads down", "shelter", "take shelter"],
     he: ["תפסו מחסה", "תפוס מחסה", "מחסה", "התחבא", "תתחבא", "הסתתר", "תסתתר", "הורידו ראש", "תורידו ראש", "מכסה"],
   },
   enter: {
@@ -88,8 +88,8 @@ export const leaderWords = {
   },
 };
 
-// Words that turn the order after them off.
-const negation = { en: /(?:\b(?:don't|do not|dont|never|without|no need to)\s+(?:[a-z']+\s+){0,2})$/, he: /(?:(?:^|\s)(?:אל|לא|בלי|אסור)\s+(?:\S+\s+){0,1})$/ };
+// Words that turn the order right after them off: "don't stop to fight", "אל תתקפו".
+const negation = { en: /(?:\b(?:don't|do not|dont|never|without|no need to)\s+(?:[a-z']+\s+){0,1})$/, he: /(?:(?:^|\s)(?:אל|לא|בלי|אסור)\s+)$/ };
 const haulerWords = /\b(haulers?|trucks?|crawlers?|miners?|harvesters?)\b|משאית|משאיות|מוביל|מובילים|זחל|זחלים/;
 const escortWords = /\b(escort|protect|cover|guard)\b|לווה|ליווי|אבטח|שמור/;
 const compass = /\b(north|south|east|west)|צפון|דרום|מזרח|מערב/i;
@@ -212,11 +212,11 @@ export function scan(text, lang, words, rules) {
     if (plainWords.has(word) || names.has(word)) continue;
     if (lang === "he" && /^[ולשה]/.test(word) && word.length > 4 && !names.has(word.slice(1))) word = word.slice(1);
     else if (lang === "he" && names.has(word.slice(1))) continue;
-    const scored = single.map(([cls, w]) => [likeness(word, w, lang), cls]).sort((a, b) => b[0] - a[0]);
+    const scored = single.map(([cls, w]) => [lang === "he" ? Math.max(likeness(word, w, lang), likeness(word.slice(0, w.length), w, lang)) : likeness(word, w, lang), cls]).sort((a, b) => b[0] - a[0]);
     const best = scored[0];
     const need = lang === "he" ? 0.75 : 0.8;
     if (!best || best[0] < need) continue;
-    const rival = scored.find(([score, cls]) => cls !== best[1] && score >= best[0] - 0.05);
+    const rival = scored.find(([score, cls]) => cls !== best[1] && score > best[0] - 0.05);
     if (rival) continue; // it sounds like two different orders: not clear enough
     found.push({ cls: best[1], at: m.index, text: m[0], fuzzy: true, negated: negation[lang === "he" ? "he" : "en"].test(text.slice(0, m.index)) });
     blank(m.index, m[0].length);
@@ -259,15 +259,51 @@ export function contactIn(body, rules) {
   return m ? numberOf(m[1]) : 0;
 }
 
-// whereSaid gives, for each point the net found in a call, where in the text its name
-// stands, so that "from Delta to Foxtrot" can be told from "to Delta from Foxtrot".
+const namesOfPoint = (p) => [p?.callsign.en, p?.callsign.he, p?.name.en, p?.name.he, ...(p?.aliases ?? [])].filter(Boolean).map((n) => n.toLowerCase());
+
+// morePoints finds what the net's own reading misses: a Hebrew name that starts with "ה"
+// loses it behind "ל", "ב" or "מ" ("למעבר הקפוא" is "המעבר הקפוא").
+function morePoints(text, rules) {
+  const found = [];
+  for (const p of rules.map.points) {
+    for (const n of namesOfPoint(p).filter((name) => /^ה[א-ת]/.test(name))) {
+      if (new RegExp(`(?<![${HE}])ו?[לבמכ]${escape(n.slice(1))}(?![${HE}])`).test(text)) found.push(p.id);
+    }
+  }
+  return [...new Set(found)];
+}
+
+// whereSaid gives, for each point named in a call, where in the text its name stands, so
+// that "from Delta to Foxtrot" can be told from "to Delta from Foxtrot".
 function whereSaid(text, ids, rules) {
-  return ids.map((id) => {
-    const p = rules.map.points.find((q) => q.id === id);
-    const names = [p?.callsign.en, p?.callsign.he, p?.name.en, p?.name.he, ...(p?.aliases ?? [])].filter(Boolean).map((n) => n.toLowerCase());
-    const at = Math.min(...names.map((n) => text.indexOf(n)).filter((i) => i >= 0), Infinity);
-    return { id, at };
-  });
+  return ids
+    .map((id) => {
+      const names = namesOfPoint(rules.map.points.find((q) => q.id === id)).flatMap((n) => (/^ה[א-ת]/.test(n) ? [n, n.slice(1)] : [n]));
+      const at = Math.min(...names.map((n) => text.indexOf(n)).filter((i) => i >= 0), Infinity);
+      return { id, at };
+    })
+    .sort((a, b) => a.at - b.at);
+}
+
+// withoutNames blanks the names of the points a call mentions, so that the "east" of "the
+// east field" is not read as a bearing off it.
+function withoutNames(text, ids, rules) {
+  let out = text;
+  for (const id of ids) {
+    for (const n of namesOfPoint(rules.map.points.find((q) => q.id === id)).sort((a, b) => b.length - a.length)) {
+      out = out.split(n).join(" ".repeat(n.length));
+      if (/^ה[א-ת]/.test(n)) out = out.split(n.slice(1)).join(" ".repeat(n.length - 1));
+    }
+  }
+  return out;
+}
+
+// Little words that say nothing about where: what is left of "hold" besides them means
+// the call named a place this brain did not catch.
+const filler = new Set(["the", "a", "an", "it", "and", "to", "at", "on", "in", "of", "now", "please", "there", "here", "your", "you", "position", "ground", "fast", "quickly", "right", "away", "immediately", "this", "that", "is", "hammer", "over", "out", "for", "me", "us", "we", "just", "then", "up", "down", "still", "tight", "firm", "all", "squad", "team", "men", "boys", "guys", "ok", "okay",
+  "את", "אותו", "אותה", "אותם", "עכשיו", "מיד", "בבקשה", "פה", "כאן", "שם", "במקום", "בעמדה", "מהר", "על", "של", "זה", "אתם", "אתה", "כולם", "טוב", "רק", "גם", "עד", "הודעה", "חדשה", "להודעה"]);
+function leftover(rest, lang) {
+  return [...rest.matchAll(lang === "he" ? new RegExp(`[${HE}]{2,}`, "g") : /[a-z]{2,}/g)].map((m) => m[0]).filter((w) => !filler.has(w));
 }
 
 // The intents. Each is plain data: a label that names it (the same label an option of the
@@ -335,7 +371,8 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
   const marks = escort ? [] : (call.landmarks ?? []);
   const bridges = marks.filter((id) => (rules.map.bridges ?? []).some((b) => b.id === id));
   const named = contactIn(call.body, rules);
-  const points = whereSaid(text, call.points ?? [], rules);
+  const said = [...new Set([...(call.points ?? []), ...(lang === "he" ? morePoints(text, rules) : [])])];
+  const points = whereSaid(text, said, rules);
   const engineer = unit.captureSeconds > 0;
   const which = (ids) => intents.unclear("sayAgainWhich", { options: ids });
   const ownHQ = hqOf(rules, agent.side, true);
@@ -352,7 +389,7 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
   }
   // "Dig in" builds a position where the squad stands. Told to go somewhere and dig in, it
   // goes and holds the place, which takes the cover there.
-  const elsewhere = (call.points?.length || marks.length) && (has("move") || has("hold"));
+  const elsewhere = (said.length || marks.length) && (has("move") || has("hold"));
   if (has("dig") && !elsewhere) return canDig(unit) ? intents.fortify() : intents.negative("noDig");
   // An enemy structure named with a word for taking it: engineers take it over.
   if (theirs && has("capture")) return engineer ? intents.capture(theirs.id) : intents.negative("onlyEngineersCapture");
@@ -370,7 +407,7 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
   if (points.length > 1 && orWords.test(text)) return which(points.map((p) => p.id));
   const from = (p) => /(?:\bfrom\s+(?:the\s+)?|(?:^|\s)מ)$/.test(text.slice(0, p.at));
   const point = (points.find((p) => !from(p)) ?? points[0])?.id;
-  const offPoint = point && compass.test(text) && marks.length === 0; // "north of Foxtrot": the game reads the words
+  const offPoint = point && compass.test(withoutNames(text, said, rules)) && marks.length === 0; // "north of Foxtrot": the game reads the words
 
   if (has("fallBack") && !has("attack")) {
     const to = point ?? ownHQ;
@@ -381,7 +418,7 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
     return intents.move(out, "leave", { leave: true });
   }
   if (escort) {
-    const field = call.points?.[0] ?? workedField(status, rules, agent.side);
+    const field = point ?? workedField(status, rules, agent.side);
     return intents.hold(field, `hold:${field}`);
   }
   if (has("attack")) {
@@ -408,7 +445,8 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
     const near = nearestCover(status, rules, { within: 400 });
     return near ? intents.hold(near.id, "cover", { shelter: near.id }) : intents.hold("here", "cover");
   }
-  const verb = has("hold") ? "hold" : has("move") ? "move" : has("stop") ? "hold" : null;
+  // "Go to the town and dig in there" is to hold the town.
+  const verb = has("hold") || (has("dig") && elsewhere) ? "hold" : has("move") ? "move" : has("stop") ? "hold" : null;
   if (!verb) {
     // Told not to move, and nothing else: stay.
     if (found.some((f) => f.cls === "move" && f.negated)) return intents.hold("here", "hold:here");
@@ -427,6 +465,9 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
   if (point) return intents[verb](point);
   if (homeWords.test(text)) return intents[verb](ownHQ);
   if (verb === "move") return intents.unclear("sayAgainWhere", { verb: "verb.move" });
+  // "Hold" and nothing else is to hold here. With words left over that this brain could
+  // not place, the call named somewhere: ask, rather than stay put on a guess.
+  if (!has("stop") && !hereWords.test(text) && leftover(rest, lang).length > 0) return intents.unclear("sayAgainWhere", { verb: "verb.hold" });
   return intents.hold("here", "hold:here");
 }
 
