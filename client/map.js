@@ -17,13 +17,18 @@ import { drawField, drawFountain, fieldSeen, fieldShare, ghosts, gusherAt, haule
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
 import { coverPercent, drawBridge, drawMiniMap, drawScenery, isWater, landmarkFallbacks, paintGround, placeAt, scenery } from "./terrain.js";
-import { pixelRatio, smoothing } from "./touch.js";
+import { TileCache, detailLevel, tilesIn } from "./tiles.js";
+import { fingers, pixelRatio, smoothing } from "./touch.js";
 
 export const sideColor = { [-1]: "#cfd3c8", 0: "#4da3ff", 1: "#ff6b4a" };
 const nerveColor = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
 const TAU = Math.PI * 2;
 const RES = 1.5; // terrain is baked at this many pixels per iso unit, less on a big map
 const BAKE_PIXELS = 11e6; // the most pixels the baked terrain may have: phones refuse more
+// A big map's whole picture is coarse, so the part in view is baked again in sharp tiles
+// (tiles.js). This many are kept, 4 MB each; a phone keeps fewer.
+const TILES_KEPT = 16;
+const TILES_KEPT_PHONE = 8;
 const MARGIN = 90;
 
 // A small seeded generator, so the terrain looks the same on every load.
@@ -541,6 +546,33 @@ export class Scene {
     layer.height = Math.round(((W + H) / 2 + 2 * MARGIN) * res);
     const g = layer.getContext("2d");
     g.setTransform(res, 0, 0, res, (H + MARGIN) * res, MARGIN * res);
+    const rand = this.paintTerrain(g);
+    this.layer = layer;
+    // The same picture in sharp tiles, for a view closer than the whole one can show.
+    this.picture = { x: -H - MARGIN, y: -MARGIN, w: W + H + 2 * MARGIN, h: (W + H) / 2 + 2 * MARGIN };
+    this.tiles = new TileCache(fingers() ? TILES_KEPT_PHONE : TILES_KEPT, (level, tile) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = Math.round(tile.size * level);
+      const tg = canvas.getContext("2d");
+      tg.setTransform(level, 0, 0, level, -tile.x * level, -tile.y * level);
+      this.paintTerrain(tg);
+      return canvas;
+    });
+    // Glints on open water, wherever the map has any.
+    this.waves = [];
+    for (let i = 0; i < 4000 && this.waves.length < Math.round((W * H) / 23000); i++) {
+      const x = rand() * W;
+      const y = rand() * H;
+      if (isWater(rules, x, y) && isWater(rules, x - 30, y) && isWater(rules, x + 30, y)) this.waves.push({ x, y, phase: rand() * TAU, len: 14 + rand() * 26 });
+    }
+  }
+
+  // paintTerrain draws the ground onto a context set to the iso plane: the same picture
+  // every time, whatever part of it the canvas shows. It returns its random generator, for
+  // what else is scattered over the map.
+  paintTerrain(g) {
+    const { rules } = this;
+    const { width: W, height: H } = rules.map;
     const path = (pts, dy = 0) => {
       g.beginPath();
       pts.forEach(([x, y], i) => {
@@ -582,15 +614,45 @@ export class Scene {
     const tile = (name) => (sprites.terrain[name] ? g.createPattern(sprites.terrain[name], "repeat") : null);
     paintGround(g, rules, rand, { water: tile("sea"), ice: tile("ice"), mountain: tile("mountain") });
     for (const s of scenery(rules, rand)) drawScenery(g, s, ...toIso(s.x, s.y));
+    return rand;
+  }
 
-    this.layer = layer;
-    // Glints on open water, wherever the map has any.
-    this.waves = [];
-    for (let i = 0; i < 4000 && this.waves.length < Math.round((W * H) / 23000); i++) {
-      const x = rand() * W;
-      const y = rand() * H;
-      if (isWater(rules, x, y) && isWater(rules, x - 30, y) && isWater(rules, x + 30, y)) this.waves.push({ x, y, phase: rand() * TAU, len: 14 + rand() * 26 });
+  // drawGround lays the baked ground under the frame: the whole-map picture, and over it
+  // the sharp tiles of the part in view when the view is closer than that picture shows.
+  // A tile not baked yet is baked now, one a frame, so a move never stalls the page.
+  drawGround(ctx, cam) {
+    const z = cam.zoom;
+    const { picture } = this;
+    ctx.imageSmoothingQuality = smoothing();
+    const sx = (x) => (x - cam.cx) * z + cam.w / 2;
+    const sy = (y) => (y - cam.cy) * z + cam.h / 2;
+    ctx.drawImage(this.layer, sx(picture.x), sy(picture.y), picture.w * z, picture.h * z);
+    const level = detailLevel(z * this.dpr, this.res);
+    if (!level) return;
+    const view = { x: cam.cx - cam.w / 2 / z, y: cam.cy - cam.h / 2 / z, w: cam.w / z, h: cam.h / z };
+    const wanted = tilesIn(picture, level, view);
+    if (wanted.length > this.tiles.limit) return; // more than is kept: the whole picture will do
+    let baked = false;
+    for (const t of wanted) {
+      const fresh = !baked && !this.tiles.get(level, t);
+      const canvas = this.tiles.get(level, t, fresh);
+      baked = baked || fresh;
+      if (!canvas) continue;
+      // Whole device pixels, so two tiles side by side leave no seam between them.
+      const k = this.dpr;
+      const x0 = Math.floor(sx(t.x) * k) / k;
+      const y0 = Math.floor(sy(t.y) * k) / k;
+      const x1 = Math.ceil(sx(t.x + t.size) * k) / k;
+      const y1 = Math.ceil(sy(t.y + t.size) * k) / k;
+      ctx.drawImage(canvas, x0, y0, x1 - x0, y1 - y0);
     }
+  }
+
+  // tilePixels is how many pixels the kept tiles hold, for measuring the page's memory.
+  tilePixels() {
+    let n = 0;
+    for (const { canvas } of this.tiles.tiles.values()) n += canvas.width * canvas.height;
+    return n;
   }
 
   // ---- frame ----
@@ -627,10 +689,7 @@ export class Scene {
     const S = (x, y) => cam.screen(x, y);
 
     // Terrain.
-    const gx = (-rules.map.height - MARGIN - cam.cx) * z + cam.w / 2;
-    const gy = (-MARGIN - cam.cy) * z + cam.h / 2;
-    ctx.imageSmoothingQuality = smoothing();
-    ctx.drawImage(this.layer, gx, gy, (this.layer.width / this.res) * z, (this.layer.height / this.res) * z);
+    this.drawGround(ctx, cam);
     ctx.lineCap = "round";
     for (const w of this.waves) {
       const glint = 0.5 + 0.5 * Math.sin(time * 1.3 + w.phase);

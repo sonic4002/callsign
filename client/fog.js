@@ -5,7 +5,8 @@
 
 import { smoothing } from "./touch.js";
 
-const UNIT = 8; // map units per fog pixel
+const UNIT = 8; // map units per fog pixel, more on a big map
+const FOG_PIXELS = 130000; // the fog picture is repainted every frame, so it stays about this size
 const PAD = 160; // the fog reaches this far past the map edge, in map units
 const DIM = 0.5; // darkness left over ground seen before
 const INK = "#04070a";
@@ -14,9 +15,10 @@ export class Fog {
   constructor(rules) {
     this.rules = rules;
     const { width, height } = rules.map;
+    this.unit = Math.max(UNIT, Math.ceil(Math.sqrt(((width + 2 * PAD) * (height + 2 * PAD)) / FOG_PIXELS)));
     this.canvas = document.createElement("canvas");
-    this.canvas.width = Math.ceil((width + 2 * PAD) / UNIT);
-    this.canvas.height = Math.ceil((height + 2 * PAD) / UNIT);
+    this.canvas.width = Math.ceil((width + 2 * PAD) / this.unit);
+    this.canvas.height = Math.ceil((height + 2 * PAD) / this.unit);
     this.g = this.canvas.getContext("2d");
     this.cells = document.createElement("canvas"); // one pixel per fog cell, plus the pad
     this.key = null;
@@ -65,15 +67,15 @@ export class Fog {
     g.imageSmoothingEnabled = true;
     g.imageSmoothingQuality = "high";
     g.globalAlpha = 1 - DIM;
-    const k = fog.cell / UNIT;
+    const k = fog.cell / this.unit;
     // Half a cell of offset puts each cell's pixel centre on the cell's centre.
-    g.drawImage(this.cells, (PAD - this.pad * fog.cell) / UNIT, (PAD - this.pad * fog.cell) / UNIT, this.cells.width * k, this.cells.height * k);
+    g.drawImage(this.cells, (PAD - this.pad * fog.cell) / this.unit, (PAD - this.pad * fog.cell) / this.unit, this.cells.width * k, this.cells.height * k);
     g.globalAlpha = 1;
     // Ground in sight now.
     for (const [x, y, sight] of eyes) {
-      const cx = (x + PAD) / UNIT;
-      const cy = (y + PAD) / UNIT;
-      const r = (sight * 1.04) / UNIT;
+      const cx = (x + PAD) / this.unit;
+      const cy = (y + PAD) / this.unit;
+      const r = (sight * 1.04) / this.unit;
       const light = g.createRadialGradient(cx, cy, r * 0.72, cx, cy, r);
       light.addColorStop(0, "rgba(0,0,0,1)");
       light.addColorStop(1, "rgba(0,0,0,0)");
@@ -92,7 +94,7 @@ export class Fog {
     ctx.transform(z, z / 2, -z, z / 2, cam.w / 2 - cam.cx * z, cam.h / 2 - cam.cy * z);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = smoothing();
-    ctx.drawImage(this.canvas, -PAD, -PAD, this.canvas.width * UNIT, this.canvas.height * UNIT);
+    ctx.drawImage(this.canvas, -PAD, -PAD, this.canvas.width * this.unit, this.canvas.height * this.unit);
     ctx.restore();
   }
 
@@ -100,6 +102,6 @@ export class Fog {
   drawRadar(g, k) {
     if (!this.on) return;
     g.imageSmoothingEnabled = true;
-    g.drawImage(this.canvas, -PAD * k, -PAD * k, this.canvas.width * UNIT * k, this.canvas.height * UNIT * k);
+    g.drawImage(this.canvas, -PAD * k, -PAD * k, this.canvas.width * this.unit * k, this.canvas.height * this.unit * k);
   }
 }
