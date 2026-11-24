@@ -184,3 +184,29 @@ test("openers: a callsign the audio supports is taken as the first word, a poor 
   assert.equal(await make(3).transcribe(audio, { openers }), "viper two");
   assert.equal(await make(-12).transcribe(audio, { openers }), "zebra two");
 });
+
+// The page writes calls itself (the order menu, the build and upgrade buttons, the Help
+// examples) and sends them like typed text. Tidying must never turn one into another
+// call: "צפע" is not the point "זאב", "כיתת" is not "דוד", "Militia cell" is not Kilo.
+test("tidy leaves the calls the page writes alone, typed or spoken", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  const cs = rules.callsigns;
+  const words = (text) => text.split(/[\s,.:;!?]+/).filter(Boolean).join(" ");
+  for (const lang of ["he", "en"]) {
+    const s = JSON.parse(readFileSync(new URL(`../i18n/${lang}.json`, import.meta.url), "utf8"));
+    const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+    const calls = Object.keys(s).filter((k) => /^help\..*\.say$/.test(k)).map((k) => s[k]);
+    for (const p of rules.map.points) for (const kind of ["hold", "move", "attack"]) calls.push(fill(s[`call.${kind}`], { to: `${cs.classes.infantry[lang]} 1`, from: cs.player[lang], point: p.callsign[lang] }));
+    calls.push(fill(s["call.attack"], { to: `${cs.classes.vehicle[lang]} 2`, from: cs.player[lang], point: `${cs.contact[lang]} 3` }));
+    for (const f of Object.values(rules.factions)) for (const u of Object.values(f.units)) calls.push(fill(s["call.buy"], { to: cs.operator[lang], from: cs.player[lang], class: s[`class.${u.class}`], unit: u.name[lang] }));
+    for (const c of Object.values(cs.classes)) calls.push(fill(s["call.upgrade"], { to: cs.operator[lang], from: cs.player[lang], squad: `${c[lang]} 1` }));
+    for (const text of calls) {
+      assert.equal(tidy(text, { lang, rules, typed: true }), text, "typed text is sent as written");
+      // A spoken call may have its punctuation redone, never its words.
+      assert.equal(words(tidy(text, { lang, rules })).toLowerCase(), words(text).toLowerCase());
+    }
+  }
+  // What typing still gets: a callsign that is only roughly spelled, put right.
+  assert.equal(tidy("צבע 1 תפוס את דוד", { lang: "he", rules, typed: true }), "צפע 1 תפוס את דוד");
+  assert.equal(tidy("vipr 2 attack target three", { lang: "en", rules, typed: true }), "Viper 2 attack Target 3");
+});

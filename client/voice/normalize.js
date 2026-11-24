@@ -13,7 +13,7 @@ const numbers = {
 };
 
 // Ordinary words that sound like a map point but are not one.
-const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "out", "over", "tell", "dig", "fox", "see", "sir", "zero", "brave", "dealt", "דור", "גם", "כל", "סוף", "הגיע", "פסול"]);
+const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "out", "over", "tell", "dig", "fox", "see", "sir", "zero", "brave", "dealt", "דור", "גם", "כל", "סוף", "הגיע", "פסול", "כיתה", "כיתת", "כיתות", "זהב", "את", "אותה", "אותו", "אותם", "to", "it", "cell"]);
 
 // sound reduces a word to rough consonant classes, so "vapour" and "viper" come out alike.
 export function sound(word, lang) {
@@ -89,9 +89,11 @@ function addressee(text, lang, rules) {
   return out.length > 1 ? out.slice(0, -1).join(", ") + joiner + out.at(-1) : out[0];
 }
 
-// places puts the map's own spelling on words that sound like a point's callsign.
-function places(body, lang, rules) {
-  return contacts(placeNames(body, lang, rules), lang, rules);
+// places puts the map's own spelling on words that sound like a point's callsign. Text
+// the player typed (`typed`) is left as written: matching by sound is for what a
+// recogniser heard, and on typed words it only does harm ("זהב" is not "זאב").
+function places(body, lang, rules, typed = false) {
+  return contacts(typed ? body : placeNames(body, lang, rules), lang, rules);
 }
 
 // contacts respells a named enemy squad: "target three" → "Target 3".
@@ -107,8 +109,16 @@ function contacts(body, lang, rules) {
 function placeNames(body, lang, rules) {
   const points = rules.map.points.map((p) => p.callsign[lang]);
   const exact = (word) => points.find((p) => p.toLowerCase() === word.toLowerCase());
+  // A station's own name is never a place, however alike they sound: "צפע" is not "זאב".
+  // The same goes for the words of a unit's name ("Militia cell" is not Kilo).
+  const cs = rules.callsigns;
+  const units = Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.name));
+  const stations = new Set(
+    [cs.player, cs.operator, cs.allStations, cs.contact, ...Object.values(cs.classes), ...units].flatMap((name) => (name?.[lang] ?? "").toLowerCase().split(/\s+/)),
+  );
+  const known = (word) => notPlaces.has(word.toLowerCase()) || stations.has(word.toLowerCase());
   const match = (word) => {
-    if (word.length < 3 || notPlaces.has(word.toLowerCase())) return null;
+    if (word.length < 3 || known(word)) return null;
     const best = points.map((p) => [similarity(word, p, lang), p]).sort((a, b) => b[0] - a[0])[0];
     return best[0] >= 0.75 ? best[1] : null;
   };
@@ -122,14 +132,18 @@ function placeNames(body, lang, rules) {
     }
     // A name heard as two words: "fox strut", "fox-trot".
     const next = parts[i + 2];
-    const both = next && /^[\s-]$/.test(parts[i + 1]) && !exact(next) ? match(word + next) : null;
+    // Not across a little word or a station's name: "to hold" is not Delta.
+    const halves = next && word.length >= 3 && next.length >= 3 && !stations.has(word.toLowerCase()) && !stations.has(next.toLowerCase());
+    const both = halves && /^[\s-]$/.test(parts[i + 1]) && !exact(next) ? match(word + next) : null;
     if (both && !match(word)) {
       parts.splice(i, 3, both);
       continue;
     }
     // Hebrew glues "in", "to", "the" and the like to the front of the name: בפסל, לכרמל.
-    const glued = lang === "he" && /^[בלמהוכש]/.test(word) && word.length > 3 ? exact(word.slice(1)) ?? match(word.slice(1)) : null;
-    parts[i] = glued ? word[0] + glued : match(word) ?? word;
+    // A known word, alone or behind such a letter ("וצפע"), is not a place.
+    const plain = known(word) || known(word.slice(1));
+    const glued = lang === "he" && !plain && /^[בלמהוכש]/.test(word) && word.length > 3 ? exact(word.slice(1)) ?? match(word.slice(1)) : null;
+    parts[i] = glued ? word[0] + glued : plain ? word : match(word) ?? word;
   }
   return parts.join("");
 }
@@ -172,7 +186,7 @@ export function normalize(heard, { lang, rules }) {
 // relaxed tidies a message that has no "this is": "צבע 1 תפוס את דוד" or "vapour two attack
 // gulf". Only a first word that sounds like a callsign and is followed by its number is
 // respelled; the operator's name must be close to exact. Map points in the rest are snapped.
-export function relaxed(heard, { lang, rules }) {
+export function relaxed(heard, { lang, rules, typed = false }) {
   const text = heard.replace(/\s+/g, " ").trim();
   const m = /^([^\s,.:;!?]+)(?:[\s\-#]+([^\s,.:;!?]+))?/.exec(text);
   if (!m) return text;
@@ -189,12 +203,14 @@ export function relaxed(heard, { lang, rules }) {
     head = cs.operator[lang];
     taken = m[1].length;
   }
-  return head + places(text.slice(taken), lang, rules);
+  return head + places(text.slice(taken), lang, rules, typed);
 }
 
 // tidy picks the right repair for a message: the full call when "this is" was said,
-// otherwise the relaxed form.
+// otherwise the relaxed form. A typed message (`typed`) only has a misspelled callsign at
+// its front put right; the rest is sent as the player wrote it.
 export function tidy(heard, opts) {
+  if (opts.typed) return relaxed(heard, opts);
   const full = normalize(heard, opts);
   return full !== heard.replace(/\s+/g, " ").trim() ? full : relaxed(heard, opts);
 }
