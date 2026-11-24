@@ -1,5 +1,5 @@
 // One agent in a Web Worker: the operator or a squad leader, in the player's browser.
-// The page's host (client/agents/host.js) starts one Worker per station and talks to it
+// The page's host (client/brains/host.js) starts one Worker per station and talks to it
 // in small messages. The Worker holds the seat token, never the player's key.
 //
 //   page → worker   { type: "start", server, side, role, squad, join, standByMs,

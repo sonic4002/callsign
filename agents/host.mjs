@@ -2,7 +2,7 @@
 // leader for every squad, started and stopped as squads deploy and are lost.
 //
 // The same class runs in Node (agents/main.mjs) and in the player's browser, where each
-// agent lives in its own Web Worker (client/agents/host.js). Only `spawn` differs.
+// agent lives in its own Web Worker (client/brains/host.js). Only `spawn` differs.
 //
 // Several hosts may be connected for one side; the game server lets one of them run the
 // agents and tells each where it stands in its greeting (`active`). A host standing by

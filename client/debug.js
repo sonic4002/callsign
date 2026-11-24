@@ -3,6 +3,7 @@
 // it writes a radio call, in the page language, and the server routes it like any other.
 // Nerve shows in what the troops do; the "show nerve" switch is a debugging aid.
 
+import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
@@ -49,6 +50,7 @@ function applyLanguage() {
   drawn.roster = drawn.build = "";
   renderSidebar();
   renderOverlay();
+  brains.render();
   renderTrack();
 }
 
@@ -93,6 +95,9 @@ const clock = (tick) => {
 };
 const open = () => ws?.readyState === WebSocket.OPEN;
 
+// The player's own agents, when this browser runs them (client/brains).
+const brains = mountAgents({ t, system, server: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`, side, canAct: () => role === "hammer" });
+
 function connect() {
   system("connecting");
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?side=${side}&role=${role}`);
@@ -112,6 +117,7 @@ function onFrame(frame) {
       faction = frame.faction;
       entries = frame.log.map((m) => ({ kind: "radio", message: m }));
       system(me ? "matchStarted" : "spectating", { faction });
+      brains.agents.newMatch(frame.match);
       scene.setRules(rules);
       scene.setState(state);
       drawn.roster = drawn.build = "";
