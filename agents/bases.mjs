@@ -2,6 +2,8 @@
 // status, and how the scripted brain reads a call about building or about a structure.
 // It runs in Node and in a Web Worker alike, like the rest of the agent core.
 
+import { leaderMend, leaderSiege, operatorPower, powerFact, powerWords, radarWords } from "./power.mjs";
+
 const names = (ids, table) => ids.map((id) => table[id]?.name.en ?? id).join(", ");
 
 // structureLines lists a faction's structures for the operator's prompt.
@@ -19,6 +21,7 @@ export function structureLines(rules, faction) {
         const only = s.vs && Object.values(s.vs).filter((v) => v === 0).length >= 3;
         facts.push(only ? `fires on aircraft only, out to ${s.range}` : `fires on its own at enemies within ${s.range}`);
       }
+      if (powerFact(s)) facts.push(powerFact(s));
       if (s.role === "fence") facts.push(`a run of ${s.segments} segments that stops enemy ground units until it is shot down`);
       return `- ${id}: ${s.name.en} (${s.name.he}), ${facts.join("; ")}`;
     })
@@ -32,7 +35,8 @@ export function operatorBases(rules, faction) {
 ${structureLines(rules, faction)}
 Base structures (everything that is not a defence or a fence) stand in fixed places around your headquarters, one of each, and one goes up at a time; gold is taken when work begins and a structure does nothing until it stands. A defence or a fence takes a \`place\`: a point you hold, a structure of yours by id, or a side of your base ("base:north", "base:south", "base:east", "base:west", "base:front" toward the enemy, "base:rear"); it must be within ${m.buildRadius} of your headquarters, a structure of yours or a point you hold. You may hold ${m.defenceCap} defences and ${m.fenceRuns} fence runs, and one defence or fence goes up at a time beside the base structure. A fence run can also go between two places: give \`place\` and \`place2\`.
 Your status lists structures: yours with their health and whether they are still going up, and the enemy's as your side last saw them. An enemy structure can be attacked by any squad that can hurt it (tell the squad its id, for example "attack s7, the enemy works") and taken over by an engineer squad. Losing a structure takes away what it lets you buy until you rebuild it; squads already in the field stay. Tell Hammer when a structure of yours is lost or taken.
-Build when Hammer asks, and confirm what you started and its cost. Building is spending: on your own you build only while command.buy is true, exactly as with buying, and the net tells Hammer what you started, so do not announce it again. With the purse, open with the refinery and then the barracks, build what your next unit needs, and put back a lost refinery or barracks before anything else. If the build is refused, tell Hammer why.`;
+Build when Hammer asks, and confirm what you started and its cost. Building is spending: on your own you build only while command.buy is true, exactly as with buying, and the net tells Hammer what you started, so do not announce it again. With the purse, build what your next unit needs, and put back a lost refinery or barracks before anything else. If the build is refused, tell Hammer why.
+${operatorPower(rules, faction)}`;
 }
 
 // leaderBases is a squad leader's paragraph on structures.
@@ -40,9 +44,9 @@ export function leaderBases(unit) {
   const engineer = unit.captureSeconds > 0;
   return `Structures. Your status lists the structures your side knows of, each with an id such as "s7": your own, and the enemy's as last seen. To attack an enemy structure give its id as the attack point. Enemy defences fire on their own at whatever comes in range; enemy fences stop your squad until it shoots a gap in them.${
     engineer
-      ? ` Your squad are engineers: it fights poorly and exists for two jobs. capture takes over an enemy base structure: the squad walks to it, and after ${unit.captureSeconds} seconds beside it without being shot at the structure is your side's and your squad stays inside to run it, which is the end of the squad. Headquarters, defences and fences cannot be taken. repair mends a broken bridge. Ask for an escort before you go; under fire the takeover stops.`
+      ? ` Your squad are engineers: it fights poorly and exists for two jobs. capture takes over an enemy base structure: the squad walks to it, and after ${unit.captureSeconds} seconds beside it without being shot at the structure is your side's and your squad stays inside to run it, which is the end of the squad. Headquarters, defences and fences cannot be taken. repair mends a broken bridge.${leaderMend(unit)} Ask for an escort before you go; under fire the takeover stops.`
       : ""
-  }`;
+  }${leaderSiege(unit)}`;
 }
 
 // compactStructures trims the structures in a status to what a decision needs.
@@ -59,6 +63,7 @@ export function compactStructures(status, side) {
       y: s.y,
       health: s.hp,
       ...((s.building === true || (typeof s.building === "number" && s.building < 1)) && { building: true }),
+      ...(s.repairing && { repairing: true }),
     }));
 }
 
@@ -72,6 +77,8 @@ const roleWords = {
   airbase: /\b(airbase|air base|airfield|airport|airstrip|launch yard)\b|בסיס אוויר|בסיס האוויר|שדה תעופה|מנחת|שיגור/,
   dockyard: /\b(dock|docks|dockyard|shipyard|harbou?r|boat shed)\b|מספנ|נמל|מזח|סככ/,
   fence: /\b(fence|wall|wire|barrier)\b|גדר|חומ/,
+  power: powerWords,
+  radar: radarWords,
 };
 const antiAir = /\b(anti[- ]?air(craft)?|flak|aa|rocket nest)\b|נ"מ|נ״מ|נגד מטוסים|קן טילים/;
 const defence = /\b(gun|guns|turret|sentry|nest|defen[cs]e|tower)\b|תותח|מקלע|עמדה|עמדת|מגדל/;

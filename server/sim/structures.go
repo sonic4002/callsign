@@ -1234,6 +1234,8 @@ type StructureView struct {
 	Run      int     `json:"run,omitempty"`
 	// Repairing is set on an own structure that is being mended for gold.
 	Repairing bool `json:"repairing,omitempty"`
+	// Dark is set on a structure that uses power while its side is short of power.
+	Dark bool `json:"dark,omitempty"`
 	// A fence segment's ends.
 	AX float64 `json:"ax,omitempty"`
 	AY float64 `json:"ay,omitempty"`
@@ -1265,6 +1267,9 @@ func (s *Sim) structureViews(side int) []StructureView {
 			}
 			v.Side, v.HP, v.Ruin, v.Building, v.Visible = m.Side, m.HP, m.Ruin, m.Building, m.Visible
 		}
+		// A structure that uses power stands dark while its side is short of it; an
+		// enemy's shows that only while it is in sight.
+		v.Dark = v.Visible && !v.Ruin && v.Building >= 1 && st.def.Power < 0 && s.power[st.Side].low
 		out = append(out, v)
 	}
 	return out

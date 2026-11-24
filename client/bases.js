@@ -51,7 +51,7 @@ export function structureCards(state, rules, faction, side) {
       const going = up.find((s) => s.building < 1);
       const missing = def.requires.find((role) => !stands(state, side, role));
       if (going) Object.assign(card, { state: "rising", progress: going.building });
-      else if (base(def) && count(def.role) > 0) card.state = "have";
+      else if (base(def) && count(def.role) >= (def.role === "power" ? (rules.match.powerStructures ?? 1) : 1)) card.state = "have";
       else if (missing) Object.assign(card, { state: "needs", needs: ofRole(rules, faction, missing) });
       else if (rising(base(def))) card.state = "busy";
       else if (def.role === "defence" && count("defence") >= rules.match.defenceCap) card.state = "full";

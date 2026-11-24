@@ -389,3 +389,33 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 @keyframes booting { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #overlay.booting .card::after { animation: none; } }
 #lobby-voice { margin: .5rem 0 0; font-size: .78rem; color: var(--muted); }
+
+/* ---- power, the radar and our own structures ---- */
+#power { grid-column: 1 / -1; display: grid; grid-template-columns: auto auto auto 1fr auto; align-items: center; gap: .4rem; font-size: .78rem; }
+#power[hidden], #structure-menu[hidden], #radar-off[hidden], #structure-menu button[hidden] { display: none; }
+#power .icon { display: inline-flex; }
+#power .label { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#power .figures { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--brass); }
+#power .bar { display: block; block-size: .4rem; background: #0b0f10; border: 1px solid var(--edge-hi); }
+#power .bar b { display: block; block-size: 100%; background: var(--brass); transition: inline-size .3s; }
+#power .state { color: var(--muted); }
+#power.low .figures, #power.low .state { color: var(--warn); }
+#power.low .bar b { background: var(--warn); }
+#power.low .state { font-weight: 700; animation: requested 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { #power.low .state { animation: none; } }
+#radar-box { position: relative; }
+#radar-off { position: absolute; inset: 0; margin: 0; display: grid; place-items: center; padding: .6rem; text-align: center; font-size: .8rem; color: var(--muted); pointer-events: none; unicode-bidi: plaintext; }
+#structures .power { display: inline-flex; align-items: center; gap: .1rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+#structures .power.gives { color: var(--mine); }
+#structures .power.short { color: var(--warn); font-weight: 700; }
+#structure-list li.repairing .order { color: var(--brass); }
+#structure-list li.dark .name { color: var(--warn); }
+#structure-menu {
+  position: absolute; display: flex; flex-direction: column; gap: .35rem; padding: .5rem .6rem;
+  background: #10161af2; border: 1px solid var(--brass-dim); transform: translate(-50%, 12px); z-index: 3;
+}
+#structure-menu strong { font-size: .8rem; color: var(--brass); text-align: center; unicode-bidi: plaintext; }
+#structure-menu small { font-size: .7rem; color: var(--muted); text-align: center; }
+#structure-menu div { display: flex; gap: .35rem; }
+#structure-menu button { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+#structure-menu .gold { color: var(--brass); font-variant-numeric: tabular-nums; }

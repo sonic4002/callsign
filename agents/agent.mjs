@@ -9,9 +9,10 @@ import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
 import { Telemetry, troubleCode } from "./telemetry.mjs";
 import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
 import { compactStructures } from "./bases.mjs";
+import { eventLine as powerEventLine } from "./power.mjs";
 
 const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned"]);
-const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell"]);
+const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell", "low_power", "power_restored", "structure_repaired", "repair_stopped"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
@@ -280,6 +281,9 @@ export function compactStatus(status, side) {
     enemyHaulersSeen: (status.haulers ?? []).filter((h) => h.side !== side).map((h) => ({ contact: h.id, x: h.x, y: h.y, inSight: h.visible })),
     goldFields: (status.fields ?? []).map((f) => ({ field: f.gusher, full: f.gold, inSight: f.visible })),
     hqHealth: status.hq,
+    // What the structures supply and use; low power slows building and silences defences.
+    power: status.power,
+    radar: status.radar,
     squads: status.squads.map((s) => ({ callsign: s.callsign.en, unit: s.unit, class: s.class, ...squad(s) })),
     // Bought and on their way: they count toward the cap and cannot be ordered yet.
     deploying: (status.deploying ?? []).map((d) => ({ callsign: d.callsign.en, unit: d.unit, secondsLeft: Math.ceil(d.ticksLeft / 10) })),
@@ -341,7 +345,7 @@ function describe(item) {
     case "bridge_repaired":
       return `${item.place} stands again.`;
   }
-  return `Event: ${e.kind}.`;
+  return powerEventLine(e) || `Event: ${e.kind}.`;
 }
 
 // callsFor reports whether a transmission is a call this station must act on. "Out" means

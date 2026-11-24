@@ -52,6 +52,16 @@
           <button type="button" data-order="capture" data-i18n="act.capture" hidden></button>
         </div>
       </div>
+      <!-- One of the player's own structures, tapped: each button sends a radio call. -->
+      <div id="structure-menu" hidden>
+        <strong id="structure-menu-title"></strong>
+        <small id="structure-menu-facts"></small>
+        <div>
+          <button type="button" data-structure-act="sell"><span class="icon"></span><span data-i18n="act.sell"></span><bdi dir="ltr" class="gold"></bdi></button>
+          <button type="button" data-structure-act="repair"><span class="icon"></span><span data-i18n="act.repair"></span><bdi dir="ltr" class="gold"></bdi></button>
+          <button type="button" data-structure-act="mend"><span class="icon"></span><span data-i18n="act.mend"></span></button>
+        </div>
+      </div>
     </div>
     <section id="radio" class="panel">
       <h2 data-i18n="radioLog"></h2>
@@ -92,11 +102,13 @@
         <label><span data-i18n="hqOurs"></span><i class="bar ours"><b id="hq-ours"></b></i></label>
         <label><span data-i18n="hqEnemy"></span><i class="bar enemy"><b id="hq-enemy"></b></i></label>
       </div>
+      <!-- What the side's structures supply and use; it turns to a warning when power is low. -->
+      <div id="power" hidden><span class="icon"></span><span class="label" data-i18n="power"></span><bdi dir="ltr" class="figures"></bdi><i class="bar"><b></b></i><small class="state"></small></div>
     </section>
 
     <section class="panel" data-sheet="more">
       <h2 data-i18n="radar"></h2>
-      <canvas id="radar-map" dir="ltr"></canvas>
+      <div id="radar-box"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
     </section>
 
     <section class="panel grow" data-sheet="squads">
@@ -272,6 +284,10 @@
         <dt data-i18n="help.q.upgrade"></dt><dd data-i18n="help.a.upgrade"></dd>
         <dt data-i18n="help.q.speed"></dt><dd data-i18n="help.a.speed"></dd>
         <dt data-i18n="help.q.units"></dt><dd data-i18n="help.a.units"></dd>
+        <dt data-i18n="help.q.power"></dt><dd data-i18n="help.a.power"></dd>
+        <dt data-i18n="help.q.radar"></dt><dd data-i18n="help.a.radar"></dd>
+        <dt data-i18n="help.q.sell"></dt><dd data-i18n="help.a.sell"></dd>
+        <dt data-i18n="help.q.defences"></dt><dd data-i18n="help.a.defences"></dd>
       </dl>
       <h2 data-i18n="strict"></h2>
       <ul>
@@ -309,6 +325,10 @@
         <li><span data-i18n="help.buildWorks"></span><code dir="auto" data-i18n="help.buildWorks.say"></code></li>
         <li><span data-i18n="help.defend"></span><code dir="auto" data-i18n="help.defend.say"></code></li>
         <li><span data-i18n="help.haul"></span><code dir="auto" data-i18n="help.haul.say"></code></li>
+        <li><span data-i18n="help.power"></span><code dir="auto" data-i18n="help.power.say"></code></li>
+        <li><span data-i18n="help.radar"></span><code dir="auto" data-i18n="help.radar.say"></code></li>
+        <li><span data-i18n="help.sell"></span><code dir="auto" data-i18n="help.sell.say"></code></li>
+        <li><span data-i18n="help.repairStructure"></span><code dir="auto" data-i18n="help.repairStructure.say"></code></li>
         <li><span data-i18n="help.buyNaval"></span><code dir="auto" data-i18n="help.buyNaval.say"></code></li>
         <li><span data-i18n="help.upgrade"></span><code dir="auto" data-i18n="help.upgrade.say"></code></li>
       </ul>

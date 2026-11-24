@@ -4,6 +4,7 @@
 
 import { buildVerb, captureVerb, namedStructure, placeOf, wantedStructure } from "./bases.mjs";
 import { compactStructures } from "./bases.mjs";
+import { mendVerb, powerLines, sellVerb, sparePower } from "./power.mjs";
 
 const verbs = [
   ["attack", /\b(attack|assault|destroy|hit)\b|תקוף|תקפו|לתקוף|השמד/],
@@ -25,6 +26,7 @@ const say = {
 const haulerLines = {
   hauler_attacked: { en: (p) => `Hauler under attack near ${p}`, he: (p) => `מוביל זהב מותקף ליד ${p}` },
   hauler_lost: { en: (p) => `Hauler lost near ${p}`, he: (p) => `מוביל זהב אבד ליד ${p}` },
+  ...powerLines,
 };
 const eventLines = {
   pinned: { en: (p) => `Pinned at ${p}, request support`, he: (p) => `מרותקים ב${p}, מבקש סיוע` },
@@ -60,6 +62,9 @@ function leaderPlan({ agent, wake, rules }) {
   if (theirs && captureVerb.test(call.body.toLowerCase()) && agent.unit?.captureSeconds > 0) {
     return [{ name: "capture", input: { place: theirs.id }, orElse }, radio(back, say.wilco[lang], "out")];
   }
+  // A structure of their own named with a word for mending: engineers go in and mend it.
+  const ours = agent.unit?.captureSeconds > 0 && mendVerb.test(call.body.toLowerCase()) && namedStructure(call.body, structures, { enemy: false });
+  if (ours) return [{ name: "repair", input: { place: ours.id }, orElse }, radio(back, say.wilco[lang], "out")];
   const escort = escortWords.test(call.body.toLowerCase()) && haulerWords.test(call.body.toLowerCase());
   let verb = escort ? "hold" : verbOf(call.body);
   if (theirs && verb === "attack") {
@@ -156,6 +161,9 @@ function ownMoves({ wake, rules, agent }) {
       const [id, def] = Object.entries(defs).find(([, d]) => d.role === role) ?? [];
       const missing = (def?.requires ?? []).find((need) => !stands(need));
       if (missing) return raise(missing);
+      // Power first: what would leave the side short waits for another power structure.
+      const plants = base.filter((st) => st.role === "power").length;
+      if (role !== "power" && def?.power < 0 && sparePower(s, agent.side, defs) + def.power < 0 && plants < (rules.match.powerStructures ?? 1)) return raise("power");
       if (id && !rising && s.gold >= cost(role)) moves.push({ name: "build", input: { structure: id, place: "", place2: "" } });
     };
     const hauler = units.find(([, u]) => u.class === "hauler");
@@ -167,7 +175,9 @@ function ownMoves({ wake, rules, agent }) {
     // the barracks. A second hauler comes out of the works once it stands; with no hauler
     // left at all the works comes before any squad.
     const more = hauler && haulers < Math.min(2, rules.match.haulerCap ?? 0);
-    if (!stands("refinery")) raise("refinery");
+    const short = s.power?.low && sparePower(s, agent.side, defs) < 0 && base.filter((st) => st.role === "power").length < (rules.match.powerStructures ?? 1);
+    if (short) raise("power");
+    else if (!stands("refinery")) raise("refinery");
     else if (!stands("barracks")) raise("barracks");
     else if (more && stands(hauler[1].requires)) {
       if (s.gold >= hauler[1].cost) moves.push({ name: "buy", input: { unit: hauler[0], upgrade: "" } });
@@ -228,6 +238,10 @@ function operatorPlan(ctx) {
     if (!field) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "haul", input: { field, hauler: 0 }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
+  // Selling or mending one of the side's own structures, named by its name or its role.
+  const own = (sellVerb.test(text) || mendVerb.test(text)) && namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false });
+  if (own) return [{ name: sellVerb.test(text) ? "sell" : "repair", input: { place: own.id }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  if (sellVerb.test(text)) return [radio(back, say.sayAgain[lang], "over")]; // sell what?
   // Building: a structure named with a word for building, or a defence or a fence asked
   // for by itself ("a gun at Delta", "fence the north side").
   const structures = rules.factions[wake.status?.faction ?? ""]?.structures ?? {};
@@ -245,7 +259,8 @@ function operatorPlan(ctx) {
   if (/\b(status|sitrep|happening)\b|מצב|מה קורה/.test(text) && wake.status) {
     const s = wake.status;
     const held = s.points.filter((p) => p.owner === agent.side).map((p) => p.id);
-    const body = lang === "he" ? `${s.squads.length} כיתות, ${s.gold} זהב, מחזיקים ב ${held.join(" ")}` : `${s.squads.length} squads, ${s.gold} gold, holding ${held.join(" ")}`;
+    const power = s.power?.low ? (lang === "he" ? ", חסר חשמל" : ", power is low") : "";
+    const body = (lang === "he" ? `${s.squads.length} כיתות, ${s.gold} זהב, מחזיקים ב ${held.join(" ")}` : `${s.squads.length} squads, ${s.gold} gold, holding ${held.join(" ")}`) + power;
     return [radio(back, body, "over")];
   }
   const verb = verbOf(text);

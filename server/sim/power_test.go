@@ -183,6 +183,15 @@ func TestAPoweredDefenceStopsOnLowPowerAndResumes(t *testing.T) {
 	if n := hits(8); n != 0 {
 		t.Fatalf("on low power the gun still did %d damage", n)
 	}
+	// Both sides are shown it standing dark: its owner, and the enemy that has it in sight.
+	for side := 0; side < 2; side++ {
+		if st := seen(s, side, gun.ID); st == nil || !st.Dark {
+			t.Fatalf("side %d should be shown the gun dark: %+v", side, st)
+		}
+	}
+	if st := own(s, 0, shared.RolePower); st != nil && st.Dark {
+		t.Fatal("a structure that supplies power is never dark")
+	}
 	// Power back, it fires again.
 	wealth(s, 0, 200)
 	build(t, s, 0, "power")

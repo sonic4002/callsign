@@ -278,3 +278,13 @@ body.no-server #no-server {
   #lobby-gold-other { min-block-size: 44px; font-size: 16px; }
   #lobby-match canvas { inline-size: 6rem; }
 }
+
+/* ---- power and our own structures, on a phone ---- */
+@media (max-width: 820px), (pointer: coarse) and (max-height: 520px) {
+  #power { grid-template-columns: auto auto auto; gap: .25rem; font-size: .72rem; }
+  #power .label, #power .bar { display: none; }
+  #power .state { display: none; }
+  #power.low .state { display: inline; }
+  #structure-menu { padding: .6rem; gap: .5rem; }
+  #structure-menu button { min-block-size: 48px; font-size: 1rem; }
+}

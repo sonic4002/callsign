@@ -51,15 +51,15 @@ export const leaderTools = [
 ];
 
 // Squads that mend bridges get repair; engineer squads also take over enemy structures.
-export const repairTool = tool("repair", "Go to a bridge and mend it. The squad works from the bank while nobody shoots at it; a fallen bridge stands again part-way through.", {
-  place: { type: "string", description: 'The bridge, by id or name ("bridge-south", "the south bridge").' },
+export const repairTool = tool("repair", "Go to a bridge and mend it. The squad works from the bank while nobody shoots at it; a fallen bridge stands again part-way through. Engineers can also name a damaged structure of their own side: they go in, make it whole, and stay inside for good.", {
+  place: { type: "string", description: 'The bridge, by id or name ("bridge-south", "the south bridge"), or for engineers a damaged structure of your own side by its id from your status, such as "s5".' },
 });
 export const captureTool = tool("capture", "Take over an enemy base structure. Your squad walks to it and, after a few seconds beside it without being shot at, the structure is your side's and the squad stays inside it for good.", {
   place: { type: "string", description: 'The enemy structure: its id from your status, such as "s7", or its name ("the enemy refinery").' },
 });
 
 // leaderToolsFor is the tool list of the leader of a squad of that unit.
-export const leaderToolsFor = (unit) => [...leaderTools, ...(unit?.captureSeconds > 0 ? [captureTool] : []), ...(unit?.repairPerSecond > 0 ? [repairTool] : [])];
+export const leaderToolsFor = (unit) => [...leaderTools, ...(unit?.captureSeconds > 0 ? [captureTool] : []), ...(unit?.repairPerSecond > 0 || unit?.captureSeconds > 0 ? [repairTool] : [])];
 
 export const operatorTools = [
   radio,
@@ -84,6 +84,12 @@ export const operatorTools = [
   tool("haul", "Tell your gold haulers which field to work. They keep working it until told otherwise, even under threat, so use it on purpose.", {
     field: { type: "string", description: 'The gold field, by the map point it lies at ("K", "Kilo", "כרמל"), or "auto" to let the haulers choose a safe field themselves.' },
     hauler: { type: "integer", description: "One hauler's id from your status, or 0 for all of them." },
+  }),
+  tool("sell", "Sell one of your own structures. It is removed at once and part of its cost comes back as gold; what it let you buy and the power it gave go with it. The headquarters cannot be sold.", {
+    place: { type: "string", description: 'The structure: its id from your status, such as "s5", or its name ("the dockyard").' },
+  }),
+  tool("repair", "Pay to mend one of your own damaged structures. It mends over time and takes gold as it goes, until it is whole or your gold runs out.", {
+    place: { type: "string", description: 'The structure: its id from your status, such as "s5", or its name ("the refinery").' },
   }),
 ];
 

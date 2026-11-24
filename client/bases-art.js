@@ -3,7 +3,7 @@
 // otherwise each role has a code-drawn picture here, in the faction's colours, so a
 // missing sprite never leaves a gap.
 
-import { drawBuilding, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
+import { drawBuilding, drawPoweredStructure, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
 import { toIso } from "./iso.js";
 
 const palettes = {
@@ -145,7 +145,9 @@ export function drawStructure(ctx, st, def, color, time) {
     return;
   }
   const paint = () => {
-    if (sprites.buildings[st.kind]) drawBuilding(ctx, st.kind, color, time);
+    // A structure short of power stands dark, and a radar's dish turns only with power.
+    if (sprites.buildings[st.kind] && (st.dark || sprites.buildings[st.kind].spin)) drawPoweredStructure(ctx, st.kind, color, time, !st.dark);
+    else if (sprites.buildings[st.kind]) drawBuilding(ctx, st.kind, color, time);
     else (fallbacks[st.role] ?? fallbacks.barracks)(ctx, p, time, def);
   };
   const rising = st.building < 1;
