@@ -24,6 +24,10 @@ export const ordered = (c) => said(c, (m) => m.from?.key === "player" && (m.to ?
 export const answered = (c) => said(c, (m) => Boolean(m.from?.squad) && (m.to ?? []).some((to) => to.key === "player"));
 // holds: this side holds the point.
 export const holds = (c, id) => (c.state?.points ?? []).some((p) => p.id === id && p.owner === c.side);
+// stands: this side has a finished structure of a role (a refinery, a barracks).
+export const stands = (c, role) => (c.state?.structures ?? []).some((s) => s.side === c.side && s.role === role && !s.ruin && s.building >= 1);
+// hauling: the refinery stands and its hauler has come out of it.
+export const hauling = (c) => stands(c, "refinery") && (c.state?.haulers ?? []).some((h) => h.side === c.side);
 // bought: a squad beyond the ones the match started with is on its way or in the field.
 export const bought = (c) => mine(c).length + (c.state?.deploying ?? []).filter((d) => d.side === c.side).length > startSquads(c);
 // arrived: that squad has reached the field.
@@ -51,8 +55,9 @@ export function nearest(rules, side, kind, skip = 0) {
   return rules.map.points.filter((p) => p.kind === kind).sort((a, b) => far(a) - far(b))[skip]?.id ?? "";
 }
 
-// The steps. `mark` is what the map points at ("squad", "first" the first point, "rig",
-// "contact"); `focus` is what the page lights up, and `tab` the phone sheet it lives in.
+// The steps. `mark` is what the map points at ("squad", "first" the first point,
+// "contact"); `focus` is what the page lights up, `tab` the phone sheet it lives in, and
+// `pane` the half of the build panel it is on.
 // `touch` says the step is worded differently for fingers.
 export const STEPS = [
   { id: "welcome", manual: true },
@@ -60,9 +65,10 @@ export const STEPS = [
   { id: "order", touch: true, mark: "first", focus: "#send", done: ordered },
   { id: "answer", manual: true, focus: "#log", tab: "radio", ready: answered },
   { id: "orders", manual: true },
-  { id: "capture", mark: "rig", done: (c) => holds(c, c.rig) },
+  { id: "refinery", touch: true, focus: "#structures", tab: "build", pane: "structures", done: hauling },
   { id: "fog", manual: true },
-  { id: "buy", touch: true, focus: "#build", tab: "build", done: bought },
+  { id: "barracks", touch: true, focus: "#structures", tab: "build", pane: "structures", done: (c) => stands(c, "barracks") },
+  { id: "buy", touch: true, focus: "#build", tab: "build", pane: "units", done: bought },
   { id: "deploy", manual: true, focus: "#roster", tab: "squads", ready: arrived },
   { id: "upgrade", touch: true, focus: "#roster", tab: "squads", done: upgraded },
   { id: "enemy", touch: true, mark: "contact", done: engaged },
@@ -72,7 +78,7 @@ export const STEPS = [
 
 export const indexOf = (id) => STEPS.findIndex((s) => s.id === id);
 
-// The lesson's enemy stands still until the learner has taken a rig and is buying a squad:
+// The lesson's enemy stands still until the learner has a base and is buying a squad:
 // from this step on it is released, and walks in while the next two are read.
 export const released = (index) => index >= indexOf("buy");
 

@@ -83,7 +83,7 @@ export class Coach {
     this.render(c);
   }
 
-  // #with adds what the steps need to know about this map: which rig to capture.
+  // #with adds what the steps need to know about this map.
   #with(c) {
     return { ...c, rig: nearest(c.rules, c.side, "landRig") };
   }
@@ -102,6 +102,8 @@ export class Coach {
     card.hidden = false;
     // A new step that happens on the map puts away a sheet left open by the one before.
     if (this.shown !== step.id && !step.tab) document.querySelector('#dock [aria-pressed="true"]')?.click();
+    // A step in the build panel turns it to the half it is about.
+    if (this.shown !== step.id && step.pane) document.querySelector(`[data-build-tab="${step.pane}"][aria-selected="false"]`)?.click();
     this.shown = step.id;
     const vars = this.#names(this.#with(c));
     const fingers = this.touch() && step.touch;
@@ -118,7 +120,6 @@ export class Coach {
     const marks = {
       squad: () => (squads[0] ? { squad: squads[0].id } : null),
       first: () => ({ point: vars.firstId }),
-      rig: () => ({ point: vars.rigId }),
       contact: () => ({ contact: true }),
     };
     this.scene.coach = marks[step.mark]?.() ?? null;
@@ -150,6 +151,7 @@ export class Coach {
     const line = units.filter((u) => u.class === "infantry").sort((a, b) => a.cost - b.cost)[0];
     const contact = state.contacts?.[0];
     const tier = (n) => rules.tiers.find((x) => x.tier === n);
+    const structure = (role) => Object.values(rules.factions[state.faction ?? ""]?.structures ?? {}).find((s) => s.role === role)?.name[lang] ?? role;
     return {
       me: me[lang],
       squad: call(0),
@@ -158,13 +160,10 @@ export class Coach {
       firstId,
       first: point(firstId),
       firstName: rules.map.points.find((p) => p.id === firstId)?.callsign[lang] ?? firstId,
-      rigId: c.rig,
-      rig: point(c.rig),
       anvil: rules.callsigns.operator[lang],
       unit: line?.name[lang] ?? "",
       target: `${rules.callsigns.contact[lang]} ${contact?.id ?? 3}`,
       seconds: rules.match.captureSeconds,
-      income: rules.rigs.landRig.income,
       cost2: tier(2)?.upgradeCost ?? "",
       cost3: tier(3)?.upgradeCost ?? "",
       // The page's own words for its buttons and panels, so a line names what is on screen.
@@ -172,6 +171,10 @@ export class Coach {
       send: this.t("send"),
       squads: this.t("roster"),
       build: this.t("build"),
+      structures: this.t("structures"),
+      refinery: structure("refinery"),
+      barracks: structure("barracks"),
+      hauler: units.find((u) => u.class === "hauler")?.name[lang] ?? "",
       buildTab: this.t("tab.build"),
       procedure: this.t("strict"),
     };

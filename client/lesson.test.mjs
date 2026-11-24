@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { STEPS, advance, answered, bought, canGoOn, engaged, holds, indexOf, nearest, ordered, released, upgraded } from "./lesson.js";
+import { STEPS, advance, answered, bought, canGoOn, engaged, holds, indexOf, nearest, ordered, released, upgraded, stands, hauling } from "./lesson.js";
 
 const rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8"));
 const en = JSON.parse(readFileSync(new URL("i18n/en.json", import.meta.url), "utf8"));
@@ -66,16 +66,31 @@ test("the answer step offers Next only once a squad has answered", () => {
   assert.equal(answered(match({ log: [say(viper1, { key: "operator" }, "Anvil, this is Viper 1. Contact. Over.")] })), false);
 });
 
-test("capturing the rig, buying, the squad arriving and the upgrade are read from the match", () => {
+test("the refinery and its hauler, the barracks, buying, the squad arriving and the upgrade are read from the match", () => {
   const c = match();
-  assert.equal(advance(indexOf("capture"), c), indexOf("capture"));
-  const taken = match();
-  taken.state.points.find((p) => p.id === "B").owner = 0;
-  assert.equal(holds(taken, "B"), true);
-  assert.equal(advance(indexOf("capture"), taken), indexOf("fog"));
-  const enemyHolds = match();
-  enemyHolds.state.points.find((p) => p.id === "B").owner = 1;
-  assert.equal(holds(enemyHolds, "B"), false);
+  const built = (role, more = {}) => ({ id: `s-${role}`, kind: role, role, side: 0, building: 1, ...more });
+  assert.equal(advance(indexOf("refinery"), c), indexOf("refinery"));
+  // Going up is not standing, and a refinery with no hauler out yet is not an economy.
+  const rising = match();
+  rising.state.structures = [built("refinery", { building: 0.6 })];
+  assert.equal(stands(rising, "refinery"), false);
+  const empty = match();
+  empty.state.structures = [built("refinery")];
+  assert.equal(hauling(empty), false);
+  const working = match();
+  working.state.structures = [built("refinery")];
+  working.state.haulers = [{ id: 1001, side: 0, state: "out" }];
+  assert.equal(advance(indexOf("refinery"), working), indexOf("fog"));
+  // The enemy's refinery and hauler are not ours.
+  const theirs0 = match();
+  theirs0.state.structures = [built("refinery", { side: 1 })];
+  theirs0.state.haulers = [{ id: 1002, side: 1, state: "out" }];
+  assert.equal(hauling(theirs0), false);
+  assert.equal(holds(match(), "B"), false);
+
+  assert.equal(advance(indexOf("barracks"), working), indexOf("barracks"));
+  working.state.structures.push(built("barracks"));
+  assert.equal(advance(indexOf("barracks"), working), indexOf("buy"));
 
   assert.equal(bought(c), false);
   const coming = match();
@@ -110,10 +125,11 @@ test("the fight: a squad sent at a named enemy, by click, by voice or by typing"
 
 test("skip ends any step, steps already done are passed over, and the lesson ends after the last", () => {
   const c = match();
-  assert.equal(advance(indexOf("capture"), c, { skip: true }), indexOf("fog"));
+  assert.equal(advance(indexOf("refinery"), c, { skip: true }), indexOf("fog"));
   // Everything up to the fight was done ahead of the coach: reading steps still wait.
   const ahead = match({ selected: 1, log: [say(player, viper1, "Viper 1 hold Delta"), say(viper1, player, "Wilco")] });
-  ahead.state.points.find((p) => p.id === "B").owner = 0;
+  ahead.state.structures = ["refinery", "barracks"].map((role) => ({ id: role, kind: role, role, side: 0, building: 1 }));
+  ahead.state.haulers = [{ id: 1001, side: 0, state: "out" }];
   ahead.state.squads.push(squad(5, { tier: 2 }));
   assert.equal(advance(indexOf("select"), ahead), indexOf("answer"));
   assert.equal(advance(indexOf("orders"), ahead, { next: true }), indexOf("fog"));
