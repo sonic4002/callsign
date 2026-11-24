@@ -20,7 +20,16 @@ export async function makeBrain(env = process.env) {
   if (kind === "claude") {
     if (!key) throw new Error("CALLSIGN_BRAIN=claude needs CALLSIGN_ANTHROPIC_KEY in .env");
     const { claudeBrain } = await import("./brain-claude.mjs");
-    return claudeBrain({ apiKey: key, operatorModel: env.CALLSIGN_OPERATOR_MODEL || undefined });
+    const brain = claudeBrain({ apiKey: key, operatorModel: env.CALLSIGN_OPERATOR_MODEL || undefined });
+    if (env.CALLSIGN_BRAIN === "claude") return brain; // asked for by name: fail loudly later, never swap
+    try {
+      await brain.check();
+      return brain;
+    } catch (err) {
+      console.log(`Claude is not usable: ${err.message}.`);
+    }
+    const { scriptedBrain } = await import("./brain-scripted.mjs");
+    return scriptedBrain();
   }
   if (kind !== "scripted") throw new Error(`unknown CALLSIGN_BRAIN "${kind}"`);
   const { scriptedBrain } = await import("./brain-scripted.mjs");
@@ -94,7 +103,7 @@ if (import.meta.main) {
   const server = env.CALLSIGN_SERVER || "ws://127.0.0.1:8080/ws";
   const brain = await makeBrain(env);
   if (brain.name === "scripted") {
-    console.log("No Anthropic key: squads run on the scripted brain. It follows plain orders (hold, move, attack a point) and nothing more.");
+    console.log("Squads run on the scripted brain. It follows plain orders (hold, move, attack a point) and nothing more.");
   }
   for (;;) {
     const host = new Host({ server, side: Number(env.CALLSIGN_SIDE || 0), brain, operator: env.CALLSIGN_OPERATOR !== "0" });

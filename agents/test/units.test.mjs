@@ -202,10 +202,12 @@ test("claude brain: model and effort by tier, fallback where the model has one, 
   }
 });
 
-test("makeBrain: scripted without a key, and never a silent downgrade when Claude was asked for", async () => {
+test("makeBrain: scripted without a usable key, and never a downgrade when Claude was asked for by name", async () => {
   assert.equal((await makeBrain({})).name, "scripted");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "" })).name, "scripted");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test" })).name, "claude");
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "claude" })).name, "claude");
+  // A subscription token is not an API key: found at start, said in the log, scripted instead.
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x" })).name, "scripted");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "scripted" })).name, "scripted");
   await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "claude" }), /needs CALLSIGN_ANTHROPIC_KEY/);
   await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "gpt" }), /unknown CALLSIGN_BRAIN/);
