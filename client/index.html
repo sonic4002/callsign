@@ -330,6 +330,22 @@
   </form>
 </dialog>
 <script type="module" src="mobile.js"></script>
+<script>
+  // Self-repair. If the start screen has not come up after a while (its button is still
+  // absent or disabled), the files kept on this device are probably a mix of versions:
+  // drop them and load the page once more, straight from the server.
+  setTimeout(async function () {
+    var start = document.getElementById("start");
+    var stuck = document.getElementById("overlay").classList.contains("booting") || (start && start.disabled);
+    if (!stuck || !navigator.onLine || sessionStorage.getItem("callsign.repair")) return;
+    sessionStorage.setItem("callsign.repair", "1");
+    try {
+      if (navigator.serviceWorker) for (var reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();
+      if (window.caches) for (var name of await caches.keys()) await caches.delete(name);
+    } catch (e) {}
+    location.reload();
+  }, 20000);
+</script>
 <script type="module" src="debug.js"></script>
 </body>
 </html>

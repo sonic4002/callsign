@@ -2,17 +2,16 @@
 // all without a network (the page then says there is no game server).
 //
 // Two rules, by what a file is:
-//   the page itself (scripts, styles, strings, rules): the network first, so a reload always
-//     brings the newest code; the kept copy only when the network is slow or gone;
+//   the page itself (scripts, styles, strings, rules): always from the network while there
+//     is one, however slow, so the page is never a mix of new and old files (that mix
+//     broke the page on a slow phone); the kept copy only when the network is gone;
 //   sprites and music: the kept copy first, refreshed behind the player's back.
 // Never kept: the game connection, the speech service, the relay, speech-model weights and
 // their runtime (the voice code stores those itself, on the player's first use of the mic).
 
-const CACHE = "callsign-1";
+const CACHE = "callsign-2";
 const NEVER = [/^\/ws\b/, /^\/tts\//, /^\/relay\//, /^\/mcp\b/, /^\/assets\/models\//, /^\/assets\/voice-cache\//, /^\/vendor\//];
 const PICTURES = [/^\/assets\/sprites\//, /^\/assets\/audio\//];
-const SLOW = 3000; // ms to wait for the network before showing the kept page
-
 const kept = (url) => url.origin === self.location.origin && !NEVER.some((re) => re.test(url.pathname));
 
 self.addEventListener("install", (event) => {
@@ -79,9 +78,12 @@ async function networkFirst(request) {
   const url = new URL(request.url);
   const key = request.mode === "navigate" ? url.origin + url.pathname : request;
   const hit = await cache.match(key);
-  const fresh = save(cache, request, key);
-  if (!hit) return fresh;
-  fresh.catch(() => {});
-  const slow = new Promise((resolve) => setTimeout(() => resolve(hit), SLOW));
-  return Promise.race([fresh.catch(() => hit), slow]);
+  try {
+    // Past the browser's own cache as well; a page navigation cannot be copied, so it is asked by address.
+    const net = request.mode === "navigate" ? new Request(request.url, { cache: "no-cache" }) : new Request(request, { cache: "no-cache" });
+    return await save(cache, net, key);
+  } catch (err) {
+    if (hit) return hit; // no network at all: the kept page, which will say so
+    throw err;
+  }
 }

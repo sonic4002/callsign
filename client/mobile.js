@@ -73,7 +73,16 @@ if ("serviceWorker" in navigator) {
     for (const reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();
     for (const name of await caches.keys()) await caches.delete(name);
   } else {
-    navigator.serviceWorker.register("sw.js").catch(() => {}); // the page works without it
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {}); // the page works without it
+    // A newer worker taking over means this page was loaded by the old one: load it again,
+    // once, so every file comes from the same version.
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (sessionStorage.getItem("callsign.swReload")) return;
+        sessionStorage.setItem("callsign.swReload", "1");
+        location.reload();
+      });
+    }
     // On a first visit the page loaded before the worker took charge. Tell it what was
     // loaded, so the next visit opens offline too.
     setTimeout(async () => {
