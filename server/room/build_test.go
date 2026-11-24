@@ -126,7 +126,14 @@ func TestSquadsAreSentAtStructuresAndOnlyEngineersCapture(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return res.(map[string]any)["structures"].([]StructureBrief)
+		// The buildings of no army in sight of the base are listed too; they have tests of their own.
+		var out []StructureBrief
+		for _, b := range res.(map[string]any)["structures"].([]StructureBrief) {
+			if b.Role != shared.RoleTech {
+				out = append(out, b)
+			}
+		}
+		return out
 	}
 	for _, b := range briefs(viper1) {
 		if !b.Yours {

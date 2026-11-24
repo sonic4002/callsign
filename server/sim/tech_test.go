@@ -273,7 +273,7 @@ func TestATechBuildingCanBeKnockedDownAndThenGivesNothing(t *testing.T) {
 	// Nobody shoots at one unasked, not even with it in range and nothing else to do.
 	raiders := buyFielded(t, s, 1, "militia")
 	place(raiders, clinic.X+90, clinic.Y)
-	s.Step() // it has to see the building to be sent to it
+	s.Step()                                                                                 // it has to see the building to be sent to it
 	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: raiders.ID, Place: clinic.ID}) // stand beside it
 	run(s, 15)
 	if got := seen(s, 0, clinic.ID); got.HP != 1 {

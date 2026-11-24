@@ -280,7 +280,11 @@ type Rules struct {
 		// ("take"), and how the net announces a purchase the operator made on its own.
 		Command     map[string]Words `json:"command"`
 		OwnPurchase map[string]Text  `json:"ownPurchase"`
-		Prowords    map[string]Words `json:"prowords"`
+		// Cues are the fixed lines the operator says about the base by itself (see
+		// server/room/cues.go): the words in both languages, the least seconds between
+		// two of a kind, and the events raised elsewhere that call for it.
+		Cues     map[string]Cue   `json:"cues"`
+		Prowords map[string]Words `json:"prowords"`
 	} `json:"radio"`
 }
 
@@ -376,6 +380,14 @@ func JSONFor(id string) ([]byte, error) {
 	return b, nil
 }
 
+// Cue is one fixed line of the operator's. {structure}, {squad}, {unit} and {point} in a
+// line are filled in with names in the language it is said in.
+type Cue struct {
+	Line   Text     `json:"line"`
+	Gap    float64  `json:"gap"`              // seconds before the same cue may be said again
+	Events []string `json:"events,omitempty"` // event kinds, by name, that call for it
+}
+
 func (r *Rules) check() error {
 	if r.TickRate <= 0 {
 		return fmt.Errorf("tickRate must be positive")
@@ -391,6 +403,11 @@ func (r *Rules) check() error {
 	}
 	if err := r.checkTech(); err != nil {
 		return err
+	}
+	for name, cue := range r.Radio.Cues {
+		if cue.Line.En == "" || cue.Line.He == "" || cue.Gap < 0 {
+			return fmt.Errorf("cue %s needs a line in both languages and a gap", name)
+		}
 	}
 	if len(r.Tiers) == 0 || r.Tiers[0].Tier != 1 {
 		return fmt.Errorf("tiers must start at tier 1")

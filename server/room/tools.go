@@ -88,11 +88,15 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 	case ToolReport:
 		return rm.toolReport(c)
 	case ToolBuy:
-		return rm.toolBuy(side, a)
+		res, err := rm.toolBuy(side, a)
+		rm.cueRefusal(side, err)
+		return res, err
 	case ToolCommand:
 		return rm.toolCommand(side, a)
 	case ToolBuild:
-		return rm.toolBuild(side, a)
+		res, err := rm.toolBuild(side, a)
+		rm.cueRefusal(side, err)
+		return res, err
 	case ToolCapture, ToolRepair:
 		return rm.toolEngineer(c, name, a)
 	case ToolHaul:

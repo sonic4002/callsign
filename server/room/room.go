@@ -83,6 +83,9 @@ type Message struct {
 	// Landmarks are the landmarks and bridges the body names, by id.
 	Landmarks []string `json:"landmarks,omitempty"`
 	Final     bool     `json:"final,omitempty"` // the operator's sign-off when the match ends
+	// Cue names the base cue this is (see cues.go): a fixed line the server wrote in the
+	// operator's name, not something the operator's agent thought of.
+	Cue string `json:"cue,omitempty"`
 }
 
 // Client is one connection. Out carries the JSON frames to write to it; it is closed
@@ -117,6 +120,9 @@ type Room struct {
 	seats     [2]seat
 	quiet     time.Time // since when no person has been connected; zero while one is
 	closed    bool
+
+	// The tick each kind of base cue was last said to each side; see cues.go.
+	cued [2]map[string]int
 
 	// What each side's agents last said about themselves; see telemetry.go.
 	tele [2]map[int]*agentReport
@@ -154,6 +160,7 @@ func (rm *Room) reset() error {
 		rm.logs[side] = nil
 		rm.lang[side] = map[string]string{}
 		rm.cmd[side] = command{asked: -1, buy: rm.cfg.Purse}
+		rm.cued[side] = map[string]int{}
 		rm.bots[side] = nil
 		if style := rm.cfg.Bots[side]; style != "" {
 			rm.bots[side] = &bot.Player{Side: side, Style: style, R: rm.r}
@@ -201,6 +208,7 @@ func (rm *Room) Tick() {
 			frame["callsign"] = rm.squadName(sq)
 		}
 		rm.broadcast(e.Side, frame)
+		rm.cueEvent(e)
 		if e.Kind == sim.EvSquadLost {
 			for c := range rm.clients {
 				if c.ID.Role == RoleSquad && c.ID.Side == e.Side && c.ID.Squad == e.Squad {
