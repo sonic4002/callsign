@@ -10,6 +10,9 @@ review), this cuts the background away, trims, scales to game size and writes
 The units are not generated images: art/units.py renders them and owns the "units" part
 of the manifest, which is kept as it is here.
 
+A sprite with `from` is a second state of that sprite (a headquarters in ruins): it is
+trimmed to the same frame, so both have one size and one anchor.
+
 Sprites without `keep` are left out of the manifest, and the page draws its own stand-in.
 
     python art/cleanup.py [--sheet contact.png]
@@ -47,14 +50,18 @@ Every sprite below was generated on this machine by `make art` and reviewed by e
   https://huggingface.co/Comfy-Org/Flux-2-Klein-4B
 - VAE: `flux2-vae.safetensors`, Apache-2.0, same package
 - Runner: ComfyUI, sampler `euler`, Flux2Scheduler, 4 steps, guidance 1, 1024x1024
+- The ruined headquarters are the same model redrawing the kept headquarters image (the klein
+  image-edit graph, a reference latent), so the ruin stands exactly where the building stood
 - Background removal: BiRefNet (general), MIT, https://github.com/ZhengPeng7/BiRefNet, run through rembg
 
 No third-party artwork is included.
 """
 
 
-def cut_out(image, session):
-    """Removes the studio background and returns a trimmed RGBA image."""
+def cut_out(image, session, box=None):
+    """Removes the studio background and returns a trimmed RGBA image and the box it was
+    trimmed to. Given a `box`, it trims to that one instead: a second state of a building
+    then fills exactly the frame of the first, so the page can swap one for the other."""
     from rembg import remove
 
     rgba = remove(image.convert("RGB"), session=session, post_process_mask=True)
@@ -63,10 +70,10 @@ def cut_out(image, session):
     # Pull the edge in by a pixel so no grey studio fringe survives the downscale.
     alpha = np.asarray(Image.fromarray(alpha).filter(ImageFilter.MinFilter(3)))
     rgba.putalpha(Image.fromarray(alpha))
-    box = rgba.getbbox()
-    if box is None:
+    if rgba.getbbox() is None:
         raise SystemExit("background removal left nothing")
-    return rgba.crop(box)
+    box = box or rgba.getbbox()
+    return rgba.crop(box), box
 
 
 def scale_to_height(rgba, height):
@@ -119,6 +126,7 @@ def main():
     manifest = {"units": old.get("units", {}), "buildings": {}, "terrain": {}}
     credits = ["# Sprite credits", "", MODEL_NOTE, "| Sprite | Seed | Prompt |", "|---|---|---|"]
     sheet = []
+    boxes = {}  # sprite id → the box its picture was trimmed to
 
     def raw_image(sprite):
         raw = RAW / f"{sprite['id']}__{sprite['keep']}.png"
@@ -143,7 +151,9 @@ def main():
                 from rembg import new_session
 
                 session = new_session("birefnet-general")
-            cut = cut_out(image, session)
+            if "from" in sprite and sprite["from"] not in boxes:
+                raise SystemExit(f"{sprite['id']} must come after {sprite['from']} in sprites.json")
+            cut, boxes[sprite["id"]] = cut_out(image, session, boxes.get(sprite.get("from")))
             result = scale_to_height(cut, sprite["height"])
             manifest["buildings"][sprite["id"]] = {"image": rel, "size": [result.width, result.height], "anchor": ANCHOR}
         result.save(OUT / rel, optimize=True)

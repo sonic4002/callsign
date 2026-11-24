@@ -358,6 +358,28 @@
         0.8
       ]
     },
+    "hq_aegis_ruin": {
+      "image": "buildings/hq_aegis_ruin.png",
+      "size": [
+        257,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    },
+    "hq_ashfall_ruin": {
+      "image": "buildings/hq_ashfall_ruin.png",
+      "size": [
+        293,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ]
+    },
     "landRig": {
       "image": "buildings/landRig.png",
       "size": [

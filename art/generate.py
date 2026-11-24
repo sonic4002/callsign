@@ -7,6 +7,9 @@ assets/raw/<id>__<seed>.png. Images that already exist are skipped.
     python art/generate.py                 every sprite in art/sprites.json, its `seeds`
     python art/generate.py tank militia    only these ids
     python art/generate.py --seeds 5 6 tank    other seeds, to look for a better candidate
+
+A sprite with `from` is a second state of another sprite (a headquarters in ruins): the
+model redraws that sprite's kept image as the prompt asks, so the two match.
 """
 
 import argparse
@@ -51,6 +54,19 @@ def workflow(prompt, seed, width, height):
         "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sample", 0], "vae": ["vae", 0]}},
         "save": {"class_type": "SaveImage", "inputs": {"images": ["decode", 0], "filename_prefix": "callsign"}},
     }
+
+
+def edit_workflow(prompt, seed, reference):
+    """The official klein image-edit graph: the same model redraws a reference image as the
+    prompt asks. Used for a second state of a kept sprite, such as a building in ruins."""
+    flow = workflow(prompt, seed, 1024, 1024)
+    flow["image"] = {"class_type": "LoadImage", "inputs": {"image": reference}}
+    flow["scaled"] = {"class_type": "ImageScaleToTotalPixels", "inputs": {"image": ["image", 0], "upscale_method": "nearest-exact", "megapixels": 1.0, "resolution_steps": 1}}
+    flow["reference"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["scaled", 0], "vae": ["vae", 0]}}
+    flow["positive_ref"] = {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["positive", 0], "latent": ["reference", 0]}}
+    flow["negative_ref"] = {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["negative", 0], "latent": ["reference", 0]}}
+    flow["guider"]["inputs"].update(positive=["positive_ref", 0], negative=["negative_ref", 0])
+    return flow
 
 
 def call(path, body=None):
@@ -104,6 +120,7 @@ def main():
     args = ap.parse_args()
 
     spec = json.loads((HERE / "sprites.json").read_text())
+    by_id = {s["id"]: s for s in spec["sprites"]}
     jobs = []
     for sprite in spec["sprites"]:
         if args.ids and sprite["id"] not in args.ids:
@@ -122,7 +139,14 @@ def main():
     try:
         for sprite, prompt, seed, out in jobs:
             began = time.time()
-            flow = workflow(prompt, seed, *sprite.get("size", [1024, 1024]))
+            if "from" in sprite:
+                # A second state starts from the kept image of the sprite it belongs to.
+                source = by_id[sprite["from"]]
+                reference = f"{source['id']}__{source['keep']}.png"
+                shutil.copy(RAW / reference, WORK / "input" / reference)
+                flow = edit_workflow(prompt, seed, reference)
+            else:
+                flow = workflow(prompt, seed, *sprite.get("size", [1024, 1024]))
             shutil.move(render(flow), out)
             print(f"{out.name}  {time.time() - began:.1f}s", flush=True)
     finally:
