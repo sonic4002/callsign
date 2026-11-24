@@ -6,6 +6,7 @@
 import { drawUnit, loadSprites } from "./art.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
+import { Sfx } from "./sfx.js";
 import { Speech } from "./speech/speech.js";
 import { tidy } from "./voice/normalize.js";
 import { Voice } from "./voice/voice.js";
@@ -79,7 +80,8 @@ const drawn = { roster: "", build: "" }; // what the sidebar lists show now
 
 const scene = new Scene($("map"), $("radar-map"), { lang: () => lang, showNerve: () => $("nerve").checked, side });
 const music = await new Music().load();
-const speech = new Speech({ volume: () => music.volume, duck: (on) => music.duck(on) });
+scene.sfx = new Sfx({ level: () => (music.muted ? 0 : music.volume) }); // guns and blasts follow the music's volume and mute
+const speech = new Speech({ volume: () => 0.6 + 0.4 * music.volume, duck: (on) => (music.duck(on), scene.sfx.duck(on)) });
 speech.bind($("speak"));
 await loadSprites();
 
@@ -121,12 +123,16 @@ function onFrame(frame) {
       break;
     case "radio":
       entries.push({ kind: "radio", message: frame.message });
+      // Anvil turning a purchase down ends the wait for it.
+      if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) buyAnswered();
       speech.say(frame.message, { rules, faction });
       break;
     case "refused":
+      buyAnswered();
       system("refused", { reason: frame.reason }, "warn");
       return;
     case "event":
+      if (frame.event.side === side && frame.event.kind === "deploying") buyAnswered(frame.event.unit);
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
@@ -165,7 +171,7 @@ function renderLog() {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count });
+        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count });
       } else {
         time.textContent = clock(e.tick);
         text.textContent = t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" });
@@ -181,8 +187,45 @@ function renderLog() {
 function transmit(text) {
   if (!text || !open()) return false;
   ws.send(JSON.stringify({ type: "radio", text, strict }));
+  noteBuy(text);
   return true;
 }
+
+// ---- purchases on their way ----
+//
+// A purchase has two waits. First the operator has to hear the call and decide: the unit's
+// button shows "requested" from the moment a buy call is sent, however it was sent. Then
+// the server deploys the squad: the button and the roster show a bar that fills.
+
+const REQUEST_TIMEOUT = 25_000; // ms a call may go unanswered before the button gives up
+const requested = new Map(); // unit id, or "*" when the call did not say which → time it expires
+const buyWords = /\b(buy|purchase|order|deploy|raise|build|recruit)\b|קנה|קנו|רכוש|הזמן|גייס|הקם/i;
+const classWords = {
+  infantry: /infantry|soldier|squad of men|חי"ר|חיר|רגלים|חיילים/i,
+  vehicle: /vehicle|armou?r|tank|truck|רכב|שריון|טנק|טנדר/i,
+  naval: /boat|naval|ship|סירה|סירת|סירות|ימי/i,
+};
+
+function noteBuy(text) {
+  if (!rules || !faction || !buyWords.test(text)) return;
+  const low = text.toLowerCase();
+  const units = Object.entries(rules.factions[faction]?.units ?? {});
+  const says = ([, u]) => [u.name.en, u.name.he].some((name) => name.toLowerCase().split(/\s+/).some((word) => word.length >= 3 && low.includes(word)));
+  const named = units.filter(says);
+  const hit = named.length ? named : units.filter(([, u]) => classWords[u.class]?.test(text));
+  const until = performance.now() + REQUEST_TIMEOUT;
+  if (hit.length) for (const [id] of hit) requested.set(id, until);
+  else requested.set("*", until);
+}
+
+// The operator answered, or the server did: nothing is waiting on a decision any more.
+function buyAnswered(unit) {
+  if (unit) requested.delete(unit);
+  else requested.clear();
+  requested.delete("*");
+}
+
+const isRequested = (unit) => [unit, "*"].some((key) => requested.get(key) > performance.now());
 
 // How closely the net holds the player to radio procedure: 1 relaxed, 2 standard, 3 strict.
 let strict = [1, 2, 3].find((n) => String(n) === localStorage.getItem("callsign.strict")) ?? 1;
@@ -197,7 +240,21 @@ const speaks = (text) => (/[\u0590-\u05ff]/.test(text) ? "he" : "en");
 for (const id of ["help-open", "help-close"]) $(id).addEventListener("click", () => ($("help").hidden = id === "help-close"));
 $("help").addEventListener("click", (ev) => ev.target === $("help") && ($("help").hidden = true));
 addEventListener("keydown", (ev) => ev.key === "Escape" && ($("help").hidden = true));
-$("help").hidden = !query.has("help"); // ?help opens the page on the help window
+$("help").hidden = !query.has("help");
+
+// The help window has two panes; clicking an example call puts it in the radio box.
+function helpTab(name) {
+  for (const pane of document.querySelectorAll("#help [data-pane]")) pane.hidden = pane.dataset.pane !== name;
+  for (const tab of document.querySelectorAll("#help [data-tab]")) tab.setAttribute("aria-selected", String(tab.dataset.tab === name));
+}
+for (const tab of document.querySelectorAll("#help [data-tab]")) tab.addEventListener("click", () => helpTab(tab.dataset.tab));
+helpTab(query.get("help") === "examples" ? "examples" : "guide");
+for (const example of document.querySelectorAll("#help .examples code")) {
+  example.addEventListener("click", () => {
+    $("help").hidden = true;
+    draft(example.textContent);
+  });
+} // ?help opens the page on the help window
 
 // draft puts a call in the box for the player to send or edit.
 function draft(text) {
@@ -271,12 +328,20 @@ function talk() {
   voice.start(lang);
 }
 
+// callsigns lists what a call to this side can open with: its squads' class names, the
+// operator and "all stations".
+function callsigns(spoke) {
+  const cs = rules.callsigns;
+  const classes = new Set(Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.class)));
+  return [...[...classes].map((c) => cs.classes[c][spoke]), cs.operator[spoke], cs.allStations[spoke]];
+}
+
 async function talkEnd() {
   if (wasMuted !== null) music.setMuted(wasMuted);
   wasMuted = null;
   if (!voice.held) return;
   const spoke = lang;
-  const text = await voice.stop(spoke);
+  const text = await voice.stop(spoke, rules ? callsigns(spoke) : []);
   if (!text || !rules) return;
   // Spoken calls go out at once; the log shows what was sent, and Up brings it back to fix.
   draft(tidy(text, { lang: spoke, rules }));
@@ -317,23 +382,66 @@ function renderSidebar() {
   $("hq-enemy").style.inlineSize = `${state.hq[1 - side] * 100}%`;
 
   const mine = state.squads.filter((sq) => sq.side === side);
+  const deploying = (state.deploying ?? []).filter((d) => d.side === side);
   const cap = rules.match.populationCap;
-  $("pop").textContent = `${mine.length}/${cap}`;
+  const pop = mine.length + deploying.length; // a squad on its way already holds its place
+  $("pop").textContent = `${pop}/${cap}`;
   const canAct = Boolean(me) && !state.over;
 
   // The lists are rebuilt only when what they show changes, so buttons stay clickable.
+  // Progress bars are then moved in place on every frame.
   const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
-  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order])]);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order]), deploying.map((d) => d.id)]);
   if (rosterKey !== drawn.roster) {
     drawn.roster = rosterKey;
-    $("roster").replaceChildren(...(mine.length ? mine.map((sq) => rosterRow(sq, canAct)) : [el("li", "empty", t("rosterEmpty"))]));
+    const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
+    $("roster").replaceChildren(...(rows.length ? rows : [el("li", "empty", t("rosterEmpty"))]));
   }
   const units = Object.entries(rules.factions[faction]?.units ?? {});
-  const buildKey = JSON.stringify([lang, faction, canAct, mine.length >= cap, units.map(([, u]) => state.gold >= u.cost)]);
+  const buildKey = JSON.stringify([lang, faction, canAct, pop >= cap, units.map(([, u]) => state.gold >= u.cost)]);
   if (buildKey !== drawn.build) {
     drawn.build = buildKey;
-    $("build").replaceChildren(...units.map(([id, u]) => buildButton(id, u, canAct && mine.length < cap && state.gold >= u.cost)));
+    $("build").replaceChildren(...units.map(([id, u]) => buildButton(id, u, canAct && pop < cap && state.gold >= u.cost)));
   }
+  renderDeploying(deploying);
+}
+
+const secondsLeft = (d) => Math.ceil(d.ticksLeft / rules.tickRate);
+const progress = (d) => 1 - d.ticksLeft / d.ticksTotal;
+
+// renderDeploying moves the bars: on the roster rows, and on each unit's build button,
+// which shows the squad of that unit closest to the field and how many are on their way.
+function renderDeploying(deploying) {
+  for (const d of deploying) {
+    const row = $("roster").querySelector(`[data-deploy="${d.id}"]`);
+    if (!row) continue;
+    row.querySelector(".deploy-bar b").style.inlineSize = `${progress(d) * 100}%`;
+    row.querySelector(".order").textContent = t("deployingIn", { seconds: secondsLeft(d) });
+  }
+  for (const button of $("build").children) {
+    const queue = deploying.filter((d) => d.unit === button.dataset.unit);
+    const first = queue[0];
+    button.classList.toggle("deploying", Boolean(first));
+    button.classList.toggle("requested", !first && isRequested(button.dataset.unit));
+    button.querySelector(".fill").style.blockSize = first ? `${progress(first) * 100}%` : "0";
+    button.querySelector(".left").textContent = first ? t("seconds", { seconds: secondsLeft(first) }) : "";
+    const count = button.querySelector(".count");
+    count.hidden = queue.length < 2;
+    count.textContent = String(queue.length);
+  }
+}
+
+// deployRow is a bought squad on its way: it becomes an ordinary roster row on arrival.
+function deployRow(d) {
+  const unit = rules.factions[faction].units[d.unit];
+  const li = el("li", "deploying");
+  li.dataset.deploy = d.id;
+  const name = el("span", "name", d.callsign[lang]);
+  name.append(el("span", "unit", unit.name[lang]));
+  const bar = el("span", "deploy-bar");
+  bar.append(el("b"));
+  li.append(name, bar, el("span", "order", t("deployingIn", { seconds: secondsLeft(d) })));
+  return li;
 }
 
 function orderText(sq) {
@@ -371,6 +479,7 @@ function buildButton(id, unit, enabled) {
   const button = el("button");
   button.type = "button";
   button.disabled = !enabled;
+  button.dataset.unit = id;
   const icon = el("canvas");
   const dpr = devicePixelRatio || 1;
   icon.width = 72 * dpr;
@@ -380,7 +489,10 @@ function buildButton(id, unit, enabled) {
   g.translate(36, unit.class === "infantry" ? 38 : 36);
   g.scale(1.25, 1.25);
   drawUnit(g, { unit: id, cls: unit.class, faction, members: Math.min(unit.members, 3), moving: false, firing: false, time: 0, turn: 0.4, seed: 0 });
-  button.append(icon, el("span", "", unit.name[lang]), el("span", "cost", String(unit.cost)));
+  const count = el("span", "count");
+  count.hidden = true;
+  // The fill rises behind the picture while a squad of this unit deploys.
+  button.append(el("i", "fill"), icon, el("span", "", unit.name[lang]), el("span", "cost", String(unit.cost)), el("bdi", "left"), count);
   // Buying is a radio call to the operator like any other; the button only writes and sends it.
   button.addEventListener("click", () => transmit(call("buy", { to: anvil(), class: t(`class.${unit.class}`), unit: unit.name[lang] })));
   return button;

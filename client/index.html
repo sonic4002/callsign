@@ -119,28 +119,50 @@
 <div id="help" hidden>
   <div class="card">
     <h1 data-i18n="help.title"></h1>
-    <h2 data-i18n="help.talk"></h2>
-    <p data-i18n="help.talk.body"></p>
-    <h2 data-i18n="help.orders"></h2>
-    <ul class="examples">
-      <li><span data-i18n="help.attack"></span><code dir="auto" data-i18n="help.attack.say"></code></li>
-      <li><span data-i18n="help.attackTarget"></span><code dir="auto" data-i18n="help.attackTarget.say"></code></li>
-      <li><span data-i18n="help.attackAny"></span><code dir="auto" data-i18n="help.attackAny.say"></code></li>
-      <li><span data-i18n="help.hold"></span><code dir="auto" data-i18n="help.hold.say"></code></li>
-      <li><span data-i18n="help.move"></span><code dir="auto" data-i18n="help.move.say"></code></li>
-      <li><span data-i18n="help.report"></span><code dir="auto" data-i18n="help.report.say"></code></li>
-      <li><span data-i18n="help.buy"></span><code dir="auto" data-i18n="help.buy.say"></code></li>
-      <li><span data-i18n="help.upgrade"></span><code dir="auto" data-i18n="help.upgrade.say"></code></li>
-      <li><span data-i18n="help.all"></span><code dir="auto" data-i18n="help.all.say"></code></li>
-    </ul>
-    <h2 data-i18n="strict"></h2>
-    <ul>
-      <li><strong data-i18n="strict.1"></strong> <span data-i18n="help.strict.1"></span></li>
-      <li><strong data-i18n="strict.2"></strong> <span data-i18n="help.strict.2"></span></li>
-      <li><strong data-i18n="strict.3"></strong> <span data-i18n="help.strict.3"></span></li>
-    </ul>
-    <h2 data-i18n="help.more"></h2>
-    <p data-i18n="help.more.body"></p>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="guide" data-i18n="help.tab.guide"></button>
+      <button type="button" role="tab" data-tab="examples" data-i18n="help.tab.examples"></button>
+    </div>
+    <section data-pane="guide">
+      <h2 data-i18n="help.talk"></h2>
+      <p data-i18n="help.talk.body"></p>
+      <h2 data-i18n="strict"></h2>
+      <ul>
+        <li><strong data-i18n="strict.1"></strong> <span data-i18n="help.strict.1"></span></li>
+        <li><strong data-i18n="strict.2"></strong> <span data-i18n="help.strict.2"></span></li>
+        <li><strong data-i18n="strict.3"></strong> <span data-i18n="help.strict.3"></span></li>
+      </ul>
+      <h2 data-i18n="help.more"></h2>
+      <p data-i18n="help.more.body"></p>
+    </section>
+    <section data-pane="examples" hidden>
+      <p data-i18n="help.ex.intro"></p>
+      <h2 data-i18n="help.ex.squads"></h2>
+      <ul class="examples">
+        <li><span data-i18n="help.attack"></span><code dir="auto" data-i18n="help.attack.say"></code></li>
+        <li><span data-i18n="help.attackTarget"></span><code dir="auto" data-i18n="help.attackTarget.say"></code></li>
+        <li><span data-i18n="help.attackAny"></span><code dir="auto" data-i18n="help.attackAny.say"></code></li>
+        <li><span data-i18n="help.hold"></span><code dir="auto" data-i18n="help.hold.say"></code></li>
+        <li><span data-i18n="help.move"></span><code dir="auto" data-i18n="help.move.say"></code></li>
+        <li><span data-i18n="help.fallBack"></span><code dir="auto" data-i18n="help.fallBack.say"></code></li>
+        <li><span data-i18n="help.several"></span><code dir="auto" data-i18n="help.several.say"></code></li>
+        <li><span data-i18n="help.report"></span><code dir="auto" data-i18n="help.report.say"></code></li>
+        <li><span data-i18n="help.all"></span><code dir="auto" data-i18n="help.all.say"></code></li>
+      </ul>
+      <h2 data-i18n="help.ex.anvil"></h2>
+      <ul class="examples">
+        <li><span data-i18n="help.manage"></span><code dir="auto" data-i18n="help.manage.say"></code></li>
+        <li><span data-i18n="help.status"></span><code dir="auto" data-i18n="help.status.say"></code></li>
+        <li><span data-i18n="help.buy"></span><code dir="auto" data-i18n="help.buy.say"></code></li>
+        <li><span data-i18n="help.buyNaval"></span><code dir="auto" data-i18n="help.buyNaval.say"></code></li>
+        <li><span data-i18n="help.upgrade"></span><code dir="auto" data-i18n="help.upgrade.say"></code></li>
+      </ul>
+      <h2 data-i18n="help.ex.procedure"></h2>
+      <ul class="examples">
+        <li><span data-i18n="help.radioCheck"></span><code dir="auto" data-i18n="help.radioCheck.say"></code></li>
+        <li><span data-i18n="help.full"></span><code dir="auto" data-i18n="help.full.say"></code></li>
+      </ul>
+    </section>
     <div class="row"><button type="button" class="primary" id="help-close" data-i18n="help.close"></button></div>
   </div>
 </div>

@@ -19,7 +19,7 @@ const classes = [...new Set(Object.values(rules.factions).flatMap((f) => Object.
 
 // Keys built at run time, as `prefix.${value}`, and the values they can take.
 const dynamic = {
-  "event.": ["captured", "point_lost", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded"],
+  "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer"],
   "order.": ["none", "move", "hold", "attack"],
   "call.": ["hold", "move", "attack", "buy", "upgrade"],

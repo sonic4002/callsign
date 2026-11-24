@@ -199,3 +199,26 @@ footer.panel { font-size: .78rem; color: var(--muted); }
 #help .row { display: flex; justify-content: flex-end; margin-block-start: 1.2rem; }
 footer.panel select { margin-inline-start: .4rem; font: inherit; color: inherit; background: #10161a; border: 1px solid var(--edge-hi); }
 footer.panel label { display: block; margin-block-end: .3rem; }
+#help .tabs { display: flex; gap: .3rem; margin-block-start: .8rem; border-block-end: 1px solid var(--edge-hi); }
+#help .tabs button { padding: .35rem .9rem; border-block-end: 0; opacity: .65; }
+#help .tabs button[aria-selected="true"] { opacity: 1; color: var(--brass); border-color: var(--brass); }
+#help .examples li { grid-template-columns: 13rem 1fr; }
+#help .examples code { cursor: pointer; }
+#help .examples code:hover { text-decoration: underline; }
+
+/* ---- purchases on their way ---- */
+#roster li.deploying { cursor: default; border-inline-start-color: var(--brass); border-style: dashed; border-inline-start-style: solid; }
+#roster li.deploying .name { color: var(--muted); }
+#roster .deploy-bar { grid-column: 1; block-size: .3rem; margin-block: .3rem .2rem; background: #2a3237; overflow: hidden; }
+#roster .deploy-bar b { display: block; block-size: 100%; inline-size: 0; background: var(--brass); transition: inline-size .12s linear; }
+#build button { position: relative; overflow: hidden; }
+#build button > * { position: relative; }
+#build .fill { position: absolute; inset-inline: 0; inset-block-end: 0; block-size: 0; background: linear-gradient(#c9a44c22, #c9a44c55); border-block-start: 2px solid var(--brass); transition: block-size .12s linear; pointer-events: none; }
+#build button:not(.deploying) .fill { border-block-start-width: 0; }
+#build .left { position: absolute; inset-block-start: .2rem; inset-inline-start: .3rem; font-size: .8rem; font-weight: 700; color: var(--brass); font-variant-numeric: tabular-nums; text-shadow: 0 0 4px #000; }
+#build .count { position: absolute; inset-block-start: .2rem; inset-inline-end: .3rem; min-inline-size: 1.1rem; padding: 0 .2rem; font-size: .7rem; font-weight: 700; line-height: 1.1rem; color: #0a100f; background: var(--brass); border-radius: .55rem; }
+#build .count[hidden] { display: none; }
+#build button.deploying:disabled, #build button.requested:disabled { opacity: 1; }
+#build button.requested { animation: requested 1.1s ease-in-out infinite; }
+@keyframes requested { 50% { border-color: var(--brass); box-shadow: inset 0 0 0 1px #c9a44c88, inset 0 0 14px #c9a44c33; } }
+@media (prefers-reduced-motion: reduce) { #build button.requested { animation: none; border-color: var(--brass); } }
