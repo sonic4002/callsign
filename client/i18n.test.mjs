@@ -15,6 +15,7 @@ const script = [...readdirSync(new URL(".", import.meta.url)), ...readdirSync(ne
   .map(read)
   .join("\n");
 const rules = JSON.parse(read("../shared/rules.json"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const classes = [...new Set(Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.class)))];
 
 // Keys built at run time, as `prefix.${value}`, and the values they can take.

@@ -15,6 +15,7 @@ import { Host, RANK_BROWSER, RANK_SERVER } from "../host.mjs";
 import { scriptedBrain } from "../brain-scripted.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 
 // ---- the relay brain, against a fetch that is scripted ----
 

@@ -37,6 +37,15 @@ type nav struct {
 	compVer [navModes]int
 	snaps   [navModes]map[int]int // cell → nearest passable cell, per mode
 	snapVer [navModes]int
+
+	// Working space of the path search, kept between searches. A cell's entries count
+	// only when its mark is the present search's number.
+	g      []float64
+	from   []int32
+	opened []uint32
+	closed []uint32
+	search uint32
+	heap   navHeap
 }
 
 func (s *Sim) initNav() {
@@ -323,19 +332,23 @@ func (n *nav) path(mode int, ax, ay, bx, by float64) (way [][2]float64, reached 
 		dc, dr := math.Abs(float64(i%n.cols-gc)), math.Abs(float64(i/n.cols-gr))
 		return math.Max(dc, dr) + (math.Sqrt2-1)*math.Min(dc, dr)
 	}
-	size := n.cols * n.rows
-	g := make([]float64, size)
-	from := make([]int32, size)
-	state := make([]uint8, size) // 0 unseen, 1 open, 2 closed
-	open := &navHeap{{start, hOf(start), hOf(start)}}
-	state[start], from[start] = 1, -1
+	if n.g == nil {
+		size := n.cols * n.rows
+		n.g, n.from = make([]float64, size), make([]int32, size)
+		n.opened, n.closed = make([]uint32, size), make([]uint32, size)
+	}
+	n.search++
+	g, from, id := n.g, n.from, n.search
+	n.heap = append(n.heap[:0], navNode{start, hOf(start), hOf(start)})
+	open := &n.heap
+	n.opened[start], from[start], g[start] = id, -1, 0
 	best, bestH := start, hOf(start)
 	for open.Len() > 0 {
 		cur := heap.Pop(open).(navNode)
-		if state[cur.i] == 2 {
+		if n.closed[cur.i] == id {
 			continue
 		}
-		state[cur.i] = 2
+		n.closed[cur.i] = id
 		if cur.h < bestH {
 			best, bestH = cur.i, cur.h
 		}
@@ -349,7 +362,7 @@ func (n *nav) path(mode int, ax, ay, bx, by float64) (way [][2]float64, reached 
 				continue
 			}
 			j := nr*n.cols + nc
-			if state[j] == 2 || !n.passable(mode, j) {
+			if n.closed[j] == id || !n.passable(mode, j) {
 				continue
 			}
 			step := 1.0
@@ -360,14 +373,14 @@ func (n *nav) path(mode int, ax, ay, bx, by float64) (way [][2]float64, reached 
 				}
 				step = math.Sqrt2
 			}
-			if cost := g[cur.i] + step; state[j] == 0 || cost < g[j] {
-				g[j], from[j], state[j] = cost, int32(cur.i), 1
+			if cost := g[cur.i] + step; n.opened[j] != id || cost < g[j] {
+				g[j], from[j], n.opened[j] = cost, int32(cur.i), id
 				heap.Push(open, navNode{j, cost + hOf(j), hOf(j)})
 			}
 		}
 	}
 	end := goal
-	reached = state[goal] == 2
+	reached = n.closed[goal] == id
 	if !reached {
 		end = best
 	}

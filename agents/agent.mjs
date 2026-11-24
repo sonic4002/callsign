@@ -6,10 +6,10 @@
 
 import { Link } from "./link.mjs";
 import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
-import { leaderTools, normalize, operatorTools } from "./tools.mjs";
+import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
 
-const leaderEvents = new Set(["contact", "pinned", "losses", "arrived"]);
-const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack"]);
+const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned"]);
+const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
@@ -68,7 +68,7 @@ export class Agent {
       this.tier = mine.tier;
       this.unit = this.rules.factions[this.faction].units[mine.unit];
       this.system = leaderPrompt({ rules: this.rules, side: this.side, faction: this.faction, station: this.me, unit: this.unit });
-      this.tools = leaderTools;
+      this.tools = leaderToolsFor(this.unit);
     } else {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
@@ -107,7 +107,9 @@ export class Agent {
         return;
       }
       const wanted = this.role === "squad" ? leaderEvents.has(e.kind) && e.squad === this.squad : operatorEvents.has(e.kind);
-      if (wanted) this.#enqueue({ kind: "event", event: e, callsign: frame.callsign });
+      // An event about a landmark or a bridge carries its name, for whoever reads the wake.
+      const named = e.place && [...(this.rules.map.landmarks ?? []), ...(this.rules.map.bridges ?? [])].find((p) => p.id === e.place);
+      if (wanted) this.#enqueue({ kind: "event", event: e, callsign: frame.callsign, place: named ? `${named.name.en} (${e.place})` : e.place });
     }
   }
 
@@ -222,11 +224,20 @@ export function compactStatus(status, side) {
     order: s.order,
     strength: `${s.alive}/${s.full}`,
     tier: s.tier,
-    teams: (s.teams ?? []).map((t) => `${t.nerve}, ${t.action}`),
+    teams: (s.teams ?? []).map((t) => `${t.nerve}, ${t.action}${t.in ? `, inside ${t.in}` : t.cover ? ", in cover" : ""}`),
     contacts: s.contacts,
   });
   if (status.you) {
-    return { secondsLeft: status.timeLeft, you: squad(status.you), friends: status.friends, contacts, points };
+    // The map itself is in the prompt. Here only what has changed on it: buildings that are
+    // held, full, damaged or fallen, and bridges that are damaged or down.
+    const ground = (status.landmarks ?? [])
+      .filter((l) => l.garrison || l.kind === "rubble" || l.kind === "fallen bridge" || (l.kind === "bridge" && l.cover < 1))
+      .map((l) =>
+        l.kind === "bridge" || l.kind === "fallen bridge"
+          ? { id: l.id, state: l.kind === "bridge" ? `standing, ${Math.round(l.cover * 100)}% strength` : "fallen" }
+          : { id: l.id, state: l.kind === "rubble" ? "fallen, now rubble" : `held by ${owner(l.garrison.side, side) === "yours" ? "your side" : "the enemy"}, room for ${l.room ?? 0} more fireteams` },
+      );
+    return { secondsLeft: status.timeLeft, you: squad(status.you), friends: status.friends, contacts, points, ...(ground.length ? { ground } : {}) };
   }
   return {
     secondsLeft: status.timeLeft,
@@ -246,7 +257,8 @@ function describe(item) {
     const m = item.msg;
     const lang = m.lang === "he" ? "Hebrew" : "English";
     const named = m.points?.length ? ` Points named: ${m.points.join(", ")}.` : "";
-    return `Radio call for you from ${m.from.en}, in ${lang}: "${m.text}"${named}`;
+    const marks = m.landmarks?.length ? ` Landmarks its words fit: ${m.landmarks.join(", ")}.` : "";
+    return `Radio call for you from ${m.from.en}, in ${lang}: "${m.text}"${named}${marks}`;
   }
   if (item.kind === "heard") {
     const m = item.msg;
@@ -269,6 +281,16 @@ function describe(item) {
       return `The enemy took ${e.point}.`;
     case "hq_under_attack":
       return "Your headquarters is under attack.";
+    case "garrisoned":
+      return `Your squad went inside ${item.place}.`;
+    case "building_fell":
+      return `${item.place} was brought down${e.count ? `; ${e.count} of your fireteams were inside and are out, shaken` : ""}.`;
+    case "bridge_under_attack":
+      return `${item.place} is under attack, and your side has troops on it, beside it or heading across.`;
+    case "bridge_fell":
+      return `${item.place} has fallen${e.count ? `; ${e.count} of your fireteams went down with it` : ""}.`;
+    case "bridge_repaired":
+      return `${item.place} stands again.`;
   }
   return `Event: ${e.kind}.`;
 }

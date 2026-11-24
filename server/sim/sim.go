@@ -154,6 +154,7 @@ type Sim struct {
 	Reason string
 
 	nav         *nav
+	landIdx     map[string]int // landmark id → index
 	rng         *rand.Rand
 	events      []Event
 	lengthTicks int
@@ -383,7 +384,10 @@ func (s *Sim) nearestPoint(x, y float64) string {
 	return best
 }
 
-func dist(ax, ay, bx, by float64) float64 { return math.Hypot(ax-bx, ay-by) }
+func dist(ax, ay, bx, by float64) float64 {
+	dx, dy := ax-bx, ay-by
+	return math.Sqrt(dx*dx + dy*dy)
+}
 
 // teamRef is one living team with its squad and stats, valid for one tick.
 type teamRef struct {
@@ -420,6 +424,7 @@ func (s *Sim) Step() []Event {
 	s.deploy()
 
 	live := s.liveTeams()
+	s.countGarrisons()
 	s.spot(live)
 	s.trackContacts()
 	s.trackObjects()
@@ -442,6 +447,7 @@ func (s *Sim) Step() []Event {
 	s.recover(live)
 	s.capture(live)
 	s.squadEvents(live)
+	s.countGarrisons()
 	s.observe()
 	s.checkEnd()
 	s.Tick++

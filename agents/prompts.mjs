@@ -38,9 +38,25 @@ function mapTable(rules, side) {
             : `control point, ${canTake(rules, "point")} squads can capture it`;
     return `- ${p.id}: ${p.callsign.en} / ${p.callsign.he} ("${p.name.en}", "${p.name.he}") at x=${p.x}, y=${p.y}: ${what}`;
   });
+  const kinds = rules.landmarkKinds ?? {};
+  const landmarks = (rules.map.landmarks ?? []).map((l) => {
+    const k = kinds[l.kind] ?? {};
+    const what = k.garrison ? `${l.kind}: infantry can go inside, room for ${k.garrison} fireteams` : `${l.kind}: cover`;
+    return `- ${l.id}: ${l.name.en} / ${l.name.he} (${what})`;
+  });
+  const bridges = (rules.map.bridges ?? []).map((b) => `- ${b.id}: ${b.name.en} / ${b.name.he}`);
   return [
-    `The map is ${rules.map.width} wide and ${rules.map.height} tall; x grows east, y grows south. Everything south of y=${rules.map.waterY} is sea.`,
+    `The map is "${rules.map.name?.en ?? "the map"}", ${rules.map.width} wide and ${rules.map.height} tall; x grows east, y grows south, distances are in metres.`,
     ...lines,
+    "Ground. Water stops land units except at a bridge; mountains stop them; ice can be crossed but slowly and with no cover. Boats keep to the water, aircraft cross everything. The server refuses a place a squad's unit cannot get to.",
+    ...(bridges.length ? ["Bridges. A bridge can be shot down, and everything on it is lost with it; a squad told to hold or attack will not start across one that is about to fall, a squad told to move will. Your status lists bridges that are damaged or down.", ...bridges] : []),
+    ...(landmarks.length
+      ? [
+          "Landmarks. Each has an id and a name, and an order can go to it by either. A fireteam standing still behind one is harder to hit; infantry inside a building are harder still to hit and are seen only from close by or once they fire, but heavy weapons bring a building down. Your status lists the buildings that are held, damaged or fallen.",
+          ...landmarks,
+        ]
+      : []),
+    'Places. Hammer may describe where to go: "the grove north of Foxtrot", "הבית שליד פסל", "200 metres east of Golf". Pass the landmark\'s id, or the words themselves, as the place. When the words fit more than one landmark the tool says which ones: answer "Say again" and name them. Say where you are the same way, by landmark name.',
     `A point is captured by standing on it alone for ${rules.match.captureSeconds} seconds. When the timer runs out, the side holding more points wins.`,
     `Enemy squads in sight are named by their contact id: "${rules.callsigns.contact.en} 3" (${rules.callsigns.contact.he} 3 in Hebrew) is contact 3 in your status. Hammer orders attacks on them by that name, and you name them the same way on the radio.`,
     "Fog of war: your side sees only what its own squads and headquarters have in sight. In your status, who holds a point that is not in sight now, and the enemy headquarters' strength, are as your side last saw them and may be out of date.",
@@ -63,13 +79,13 @@ const wakes = `You are woken only when something happens: a radio call addressed
 export function leaderPrompt({ rules, side, faction, station, unit }) {
   return `You lead squad ${station.en} (${station.he}) in Callsign, a real-time strategy game commanded over a military radio net. Your squad is ${unit.name.en} (${unit.class}) of the ${rules.factions[faction].name.en}.
 
-Your fireteams fight on their own: they pick targets, take cover and return fire without you. You decide where the squad goes and what it does there, and you keep your commander informed.
+Your fireteams fight on their own: they pick targets, take the cover at their post and return fire without you. You decide where the squad goes and what it does there, and you keep your commander informed.
 
 Chain of command. Hammer (פטיש) is the human commander. Anvil (סדן) is Hammer's operator. You always carry out their orders: you choose how, never whether. A direct order from Hammer outranks Anvil until Hammer hands you back to Anvil.
 
 ${wakes}
 
-On an order: first act with move, hold or attack, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
+On an order: first act with move, hold or attack${unit.repairPerSecond > 0 ? " (or repair, for a bridge)" : ""}, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
 
 ${procedure}
 

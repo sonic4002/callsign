@@ -377,11 +377,9 @@ func (s *Sim) LandmarksNear(sq *Squad) []NearbyLandmark {
 		}
 		out = append(out, v)
 	}
+	// Every bridge, wherever it is: there are few, and a fallen one changes every plan.
 	for i := range s.Bridges {
 		b := &s.Bridges[i]
-		if x, y := b.mid(); !near(x, y) {
-			continue
-		}
 		m := s.Sides[sq.Side].bridges[i]
 		kind := "bridge"
 		if !m.Standing {

@@ -13,9 +13,10 @@ const tool = (name, description, properties) => ({
   },
 });
 
-const point = (what) => ({
+// A place is where an order sends the squad. The server reads all of these forms.
+const place = (what) => ({
   type: "string",
-  description: `${what} A map point by id or any of its names, for example "F", "Foxtrot", "פסל" or "the town".`,
+  description: `${what} One of: a map point by id or any of its names ("F", "Foxtrot", "פסל", "the town"); a landmark or bridge by its id from the map list ("F-house-1", "bridge-south") or by its name ("the grove north of Foxtrot"); or a spot off a point, as "<bearing> of <point> [<metres>]" ("north of Foxtrot", "NE of D 150").`,
 });
 
 const radio = tool(
@@ -37,15 +38,25 @@ const report = tool("report", "Read the current situation: positions, orders, st
 export const leaderTools = [
   radio,
   report,
-  tool("move", "Send your squad to a point without stopping to fight on the way.", { point: point("Where to go.") }),
-  tool("hold", "Send your squad to a point to defend it. The squad fights anything that comes in range.", {
-    point: point('Where to hold. Use "here" to hold the ground you are on.'),
+  tool("move", "Send your squad to a place without stopping to fight on the way. Only a move order takes a squad across a bridge that is about to fall.", {
+    place: place("Where to go."),
   }),
-  tool("attack", "Advance and engage. Give a point to attack toward it, or a contact id to hunt that enemy squad. Fill one and leave the other empty.", {
-    point: { type: "string", description: 'Point to attack toward, or "" when attacking a contact.' },
-    contact: { type: "integer", description: "Enemy squad id from your status, or 0 when attacking a point." },
+  tool("hold", "Send your squad to a place to defend it. The squad fights anything that comes in range and takes the cover the place offers: infantry go inside a building named or standing at the post.", {
+    place: place('Where to hold. Use "here" to hold the ground you are on.'),
+  }),
+  tool("attack", "Advance and engage. Give a place to attack toward it, or a contact id to hunt that enemy squad. Fill one and leave the other empty. Naming a bridge or a building makes the squad shoot at it once in range.", {
+    place: { type: "string", description: 'Place to attack toward, in any form a place takes, or "" when attacking a contact.' },
+    contact: { type: "integer", description: "Enemy squad id from your status, or 0 when attacking a place." },
   }),
 ];
+
+// repairTool is for squads whose unit mends bridges.
+export const repairTool = tool("repair", "Go to a bridge and mend it. The squad works from the bank while nobody shoots at it; a fallen bridge stands again part-way through.", {
+  place: { type: "string", description: 'The bridge, by id or name ("bridge-south", "the south bridge").' },
+});
+
+// leaderToolsFor is the tool list of the leader of a squad of that unit.
+export const leaderToolsFor = (unit) => (unit?.repairPerSecond > 0 ? [...leaderTools, repairTool] : leaderTools);
 
 export const operatorTools = [
   radio,
@@ -61,7 +72,7 @@ export function normalize(name, input) {
   const args = {};
   for (const [key, value] of Object.entries(input ?? {})) {
     if (value === "" || value === 0 || value == null) continue;
-    if (name === "hold" && key === "point" && String(value).trim().toLowerCase() === "here") continue;
+    if (name === "hold" && (key === "point" || key === "place") && String(value).trim().toLowerCase() === "here") continue;
     args[key] = value;
   }
   return args;

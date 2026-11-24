@@ -241,7 +241,7 @@ def small():
     m.around("F", [("rocks", "NW", 62)])
     m.mark("grove", 300, 300)
     m.mark("house", 590, 520)                # the bridgehead houses
-    m.mark("rocks", 620, 240)
+    m.mark("rocks", 600, 330)
     m.mark("wall", 640, 740)
     return m
 

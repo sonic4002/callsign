@@ -17,13 +17,19 @@ type LandmarkState struct {
 	HP   float64 // of a building; 0 for everything else
 
 	dmg float64 // damage taken in the tick being resolved
+
+	// Who is inside, counted at the start of every tick and kept up as teams go in and out.
+	gSide  int
+	gTeams int
 }
 
 func (s *Sim) initLandmarks() {
+	s.landIdx = map[string]int{}
 	for i := range s.R.Map.Landmarks {
 		l := &s.R.Map.Landmarks[i]
 		k := s.R.LandmarkKinds[l.Kind]
-		s.Landmarks = append(s.Landmarks, LandmarkState{Landmark: l, Kind: l.Kind, HP: k.HP})
+		s.landIdx[l.ID] = len(s.Landmarks)
+		s.Landmarks = append(s.Landmarks, LandmarkState{Landmark: l, Kind: l.Kind, HP: k.HP, gSide: NoSide})
 		if k.Size > 0 {
 			s.SetBlocked("landmark:"+l.ID, l.X, l.Y, k.Size, k.Size, true)
 		}
@@ -33,12 +39,30 @@ func (s *Sim) initLandmarks() {
 func (s *Sim) kindOf(l *LandmarkState) shared.LandmarkKind { return s.R.LandmarkKinds[l.Kind] }
 
 func (s *Sim) landmarkByID(id string) (int, *LandmarkState) {
-	for i := range s.Landmarks {
-		if s.Landmarks[i].ID == id {
-			return i, &s.Landmarks[i]
-		}
+	if i, ok := s.landIdx[id]; ok {
+		return i, &s.Landmarks[i]
 	}
 	return -1, nil
+}
+
+// countGarrisons works out who is inside every building.
+func (s *Sim) countGarrisons() {
+	for i := range s.Landmarks {
+		s.Landmarks[i].gSide, s.Landmarks[i].gTeams = NoSide, 0
+	}
+	for _, sq := range s.Squads {
+		if !sq.Alive {
+			continue
+		}
+		for i := range sq.Teams {
+			if t := &sq.Teams[i]; t.Members > 0 && t.In != "" {
+				if _, l := s.landmarkByID(t.In); l != nil {
+					l.gSide = sq.Side
+					l.gTeams++
+				}
+			}
+		}
+	}
 }
 
 // Share is a building's hit points as a share of a new one; 1 for what cannot be damaged.
@@ -54,19 +78,10 @@ func (s *Sim) landmarkShare(l *LandmarkState) float64 {
 // garrison counts who is inside a building: the side, or NoSide when it is empty, and
 // how many fireteams.
 func (s *Sim) garrison(id string) (side, teams int) {
-	side = NoSide
-	for _, sq := range s.Squads {
-		if !sq.Alive {
-			continue
-		}
-		for i := range sq.Teams {
-			if t := &sq.Teams[i]; t.Members > 0 && t.In == id {
-				side = sq.Side
-				teams++
-			}
-		}
+	if _, l := s.landmarkByID(id); l != nil {
+		return l.gSide, l.gTeams
 	}
-	return side, teams
+	return NoSide, 0
 }
 
 // entryRadius is how close a fireteam must come to a building to go inside.
@@ -189,6 +204,7 @@ func (s *Sim) enterBuildings(live []*teamRef) {
 		}
 		_, before := s.garrison(l.ID)
 		t.In, t.path = l.ID, nil
+		l.gSide, l.gTeams = tr.sq.Side, l.gTeams+1
 		ox, oy := formation(tr.slot, tr.u.Teams, tr.sq.Side)
 		t.X, t.Y = l.X+ox*0.25, l.Y+oy*0.25
 		if before == 0 {
@@ -204,6 +220,9 @@ func (s *Sim) leave(tr *teamRef) {
 	t.In = ""
 	if l == nil {
 		return
+	}
+	if l.gTeams--; l.gTeams <= 0 {
+		l.gSide, l.gTeams = NoSide, 0
 	}
 	// Out of the door on the side it is going to, onto ground it can stand on.
 	dx, dy := tr.sq.Order.X-l.X, tr.sq.Order.Y-l.Y

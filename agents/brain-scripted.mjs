@@ -5,8 +5,11 @@
 const verbs = [
   ["attack", /\b(attack|assault|destroy|hit)\b|תקוף|תקפו|לתקוף|השמד/],
   ["move", /\b(move|go|advance|head)\b|נוע|נועו|זוז|זוזו|התקדם/],
-  ["hold", /\b(hold|defend|take|capture|secure|guard)\b|תחזיק|החזק|להחזיק|הגן|קח|כבוש|תפוס|תפסו/],
+  ["repair", /\b(repair|fix|mend|rebuild)\b|תקן|תקנו|שקם|שקמו/],
+  ["hold", /\b(hold|defend|take|capture|secure|guard|cover|hide|garrison|enter)\b|\bget in(to)?\b|תחזיק|החזק|החזיק|להחזיק|הגן|קח|כבוש|תפוס|תפסו|מחסה|התחבא|הסתתר|היכנס/],
 ];
+// A direction in a call means a spot off a point ("hold north of Foxtrot").
+const compass = /\b(north|south|east|west)|צפון|דרום|מזרח|מערב/i;
 const say = {
   wilco: { en: "Wilco", he: "רות, יבוצע" },
   sayAgain: { en: "Say again", he: "אמור שנית" },
@@ -18,9 +21,12 @@ const eventLines = {
   contact: { en: (p) => `Contact near ${p}`, he: (p) => `מגע ליד ${p}` },
   arrived: { en: (p) => `In position at ${p}`, he: (p) => `בעמדה ב${p}` },
   losses: { en: (p) => `Taking losses at ${p}`, he: (p) => `נפגעים ב${p}` },
+  garrisoned: { en: (p) => `Inside ${p}`, he: (p) => `בתוך ${p}` },
 };
 
 const radio = (to, body, end) => ({ name: "radio", input: { to, body, end } });
+// placeName is what a landmark or bridge is called on the radio.
+const placeName = (rules, id, lang) => [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id)?.name[lang] ?? id;
 const verbOf = (text) => verbs.find(([, re]) => re.test(text.toLowerCase()))?.[0];
 
 function leaderPlan({ agent, wake, rules }) {
@@ -29,6 +35,7 @@ function leaderPlan({ agent, wake, rules }) {
     const e = wake.items.find((i) => i.kind === "event")?.event;
     const line = e && eventLines[e.kind]?.[agent.lang];
     if (!line) return [];
+    if (e.place) return [radio([agent.commander ?? "Hammer"], line(placeName(rules, e.place, agent.lang)), "over")];
     const point = rules.map.points.find((p) => p.id === e.point);
     return [radio([agent.commander ?? "Hammer"], line(point.callsign[agent.lang]), "over")];
   }
@@ -36,8 +43,26 @@ function leaderPlan({ agent, wake, rules }) {
   const lang = call.lang;
   const back = [call.from.en];
   if (call.prowords?.includes("radioCheck")) return [radio(back, say.fiveByFive[lang], "out")];
-  const verb = verbOf(call.body);
+  let verb = verbOf(call.body);
   const point = call.points?.[0];
+  const orElse = (why) => radio(back, `${say.negative[lang]}, ${why}`, "over");
+  // A landmark or bridge the call names: go there. Named unclearly, ask which.
+  const marks = call.landmarks ?? [];
+  if (marks.length > 1) {
+    const names = marks.map((id) => placeName(rules, id, lang)).join(lang === "he" ? " או " : " or ");
+    return [radio(back, `${say.sayAgain[lang]}, ${names}`, "over")];
+  }
+  if (marks.length === 1) {
+    verb ??= "hold";
+    const input = verb === "attack" ? { place: marks[0], contact: 0 } : { place: marks[0] };
+    return [{ name: verb, input, orElse }, radio(back, say.wilco[lang], "out")];
+  }
+  if (verb === "repair") return [radio(back, say.sayAgain[lang], "over")]; // repair what?
+  // A spot off a point: the server reads the words, so the call's own body is the place.
+  if (verb && point && compass.test(call.body)) {
+    const input = verb === "attack" ? { place: call.body, contact: 0 } : { place: call.body };
+    return [{ name: verb, input, orElse }, radio(back, say.wilco[lang], "out")];
+  }
   if (!verb || (!point && verb === "move")) return [radio(back, say.sayAgain[lang], "over")];
   // "Attack" with no target: the nearest enemy in sight, or else the enemy headquarters.
   const named = Number(new RegExp(`(?:${rules.callsigns.contact.en}|${rules.callsigns.contact.he})\\s*#?(\\d+)`, "i").exec(call.body)?.[1] ?? 0);
@@ -98,7 +123,7 @@ function operatorPlan({ wake, rules, agent }) {
   const point = rules.map.points.find((p) => p.id === call.points?.[0]);
   if (!verb || !point) return [radio(back, say.sayAgain[lang], "over")];
   // Pass the task to every squad that can reach the point, then confirm to Hammer.
-  const sea = point.y >= rules.map.waterY;
+  const sea = point.kind === "seaRig";
   const fit = (wake.status?.squads ?? []).filter((s) => (s.class === "naval") === sea).map((s) => s.callsign.en);
   if (fit.length === 0) return [negative(lang === "he" ? "אין כיתה שיכולה להגיע לשם" : "no squad can reach that point")];
   return [radio(fit, call.body, "over"), radio(back, say.wilco[lang], "out")];

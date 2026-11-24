@@ -12,6 +12,7 @@ import { Tokenizer } from "./tokenizer.js";
 
 const read = (name) => readFileSync(new URL(name, import.meta.url));
 const rules = JSON.parse(read("../../shared/rules.json"));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const manifest = JSON.parse(read("models.json"));
 
 // What the recognisers really wrote for spoken calls (three voices), and the call it must become.
@@ -134,6 +135,7 @@ test("the Hebrew model transcribes the test recording word for word", { skip }, 
 
 test("relaxed: a callsign that only sounds right is respelled when its number follows", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   assert.equal(relaxed("צבע 1 תפוס את דוד", { lang: "he", rules }), "צפע 1 תפוס את דוד");
   assert.equal(relaxed("צבע אחת תקוף", { lang: "he", rules }), "צפע 1 תקוף");
   assert.equal(relaxed("vapour two attack gulf", { lang: "en", rules }), "Viper 2 attack Golf");
@@ -144,6 +146,7 @@ test("relaxed: a callsign that only sounds right is respelled when its number fo
 
 test("a named enemy squad keeps its name and gets a digit", () => {
   const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
   assert.equal(relaxed("viper one attack target three", { lang: "en", rules }), "Viper 1 attack Target 3");
   assert.equal(relaxed("צפע 1 תקוף את מטרה שלוש", { lang: "he", rules }), "צפע 1 תקוף את מטרה 3");
 });

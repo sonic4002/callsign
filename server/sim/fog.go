@@ -74,7 +74,8 @@ func (s *Sim) reveal(side int, x, y, r float64) {
 	r0, r1 := max(0, int((y-r)/FogCell)), min(rows-1, int((y+r)/FogCell))
 	for row := r0; row <= r1; row++ {
 		for col := c0; col <= c1; col++ {
-			if dist(x, y, (float64(col)+0.5)*FogCell, (float64(row)+0.5)*FogCell) <= r {
+			dx, dy := x-(float64(col)+0.5)*FogCell, y-(float64(row)+0.5)*FogCell
+			if dx*dx+dy*dy <= r*r {
 				i := row*cols + col
 				seen[i/8] |= 1 << (i % 8)
 			}

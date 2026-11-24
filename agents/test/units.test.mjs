@@ -10,6 +10,7 @@ import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 import { leaderTools, normalize, operatorTools } from "../tools.mjs";
 
 const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url)));
+rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
 const viper2 = { key: "infantry-2", en: "Viper 2", he: "צפע 2", squad: 2 };
 const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 
