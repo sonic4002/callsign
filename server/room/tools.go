@@ -28,7 +28,7 @@ var ErrWhichPlace = errors.New("which one")
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
 	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair},
-	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul},
+	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul, ToolCancel, ToolRally},
 }
 
 // names accepts "Hammer" as well as ["Viper 1", "Viper 2"].
@@ -101,6 +101,10 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		return rm.toolEngineer(c, name, a)
 	case ToolHaul:
 		return rm.toolHaul(side, a)
+	case ToolCancel:
+		return rm.toolCancel(side, a)
+	case ToolRally:
+		return rm.toolRally(side, a)
 	}
 
 	// move, hold, attack, repair: always the caller's own squad.
@@ -259,7 +263,12 @@ func (rm *Room) toolBuy(side int, a toolArgs) (any, error) {
 	out := map[string]any{"squad": rm.squadName(sq), "unit": sq.Unit, "tier": sq.Tier, "gold": rm.sim.Gold(side), "announced": own}
 	if sq.Deploying() {
 		// The squad is on its way: it joins the net and takes orders when it reaches the field.
-		out["deploySeconds"] = float64(sq.DeployTicks) / float64(rm.r.TickRate)
+		// Its structure makes one unit at a time, so those ahead of it in line come first.
+		from, pos, ahead := rm.sim.LineOf(sq)
+		out["deploySeconds"] = float64(ahead+sq.DeployTicks) / float64(rm.r.TickRate)
+		if from != "" {
+			out["from"], out["inLine"] = from, pos
+		}
 	}
 	return out, nil
 }

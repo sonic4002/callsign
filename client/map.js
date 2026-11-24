@@ -5,6 +5,7 @@ import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawSegment,
 import { drawFence, drawStructure } from "./bases-art.js";
 import { structureAt, structureDef } from "./bases.js";
 import { advance, spreadOut } from "./motion.js";
+import { tint, tintKey } from "./placement.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
@@ -25,6 +26,31 @@ const MARGIN = 90;
 function rng(seed) {
   let s = seed >>> 0;
   return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+}
+
+// rallyFlag is the marker where new units gather: a pole and a pennant that moves in the wind.
+function rallyFlag(ctx, color, time) {
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 9, 4, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#e6e9e2";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -40);
+  ctx.stroke();
+  const wave = Math.sin(time * 4) * 3;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, -40);
+  ctx.quadraticCurveTo(11, -41 + wave, 22, -33 + wave * 0.6);
+  ctx.quadraticCurveTo(11, -29 + wave, 0, -26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 export class Scene {
@@ -51,6 +77,10 @@ export class Scene {
     this.sawLive = false; // this page has seen the match running, so its end is news
     this.onFinale = null; // the page's hook: called when the result screen may come up
     this.selected = 0;
+    this.placing = null; // the page's ghost: { id, def, faction, spot, why } while a structure is being placed
+    this.tinted = null; // the ground that ghost may stand on, kept until the base changes
+    this.sites = new Map(); // structure id → when its building site next throws dust and rings
+    this.doors = new Map(); // structure id → until when its door stands open behind a unit
     this.last = performance.now();
     this.waves = [];
   }
@@ -111,6 +141,7 @@ export class Scene {
       this.fx.coins(h.x, h.y, performance.now());
       this.sound("coins", h.x, h.y);
     }
+    const first = !this.state; // the first picture of a match: nothing has just come out of anything
     this.state = state;
     this.lands = new Map((state.landmarks ?? []).map((l) => [l.id, l]));
     const bridges = new Map((state.bridges ?? []).map((b) => [b.id, b]));
@@ -127,9 +158,18 @@ export class Scene {
       const faction = this.factionOf[g.unit];
       this.hqFaction[g.side] ??= faction; // a squad of a captured design does not change whose base it is
       let group = this.groups.get(g.id);
+      let born = 0;
       if (!group) {
         group = { visuals: [] };
         this.groups.set(g.id, group);
+        // A unit seen for the first time beside a structure that makes units has just come
+        // out of it: the door stands open behind it, and it grows out of the doorway.
+        const maker = first ? null : this.makerOf(state, g);
+        if (maker) {
+          born = performance.now();
+          this.doors.set(maker.id, born + 1700);
+          this.sound("door", maker.x, maker.y);
+        }
       }
       // `small` is a squad of many small figures (soldiers, drones) and not one big machine;
       // `air` is anything that flies.
@@ -147,7 +187,7 @@ export class Scene {
           if (d < bd) [best, bd] = [v, d];
         }
         if (best) free.delete(best);
-        else best = { x: tm.x, y: tm.y, px: tm.x, py: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
+        else best = { x: tm.x, y: tm.y, px: tm.x, py: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members, bornAt: born };
         // Losses inside a building are not seen from outside.
         if (tm.members < best.members && !tm.in) {
           this.lose(group, best, false);
@@ -176,6 +216,133 @@ export class Scene {
     }
     if (this.selected && !state.squads.some((s) => s.id === this.selected)) this.selected = 0;
     this.hqWatch(state);
+  }
+
+  // makerOf is the standing structure of a unit's own side that it appeared beside, if any.
+  makerOf(state, g) {
+    const at = g.teams?.[0];
+    if (!at) return null;
+    for (const st of state.structures ?? []) {
+      if (st.side !== g.side || st.ruin || st.building < 1 || st.role === "defence" || st.role === "fence") continue;
+      const fp = structureDef(this.rules, st)?.footprint ?? 40;
+      if (Math.hypot(st.x - at.x, st.y - at.y) <= fp + 70) return st;
+    }
+    return null;
+  }
+
+  // doorOf is what a structure's door shows: open behind a unit that just came out, lit
+  // when the one it is making is about to.
+  doorOf(st, now) {
+    if (this.doors.get(st.id) > now) return "open";
+    const head = (this.state.deploying ?? []).find((d) => d.from === st.id && (d.line ?? 0) === 0);
+    return head && head.ticksLeft <= this.rules.tickRate ? "lit" : "closed";
+  }
+
+  // building plays a site at work: dust at the footing, sparks, a hammer now and then,
+  // and a puff and two notes when the structure stands. Ours, and the enemy's in sight.
+  building(now) {
+    const live = new Set();
+    for (const st of this.state.structures ?? []) {
+      if (st.ruin || st.role === "fence" || !(st.side === this.side || st.visible)) continue;
+      const site = this.sites.get(st.id);
+      if (st.building >= 1) {
+        if (!site) continue;
+        this.sites.delete(st.id);
+        for (let i = 0; i < 6; i++) this.fx.dust(st.x + (Math.random() - 0.5) * 60, st.y + (Math.random() - 0.5) * 60, now + i * 40, 1.8);
+        this.sound("built", st.x, st.y);
+        continue;
+      }
+      live.add(st.id);
+      const s = site ?? { dust: 0, clank: now + 300 };
+      this.sites.set(st.id, s);
+      const fp = structureDef(this.rules, st)?.footprint ?? 40;
+      if (now >= s.dust) {
+        s.dust = now + 240 + Math.random() * 260;
+        const a = Math.random() * TAU;
+        this.fx.dust(st.x + Math.cos(a) * fp * 0.8, st.y + Math.sin(a) * fp * 0.8, now, 1.5);
+        // Welding and cutting: a few bright sparks thrown from the frame.
+        for (let i = 0; i < 3; i++) {
+          this.fx.speck("#ffd27a", st.x + (Math.random() - 0.5) * fp, st.y + (Math.random() - 0.5) * fp, { t0: now + i * 25, ttl: 420, h: 14 + Math.random() * 20, vx: (Math.random() - 0.5) * 50, vy: (Math.random() - 0.5) * 50, vh: 40 + Math.random() * 70, size: 1.3, add: true, pri: 0 });
+        }
+      }
+      if (now >= s.clank) {
+        s.clank = now + 500 + Math.random() * 900;
+        this.sound("hammer", st.x, st.y);
+      }
+    }
+    for (const id of this.sites.keys()) if (!live.has(id) && !(this.state.structures ?? []).some((st) => st.id === id)) this.sites.delete(id);
+  }
+
+  // drawTint colours the ground a structure being placed may stand on: green where it
+  // fits, red where something is in the way. Ground too far from the base is left bare.
+  drawTint(ctx, S) {
+    const p = this.placing;
+    if (!p?.def) return;
+    const key = tintKey(this.state, this.side, p.id);
+    if (this.tinted?.key !== key) this.tinted = { key, cells: tint(this.rules, this.state, this.side, p.def, 20) };
+    const { w, h } = this.cam;
+    for (const ok of [true, false]) {
+      ctx.fillStyle = ok ? "rgba(86,224,122,0.3)" : "rgba(236,84,70,0.17)";
+      ctx.beginPath();
+      for (const c of this.tinted.cells) {
+        if (c.ok !== ok) continue;
+        const a = S(c.x - 10, c.y - 10);
+        if (a[0] < -60 || a[1] < -60 || a[0] > w + 60 || a[1] > h + 60) continue;
+        const b = S(c.x + 10, c.y - 10);
+        const d = S(c.x + 10, c.y + 10);
+        const e = S(c.x - 10, c.y + 10);
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.lineTo(d[0], d[1]);
+        ctx.lineTo(e[0], e[1]);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
+  }
+
+  // drawGhost draws the structure being placed where the pointer put it: its footprint on
+  // the ground, green or red, and the building itself seen through.
+  drawGhost(ctx, S, buildScale, time) {
+    const p = this.placing;
+    if (!p?.spot) return;
+    const { x, y } = p.spot;
+    const ok = !p.why;
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = ok ? "#7dffa0" : "#ff6b5a";
+    ctx.fillStyle = ok ? "rgba(86,224,122,0.35)" : "rgba(236,84,70,0.4)";
+    if (p.def.role === "fence") {
+      // A fence run lies across the way to the enemy, centred on the spot.
+      const enemy = this.rules.map.points.find((q) => q.kind === "hq" && q.owner !== this.side);
+      const d = Math.hypot(enemy.x - x, enemy.y - y) || 1;
+      const half = (p.def.segments * p.def.segmentLength) / 2;
+      const [ax, ay] = S(x + ((enemy.y - y) / d) * half, y - ((enemy.x - x) / d) * half);
+      const [bx, by] = S(x - ((enemy.y - y) / d) * half, y + ((enemy.x - x) / d) * half);
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    ctx.beginPath();
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * TAU;
+      const [sx, sy] = S(x + Math.cos(a) * p.def.footprint, y + Math.sin(a) * p.def.footprint);
+      if (i) ctx.lineTo(sx, sy);
+      else ctx.moveTo(sx, sy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const [sx, sy] = S(x, y);
+    ctx.translate(sx, sy);
+    ctx.scale(buildScale, buildScale);
+    ctx.globalAlpha = ok ? 0.72 : 0.45;
+    drawStructure(ctx, { kind: p.id, role: p.def.role, faction: p.faction, building: 1 }, p.def, sideColor[this.side], time);
+    ctx.restore();
   }
 
   // fall leaves what is left of `count` soldiers, or of a vehicle or boat, where it was.
@@ -486,6 +653,7 @@ export class Scene {
     this.gunfire(now);
     this.smoulder(now);
     this.gush(now);
+    if (this.state) this.building(now);
     this.fx.update(now, dt);
     this.sfx?.refresh();
 
@@ -563,6 +731,7 @@ export class Scene {
     // The gold lying around each gusher, as this side last saw it.
     for (const g of rules.map.gushers ?? []) drawField(ctx, S, z, g, fieldShare(state, g.id), time);
 
+    this.drawTint(ctx, S);
     this.fx.drawGround(ctx, cam, unitScale, now);
 
     // Everything that stands up, far to near.
@@ -578,8 +747,12 @@ export class Scene {
       const def = structureDef(rules, st);
       if (!def) continue;
       if (st.role === "fence") things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: z, draw: () => drawFence(ctx, st, sideColor[st.side]) });
-      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, st, def, sideColor[st.side], time) });
+      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, { ...st, door: this.doorOf(st, now) }, def, sideColor[st.side], time) });
     }
+    // Where new units gather, when a place was chosen: a flag in the side's colour.
+    const flags = new Map();
+    for (const st of state.structures ?? []) if (st.rally && st.side === this.side && !st.ruin) flags.set(`${st.rally.x},${st.rally.y}`, st.rally);
+    for (const r of flags.values()) things.push({ depth: r.x + r.y, x: r.x, y: r.y, scale: buildScale, draw: () => rallyFlag(ctx, sideColor[this.side], time) });
     for (const g of rules.map.gushers ?? []) {
       things.push({
         depth: g.x + g.y,
@@ -627,7 +800,15 @@ export class Scene {
           x: v.px,
           y: v.y,
           scale: unitScale,
-          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate }),
+          draw: () => {
+            // Just out of its structure: it shows and grows as it clears the doorway.
+            const age = v.bornAt ? (now - v.bornAt) / 900 : 1;
+            if (age < 1) {
+              ctx.globalAlpha = Math.min(1, age * 2.5);
+              ctx.scale(0.55 + 0.45 * age, 0.55 + 0.45 * age);
+            }
+            drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate });
+          },
         });
       }
     }
@@ -679,6 +860,7 @@ export class Scene {
     // Fog of war over everything on the ground; the labels stay readable above it.
     this.fog.render(state.fog, this.eyes());
     this.fog.draw(ctx, cam);
+    this.drawGhost(ctx, S, buildScale, time);
 
     this.labels(buildScale, unitScale);
     this.drawRadar();

@@ -235,3 +235,13 @@ func (r *Rules) checkStructures(name string, f *Faction) error {
 	}
 	return nil
 }
+
+// UnitIDs lists a faction's unit ids in a fixed order.
+func (f *Faction) UnitIDs() []string {
+	ids := make([]string, 0, len(f.Units))
+	for id := range f.Units {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}

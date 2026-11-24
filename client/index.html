@@ -42,6 +42,18 @@
           <button type="button" class="primary" id="coach-real" data-i18n="tut.real" hidden></button>
         </div>
       </aside>
+      <!-- Placing a structure, or picking where new squads gather: what the ghost says, and
+           the buttons a thumb reaches. -->
+      <div id="placer" hidden>
+        <strong id="placer-title"></strong>
+        <span id="placer-why" dir="auto"></span>
+        <small id="placer-hint"></small>
+        <div>
+          <button type="button" class="primary" id="placer-ok" data-i18n="placer.ok"></button>
+          <button type="button" id="placer-home" data-i18n="placer.rallyHome" hidden></button>
+          <button type="button" id="placer-cancel" data-i18n="placer.cancel"></button>
+        </div>
+      </div>
       <div id="orders" hidden>
         <strong id="orders-title"></strong>
         <div>
@@ -126,6 +138,7 @@
         <ul id="structure-list"></ul>
       </div>
       <div data-build-pane="units" hidden>
+        <p id="rally"><span data-i18n="rally.label"></span> <strong id="rally-place" dir="auto"></strong> <button type="button" id="rally-set" data-i18n="rally.set"></button></p>
         <div id="build"></div>
       </div>
     </section>
@@ -275,6 +288,8 @@
         <dt data-i18n="help.q.upgrade"></dt><dd data-i18n="help.a.upgrade"></dd>
         <dt data-i18n="help.q.speed"></dt><dd data-i18n="help.a.speed"></dd>
         <dt data-i18n="help.q.units"></dt><dd data-i18n="help.a.units"></dd>
+        <dt data-i18n="help.q.place"></dt><dd data-i18n="help.a.place"></dd>
+        <dt data-i18n="help.q.line"></dt><dd data-i18n="help.a.line"></dd>
       </dl>
       <h2 data-i18n="strict"></h2>
       <ul>
@@ -310,6 +325,9 @@
         <li><span data-i18n="help.buy"></span><code dir="auto" data-i18n="help.buy.say"></code></li>
         <li><span data-i18n="help.openBase"></span><code dir="auto" data-i18n="help.openBase.say"></code></li>
         <li><span data-i18n="help.buildWorks"></span><code dir="auto" data-i18n="help.buildWorks.say"></code></li>
+        <li><span data-i18n="help.placeSpot"></span><code dir="auto" data-i18n="help.placeSpot.say"></code></li>
+        <li><span data-i18n="help.cancelUnit"></span><code dir="auto" data-i18n="help.cancelUnit.say"></code></li>
+        <li><span data-i18n="help.rally"></span><code dir="auto" data-i18n="help.rally.say"></code></li>
         <li><span data-i18n="help.defend"></span><code dir="auto" data-i18n="help.defend.say"></code></li>
         <li><span data-i18n="help.haul"></span><code dir="auto" data-i18n="help.haul.say"></code></li>
         <li><span data-i18n="help.buyNaval"></span><code dir="auto" data-i18n="help.buyNaval.say"></code></li>

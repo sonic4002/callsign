@@ -24,11 +24,13 @@ const dynamic = {
   "event.": ["captured", "point_lost", "deploying", "squad_spawned", "squad_lost", "enemy_destroyed", "hq_under_attack", "upgraded", "hauler_attacked", "hauler_lost",
     "structure_started", "structure_built", "structure_attacked", "structure_lost", "structure_lost_theirs", "structure_captured", "structure_taken",
     "structure_captured_tech", "structure_seen_taken",
-    "garrisoned", "building_fell", "bridge_under_attack", "bridge_fell", "bridge_repaired"],
+    "garrisoned", "building_fell", "bridge_under_attack", "bridge_fell", "bridge_repaired",
+    "deploy_lost", "deploy_cancelled", "rally_set", "rally_home"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer", "timer_hq", "timer_force"],
   "order.": ["none", "move", "hold", "attack", "repair"],
-  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "build", "buildAt", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech"],
+  "call.": ["hold", "move", "attack", "cover", "buy", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "buildSpot", "cancel", "rally", "rallyHome"],
   "eventMany.": ["squad_spawned", "squad_lost", "enemy_destroyed", "structure_built"],
+  "placer.why.": ["far", "ground", "shore", "room", "edge"],
   "haul.": ["out", "loading", "returning", "unloading", "fleeing", "waiting"],
   "bearing.": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "insecure", "denied", "missing", "nothing", "failed"],
@@ -134,6 +136,31 @@ test("the scripted operator and squad leaders understand the calls the page writ
       const use = await think("anvil", body(text), { points: [g.point], status: { faction: "aegis", squads: [], points: [], gold: 0 } });
       assert.deepEqual([use?.name, use?.input.field], ["haul", g.point], `${lang}: "${text}" should send the haulers to ${g.point}`);
     }
+    // Placing a structure writes the spot into the call; the operator passes the words on,
+    // and they are the words the radio net reads back into a place (server/radio).
+    const { spotAt, spotWords } = await import("./placement.js");
+    const tr = (key, vars = {}) => fill(strings[key], vars);
+    const alpha = rules.map.points.find((p) => p.id === "A");
+    const spot = spotAt(rules, alpha.x + 60, alpha.y - 140);
+    const words = spotWords(tr, spot, alpha.callsign[lang]);
+    for (const [faction, f] of Object.entries(rules.factions)) {
+      for (const [id, def] of Object.entries(f.structures)) {
+        if (def.role === "hq") continue;
+        const text = fill(strings["call.buildSpot"], { to: rules.callsigns.operator[lang], from, structure: def.name[lang], place: words });
+        const use = await think("anvil", body(text), { points: ["A"], status: { faction, squads: [], points: [], gold: 999 } });
+        assert.deepEqual([use?.name, use?.input.structure, use?.input.place], ["build", id, words], `${lang}: "${text}" should build ${id} on the spot`);
+      }
+      for (const [id, unit] of Object.entries(f.units)) {
+        const text = fill(strings["call.cancel"], { to: rules.callsigns.operator[lang], from, unit: unit.name[lang] });
+        const use = await think("anvil", body(text), { status: { faction, squads: [], points: [], gold: 0 } });
+        assert.deepEqual([use?.name, use?.input.unit], ["cancel", id], `${lang}: "${text}" should cancel ${id}`);
+      }
+    }
+    const delta = rules.map.points.find((p) => p.id === "D");
+    const rally = await think("anvil", body(fill(strings["call.rally"], { to: rules.callsigns.operator[lang], from, point: delta.callsign[lang] })), { points: ["D"], status: { faction: "aegis", squads: [], points: [], gold: 0 } });
+    assert.deepEqual([rally?.name, rally?.input.place], ["rally", "D"], `${lang}: the rally call`);
+    const home = await think("anvil", body(fill(strings["call.rallyHome"], { to: rules.callsigns.operator[lang], from })), { status: { faction: "aegis", squads: [], points: [], gold: 0 } });
+    assert.deepEqual([home?.name, home?.input.place], ["rally", "home"], `${lang}: the rally-home call`);
     const point = rules.map.points.find((p) => p.id === "F");
     for (const verb of ["hold", "move", "attack"]) {
       const text = fill(strings[`call.${verb}`], { to: rules.callsigns.classes.infantry[lang] + " 2", from, point: point.callsign[lang] });

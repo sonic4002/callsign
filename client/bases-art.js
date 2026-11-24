@@ -3,7 +3,7 @@
 // otherwise each role has a code-drawn picture here, in the faction's colours, so a
 // missing sprite never leaves a gap.
 
-import { drawBuilding, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
+import { drawBuilding, drawDoor, isoBox, shadow, sprites, drawSegment, stageOf } from "./art.js";
 import { toIso } from "./iso.js";
 
 const palettes = {
@@ -136,7 +136,8 @@ function rubble(ctx, p) {
 const heights = { barracks: 46, refinery: 62, works: 60, airbase: 56, dockyard: 54, defence: 40 };
 
 // drawStructure draws one structure standing on the origin of the context.
-//   st: { kind, role, faction, building, ruin }  def: its rules entry  color: its side's colour
+//   st: { kind, role, faction, building, ruin, door }  def: its rules entry  color: its side's colour
+//   door: "open" or "lit" while a unit comes out of it
 export function drawStructure(ctx, st, def, color, time) {
   const p = palettes[st.faction] ?? palettes.aegis;
   if (st.ruin) {
@@ -151,6 +152,7 @@ export function drawStructure(ctx, st, def, color, time) {
   const rising = st.building < 1;
   if (!rising) {
     paint();
+    if (st.door && st.door !== "closed") drawDoor(ctx, st.kind, st.door);
     if (!sprites.buildings[st.kind] && st.role !== "defence") flag(ctx, color, -30, 2, time);
     return;
   }

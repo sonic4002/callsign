@@ -17,6 +17,7 @@ import { Sfx } from "./sfx.js";
 import { haulerRows } from "./gold.js";
 import { Speech } from "./speech/speech.js";
 import { matchLengths, ordersFor, parseOffset, seatState, startGold } from "./places.js";
+import { canPlace, parseSpot, spotAt, spotWords, tint, unitLine } from "./placement.js";
 import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
@@ -141,6 +142,8 @@ const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[la
 function placeName(id) {
   const named = [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])].find((p) => p.id === id);
   if (named) return named.name[lang];
+  const spot = parseSpot(rules, id);
+  if (spot) return spotWords(t, spot, pointName(spot.point));
   const off = parseOffset(id);
   if (off) return t("place.offset", { metres: off.metres, bearing: t(`bearing.${off.bearing}`), point: pointName(off.point) });
   return pointName(id);
@@ -345,6 +348,8 @@ function onFrame(frame) {
       if (frame.event.kind === "squad_lost" && frame.event.reason === "spent") break;
       // Whose structure it was decides how its loss or takeover reads.
       if (frame.event.side === side && frame.event.kind.startsWith("structure_")) frame.event.kind = structureEvent(frame.event, side);
+      // A rally point put back beside the structures reads differently from one that was set.
+      if (frame.event.kind === "rally_set" && !frame.event.place) frame.event.kind = "rally_home";
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
       if (frame.event.side === side && `event.${frame.event.kind}` in strings.en) {
         entries.push({ kind: "event", event: frame.event, callsign: frame.callsign });
@@ -391,7 +396,7 @@ function renderLog() {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", count };
+        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", unit: unitDef(rules, ev.unit ?? "")?.name[lang] ?? "", gold: ev.count, count };
         text.textContent = count > 1 && `eventMany.${ev.kind}` in strings.en ? t(`eventMany.${ev.kind}`, vars) : times(t(`event.${ev.kind}`, vars));
       } else {
         time.textContent = clock(e.tick);
@@ -714,7 +719,7 @@ function renderSidebar() {
   // The lists are rebuilt only when what they show changes, so buttons stay clickable.
   // Progress bars are then moved in place on every frame.
   const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
-  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order]), deploying.map((d) => d.id), live(upgrading), live(promoted)]);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order]), deploying.map((d) => [d.id, d.line ?? 0]), live(upgrading), live(promoted)]);
   if (rosterKey !== drawn.roster) {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
@@ -762,7 +767,9 @@ function renderHaulers(haulers, count) {
   }
 }
 
-const secondsLeft = (d) => Math.ceil(d.ticksLeft / rules.tickRate);
+// A unit waits for the ones ahead of it in its structure's line, then for its own making.
+const secondsLeft = (d) => Math.ceil(((d.ticksAhead ?? 0) + d.ticksLeft) / rules.tickRate);
+const deployText = (d) => ((d.line ?? 0) > 0 ? t("deploy.waiting", { seconds: secondsLeft(d) }) : t("deployingIn", { seconds: secondsLeft(d) }));
 const progress = (d) => 1 - d.ticksLeft / d.ticksTotal;
 
 // renderDeploying moves the bars: on the roster rows, and on each unit's build button,
@@ -772,26 +779,28 @@ function renderDeploying(deploying) {
     const row = $("roster").querySelector(`[data-deploy="${d.id}"]`);
     if (!row) continue;
     row.querySelector(".deploy-bar b").style.inlineSize = `${progress(d) * 100}%`;
-    row.querySelector(".order").textContent = t("deployingIn", { seconds: secondsLeft(d) });
+    row.querySelector(".order").textContent = deployText(d);
   }
   for (const button of $("build").children) {
-    const queue = deploying.filter((d) => d.unit === button.dataset.unit);
-    const first = queue[0];
+    // The one of this unit that comes out first, wherever it is being made, and how many
+    // are on their way in all (placement.js).
+    const line = unitLine(state, side, button.dataset.unit);
+    const first = line.first;
     button.classList.toggle("deploying", Boolean(first));
     const asked = inLine(button.dataset.unit);
     button.classList.toggle("requested", !first && asked > 0);
-    button.querySelector(".fill").style.blockSize = first ? `${progress(first) * 100}%` : "0";
+    button.querySelector(".fill").style.blockSize = first && line.making ? `${progress(first) * 100}%` : "0";
     button.querySelector(".left").textContent = first ? t("seconds", { seconds: secondsLeft(first) }) : "";
     const count = button.querySelector(".count");
     // How many of this unit are in line: asked for and not yet answered, plus on their way.
-    const total = asked + queue.length;
+    const total = asked + line.count;
     count.hidden = total < 2 && asked === 0;
     count.textContent = String(total);
   }
 }
 
 // deployRow is a bought squad on its way: it becomes an ordinary roster row on arrival.
-function deployRow(d) {
+function deployRow(d, i, all) {
   const unit = unitDef(rules, d.unit);
   const li = el("li", "deploying");
   li.dataset.deploy = d.id;
@@ -799,7 +808,17 @@ function deployRow(d) {
   name.append(el("span", "unit", unit.name[lang]));
   const bar = el("span", "deploy-bar");
   bar.append(el("b"));
-  li.append(name, bar, el("span", "order", t("deployingIn", { seconds: secondsLeft(d) })));
+  li.append(name, bar, el("span", "order", deployText(d)));
+  // The last one bought of a unit can be taken out of its line: a radio call like any other.
+  if (!all.slice(i + 1).some((o) => o.unit === d.unit)) {
+    const cancel = el("button", "cancel", "×");
+    cancel.type = "button";
+    cancel.title = t("deploy.cancel");
+    cancel.setAttribute("aria-label", t("deploy.cancel"));
+    cancel.disabled = !me || Boolean(state.over);
+    cancel.addEventListener("click", () => order(call("cancel", { to: anvil(), unit: unit.name[lang] })));
+    li.append(cancel);
+  }
   return li;
 }
 
@@ -883,8 +902,8 @@ function structureEvent(ev, mySide) {
 }
 
 // The Structures half of the build panel. Like the unit buttons, these only write a
-// radio call to the operator: a base structure's call is sent at once, and a defence's or
-// a fence's is put in the box so that the place can be changed first.
+// radio call to the operator: pressing one puts its ghost on the map, and the spot the
+// player confirms goes into the call (see "placing" below).
 // The build panel shows one of its two halves. It opens on Structures, since nothing can
 // be bought before something is built, and remembers the player's choice after that.
 let buildTab = localStorage.getItem("callsign.buildTab") === "units" ? "units" : "structures";
@@ -923,6 +942,7 @@ function renderStructures(canAct) {
     button.classList.toggle("requested", card.state !== "rising" && waiting(`s:${card.id}`).length > 0);
     if (card.state === "rising") button.querySelector(".why").textContent = t("structure.rising", { percent: Math.round(card.progress * 100) });
   }
+  renderRally(canAct);
   buildBadges(cards.filter((c) => c.state === "rising").length, (state.deploying ?? []).filter((d) => d.side === side).length);
   const rows = structureRows(state, rules, side);
   const listKey = JSON.stringify([lang, rows.map((r) => [r.id, Math.round(r.hp * 20), r.building >= 1, r.segments])]);
@@ -958,13 +978,12 @@ function structureButton(card, canAct) {
     ready: what,
     poor: what,
     rising: t("structure.rising", { percent: Math.round(card.progress * 100) }),
-    have: t("structure.have"),
     busy: t("structure.busy"),
     full: t("structure.full"),
     needs: card.needs ? t("structure.needs", { structure: card.needs.def.name[lang] }) : "",
   }[card.state];
   const count = el("span", "count", String(card.have));
-  count.hidden = card.have < 1 || !["defence", "fence"].includes(def.role);
+  count.hidden = card.have < 1;
   button.title = what;
   button.append(
     el("i", "fill"),
@@ -974,12 +993,114 @@ function structureButton(card, canAct) {
     el("span", "why", why),
     count,
   );
-  button.addEventListener("click", () => {
-    const fixed = def.role === "defence" || def.role === "fence";
-    if (fixed) draft(call("buildAt", { to: anvil(), structure: def.name[lang], place: t("place.front") }));
-    else transmit(call("build", { to: anvil(), structure: def.name[lang] }));
-  });
+  button.addEventListener("click", () => startPlacing(id, def));
   return button;
+}
+
+// ---- placing a structure, and picking where new squads gather ----
+//
+// Pressing a structure puts a ghost of it on the map. Under a mouse it follows the
+// pointer and a click on green ground confirms; under a finger a tap moves it and the
+// button confirms. Confirming writes the call with the spot in it and sends it: the
+// operator and the server decide, and the server's refusal comes back on the net.
+let placing = null; // { mode: "build", id, def, faction, spot, why, touch } or { mode: "rally" }
+let pointerKind = "mouse"; // what last touched the map
+
+function startPlacing(id, def) {
+  hideOrders();
+  placing = { mode: "build", id, def, faction, spot: null, why: "", touch: matchMedia("(pointer: coarse)").matches };
+  scene.placing = placing;
+  // Start on ground that will take it: under the middle of the view when that fits,
+  // otherwise the nearest that does, brought into view.
+  const cam = scene.cam;
+  const [cx, cy] = cam.world(cam.w / 2, cam.h / 2);
+  let spot = spotAt(rules, cx, cy);
+  if (canPlace(rules, state, side, def, spot.x, spot.y)) {
+    const fits = tint(rules, state, side, def, 20)
+      .filter((c) => c.ok)
+      .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))
+      .map((c) => spotAt(rules, c.x, c.y))
+      .find((s) => !canPlace(rules, state, side, def, s.x, s.y));
+    if (fits) {
+      spot = fits;
+      const [sx, sy] = cam.screen(spot.x, spot.y);
+      if (sx < 60 || sy < 60 || sx > cam.w - 60 || sy > cam.h - 150) cam.centerOn(spot.x, spot.y);
+    }
+  }
+  moveGhost(spot.x, spot.y);
+}
+
+function moveGhost(wx, wy) {
+  if (placing?.mode !== "build") return;
+  placing.spot = spotAt(rules, wx, wy);
+  placing.why = canPlace(rules, state, side, placing.def, placing.spot.x, placing.spot.y);
+  renderPlacer();
+}
+
+function renderPlacer() {
+  $("placer").hidden = !placing;
+  if (!placing) return;
+  const build = placing.mode === "build";
+  $("placer-title").textContent = build ? t("placer.title", { structure: placing.def.name[lang] }) : t("placer.rally");
+  const why = $("placer-why");
+  // Why it cannot stand there, or the spot as the call will say it.
+  if (!build) why.textContent = "";
+  else if (placing.why) why.textContent = t(`placer.why.${placing.why}`);
+  else why.textContent = spotWords(t, placing.spot, pointName(placing.spot.point));
+  why.classList.toggle("bad", build && Boolean(placing.why));
+  $("placer-hint").textContent = !build ? t("placer.rallyHint") : t(placing.touch ? "placer.hintTouch" : "placer.hint");
+  $("placer-ok").hidden = !build;
+  $("placer-ok").disabled = !build || !placing.spot || Boolean(placing.why);
+  $("placer-home").hidden = build;
+}
+
+function stopPlacing() {
+  placing = null;
+  scene.placing = null;
+  renderPlacer();
+}
+
+function confirmPlacing() {
+  if (placing?.mode !== "build" || !placing.spot || !me) return;
+  // The base may have changed since the ghost was put down.
+  placing.why = canPlace(rules, state, side, placing.def, placing.spot.x, placing.spot.y);
+  if (placing.why) return renderPlacer();
+  const { def, spot } = placing;
+  stopPlacing();
+  order(call("buildSpot", { to: anvil(), structure: def.name[lang], place: spotWords(t, spot, pointName(spot.point)) }));
+}
+
+$("placer-ok").addEventListener("click", confirmPlacing);
+$("placer-cancel").addEventListener("click", stopPlacing);
+$("placer-home").addEventListener("click", () => {
+  stopPlacing();
+  order(call("rallyHome", { to: anvil() }));
+});
+$("rally-set").addEventListener("click", () => {
+  hideOrders();
+  scene.placing = null;
+  placing = { mode: "rally" };
+  renderPlacer();
+});
+addEventListener("keydown", (ev) => ev.key === "Escape" && placing && stopPlacing());
+// A press outside the map and the build panel puts the ghost away.
+addEventListener("pointerdown", (ev) => {
+  if (placing && !ev.target.closest?.('#map-wrap, #placer, [data-sheet="build"]')) stopPlacing();
+});
+
+// placeRally sends the rally call for the named point under a tap, if there is one.
+function placeRally(wx, wy) {
+  const point = rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= rules.match.captureRadius * 1.15);
+  if (!point) return;
+  stopPlacing();
+  order(call("rally", { to: anvil(), point: point.callsign[lang] }));
+}
+
+// renderRally says where new squads gather now, as the side's structures have it.
+function renderRally(canAct) {
+  const rally = (state.structures ?? []).find((s) => s.side === side && !s.ruin && s.rally)?.rally;
+  $("rally-place").textContent = rally ? placeName(rally.place) : t("rally.home");
+  $("rally-set").disabled = !canAct;
 }
 
 function structureRow(r) {
@@ -1025,10 +1146,13 @@ attachGestures(canvas, {
   onTap: mapClick,
 });
 // Under a mouse, a landmark or a bridge shows its name.
+canvas.addEventListener("pointerdown", (ev) => (pointerKind = ev.pointerType));
 canvas.addEventListener("pointermove", (ev) => {
   if (ev.pointerType !== "mouse") return;
   const box = canvas.getBoundingClientRect();
   scene.hover = { x: ev.clientX - box.left, y: ev.clientY - box.top };
+  // The ghost of a structure being placed follows the mouse.
+  if (placing?.mode === "build" && state) moveGhost(...scene.cam.world(scene.hover.x, scene.hover.y));
 });
 canvas.addEventListener("pointerleave", () => (scene.hover = null));
 canvas.addEventListener(
@@ -1056,6 +1180,13 @@ function mapClick(ev) {
   const box = canvas.getBoundingClientRect();
   const sx = ev.clientX - box.left;
   const sy = ev.clientY - box.top;
+  if (placing?.mode === "build") {
+    moveGhost(...scene.cam.world(sx, sy));
+    // A mouse click on green ground is the confirmation; a finger only moves the ghost.
+    if (pointerKind === "mouse" && !placing.why) confirmPlacing();
+    return;
+  }
+  if (placing?.mode === "rally") return placeRally(...scene.cam.world(sx, sy));
   const hit = scene.pick(sx, sy, side);
   if (hit.squad) return select(hit.squad);
   hideOrders();

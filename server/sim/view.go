@@ -93,6 +93,12 @@ type DeployView struct {
 	Class      string      `json:"class"`
 	TicksLeft  int         `json:"ticksLeft"`
 	TicksTotal int         `json:"ticksTotal"`
+	// From is the structure it comes out of, "" for none. Line is its place in that
+	// structure's line (0 is being made now), and TicksAhead what the ones before it
+	// still need: only the first in a line counts down.
+	From       string `json:"from,omitempty"`
+	Line       int    `json:"line"`
+	TicksAhead int    `json:"ticksAhead"`
 }
 
 type PointView struct {
@@ -176,9 +182,11 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	s.viewMap(&snap, side)
 	for _, sq := range s.Squads {
 		if sq.Deploying() && (side == Spectator || sq.Side == side) {
+			from, pos, ahead := s.lineView(sq)
 			snap.Deploying = append(snap.Deploying, DeployView{
 				ID: sq.ID, Side: sq.Side, Callsign: s.Callsign(sq), Unit: sq.Unit, Class: sq.unit.Class,
 				TicksLeft: sq.DeployTicks, TicksTotal: sq.DeployTotal,
+				From: from, Line: pos, TicksAhead: ahead,
 			})
 		}
 		if !sq.Alive {
@@ -292,6 +300,7 @@ func (s *Sim) Hash() uint64 {
 		put(uint64(sq.ID))
 		put(uint64(sq.Tier))
 		put(uint64(sq.DeployTicks))
+		put(uint64(sq.From))
 		h.Write([]byte(sq.Order.Kind))
 		h.Write([]byte(sq.Order.Point))
 		h.Write([]byte(sq.Order.Place))

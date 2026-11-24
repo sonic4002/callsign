@@ -122,11 +122,8 @@ func (s *Sim) grantHauler(st *Structure) {
 		return
 	}
 	sq := s.raise(st.Side, id)
+	sq.From = st.ID // it drives out of the refinery that brought it
 	s.field(sq)
-	x, y := s.unloadSpot(dropoff{st.X, st.Y}, sq.ID)
-	for i := range sq.Teams {
-		sq.Teams[i].X, sq.Teams[i].Y = x, y
-	}
 }
 
 // IsHauler reports whether a squad is a gold hauler.

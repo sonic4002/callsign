@@ -122,6 +122,20 @@ export function wantedUnit(text, units) {
   return entries.filter(([, u]) => u.class === cls).sort((a, b) => a[1].cost - b[1].cost)[0]?.[0];
 }
 
+const cancelVerb = /\b(cancel|scrap|call off)\b|בטל|בטלו/;
+const rallyVerb = /\brall(y|ies)\b|\b(gather|assemble|muster)\b|מתכנס|התכנס|כינוס|נאספ/;
+const namesAUnit = (text, units) => Object.values(units).some((u) => text.includes(u.name.en.toLowerCase()) || text.includes(u.name.he));
+
+// spotOf cuts an exact spot out of a call: from its first distance to its end ("140 metres
+// north and 60 metres east of Alpha"). The game turns the words into the place.
+const bearing = /north|south|east|west|צפונ|דרומ|מזרח|מערב/;
+export function spotOf(body) {
+  const at = body.search(/\d/);
+  if (at < 0) return undefined;
+  const spot = body.slice(at).replace(/[.!\s]+$/, "");
+  return bearing.test(spot.toLowerCase()) ? spot : undefined;
+}
+
 // ownMoves is the scripted operator running the fight after Hammer handed it over: one
 // purchase when gold allows, and a point to hold for every squad that has no orders. In
 // the default mode it is never called: the operator acts on Hammer's orders only.
@@ -209,6 +223,20 @@ function operatorPlan(ctx) {
     if (!squad) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
+  // "Cancel the tank", "בטל את הטנק": the last one of that kind leaves its line.
+  const units = rules.factions[wake.status?.faction ?? ""]?.units ?? {};
+  if (cancelVerb.test(text)) {
+    const unit = /\b(last|that|it)\b|האחרון|האחרונה/.test(text) && !namesAUnit(text, units) ? "" : (wantedUnit(text, units) ?? "");
+    return [{ name: "cancel", input: { unit }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
+  // "New squads rally at Delta", "כיתות חדשות מתכנסות בדוד": where new units gather.
+  if (rallyVerb.test(text)) {
+    const home = /\b(home|beside|at the base|by the door)\b|ליד המבנה|בבית|בבסיס/.test(text);
+    const place = home ? "home" : (spotOf(call.body) ?? call.points?.[0]);
+    if (!place) return [radio(back, say.sayAgain[lang], "over")];
+    const from = namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false });
+    return [{ name: "rally", input: { place, structure: from?.id ?? "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
   if (haulerWords.test(text) && !/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
     // "Haulers to the Kilo field", "המשאיות לשדה כרמל", "haulers on their own".
     const auto = /\b(auto|on their own|themselves|choose)\b|לבד|בעצמם|בעצמן/.test(text);
@@ -222,7 +250,10 @@ function operatorPlan(ctx) {
   const wanted = wantedStructure(text, structures);
   const fixed = wanted && ["defence", "fence"].includes(structures[wanted].role);
   if (wanted && (buildVerb.test(text) || (fixed && !verbOf(text)))) {
-    const input = { structure: wanted, place: fixed ? placeOf(text, call.points) : "", place2: "" };
+    // An exact spot in the call ("140 metres north and 60 metres east of Alpha") is passed
+    // on as it was said; the game reads it. A base structure with no spot takes a point
+    // named in the call, or the game's own choice.
+    const input = { structure: wanted, place: spotOf(call.body) ?? (fixed ? placeOf(text, call.points) : (call.points?.[0] ?? "")), place2: "" };
     return [{ name: "build", input, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (/\b(buy|purchase|build)\b|קנה|קנו|רכוש|בנה/.test(text)) {

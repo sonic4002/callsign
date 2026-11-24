@@ -64,9 +64,9 @@ export const leaderToolsFor = (unit) => [...leaderTools, ...(unit?.captureSecond
 export const operatorTools = [
   radio,
   report,
-  tool("build", "Spend gold to start a structure. Base structures take their own place by your headquarters; a defence or a fence takes a place.", {
+  tool("build", "Spend gold to start a structure where Hammer said, or where you choose. It is refused, with the reason, when it cannot stand there.", {
     structure: { type: "string", description: 'Structure id from your list, for example "vehicleWorks".' },
-    place: { type: "string", description: 'For a defence or a fence: a point you hold, a structure of yours by id, or a side of your base such as "base:front" or "base:north". "" for a base structure, or to use the front of your base.' },
+    place: { type: "string", description: 'Where it goes. When Hammer gave an exact spot, pass those words as they were said ("140 metres north and 60 metres east of Alpha"), or write it as "N140 E60 of A". Otherwise a point, a structure of yours by id, or a side of your base such as "base:front" or "base:north". "" lets the game choose a place by your headquarters (a defence or a fence then goes to the front of your base).' },
     place2: { type: "string", description: 'Only for a fence that runs from `place` toward a second place; otherwise "".' },
   }),
   tool("buy", "Spend gold. Fill `unit` to raise a new squad, or `upgrade` to raise a squad's brain tier. Fill one and leave the other empty.", {
@@ -81,6 +81,13 @@ export const operatorTools = [
       buy: { type: "boolean", description: "Whether you may buy and upgrade on your own from now on: true when Hammer let you (or handed you the fight without holding the purse back), false when Hammer told you not to spend or took command back." },
     },
   ),
+  tool("cancel", "Take a unit out of its production line before it comes out, and get back the gold not yet spent on it: all of it while it waits, part of it once work on it began.", {
+    unit: { type: "string", description: 'Unit id or name; the last one of that kind bought is cancelled. "" cancels the last unit bought, whatever it is.' },
+  }),
+  tool("rally", "Set where new units gather when they come out of the structure that makes them. They go there and hold it.", {
+    place: { type: "string", description: 'A point, a landmark, or a spot such as "100 metres north of Alpha". "home" puts them back beside their structure.' },
+    structure: { type: "string", description: 'One structure of yours, by id or name, to set only its rally point; "" for every structure.' },
+  }),
   tool("haul", "Tell your gold haulers which field to work. They keep working it until told otherwise, even under threat, so use it on purpose.", {
     field: { type: "string", description: 'The gold field, by the map point it lies at ("K", "Kilo", "כרמל"), or "auto" to let the haulers choose a safe field themselves.' },
     hauler: { type: "integer", description: "One hauler's id from your status, or 0 for all of them." },

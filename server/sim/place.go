@@ -30,6 +30,7 @@ type Place struct {
 
 	Structure *Structure // set for a structure
 	Base      string     // "north", "south", "east" or "west" when the place is a side of one's own base
+	Exact     bool       // an exact spot ("N140 E60 of A"): what is built there stands just there
 }
 
 // PlaceFinder lets another part of the game add places of its own, such as structures.
@@ -72,6 +73,11 @@ func (s *Sim) ResolvePlace(text string) (Place, error) {
 		if p, ok := find(text); ok {
 			return p, nil
 		}
+	}
+	// "<N|S><metres> <E|W><metres> of <point>": an exact spot, as far north or south and
+	// as far east or west of a point. One of the two may be left out.
+	if x, y, id, ok := s.spotForm(text); ok {
+		return Place{Kind: PlaceOffset, ID: id, X: x, Y: y, Point: id[strings.LastIndex(id, " ")+1:], Exact: true}, nil
 	}
 	// "<bearing> of <point> [<metres>]"
 	if f := strings.Fields(text); (len(f) == 3 || len(f) == 4) && strings.EqualFold(f[1], "of") {
@@ -146,4 +152,47 @@ func (o *Order) PlaceID() string {
 		return o.Place
 	}
 	return o.Point
+}
+
+// spotForm reads the exact form of an offset, "N140 E60 of A" (also "S20 of A", "W300 of
+// A"), and returns the spot and the form written the one way.
+func (s *Sim) spotForm(text string) (x, y float64, id string, ok bool) {
+	f := strings.Fields(text)
+	if len(f) < 3 || len(f) > 4 || !strings.EqualFold(f[len(f)-2], "of") {
+		return 0, 0, "", false
+	}
+	p := s.pointState(strings.ToUpper(f[len(f)-1]))
+	if p == nil {
+		return 0, 0, "", false
+	}
+	var dx, dy float64
+	var ns, ew string
+	for _, part := range f[:len(f)-2] {
+		part = strings.ToUpper(part)
+		if len(part) < 2 {
+			return 0, 0, "", false
+		}
+		v, err := strconv.Atoi(part[1:])
+		if err != nil || v < 0 || v > 900 {
+			return 0, 0, "", false
+		}
+		switch part[0] {
+		case 'N':
+			dy, ns = -float64(v), part
+		case 'S':
+			dy, ns = float64(v), part
+		case 'E':
+			dx, ew = float64(v), part
+		case 'W':
+			dx, ew = -float64(v), part
+		default:
+			return 0, 0, "", false
+		}
+	}
+	if ns == "" && ew == "" {
+		return 0, 0, "", false
+	}
+	x = math.Max(10, math.Min(s.R.Map.Width-10, p.X+dx))
+	y = math.Max(10, math.Min(s.R.Map.Height-10, p.Y+dy))
+	return x, y, strings.TrimSpace(ns+" "+ew) + " of " + p.ID, true
 }

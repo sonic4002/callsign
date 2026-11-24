@@ -120,6 +120,10 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return nil, err
 	case CmdHaul:
 		return s.haulCommand(c)
+	case CmdCancel:
+		return s.cancel(c)
+	case CmdRally:
+		return nil, s.setRally(c)
 	}
 	return nil, ErrBadCommand
 }
@@ -263,17 +267,22 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 		// A squad on its way already holds its place under the cap.
 		return nil, ErrPopCap
 	}
+	// The structure that makes it takes one at a time; the rest wait in its line.
+	if err := s.lineRoom(c.Side, c.Unit, &u); err != nil {
+		return nil, err
+	}
 	if err := s.spend(c.Side, u.Cost); err != nil {
 		return nil, err
 	}
 	sq := s.raise(c.Side, c.Unit)
-	ticks := int(math.Round(u.DeploySeconds * float64(s.R.TickRate)))
-	if ticks <= 0 {
-		s.field(sq)
-		return sq, nil
+	ticks := max(1, int(math.Round(u.DeploySeconds*float64(s.R.TickRate))))
+	ahead, _ := s.enqueue(sq, ticks)
+	ev := Event{Side: c.Side, Kind: EvDeploying, Squad: sq.ID, Unit: sq.Unit,
+		Count: int(math.Ceil(float64(ahead+ticks) / float64(s.R.TickRate)))}
+	if sq.From != 0 {
+		ev.Structure = s.structure(sq.From).PlaceID()
 	}
-	sq.DeployTicks, sq.DeployTotal = ticks, ticks
-	s.emit(Event{Side: c.Side, Kind: EvDeploying, Squad: sq.ID, Unit: sq.Unit, Count: int(math.Ceil(u.DeploySeconds))})
+	s.emit(ev)
 	return sq, nil
 }
 

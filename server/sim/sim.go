@@ -62,6 +62,7 @@ type Side struct {
 	// and vehicles at their share of the squad's cost, and structures at theirs.
 	Destroyed float64
 	nextNum   map[string]int // next callsign number per unit class
+	rally     *rallyPoint    // where the units of structures built from now on gather, nil for beside them
 	hqAlarm   int            // tick of the last "HQ under attack" event
 
 	// Fog of war: what this side has seen, and what it last knew.
@@ -89,6 +90,9 @@ type Order struct {
 	X, Y    float64
 	Tick    int
 	arrived bool
+	// rally marks the short walk from a structure's door to where its units gather: it
+	// ends without a report, and the squad then awaits orders.
+	rally bool
 	// Structure is the structure an attack or capture order is on (structures.go).
 	Structure int
 	work      int // ticks an engineer squad has spent on its capture
@@ -146,6 +150,9 @@ type Squad struct {
 	// has no teams and is not Alive. DeployTotal is the whole wait, for progress bars.
 	DeployTicks int
 	DeployTotal int
+	// From is the structure that makes the squad and that it comes out of (queue.go), 0
+	// for a squad that was on the field from the start.
+	From int
 
 	unit        *shared.Unit
 	haul        *haul // set for a gold hauler, which works on its own and has no leader
@@ -351,6 +358,13 @@ func (s *Sim) raise(side int, unitID string) *Squad {
 // field puts a raised squad beside its headquarters, alive and ready for orders.
 func (s *Sim) field(sq *Squad) {
 	u, side := sq.unit, sq.Side
+	if sq.From != 0 && s.comeOut(sq) {
+		// Made by a structure: it comes out of that structure's door (queue.go).
+		if sq.haul == nil {
+			s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
+		}
+		return
+	}
 	hq := s.R.HQPoint(side)
 	inward := 1.0
 	if hq.X > s.R.Map.Width/2 {
@@ -379,16 +393,14 @@ func (s *Sim) field(sq *Squad) {
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
 }
 
-// deploy counts down the squads on their way and fields the ones whose time has come.
-func (s *Sim) deploy() {
-	for _, sq := range s.Squads {
-		if sq.DeployTicks == 0 {
-			continue
-		}
-		if sq.DeployTicks--; sq.DeployTicks == 0 {
-			s.field(sq)
+// gathered reports whether every team of a squad has reached the place its order names.
+func (s *Sim) gathered(sq *Squad) bool {
+	for i := range sq.Teams {
+		if t := &sq.Teams[i]; t.Members > 0 && dist(t.X, t.Y, sq.Order.X, sq.Order.Y) > 36 {
+			return false
 		}
 	}
+	return true
 }
 
 // Deploying reports whether a squad has been bought and has not reached the field yet.
@@ -814,7 +826,10 @@ func (s *Sim) squadEvents(live []*teamRef) {
 			sq.inContact = false
 		}
 
-		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived, 0
+		if sq.Order.rally && s.gathered(sq) {
+			sq.Order = Order{Kind: OrderNone} // out of the door and in its place: awaiting orders
+		}
+		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived && !sq.Order.rally, 0
 		cx, cy := sq.Center()
 		for i := range sq.Teams {
 			t := &sq.Teams[i]

@@ -17,6 +17,10 @@
     "coverSeek": 64,
     "startStructures": [],
     "buildRadius": 340,
+    "baseRadius": 300,
+    "baseReach": 180,
+    "baseCap": 10,
+    "queueLimit": 5,
     "defenceCap": 6,
     "fenceRuns": 4
   },
@@ -595,7 +599,7 @@
         "militia": {
           "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
           "requires": "barracks",
-          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3,
+          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 2,
           "teams": 4, "members": 3, "hp": 41, "armor": 0,
           "speed": 30, "range": 160, "sight": 265,
           "damage": 9, "cooldownTicks": 8, "accuracy": 0.46, "nerveResist": 0.8,
@@ -604,7 +608,7 @@
         "technical": {
           "name": { "en": "Technical", "he": "טנדר חמוש" },
           "requires": "works",
-          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 5,
+          "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 3.5,
           "teams": 3, "members": 1, "hp": 290, "armor": 0.25,
           "speed": 48, "range": 200, "sight": 265,
           "damage": 28, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.8,
@@ -613,7 +617,7 @@
         "speedboat": {
           "name": { "en": "Speedboat", "he": "סירה מהירה" },
           "requires": "dockyard",
-          "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 5,
+          "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 4,
           "teams": 3, "members": 1, "hp": 190, "armor": 0.1,
           "speed": 52, "range": 185, "sight": 265,
           "damage": 21, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9,
@@ -622,7 +626,7 @@
         "fpvSwarm": {
           "name": { "en": "Drone swarm", "he": "נחיל רחפנים" },
           "requires": "airbase",
-          "class": "air", "domain": "air", "cost": 150, "deploySeconds": 4,
+          "class": "air", "domain": "air", "cost": 150, "deploySeconds": 3.5,
           "teams": 4, "members": 2, "hp": 28, "armor": 0,
           "speed": 90, "range": 70, "sight": 265,
           "damage": 25, "cooldownTicks": 14, "accuracy": 0.6, "nerveResist": 0.2,
@@ -632,7 +636,7 @@
         "rpgTeam": {
           "name": { "en": "Rocket team", "he": "חוליית טילי כתף" },
           "requires": "barracks",
-          "class": "infantry", "domain": "land", "cost": 150, "deploySeconds": 3,
+          "class": "infantry", "domain": "land", "cost": 150, "deploySeconds": 2.5,
           "teams": 2, "members": 3, "hp": 32, "armor": 0,
           "speed": 30, "range": 210, "sight": 265,
           "damage": 55, "cooldownTicks": 22, "accuracy": 0.55, "nerveResist": 0.8,

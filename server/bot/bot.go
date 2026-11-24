@@ -140,7 +140,7 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 					return cmds // save for it
 				}
 			}
-		} else if snap.Gold >= u.Cost {
+		} else if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) {
 			return append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
 		} else if haulers == 0 {
 			return cmds // save for the hauler
@@ -186,7 +186,7 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		}
 		return cmds
 	}
-	if snap.Gold >= u.Cost {
+	if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) {
 		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: buy})
 		p.lastBuy = snap.Tick + 1
 	}
@@ -386,4 +386,25 @@ func (p *Player) lesson(snap sim.Snapshot) []sim.Command {
 		return nil
 	}
 	return []sim.Command{{Side: p.Side, Squad: first.ID, Kind: sim.CmdAttack, Point: target}}
+}
+
+// lineFull reports whether the structures of a role have no room left in their lines:
+// each makes one unit at a time and lets only so many wait (sim/queue.go).
+func (p *Player) lineFull(snap sim.Snapshot, role string) bool {
+	if role == "" {
+		return false
+	}
+	makers := map[string]bool{}
+	for _, st := range snap.Structures {
+		if st.Side == p.Side && st.Role == role && !st.Ruin && st.Building >= 1 {
+			makers[st.ID] = true
+		}
+	}
+	waiting := 0
+	for _, d := range snap.Deploying {
+		if makers[d.From] {
+			waiting++
+		}
+	}
+	return len(makers) > 0 && waiting >= len(makers)*p.R.Match.QueueLimit
 }

@@ -32,7 +32,6 @@ const (
 var (
 	ErrNoStructure    = errors.New("your faction has no such structure")
 	ErrNeedsStructure = errors.New("a structure is missing")
-	ErrAlreadyBuilt   = errors.New("you already have one")
 	ErrBuilding       = errors.New("one at a time")
 	ErrTooFar         = errors.New("too far from your own ground")
 	ErrNoRoom         = errors.New("no room to build there")
@@ -81,6 +80,8 @@ type Structure struct {
 	// A tech building (see tech.go): its site on the map, and which sides have had its lump of gold.
 	Site string
 	paid [2]bool
+	// rally is where the units this structure makes gather, nil for beside it (queue.go).
+	rally *rallyPoint
 }
 
 // PlaceID is the id an order names this structure by.
@@ -340,7 +341,11 @@ func (s *Sim) initStructures(full bool, base []string) {
 			if def == nil || !def.Base() {
 				continue
 			}
-			st := s.raiseBase(side, id, def)
+			x, y, ok := s.SiteFor(side, def)
+			if !ok {
+				continue
+			}
+			st := s.newStructure(side, id, def, x, y)
 			st.HP, st.BuildTicks = def.HP, 0
 			s.blockGround(st, true)
 		}
@@ -362,65 +367,6 @@ func (s *Sim) newStructure(side int, kind string, def *shared.Structure, x, y fl
 // buildStartHP is the share of its hit points a structure has when work begins.
 const buildStartHP = 0.3
 
-// raiseBase starts a base structure in the next free slot. The caller has checked that
-// there is one.
-func (s *Sim) raiseBase(side int, kind string, def *shared.Structure) *Structure {
-	slot := s.freeSlot(side, def.Role)
-	var x, y float64
-	if slot == dockSlot {
-		x, y = s.dockPosition(side)
-	} else {
-		x, y = s.baseSlot(side, slot)
-	}
-	// A ruin in the slot is cleared away.
-	for _, old := range s.Structures {
-		if old.Ruin && !old.Gone && old.def.Base() && dist(old.X, old.Y, x, y) < 1 {
-			old.Gone = true
-		}
-	}
-	st := s.newStructure(side, kind, def, x, y)
-	st.Slot = slot
-	return st
-}
-
-// freeSlot is the base slot a new structure of a role takes, or -1 when the base is full.
-func (s *Sim) freeSlot(side int, role string) int {
-	taken := func(x, y float64) bool {
-		for _, st := range s.Structures {
-			if !st.Ruin && st.def.Base() && dist(st.X, st.Y, x, y) < 1 {
-				return true
-			}
-		}
-		return false
-	}
-	if role == shared.RoleDockyard {
-		if x, y := s.dockPosition(side); !taken(x, y) {
-			return dockSlot
-		}
-		return -1
-	}
-	// A refinery goes where the haulers' trip is shortest: the free slot nearest a gusher.
-	best, bd := -1, math.MaxFloat64
-	for i := range baseSlots {
-		x, y := s.baseSlot(side, i)
-		if taken(x, y) {
-			continue
-		}
-		if role != shared.RoleRefinery {
-			return i
-		}
-		for g := range s.R.Map.Gushers {
-			if d := dist(x, y, s.R.Map.Gushers[g].X, s.R.Map.Gushers[g].Y); d < bd {
-				best, bd = i, d
-			}
-		}
-		if len(s.R.Map.Gushers) == 0 {
-			return i
-		}
-	}
-	return best
-}
-
 // structureByKey finds a faction's structure by its id or by its role.
 func structureByKey(f *shared.Faction, key string) (string, *shared.Structure) {
 	if st, ok := f.Structures[key]; ok {
@@ -440,8 +386,8 @@ func (s *Sim) Build(c Command) (*Structure, error) {
 	return s.build(c)
 }
 
-// build starts a structure. Base structures take the next free slot of the base;
-// defences and fences take a place.
+// build starts a structure at a place: a base structure near the side's own base, a
+// defence or a fence on any ground the side holds.
 func (s *Sim) build(c Command) (*Structure, error) {
 	f := s.faction(c.Side)
 	kind, def := structureByKey(f, c.Structure)
@@ -466,18 +412,24 @@ func (s *Sim) build(c Command) (*Structure, error) {
 	case shared.RoleFence:
 		return s.buildFence(c, kind, def)
 	}
-	for _, st := range s.Structures {
-		if st.Side == c.Side && !st.Ruin && st.def.Role == def.Role {
-			return nil, fmt.Errorf("%w: the %s", ErrAlreadyBuilt, st.def.Name.En)
-		}
+	// A base structure goes where the order says (placement.go), or where the side
+	// itself would put it when the order names no place. A second one of a role is
+	// allowed: it adds a second production line (queue.go).
+	if s.bases(c.Side) >= s.R.Match.BaseCap {
+		return nil, fmt.Errorf("%w: %d", ErrBaseFull, s.R.Match.BaseCap)
 	}
-	if s.freeSlot(c.Side, def.Role) == -1 {
-		return nil, ErrNoRoom
+	x, y, err := s.baseSite(c, def)
+	if err != nil {
+		return nil, err
 	}
 	if err := s.spend(c.Side, def.Cost); err != nil {
 		return nil, err
 	}
-	st := s.raiseBase(c.Side, kind, def)
+	st := s.newStructure(c.Side, kind, def, x, y)
+	s.clearRuins(st)
+	if r := s.Sides[c.Side].rally; r != nil {
+		st.rally = &rallyPoint{r.Place, r.X, r.Y}
+	}
 	s.started(st)
 	return st, nil
 }
@@ -569,6 +521,14 @@ func (s *Sim) buildDefence(c Command, kind string, def *shared.Structure) (*Stru
 	}
 	x, y := pl.X, pl.Y
 	switch {
+	case pl.Exact:
+		// The commander chose the very spot: it stands there or the order is refused.
+		if err := s.CanPlace(c.Side, def, x, y); err != nil {
+			return nil, err
+		}
+		if !s.clear(x, y, def.Footprint) {
+			return nil, ErrNoRoom
+		}
 	case pl.Base != "":
 		d := compass[pl.Base]
 		x, y = x+d[0]*200, y+d[1]*200
@@ -657,6 +617,12 @@ func (s *Sim) buildFence(c Command, kind string, def *shared.Structure) (*Struct
 	default:
 		dx, dy := s.towardEnemy(c.Side, pl.X, pl.Y)
 		cx, cy := pl.X+dx*110, pl.Y+dy*110
+		if pl.Exact {
+			cx, cy = pl.X, pl.Y // the run is centred on the chosen spot, facing the enemy
+			if err := s.canPlaceWork(c.Side, 2, cx, cy); err != nil {
+				return nil, err
+			}
+		}
 		ax, ay, bx, by = cx-dy*length/2, cy+dx*length/2, cx+dy*length/2, cy-dx*length/2
 	}
 	if !s.ownGround(c.Side, (ax+bx)/2, (ay+by)/2) {
@@ -1230,6 +1196,8 @@ type StructureView struct {
 	BY float64 `json:"by,omitempty"`
 	// Site is a tech building's id on the map ("tech-clinic-w"); its side is -1 until taken.
 	Site string `json:"site,omitempty"`
+	// Rally is where an own structure's units gather, when a place was chosen for it.
+	Rally *RallyView `json:"rally,omitempty"`
 }
 
 func (s *Sim) structureViews(side int) []StructureView {
@@ -1245,6 +1213,9 @@ func (s *Sim) structureViews(side int) []StructureView {
 				continue
 			}
 			v.HP, v.Ruin, v.Building = math.Max(0, st.HP/st.def.HP), st.Ruin, 1
+			if st.rally != nil && !st.Ruin {
+				v.Rally = &RallyView{st.rally.Place, round1(st.rally.X), round1(st.rally.Y)}
+			}
 			if st.BuildTotal > 0 {
 				v.Building = 1 - float64(st.BuildTicks)/float64(st.BuildTotal)
 			}
@@ -1277,6 +1248,10 @@ func (s *Sim) hashStructures(put func(uint64), f func(float64)) {
 			flags |= 2
 		}
 		put(flags)
+		if st.rally != nil {
+			f(st.rally.X)
+			f(st.rally.Y)
+		}
 		for side := range st.seen {
 			m := st.seen[side]
 			f(m.HP)

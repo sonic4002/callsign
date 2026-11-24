@@ -303,8 +303,6 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #structures .cost { color: var(--brass); font-weight: 700; font-variant-numeric: tabular-nums; }
 #structures .why { font-size: .6rem; line-height: 1.15; color: var(--muted); min-block-size: 2.3em; max-block-size: 2.3em; overflow: hidden; }
 #structures button.needs .why, #structures button.busy .why, #structures button.full .why { color: var(--warn); }
-#structures button.have { opacity: .6; }
-#structures button.have .why { color: var(--mine); }
 #structures button.rising:disabled { opacity: 1; }
 #structures button.rising .why { color: var(--brass); font-weight: 700; }
 #structures .fill { position: absolute; inset-inline: 0; inset-block-end: 0; block-size: 0; background: linear-gradient(#c9a44c22, #c9a44c55); border-block-start: 2px solid var(--brass); transition: block-size .12s linear; pointer-events: none; }
@@ -403,3 +401,22 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   .panel.grow { flex: 1 1 10rem; min-block-size: 10rem; }
 }
 #orders-about { display: block; max-inline-size: 17rem; font-size: .7rem; line-height: 1.35; color: var(--muted); text-align: center; }
+
+/* ---- placing a structure, picking a rally point ---- */
+#placer {
+  position: absolute; inset-block-end: .9rem; inset-inline: 0; margin-inline: auto; inline-size: max-content; max-inline-size: 94%;
+  display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .5rem .8rem .6rem;
+  background: #10161af2; border: 1px solid var(--brass-dim); z-index: 3; text-align: center;
+}
+#placer[hidden] { display: none; }
+#placer strong { color: var(--brass); font-size: .85rem; }
+#placer-why { font-size: .82rem; color: #8fe0a6; unicode-bidi: plaintext; }
+#placer-why.bad { color: #ff8a78; }
+#placer small { color: var(--muted); font-size: .72rem; }
+#placer div { display: flex; gap: .5rem; }
+#placer button { min-block-size: 2.5rem; min-inline-size: 6rem; }
+#placer button[hidden] { display: none; }
+#rally { margin: 0 0 .4rem; font-size: .76rem; color: var(--muted); display: flex; gap: .35rem; align-items: baseline; flex-wrap: wrap; }
+#rally strong { color: var(--ink, #e9ede6); font-weight: 600; }
+#rally button { margin-inline-start: auto; font-size: .72rem; padding: .1rem .5rem; }
+#roster li.deploying .cancel { flex: none; inline-size: 1.6rem; block-size: 1.6rem; padding: 0; line-height: 1; font-size: 1rem; }
