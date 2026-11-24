@@ -123,10 +123,46 @@
     <h1 id="overlay-title"></h1>
     <p id="overlay-line"></p>
     <p id="overlay-side"></p>
+    <!-- The lobby: make a match, or join one by its code; then the seats until both are ready. -->
+    <form id="lobby-new" hidden>
+      <fieldset>
+        <legend data-i18n="lobby.opponent"></legend>
+        <label><input type="radio" name="opponent" value="bot" checked> <span data-i18n="lobby.bot"></span></label>
+        <label><input type="radio" name="opponent" value="friend"> <span data-i18n="lobby.friend"></span></label>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="lobby.side"></legend>
+        <label><input type="radio" name="side" value="0" checked> <span id="lobby-side-0"></span></label>
+        <label><input type="radio" name="side" value="1"> <span id="lobby-side-1"></span></label>
+        <label><input type="radio" name="side" value="-1"> <span data-i18n="lobby.random"></span></label>
+      </fieldset>
+      <label><span data-i18n="lobby.length"></span>
+        <select name="length" id="lobby-length"></select>
+      </label>
+      <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
+    </form>
+    <section id="lobby-room" hidden>
+      <p><span data-i18n="lobby.codeIs"></span> <strong id="lobby-code" dir="ltr"></strong></p>
+      <p id="lobby-share">
+        <input id="lobby-link" type="text" dir="ltr" readonly data-i18n-aria="lobby.link">
+        <button type="button" id="lobby-copy" data-i18n="lobby.copy"></button>
+      </p>
+      <ul id="lobby-seats"></ul>
+      <p id="lobby-status"></p>
+      <p id="lobby-note"></p>
+    </section>
+    <p id="lobby-error" role="alert" hidden></p>
     <div class="row">
       <button type="button" class="primary" id="start"></button>
+      <button type="button" id="lobby-leave" data-i18n="lobby.leave" hidden></button>
       <button type="button" id="overlay-lang" data-i18n="language"></button>
     </div>
+    <form id="lobby-join" hidden>
+      <label><span data-i18n="lobby.code"></span>
+        <input name="code" id="lobby-join-code" type="text" dir="ltr" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      </label>
+      <button type="submit" data-i18n="lobby.join"></button>
+    </form>
     <details id="credits" hidden>
       <summary data-i18n="credits"></summary>
       <ul id="credits-list"></ul>

@@ -13,7 +13,8 @@ const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
-  // `join` is added to the address the agent joins with: its host's id, and later its room.
+  // `join` is added to the address the agent joins with: its host's id, and { room, key } or
+  // { room, token } for a server that holds rooms.
   constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, join = {} }) {
     Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, join });
     this.inbox = [];
@@ -71,6 +72,14 @@ export class Agent {
     } else {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
+    }
+    // A call made just before this station came on the net is answered now: a commander
+    // who sits down and gives an order at once would otherwise be met with silence.
+    const fresh = hello.state.tick - 15 * this.rules.tickRate;
+    const spoke = hello.log.findLastIndex((m) => m.from.key === this.me.key);
+    for (const m of hello.log.slice(spoke + 1)) {
+      const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
+      if (m.tick >= fresh && forMe && m.from.key !== this.me.key && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
     }
   }
 
