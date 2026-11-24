@@ -297,3 +297,52 @@ Requested by the owner; it replaces story 18 and the `startStructures` decision 
 
 Story 18 now reads: As a commander, I want to open by building my refinery and receive my
 first hauler from it, so that every match begins with a real choice of build order.
+
+---
+
+## Addendum 3 (2026-11-24, third wave): ten mechanics from the genre
+
+Approved by the owner in full ("do all 10 including power"). The mechanics, the rules
+data each needs and its tests are written out under "Do now" in
+`docs/research/2026-11-24-classic-rts-play.md`; that list is part of this spec. As
+everywhere, names, designs and pictures are original to Callsign. Built after the first
+wave is fitted together and alongside Addendum 1.
+
+1. **Power.** Structures produce or use power; on low power structures build and units
+   deploy at half speed, powered defences stop firing and the radar stops. A cheap power
+   structure per faction (original names).
+2. **A radar structure** that needs the works, turns the mini map on while it stands and
+   has power, and is required for the airbase and the hero.
+3. **Production queues at the structure**: units of a role come out one after another;
+   a second structure of the role adds a second line; count and cancel on the button.
+   This replaces deployments running side by side.
+4. **Rally points set by radio**, for all production or for one structure.
+5. **Sell** (half back) **and repair** of own structures; an engineer squad sent into an
+   own structure repairs it fully and is used up.
+6. **Earned ranks**: seasoned at kills worth three times the squad's cost, elite at six;
+   steadier, more accurate, and elite squads recover health out of combat. Shown apart
+   from the bought brain tier.
+7. **Neutral tech buildings**, two or three per map, taken by engineers: gold, healing
+   for infantry, repairs for vehicles.
+8. **Spoken base cues from Anvil**: structure complete, unit ready, not enough gold, low
+   power, base under attack, hauler under attack, structure lost, new options available.
+   One fixed line per language, rate-limited, and spoken through the existing voice.
+9. **Crushing**: a heavy vehicle driving through infantry in the open kills; infantry in
+   a building, behind sandbags or in a grove is safe.
+10. **Defences only siege units outrange.**
+
+Decisions that follow:
+- The opening order becomes power structure, refinery, barracks, works, radar, airbase;
+  starting gold and the tutorial are set for it.
+- The scripted enemy, Anvil with the purse, Help and the tutorial learn all ten.
+- Low power, sell, repair, rally and cancel are radio orders like everything else; the
+  buttons that offer them only write the call.
+- Balance targets are unchanged and are re-measured on all three maps after this wave.
+
+User stories added: 56 power as a second constraint to protect and to raid; 57 losing the
+radar blinds the mini map; 58 seeing how many units are in line at each structure and
+cancelling one; 59 telling new squads where to gather; 60 selling a structure for gold in
+an emergency; 61 repairing a damaged structure; 62 squads that fight well earning a rank
+that shows; 63 capturing a neutral building for a lasting advantage; 64 hearing Anvil
+announce what happened at the base; 65 tanks running over infantry caught in the open;
+66 defences that hold against anything but siege weapons.
