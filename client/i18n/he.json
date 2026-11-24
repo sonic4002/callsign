@@ -361,5 +361,6 @@
   "lobby.goldOther": "סכום אחר",
   "lobby.goldIs": "זהב התחלתי: {gold}",
   "declareLost": "כל התחנות, הקשר עם המשחק נותק. סוף.",
-  "reconnected": "החיבור למשחק חזר."
+  "reconnected": "החיבור למשחק חזר.",
+  "loading": "טוען…"
 }

@@ -45,13 +45,28 @@ function t(key, vars = {}) {
   return text.replace(/\{(\w+)\}/g, (_, name) => vars[name]);
 }
 
-function applyLanguage() {
+// labels writes every fixed text of the page in the current language.
+function labels() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "he" ? "rtl" : "ltr";
   document.title = t("title");
   for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
   for (const node of document.querySelectorAll("[data-i18n-placeholder]")) node.placeholder = t(node.dataset.i18nPlaceholder);
   for (const node of document.querySelectorAll("[data-i18n-aria]")) node.setAttribute("aria-label", t(node.dataset.i18nAria));
+}
+
+// The start screen says what it is at once, while the pictures and the music list are
+// still on their way: on a slow connection that takes a while, and a screen of blank
+// buttons looks broken.
+labels();
+$("overlay").classList.remove("booting");
+$("overlay-title").textContent = t("title");
+$("overlay-line").textContent = t("loading");
+$("start").textContent = t("loading");
+$("start").disabled = true;
+
+function applyLanguage() {
+  labels();
   syncInputDirection();
   renderVoice();
   renderLog();
@@ -105,7 +120,12 @@ speech.bind($("speak"));
 speech.keep({ lost: { en: strings.en.declareLost, he: strings.he.declareLost } });
 let wasOnline = false; // the connection was up, so its loss is news
 let lostBefore = false;
-await loadSprites();
+// The pictures arrive in their own time: the start screen does not wait for them, and the
+// map draws its plain stand-ins until they are here.
+loadSprites().then(() => {
+  drawn.roster = drawn.build = "";
+  if (rules) renderSidebar();
+});
 
 const pointName = (id) => rules.map.points.find((p) => p.id === id)?.callsign[lang] ?? id;
 const clock = (tick) => {

@@ -361,5 +361,6 @@
   "lobby.goldOther": "Other amount",
   "lobby.goldIs": "Starting gold: {gold}",
   "declareLost": "All stations, connection to the game is lost. Out.",
-  "reconnected": "Connected to the game again."
+  "reconnected": "Connected to the game again.",
+  "loading": "Loading…"
 }
