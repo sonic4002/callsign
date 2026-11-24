@@ -141,6 +141,7 @@ def save_small(image, path):
 
 
 def paint_sheet(name, part, words, style, seed, plain_only, comfy):
+    # `comfy` starts the image model the first time a canvas has to be painted.
     """One sheet. `part` is its manifest entry (frame and anims); `words` its subject."""
     file = pathlib.Path(part["image"]).name
     sheet = Image.open(PLAIN / part["image"]).convert("RGBA")
@@ -170,6 +171,7 @@ def paint_sheet(name, part, words, style, seed, plain_only, comfy):
                         if place:
                             b, (x, y, w, h) = place
                             canvas.alpha_composite(frame.crop(b).resize((w, h), Image.LANCZOS), (x, y))
+                    comfy()
                     work = f"{pathlib.Path(file).stem}_{col}_{first}.png"
                     canvas.convert("RGB").save(G.WORK / "input" / work)
                     shutil.move(G.render(flow(prompt, seed, work)), path)
@@ -222,13 +224,18 @@ def main():
             jobs.append((name, {"image": image, "frame": size, "anims": {}}, {**words, "subject": state}))
     if not jobs:
         return
-    comfy = None if args.plain else G.start_comfyui()
+    running = []
+
+    def comfy():
+        if not running:
+            running.append(G.start_comfyui())
+
     try:
         for name, part, words in jobs:
             paint_sheet(name, part, words, spec["style"], words.get("seed", spec["seed"]), args.plain, comfy)
     finally:
-        if comfy:
-            comfy.terminate()
+        for proc in running:
+            proc.terminate()
 
 
 if __name__ == "__main__":
