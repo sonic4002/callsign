@@ -94,22 +94,35 @@ Not protected:
 
 ## Over the internet, with https
 
-`make play-public` puts the game on an https address of your own domain through a
-Cloudflare Tunnel. Cloudflare holds the certificate and ends the encryption; the tunnel
-dials out from this machine, so nothing is opened on the router and your home address is
-not published. With https the microphone works on phones and for your friend.
+`make play-public` puts the game on an https address of your own domain behind
+Cloudflare, which holds the certificate. With https the microphone works on phones and
+for your friend. Put the address in `.env` first:
 
-Once, in the Cloudflare dashboard (Zero Trust → Networks → Tunnels):
+    CALLSIGN_PUBLIC_URL=https://callsign.<your domain>
 
-1. Create a tunnel of type *Cloudflared* and copy its token.
-2. Add a public hostname to it, for example `callsign.<your domain>`, with service
-   `http://server:8080`.
-3. Put both in `.env`:
+There are two ways for Cloudflare to reach the game.
 
-       CALLSIGN_PUBLIC_URL=https://callsign.<your domain>
-       CALLSIGN_TUNNEL_TOKEN=<the token>
+**Through this home's address.** The name is a proxied DNS record that points at the home's
+public address; Cloudflare shows its own addresses in DNS, not the home's.
 
-Then `make play-public`. It prints the address and the **host password**. Open the
+1. `CALLSIGN_CF_TOKEN=<token> make public-dns` creates or updates the record. The token
+   needs *Zone → DNS → Edit* on the domain. Run it again when the home address changes.
+2. The zone's SSL/TLS mode must be **Flexible**: Cloudflare then talks to the game over
+   plain http on port 80.
+3. `make play-public` asks the router, over UPnP, to pass port 80 to the game, and
+   `make stop` closes it again. If the router refuses, forward port 80 to this machine's
+   port 8080 by hand. Some providers block port 80; then use a tunnel.
+
+Anyone who knows the home address can also reach the game on port 80 directly, without
+https, for as long as it runs.
+
+**Through a Cloudflare Tunnel.** The tunnel dials out from this machine, so nothing is
+opened on the router and the home address is never used. In the Cloudflare dashboard
+(Zero Trust → Networks → Tunnels) create a tunnel of type *Cloudflared*, add a public
+hostname for the name with service `http://server:8080`, and put the tunnel's token in
+`.env` as `CALLSIGN_TUNNEL_TOKEN`. `make play-public` uses the tunnel whenever that is set.
+
+Either way `make play-public` prints the address and the **host password**. Open the
 address, choose a friend match, type the password once (the browser remembers it), and
 send your friend the join link.
 
@@ -118,6 +131,6 @@ What changes on a public address:
 - **Only the host makes matches.** Every match runs agents on this machine, so making one
   needs the host password. Joining a match by its code or link does not.
 - **Wrong join codes are slowed**: the server answers 40 a minute in total.
-- **Traffic is encrypted** between the players and Cloudflare, and inside the tunnel.
-  Cloudflare itself can read it.
+- **Traffic is encrypted** between the players and Cloudflare. Cloudflare itself can read
+  it, and on the home-address way the last leg from Cloudflare to the home is not encrypted.
 - Still true: the join code is not a password. Whoever has the link can take the free seat.

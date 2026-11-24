@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play play-lan play-public stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
+.PHONY: image test play play-lan play-public public-dns stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -36,22 +36,40 @@ play-lan:
 	@echo "Anyone on this network who has that code can join the free seat. Nothing is encrypted."
 	CALLSIGN_BIND=0.0.0.0 CALLSIGN_SHARE=http://$(LAN_IP):8080 $(MAKE) play
 
-# The same over https for a friend anywhere, through a Cloudflare Tunnel on your own domain.
-# Needs CALLSIGN_PUBLIC_URL and CALLSIGN_TUNNEL_TOKEN in .env (docs/FRIEND-MATCH.md says how).
+# The same over https for a friend anywhere, on your own domain behind Cloudflare.
+# Needs CALLSIGN_PUBLIC_URL=https://<name> in .env; docs/FRIEND-MATCH.md has both ways:
+#   - with CALLSIGN_TUNNEL_TOKEN in .env, a Cloudflare Tunnel carries it (nothing opened);
+#   - without, the name points at this home (make public-dns) and the router is asked,
+#     over UPnP, to pass port 80 to the game for as long as it runs.
 # Only the host can make matches: the password is CALLSIGN_HOST_KEY in .env, or made here.
-PUBLIC_URL = $(shell sed -n 's/^CALLSIGN_PUBLIC_URL=//p' .env 2>/dev/null)
-HOST_KEY   = $(or $(shell sed -n 's/^CALLSIGN_HOST_KEY=//p' .env 2>/dev/null),$(shell head -c 9 /dev/urandom | base64 | tr '+/' 'ab'))
+PUBLIC_URL   = $(shell sed -n 's/^CALLSIGN_PUBLIC_URL=//p' .env 2>/dev/null)
+TUNNEL_TOKEN = $(shell sed -n 's/^CALLSIGN_TUNNEL_TOKEN=//p' .env 2>/dev/null)
+HOST_KEY     = $(or $(shell sed -n 's/^CALLSIGN_HOST_KEY=//p' .env 2>/dev/null),$(shell head -c 9 /dev/urandom | base64 | tr '+/' 'ab'))
+PUBLIC_PORT ?= 80
 play-public:
-	@grep -q '^CALLSIGN_TUNNEL_TOKEN=.' .env 2>/dev/null || { echo "set CALLSIGN_TUNNEL_TOKEN in .env (docs/FRIEND-MATCH.md)"; exit 1; }
-	@test -n "$(PUBLIC_URL)" || { echo "set CALLSIGN_PUBLIC_URL=https://<your name> in .env"; exit 1; }
+	@test -n "$(PUBLIC_URL)" || { echo "set CALLSIGN_PUBLIC_URL=https://<name> in .env"; exit 1; }
 	$(eval KEY := $(HOST_KEY))
 	@echo "Your game is at  $(PUBLIC_URL)"
 	@echo "Host password (asked once, when you make a match):  $(KEY)"
-	@echo "Your friend needs only the join link or code. Anyone else on the internet can reach the lobby but cannot start a match."
+	@echo "Your friend needs only the join link or code. Anyone else can reach the lobby but cannot start a match."
+ifneq ($(TUNNEL_TOKEN),)
 	@CALLSIGN_SHARE=$(PUBLIC_URL) CALLSIGN_HOST_KEY=$(KEY) $(MAKE) play MORE_PROFILES="--profile public"
+else
+	@test -n "$(LAN_IP)" || { echo "could not find this machine's network address; set LAN_IP=..."; exit 1; }
+	@command -v upnpc >/dev/null || { echo "upnpc is not installed: forward port $(PUBLIC_PORT) to $(LAN_IP):8080 on the router by hand"; }
+	@upnpc -e callsign -a $(LAN_IP) 8080 $(PUBLIC_PORT) TCP >/dev/null 2>&1 && echo "The router now passes port $(PUBLIC_PORT) to the game; 'make stop' closes it." \
+		|| echo "The router did not accept the port mapping: forward port $(PUBLIC_PORT) to $(LAN_IP):8080 by hand."
+	@CALLSIGN_BIND=0.0.0.0 CALLSIGN_SHARE=$(PUBLIC_URL) CALLSIGN_HOST_KEY=$(KEY) $(MAKE) play
+endif
+
+# Point the public name at this home's address, behind Cloudflare's proxy. Run it again
+# when the home address changes. Needs CALLSIGN_CF_TOKEN (a token that may edit DNS).
+public-dns:
+	@CALLSIGN_PUBLIC_URL=$(PUBLIC_URL) sh tools/public-dns.sh
 
 stop:
 	docker compose --profile voice --profile public down
+	@upnpc -l 2>/dev/null | grep -q "'callsign'" && upnpc -d $(PUBLIC_PORT) TCP >/dev/null 2>&1 && echo "closed port $(PUBLIC_PORT) on the router" || true
 
 shell:
 	$(DOCKER) -it $(IMAGE) bash
