@@ -77,6 +77,10 @@ type Structure struct {
 	hit  bool
 	// alarm is the tick the owner was last told this structure is under attack.
 	alarm int
+
+	// A tech building (see tech.go): its site on the map, and which sides have had its lump of gold.
+	Site string
+	paid [2]bool
 }
 
 // PlaceID is the id an order names this structure by.
@@ -496,7 +500,7 @@ func (s *Sim) ownGround(side int, x, y float64) bool {
 		return true
 	}
 	for _, st := range s.Structures {
-		if st.Side == side && !st.Ruin && st.def.Role != shared.RoleFence && dist(x, y, st.X, st.Y) <= r {
+		if st.Side == side && !st.Ruin && st.def.Role != shared.RoleFence && !st.Tech() && dist(x, y, st.X, st.Y) <= r {
 			return true
 		}
 	}
@@ -872,8 +876,8 @@ func (s *Sim) structureTarget(tr *teamRef, order string) *Structure {
 	var best *Structure
 	bd := math.MaxFloat64
 	for _, st := range s.Structures {
-		if st.def.Role == shared.RoleFence || !st.seen[side].Visible || !inReach(st) {
-			continue
+		if st.def.Role == shared.RoleFence || st.Tech() || !st.seen[side].Visible || !inReach(st) {
+			continue // a tech building is shot at only on an order: it is worth more taken than broken
 		}
 		d := s.reach(t, st)
 		if st.def.Role != shared.RoleDefence {
@@ -969,7 +973,7 @@ func (s *Sim) resolveStructures() {
 			s.destroy(st)
 			continue
 		}
-		if s.Tick-st.alarm > 20*s.R.TickRate && st.def.Role != shared.RoleFence {
+		if st.Side >= 0 && s.Tick-st.alarm > 20*s.R.TickRate && st.def.Role != shared.RoleFence {
 			st.alarm = s.Tick
 			owner := st.Side
 			s.emit(Event{Side: owner, Kind: EvStructureAttacked, Structure: st.PlaceID(), Unit: st.Kind, Point: s.nearestPoint(st.X, st.Y)})
@@ -984,7 +988,9 @@ func (s *Sim) destroy(st *Structure) {
 	st.Ruin, st.HP, st.BuildTicks = true, 0, 0
 	s.blockGround(st, false)
 	owner := st.Side
-	s.Sides[1-owner].Destroyed += float64(st.def.Cost)
+	if owner >= 0 {
+		s.Sides[1-owner].Destroyed += float64(st.def.Cost)
+	}
 	for side := range s.Sides {
 		if side != owner && !st.seen[side].Visible {
 			continue // the other side learns of it when it next looks
@@ -1105,11 +1111,16 @@ func (s *Sim) engineers() {
 		from := st.Side
 		st.Side = sq.Side
 		for side := range s.Sides {
+			// A side that neither held it nor took it learns of this by looking: a tech
+			// building changes hands far from anyone who might be watching.
+			if side != sq.Side && side != from && !st.seen[side].Visible {
+				continue
+			}
 			s.remember(st, side)
 			s.emit(Event{Side: side, Kind: EvStructureCaptured, Structure: st.PlaceID(), Unit: st.Kind,
 				Squad: b2i(side == sq.Side, sq.ID), Point: s.nearestPoint(st.X, st.Y), Owner: &st.Side})
 		}
-		_ = from
+		s.techTaken(st, from)
 		for i := range sq.Teams {
 			sq.Teams[i].Members, sq.Teams[i].HP = 0, 0
 		}
@@ -1212,6 +1223,8 @@ type StructureView struct {
 	AY float64 `json:"ay,omitempty"`
 	BX float64 `json:"bx,omitempty"`
 	BY float64 `json:"by,omitempty"`
+	// Site is a tech building's id on the map ("tech-clinic-w"); its side is -1 until taken.
+	Site string `json:"site,omitempty"`
 }
 
 func (s *Sim) structureViews(side int) []StructureView {
@@ -1220,7 +1233,7 @@ func (s *Sim) structureViews(side int) []StructureView {
 		v := StructureView{
 			ID: st.PlaceID(), Kind: st.Kind, Faction: st.Faction, Role: st.def.Role, Side: st.Side,
 			X: round1(st.X), Y: round1(st.Y), Run: st.Run, Visible: true,
-			AX: round1(st.AX), AY: round1(st.AY), BX: round1(st.BX), BY: round1(st.BY),
+			AX: round1(st.AX), AY: round1(st.AY), BX: round1(st.BX), BY: round1(st.BY), Site: st.Site,
 		}
 		if side == Spectator || st.Side == side {
 			if st.Gone {

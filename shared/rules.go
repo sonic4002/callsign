@@ -188,6 +188,8 @@ type Map struct {
 	Gushers   []Gusher   `json:"gushers"`
 	Bridges   []Bridge   `json:"bridges"`
 	Landmarks []Landmark `json:"landmarks"`
+	// TechBuildings are the buildings of no army on this map, mirrored west and east.
+	TechBuildings []TechSite `json:"techBuildings"`
 }
 
 // TerrainAt is the terrain letter at a position; off the map counts as mountain.
@@ -267,7 +269,9 @@ type Rules struct {
 		Classes     map[string]Text `json:"classes"`
 	} `json:"callsigns"`
 	Factions map[string]Faction `json:"factions"`
-	Radio    struct {
+	// TechBuildings are the kinds of building that belong to no army (see RoleTech).
+	TechBuildings map[string]Structure `json:"techBuildings"`
+	Radio         struct {
 		Marker  Text            `json:"marker"`
 		Over    Text            `json:"over"`
 		Out     Text            `json:"out"`
@@ -384,6 +388,9 @@ func (r *Rules) check() error {
 		if err := r.checkMap(m); err != nil {
 			return fmt.Errorf("map %s: %w", id, err)
 		}
+	}
+	if err := r.checkTech(); err != nil {
+		return err
 	}
 	if len(r.Tiers) == 0 || r.Tiers[0].Tier != 1 {
 		return fmt.Errorf("tiers must start at tier 1")

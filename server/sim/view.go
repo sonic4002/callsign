@@ -308,6 +308,7 @@ func (s *Sim) Hash() uint64 {
 		}
 	}
 	s.hashStructures(put, f)
+	s.hashTech(put)
 	s.hashHaul(put, f)
 	return h.Sum64()
 }

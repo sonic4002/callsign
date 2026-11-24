@@ -90,9 +90,9 @@ func (rm *Room) structureNamed(side int, low string, enemy bool, x, y float64) s
 		if st.Ruin || (st.Side != side) != enemy {
 			continue
 		}
-		def := rm.r.Factions[st.Faction].Structures[st.Kind]
+		def, _ := rm.r.StructureDef(st.Faction, st.Kind)
 		named := false
-		for _, name := range []string{def.Name.En, def.Name.He, st.Kind, st.Role, roleWord(st.Role)} {
+		for _, name := range append([]string{def.Name.En, def.Name.He, st.Kind, st.Role, roleWord(st.Role), st.Site}, def.Aliases...) {
 			named = named || (name != "" && strings.Contains(low, strings.ToLower(name)))
 		}
 		if !named {
@@ -226,6 +226,9 @@ type StructureBrief struct {
 	Y        float64 `json:"y"`
 	HP       float64 `json:"hp"`
 	Building bool    `json:"building,omitempty"`
+	// A tech building: whose it is ("yours", "enemy" or "nobody") and what holding it gives.
+	Holder string `json:"holder,omitempty"`
+	Gives  string `json:"gives,omitempty"`
 }
 
 // structureBriefs lists the structures a side knows of, for a leader's report: its own
@@ -237,11 +240,23 @@ func (rm *Room) structureBriefs(snap sim.Snapshot) []StructureBrief {
 		if st.Ruin || st.Role == shared.RoleFence {
 			continue
 		}
-		def := rm.r.Factions[st.Faction].Structures[st.Kind]
-		out = append(out, StructureBrief{
+		def, _ := rm.r.StructureDef(st.Faction, st.Kind)
+		b := StructureBrief{
 			ID: st.ID, Name: def.Name.En, Role: st.Role, Yours: st.Side == snap.Side, Near: rm.near(st.X, st.Y),
 			X: st.X, Y: st.Y, HP: math.Round(st.HP*100) / 100, Building: st.Building < 1,
-		})
+		}
+		if st.Role == shared.RoleTech {
+			b.Gives = def.About.En
+			switch st.Side {
+			case snap.Side:
+				b.Holder = "yours"
+			case sim.NoSide:
+				b.Holder = "nobody"
+			default:
+				b.Holder = "enemy"
+			}
+		}
+		out = append(out, b)
 	}
 	return out
 }

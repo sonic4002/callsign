@@ -128,6 +128,12 @@
         {"id": "H-grove-1", "kind": "grove", "x": 1199, "y": 739, "near": "H", "bearing": "SE", "name": {"en": "the grove south-east of Hotel", "he": "החורשה מדרום-מזרח להגר"}},
         {"id": "D-wall-1", "kind": "wall", "x": 640, "y": 740, "near": "D", "bearing": "E", "name": {"en": "the wall east of Delta", "he": "החומה ממזרח לדוד"}},
         {"id": "H-wall-1", "kind": "wall", "x": 960, "y": 740, "near": "H", "bearing": "W", "name": {"en": "the wall west of Hotel", "he": "החומה ממערב להגר"}}
+      ],
+      "techBuildings": [
+        {"id": "tech-assay-w", "kind": "tech_goldworks", "x": 630, "y": 170, "near": "G", "bearing": "W", "name": {"en": "the assay office west of Golf", "he": "בית הבוחן ממערב לגימל"}},
+        {"id": "tech-assay-e", "kind": "tech_goldworks", "x": 970, "y": 170, "near": "G", "bearing": "E", "name": {"en": "the assay office east of Golf", "he": "בית הבוחן ממזרח לגימל"}},
+        {"id": "tech-clinic-w", "kind": "tech_clinic", "x": 330, "y": 790, "near": "D", "bearing": "SW", "name": {"en": "the clinic south-west of Delta", "he": "המרפאה מדרום-מערב לדוד"}},
+        {"id": "tech-clinic-e", "kind": "tech_clinic", "x": 1270, "y": 790, "near": "H", "bearing": "SE", "name": {"en": "the clinic south-east of Hotel", "he": "המרפאה מדרום-מזרח להגר"}}
       ]
     },
     "medium": {
@@ -241,6 +247,12 @@
         {"id": "H-grove-1", "kind": "grove", "x": 1910, "y": 1100, "near": "H", "bearing": "E", "name": {"en": "the grove east of Hotel", "he": "החורשה ממזרח להגר"}},
         {"id": "S-house-1", "kind": "house", "x": 960, "y": 1180, "near": "S", "bearing": "NW", "name": {"en": "the house north-west of Sierra", "he": "הבית מצפון-מערב לסמך"}},
         {"id": "S-house-2", "kind": "house", "x": 1440, "y": 1180, "near": "S", "bearing": "NE", "name": {"en": "the house north-east of Sierra", "he": "הבית מצפון-מזרח לסמך"}}
+      ],
+      "techBuildings": [
+        {"id": "tech-assay-w", "kind": "tech_goldworks", "x": 1040, "y": 420, "near": "G", "bearing": "W", "name": {"en": "the assay office west of Golf", "he": "בית הבוחן ממערב לגימל"}},
+        {"id": "tech-assay-e", "kind": "tech_goldworks", "x": 1360, "y": 420, "near": "G", "bearing": "E", "name": {"en": "the assay office east of Golf", "he": "בית הבוחן ממזרח לגימל"}},
+        {"id": "tech-garage-w", "kind": "tech_garage", "x": 1020, "y": 1090, "near": "L", "bearing": "SE", "name": {"en": "the service yard south-east of Lima", "he": "המוסך מדרום-מזרח ללאה"}},
+        {"id": "tech-garage-e", "kind": "tech_garage", "x": 1380, "y": 1090, "near": "M", "bearing": "SW", "name": {"en": "the service yard south-west of Mike", "he": "המוסך מדרום-מערב למשה"}}
       ]
     },
     "large": {
@@ -389,6 +401,14 @@
         {"id": "V-grove-1", "kind": "grove", "x": 1530, "y": 1920, "near": "V", "bearing": "W", "name": {"en": "the grove west of Victor", "he": "החורשה ממערב לואו"}},
         {"id": "V-grove-2", "kind": "grove", "x": 1670, "y": 1920, "near": "V", "bearing": "E", "name": {"en": "the grove east of Victor", "he": "החורשה ממזרח לואו"}},
         {"id": "V-ruin-2", "kind": "ruin", "x": 1900, "y": 1920, "near": "V", "bearing": "E", "name": {"en": "the ruin east of Victor", "he": "החורבה ממזרח לואו"}}
+      ],
+      "techBuildings": [
+        {"id": "tech-assay-w", "kind": "tech_goldworks", "x": 1340, "y": 220, "near": "N", "bearing": "W", "name": {"en": "the assay office west of November", "he": "בית הבוחן ממערב לנשר"}},
+        {"id": "tech-assay-e", "kind": "tech_goldworks", "x": 1860, "y": 220, "near": "N", "bearing": "E", "name": {"en": "the assay office east of November", "he": "בית הבוחן ממזרח לנשר"}},
+        {"id": "tech-clinic-w", "kind": "tech_clinic", "x": 1280, "y": 1080, "near": "L", "bearing": "E", "name": {"en": "the clinic east of Lima", "he": "המרפאה ממזרח ללאה"}},
+        {"id": "tech-clinic-e", "kind": "tech_clinic", "x": 1920, "y": 1080, "near": "M", "bearing": "W", "name": {"en": "the clinic west of Mike", "he": "המרפאה ממערב למשה"}},
+        {"id": "tech-garage-w", "kind": "tech_garage", "x": 900, "y": 1760, "near": "D", "bearing": "E", "name": {"en": "the service yard east of Delta", "he": "המוסך ממזרח לדוד"}},
+        {"id": "tech-garage-e", "kind": "tech_garage", "x": 2300, "y": 1760, "near": "H", "bearing": "W", "name": {"en": "the service yard west of Hotel", "he": "המוסך ממערב להגר"}}
       ]
     }
   },
@@ -414,6 +434,32 @@
       "vehicle": { "en": "Rhino", "he": "קרנף" },
       "air": { "en": "Hawk", "he": "בז" },
       "naval": { "en": "Shark", "he": "כריש" }
+    }
+  },
+  "techBuildings": {
+    "tech_goldworks": {
+      "name": { "en": "Assay Office", "he": "בית הבוחן" },
+      "about": { "en": "pays gold while you hold it", "he": "משלם זהב כל עוד הוא בידיכם" },
+      "aliases": ["assay office", "assay", "goldworks", "gold works", "the mint", "mint", "בית הבוחן", "בית בוחן", "הבוחן", "מטבעה"],
+      "role": "tech", "effect": "gold", "capturable": true,
+      "hp": 900, "armor": 0.35, "footprint": 42, "sight": 160,
+      "lump": 250, "incomePerSecond": 3
+    },
+    "tech_clinic": {
+      "name": { "en": "Field Clinic", "he": "מרפאת השדה" },
+      "about": { "en": "heals your infantry standing by it", "he": "מרפאה את החי\"ר שלכם שעומד לידה" },
+      "aliases": ["field clinic", "clinic", "hospital", "aid station", "מרפאת השדה", "מרפאת שדה", "המרפאה", "מרפאה", "בית החולים"],
+      "role": "tech", "effect": "heal", "capturable": true,
+      "hp": 700, "armor": 0.25, "footprint": 44, "sight": 160,
+      "mendPerSecond": 4, "radius": 130
+    },
+    "tech_garage": {
+      "name": { "en": "Service Yard", "he": "מוסך השדה" },
+      "about": { "en": "repairs your vehicles beside it", "he": "מתקן את הרכבים שלכם שלידו" },
+      "aliases": ["service yard", "garage", "workshop", "repair yard", "מוסך השדה", "מוסך שדה", "המוסך", "מוסך", "הסדנה"],
+      "role": "tech", "effect": "repair", "capturable": true,
+      "hp": 800, "armor": 0.35, "footprint": 46, "sight": 160,
+      "mendPerSecond": 14, "radius": 140
     }
   },
   "factions": {

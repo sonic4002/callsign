@@ -237,13 +237,14 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		}
 	}
 	s.initStructures(cfg.FullBase, cfg.Base)
+	s.initTech()
 	startGold := cfg.StartGold
 	if startGold <= 0 {
 		startGold = r.Match.StartGold
 	}
 	s.initHaul(startGold)
 	// What is built or lies on the ground can be named in an order like the map's own places.
-	s.Places = append(s.Places, s.structurePlace, s.fieldPlace)
+	s.Places = append(s.Places, s.structurePlace, s.fieldPlace, s.techPlace)
 	s.initFog()
 	return s, nil
 }
@@ -506,6 +507,7 @@ func (s *Sim) Step() []Event {
 	s.recover(live)
 	s.capture(live)
 	s.engineers()
+	s.techWork()
 	s.haulWork()
 	s.squadEvents(live)
 	s.countGarrisons()
