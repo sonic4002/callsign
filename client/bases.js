@@ -34,12 +34,15 @@ export function unitLock(state, rules, faction, side, unitId) {
 
 // structureCards is the Structures half of the build panel: one card per structure the
 // faction can build, with what it costs, what it unlocks, and why it cannot be started.
-//   state: "ready" | "rising" (with progress 0…1) | "have" | "needs" | "busy" | "full" | "poor"
+//   state: "ready" | "rising" (with progress 0…1) | "needs" | "busy" | "full" | "poor"
 export function structureCards(state, rules, faction, side) {
   const all = rules.factions[faction]?.structures ?? {};
   const own = mine(state, side);
   const rising = (isBase) => own.find((s) => s.building < 1 && base(structureDef(rules, s) ?? { role: s.role }) === isBase);
   const count = (role) => own.filter((s) => s.role === role).length;
+  // Base structures are placed by the player, and a second one of a kind is a second
+  // production line; the base as a whole has a cap.
+  const bases = own.filter((s) => base(structureDef(rules, s) ?? { role: s.role })).length;
   const runs = new Set(own.filter((s) => s.role === "fence").map((s) => s.run)).size;
   return Object.keys(all)
     .filter((id) => all[id].role !== "hq")
@@ -51,9 +54,9 @@ export function structureCards(state, rules, faction, side) {
       const going = up.find((s) => s.building < 1);
       const missing = def.requires.find((role) => !stands(state, side, role));
       if (going) Object.assign(card, { state: "rising", progress: going.building });
-      else if (base(def) && count(def.role) > 0) card.state = "have";
       else if (missing) Object.assign(card, { state: "needs", needs: ofRole(rules, faction, missing) });
       else if (rising(base(def))) card.state = "busy";
+      else if (base(def) && bases >= (rules.match.baseCap ?? Infinity)) card.state = "full";
       else if (def.role === "defence" && count("defence") >= rules.match.defenceCap) card.state = "full";
       else if (def.role === "fence" && runs >= rules.match.fenceRuns) card.state = "full";
       else if (state.gold < def.cost) card.state = "poor";
@@ -95,7 +98,3 @@ export function structureAt(state, rules, x, y) {
   }
   return best;
 }
-
-// The words a build button writes for where a defence or a fence should go, until the
-// player changes them: the front of the base.
-export const defaultPlace = (def) => (def.role === "defence" || def.role === "fence" ? "front" : "");

@@ -235,13 +235,6 @@ function operatorPlan(ctx) {
     if (!squad) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
-  if (haulerWords.test(text) && !/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
-    // "Haulers to the Kilo field", "המשאיות לשדה כרמל", "haulers on their own".
-    const auto = /\b(auto|on their own|themselves|choose)\b|לבד|בעצמם|בעצמן/.test(text);
-    const field = auto ? "auto" : call.points?.[0];
-    if (!field) return [radio(back, say.sayAgain[lang], "over")];
-    return [{ name: "haul", input: { field, hauler: 0 }, orElse: negative }, radio(back, say.wilco[lang], "out")];
-  }
   // "Cancel the tank", "בטל את הטנק": the last one of that kind leaves its line.
   const units = rules.factions[wake.status?.faction ?? ""]?.units ?? {};
   if (cancelVerb.test(text)) {
@@ -255,6 +248,13 @@ function operatorPlan(ctx) {
     if (!place) return [radio(back, say.sayAgain[lang], "over")];
     const from = namedStructure(text, compactStructures(wake.status ?? {}, agent.side), { enemy: false });
     return [{ name: "rally", input: { place, structure: from?.id ?? "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
+  }
+  if (haulerWords.test(text) && !/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
+    // "Haulers to the Kilo field", "המשאיות לשדה כרמל", "haulers on their own".
+    const auto = /\b(auto|on their own|themselves|choose)\b|לבד|בעצמם|בעצמן/.test(text);
+    const field = auto ? "auto" : call.points?.[0];
+    if (!field) return [radio(back, say.sayAgain[lang], "over")];
+    return [{ name: "haul", input: { field, hauler: 0 }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   // Building: a structure named with a word for building, or a defence or a fence asked
   // for by itself ("a gun at Delta", "fence the north side").

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { buildVerb, captureVerb, namedStructure, placeOf, wantedStructure } from "../agents/bases.mjs";
+import { buildVerb, captureVerb, namedStructure, wantedStructure } from "../agents/bases.mjs";
 import { ofRole, stands, structureAt, structureCards, structureRows, unitDef, unitLock } from "./bases.js";
 
 const read = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
@@ -37,7 +37,11 @@ test("a unit is locked until the structure it needs stands", () => {
 test("the structure cards say what can be built and why not", () => {
   const cards = structureCards(start, rules, "aegis", 0);
   assert.deepEqual(cards.map((c) => c.id).sort(), Object.keys(rules.factions.aegis.structures).filter((id) => id !== "commandPost").sort());
-  assert.equal(card(start, "barracks").state, "have");
+  // A second barracks is a second production line: the card stays open, and counts.
+  assert.equal(card(start, "barracks").state, "ready");
+  assert.equal(card(start, "barracks").have, 1);
+  const crowded = { ...start, structures: [...start.structures, ...Array.from({ length: rules.match.baseCap }, (_, i) => ({ id: `s${90 + i}`, kind: "barracks", faction: "aegis", role: "barracks", side: 0, x: 0, y: 0, hp: 1, building: 1 }))] };
+  assert.equal(card(crowded, "barracks").state, "full");
   assert.equal(card(start, "vehicleWorks").state, "ready");
   assert.deepEqual(card(start, "vehicleWorks").unlocks, ["tank", "rocketLauncher"]);
   assert.equal(card(start, "airbase").state, "needs");
@@ -88,13 +92,11 @@ test("the calls the page writes for structures are understood, in both languages
     for (const [id, def] of Object.entries(f.structures)) {
       if (def.role === "hq") continue;
       for (const lang of ["en", "he"]) {
-        const fixed = def.role === "defence" || def.role === "fence";
-        const text = fixed
-          ? t(lang, "call.buildAt", { to: "Anvil", from: "Hammer", structure: def.name[lang], place: strings[lang]["place.front"] })
-          : t(lang, "call.build", { to: "Anvil", from: "Hammer", structure: def.name[lang] });
+        // The page writes one call for every structure: what to build, and the spot chosen.
+        const place = t(lang, "place.spot", { ns: 140, nsDir: strings[lang]["dir.N"], ew: 60, ewDir: strings[lang]["dir.E"], point: rules.map.points[0].callsign[lang] });
+        const text = t(lang, "call.buildSpot", { to: "Anvil", from: "Hammer", structure: def.name[lang], place });
         assert.ok(buildVerb.test(text.toLowerCase()), `${faction} ${id} ${lang}: no build word in "${text}"`);
         assert.equal(wantedStructure(text, f.structures), id, `${faction} ${id} ${lang}: "${text}"`);
-        if (fixed) assert.equal(placeOf(text, []), "base:front", `"${text}"`);
         // Seen from the other side, it is named as a target.
         const seen = [{ id: "s9", name: def.name.en, role: def.role, whose: "enemy" }];
         const attack = t(lang, "call.attackStructure", { to: "Viper 1", from: "Hammer", structure: def.name[lang] });

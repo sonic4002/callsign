@@ -38,6 +38,9 @@ export const kinds = {
   splash: { pri: 2, gap: 120, seconds: 1.0 },
   coins: { pri: 1, gap: 400, seconds: 0.7 },
   gush: { pri: 0, gap: 1500, seconds: 1.6 },
+  hammer: { pri: 0, gap: 220, seconds: 0.25 },
+  built: { pri: 1, gap: 600, seconds: 0.8 },
+  door: { pri: 1, gap: 300, seconds: 0.7 },
   cannon: { pri: 3, gap: 90, seconds: 1.9 },
   boomS: { pri: 3, gap: 90, seconds: 1.3 },
   boomM: { pri: 4, gap: 150, seconds: 3.0 },
@@ -242,6 +245,21 @@ const recipes = {
     burst(ctx, out, at, 1.5, { f0: 520, f1: 1500, q: 0.6, gain: 0.16, attack: 0.35 });
     burst(ctx, out, at + 0.2, 1.1, { type: "highpass", f0: 5200, gain: 0.035, attack: 0.3 });
     for (let i = 0; i < 4; i++) burst(ctx, out, at + 0.5 + i * 0.17 + Math.random() * 0.08, 0.06, { f0: rand(3400, 5600), q: 10, gain: 0.07 });
+  },
+  // A building site: one blow of a hammer on steel.
+  hammer(ctx, out, at) {
+    burst(ctx, out, at, 0.06, { f0: rand(1700, 2700), q: 11, gain: 0.3 });
+    thump(ctx, out, at, 0.06, 190, 90, 0.22);
+  },
+  // A structure finished: two rising notes.
+  built(ctx, out, at) {
+    burst(ctx, out, at, 0.28, { f0: 620, q: 13, gain: 0.32 });
+    burst(ctx, out, at + 0.15, 0.4, { f0: 930, q: 13, gain: 0.32 });
+  },
+  // A unit coming out: a door rolling up, and the thud when it stops.
+  door(ctx, out, at) {
+    burst(ctx, out, at, 0.5, { type: "lowpass", f0: 320, f1: 900, q: 2, gain: 0.22, attack: 0.1 });
+    thump(ctx, out, at + 0.45, 0.1, 130, 60, 0.3);
   },
   // Water thrown up and falling back.
   splash(ctx, out, at) {

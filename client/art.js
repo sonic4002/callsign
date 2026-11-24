@@ -752,6 +752,18 @@ export function drawStructurePicture(ctx, kind, { progress = 1, door = "closed",
   return true;
 }
 
+// drawDoor lays a structure's door patch ("open" or "lit") over the building drawBuilding
+// drew, at the same size. It returns false when the structure has no such picture.
+export function drawDoor(ctx, kind, door) {
+  const base = sprites.buildings[kind];
+  const patch = base?.door?.frames?.[door];
+  if (!patch?.img) return false;
+  const k = (buildingHeight[kind] ?? base.height ?? 70) / base.size[1];
+  const [ax, ay] = base.anchor ?? [0.5, 0.8];
+  ctx.drawImage(patch.img, (patch.at[0] - ax * base.size[0]) * k, (patch.at[1] - ay * base.size[1]) * k, patch.size[0] * k, patch.size[1] * k);
+  return true;
+}
+
 // drawSandbags draws a sandbag position facing `turn` (a direction on screen, as for a
 // unit). `state` is "whole", "damaged" or "flat".
 export function drawSandbags(ctx, turn, state = "whole") {
