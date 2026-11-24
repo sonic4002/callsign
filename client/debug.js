@@ -9,6 +9,7 @@ import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
 import { Speech } from "./speech/speech.js";
+import { attachGestures, fingers } from "./touch.js";
 import { tidy } from "./voice/normalize.js";
 import { Voice } from "./voice/voice.js";
 
@@ -103,7 +104,9 @@ function connect() {
   system("connecting");
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?side=${side}&role=${role}`);
   ws.addEventListener("message", (ev) => onFrame(JSON.parse(ev.data)));
+  ws.addEventListener("open", () => document.body.classList.remove("no-server"));
   ws.addEventListener("close", () => {
+    document.body.classList.add("no-server"); // the page says so until the server is back
     system("disconnected", {}, "warn");
     setTimeout(connect, 1000);
   });
@@ -277,7 +280,7 @@ for (const example of document.querySelectorAll("#help .examples code")) {
 function draft(text) {
   $("text").value = text;
   syncInputDirection();
-  $("text").focus();
+  if (!fingers()) $("text").focus(); // on a phone this would open the keyboard over the map
 }
 
 // Calls already sent, oldest first. Up and Down in the box walk through them.
@@ -330,7 +333,7 @@ function renderVoice() {
   const status = $("voice-status");
   status.hidden = voiceState === "idle";
   status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
-  status.className = ["unsupported", "denied", "missing", "failed"].includes(voiceState) ? "warn" : "";
+  status.className = ["unsupported", "insecure", "denied", "missing", "failed"].includes(voiceState) ? "warn" : "";
   $("ptt").title = t("voiceHint");
   $("ptt").classList.toggle("live", voiceState === "listening");
   $("ptt").classList.toggle("busy", ["asking", "loading", "working"].includes(voiceState));
@@ -360,8 +363,13 @@ async function talkEnd() {
   const spoke = lang;
   const text = await voice.stop(spoke, rules ? callsigns(spoke) : []);
   if (!text || !rules) return;
+  let said = tidy(text, { lang: spoke, rules });
+  // Tap a squad, then speak: an order that names nobody goes to the squad that is selected.
+  const picked = state?.squads.find((sq) => sq.id === scene.selected);
+  const names = [...callsigns(spoke), rules.callsigns.player[spoke]].map((name) => name.toLowerCase());
+  if (picked && me && !names.some((name) => said.toLowerCase().startsWith(name))) said = t("callPrefix", { to: picked.callsign[spoke], from: me[spoke] }) + said;
   // Spoken calls go out at once; the log shows what was sent, and Up brings it back to fix.
-  draft(tidy(text, { lang: spoke, rules }));
+  draft(said);
   sendBox();
 }
 
@@ -530,31 +538,20 @@ function select(sq) {
 // ---- map ----
 
 const canvas = $("map");
-let drag = null;
-
-canvas.addEventListener("pointerdown", (ev) => {
-  drag = { x: ev.clientX, y: ev.clientY, moved: false };
-  canvas.setPointerCapture(ev.pointerId);
+// One pointer drags the map, two pinch it, and a press that did not move is a click.
+attachGestures(canvas, {
+  onPan(dx, dy) {
+    canvas.classList.add("dragging");
+    hideOrders();
+    scene.cam.pan(dx, dy);
+  },
+  onZoom(factor, x, y) {
+    const box = canvas.getBoundingClientRect();
+    scene.cam.zoomAt(x - box.left, y - box.top, factor);
+  },
+  onEnd: () => canvas.classList.remove("dragging"),
+  onTap: mapClick,
 });
-canvas.addEventListener("pointermove", (ev) => {
-  if (!drag) return;
-  const dx = ev.clientX - drag.x;
-  const dy = ev.clientY - drag.y;
-  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-  drag.moved = true;
-  canvas.classList.add("dragging");
-  hideOrders();
-  scene.cam.pan(dx, dy);
-  drag.x = ev.clientX;
-  drag.y = ev.clientY;
-});
-canvas.addEventListener("pointerup", (ev) => {
-  const wasDrag = drag?.moved;
-  drag = null;
-  canvas.classList.remove("dragging");
-  if (!wasDrag) mapClick(ev);
-});
-canvas.addEventListener("pointercancel", () => (drag = null));
 canvas.addEventListener(
   "wheel",
   (ev) => {
@@ -670,6 +667,7 @@ for (const kind of ["pointerdown", "keydown"]) addEventListener(kind, () => musi
 
 function frame(now) {
   requestAnimationFrame(frame);
+  if (document.hidden) return; // nobody is looking: save the battery
   scene.draw(now);
 }
 

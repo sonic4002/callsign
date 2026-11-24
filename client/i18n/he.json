@@ -170,5 +170,10 @@
   "trouble.bad_request": "הממסר דחה את הבקשה",
   "trouble.unreachable": "אין קשר עם הממסר",
   "trouble.failed": "משהו השתבש",
-  "trouble.join": "הסוכן לא הצליח להצטרף לקרב"
+  "trouble.join": "הסוכן לא הצליח להצטרף לקרב",
+  "tab.radio": "קשר",
+  "tab.build": "בנייה",
+  "tab.more": "עוד",
+  "noServer": "אין חיבור לשרת המשחק. מנסה שוב…",
+  "voice.insecure": "דיבור דורש https או localhost; הדף נפתח ב-http רגיל. אפשר להקליד."
 }

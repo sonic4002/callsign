@@ -3,6 +3,8 @@
 // Never seen is black, seen before is dimmed, in sight is clear. The fog is painted on
 // a small flat picture of the whole map, then laid over the isometric view and the radar.
 
+import { smoothing } from "./touch.js";
+
 const UNIT = 8; // map units per fog pixel
 const PAD = 160; // the fog reaches this far past the map edge, in map units
 const DIM = 0.5; // darkness left over ground seen before
@@ -89,7 +91,7 @@ export class Fog {
     // World (x, y) → screen is ((x - y - cx) z + w/2, ((x + y)/2 - cy) z + h/2).
     ctx.transform(z, z / 2, -z, z / 2, cam.w / 2 - cam.cx * z, cam.h / 2 - cam.cy * z);
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingQuality = smoothing();
     ctx.drawImage(this.canvas, -PAD, -PAD, this.canvas.width * UNIT, this.canvas.height * UNIT);
     ctx.restore();
   }

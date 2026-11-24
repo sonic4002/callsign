@@ -3,7 +3,7 @@
 //
 // States, reported through onState(state, detail):
 //   idle | asking (for the microphone) | loading { percent } | listening | working
-//   and the ways it can stop: unsupported | denied | missing | nothing | failed
+//   and the ways it can stop: unsupported | insecure | denied | missing | nothing | failed
 
 const RATE = 16000;
 const MIN_SECONDS = 0.4;
@@ -45,6 +45,9 @@ export class Voice {
 
   // start begins recording; the model for `lang` starts loading at the same moment.
   async start(lang) {
+    // Browsers hand out the microphone only on https or localhost: a phone that opened the
+    // game by its LAN address over plain http can do everything except talk.
+    if (globalThis.isSecureContext === false) return this.onState("insecure");
     if (!this.supported) return this.onState("unsupported");
     if (this.held) return;
     this.held = true;

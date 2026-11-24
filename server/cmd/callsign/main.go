@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -80,6 +81,8 @@ func main() {
 		}
 		mux.Handle("/relay/", httputil.NewSingleHostReverseProxy(target))
 	}
+	// The install manifest has no entry in every system's table of file types.
+	mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	mux.Handle("/", http.FileServer(http.Dir(*client)))
 
 	// Cross-origin isolation lets the page's speech recogniser use WebAssembly threads.

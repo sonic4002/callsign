@@ -170,5 +170,10 @@
   "trouble.bad_request": "the relay refused the request",
   "trouble.unreachable": "the relay cannot be reached",
   "trouble.failed": "something went wrong",
-  "trouble.join": "the agent could not join the match"
+  "trouble.join": "the agent could not join the match",
+  "tab.radio": "Radio",
+  "tab.build": "Build",
+  "tab.more": "More",
+  "noServer": "No connection to the game server. Trying again…",
+  "voice.insecure": "Voice needs https or localhost; this page was opened over plain http. Typing works."
 }

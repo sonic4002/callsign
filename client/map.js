@@ -7,6 +7,7 @@ import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
+import { pixelRatio, smoothing } from "./touch.js";
 
 export const sideColor = { [-1]: "#cfd3c8", 0: "#4da3ff", 1: "#ff6b4a" };
 const nerveColor = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
@@ -77,7 +78,7 @@ export class Scene {
 
   resize() {
     const box = this.canvas.parentElement.getBoundingClientRect();
-    const dpr = devicePixelRatio || 1;
+    const dpr = pixelRatio();
     this.dpr = dpr;
     this.canvas.width = Math.max(1, Math.round(box.width * dpr));
     this.canvas.height = Math.max(1, Math.round(box.height * dpr));
@@ -448,7 +449,7 @@ export class Scene {
     // Terrain.
     const gx = (-rules.map.height - MARGIN - cam.cx) * z + cam.w / 2;
     const gy = (-MARGIN - cam.cy) * z + cam.h / 2;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingQuality = smoothing();
     ctx.drawImage(this.layer, gx, gy, (this.layer.width / RES) * z, (this.layer.height / RES) * z);
     ctx.lineCap = "round";
     for (const w of this.waves) {
