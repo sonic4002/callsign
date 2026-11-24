@@ -451,6 +451,11 @@ function mapClick(ev) {
   const hit = scene.pick(sx, sy, side);
   if (hit.squad) return select(hit.squad);
   hideOrders();
+  if (hit.contact) {
+    const name = scene.contactName(hit.contact, lang);
+    const mine = state.squads.find((sq) => sq.id === scene.selected);
+    return draft(mine ? call("attack", { to: mine.callsign[lang], point: name }) : $("text").value + name);
+  }
   if (!hit.point) return;
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (!squad) return draft($("text").value + hit.point.callsign[lang]);

@@ -233,7 +233,7 @@ function describe(item) {
   const who = item.callsign?.en ?? "A squad";
   switch (e.kind) {
     case "contact":
-      return `Your squad made contact: enemy squad #${e.contact} near ${e.point}.`;
+      return `Your squad made contact: enemy squad Target ${e.contact} near ${e.point}.`;
     case "pinned":
       return `Your squad is pinned near ${e.point}.`;
     case "losses":

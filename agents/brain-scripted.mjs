@@ -40,7 +40,8 @@ function leaderPlan({ agent, wake, rules }) {
   const point = call.points?.[0];
   if (!verb || (!point && verb === "move")) return [radio(back, say.sayAgain[lang], "over")];
   // "Attack" with no target: the nearest enemy in sight, or else the enemy headquarters.
-  const contact = (!point && wake.status?.contacts?.[0]?.id) || 0;
+  const named = Number(new RegExp(`(?:${rules.callsigns.contact.en}|${rules.callsigns.contact.he})\\s*#?(\\d+)`, "i").exec(call.body)?.[1] ?? 0);
+  const contact = named || (!point && wake.status?.contacts?.[0]?.id) || 0;
   const enemyHQ = rules.map.points.find((p) => p.kind === "hq" && p.owner !== agent.side)?.id;
   const input = verb === "attack" ? { point: contact ? "" : point ?? enemyHQ, contact } : { point: point ?? "here" };
   return [

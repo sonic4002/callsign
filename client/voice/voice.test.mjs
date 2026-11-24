@@ -141,3 +141,9 @@ test("relaxed: a callsign that only sounds right is respelled when its number fo
   assert.equal(relaxed("buy a tank", { lang: "en", rules }), "buy a tank");
   assert.equal(tidy("Viper 2, this is Hammer. Hold Foxtrot. Over.", { lang: "en", rules }), "Viper 2, this is Hammer. Hold Foxtrot. Over.");
 });
+
+test("a named enemy squad keeps its name and gets a digit", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  assert.equal(relaxed("viper one attack target three", { lang: "en", rules }), "Viper 1 attack Target 3");
+  assert.equal(relaxed("צפע 1 תקוף את מטרה שלוש", { lang: "he", rules }), "צפע 1 תקוף את מטרה 3");
+});

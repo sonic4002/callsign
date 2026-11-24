@@ -557,10 +557,15 @@ export class Scene {
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner] });
     }
     for (const group of this.groups.values()) {
-      if (!group.own || !group.visuals.length) continue;
+      if (!group.visuals.length) continue;
       const cx = group.visuals.reduce((a, v) => a + v.x, 0) / group.visuals.length;
       const low = Math.max(...group.visuals.map((v) => cam.screen(v.x, v.y)[1]));
       const [sx] = cam.screen(cx, group.visuals.reduce((a, v) => a + v.y, 0) / group.visuals.length);
+      if (!group.own) {
+        // An enemy in sight gets a name the player can say: "Viper 1 attack Target 3".
+        this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88` });
+        continue;
+      }
       this.plate(group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
         size: 12,
         color: sideColor[group.side],
@@ -622,19 +627,26 @@ export class Scene {
   // ---- picking ----
 
   // pick says what is under a point of the view: one of our squads, or a map point.
+  // contactName is what the player calls an enemy squad in sight, e.g. "Target 3".
+  contactName(view, lang) {
+    return `${this.rules.callsigns.contact[lang]} ${view.id}`;
+  }
+
   pick(sx, sy, side) {
     if (!this.rules || !this.state) return {};
     let squad = null;
+    let contact = null;
     let bd = 26;
     for (const group of this.groups.values()) {
-      if (!group.own || group.side !== side) continue;
+      if (group.own && group.side !== side) continue;
       for (const v of group.visuals) {
         const [vx, vy] = this.cam.screen(v.x, v.y);
         const d = Math.hypot(vx - sx, vy - 10 - sy);
-        if (d < bd) [squad, bd] = [group.view, d];
+        if (d < bd) [squad, contact, bd] = group.own ? [group.view, null, d] : [null, group.view, d];
       }
     }
     if (squad) return { squad };
+    if (contact) return { contact };
     const [wx, wy] = this.cam.world(sx, sy);
     const point = this.rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= this.rules.match.captureRadius * 1.15);
     return point ? { point } : {};

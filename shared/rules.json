@@ -80,6 +80,7 @@
     "player": { "en": "Hammer", "he": "פטיש" },
     "operator": { "en": "Anvil", "he": "סדן" },
     "allStations": { "en": "All stations", "he": "כל התחנות" },
+    "contact": { "en": "Target", "he": "מטרה" },
     "classes": {
       "infantry": { "en": "Viper", "he": "צפע" },
       "vehicle": { "en": "Rhino", "he": "קרנף" },

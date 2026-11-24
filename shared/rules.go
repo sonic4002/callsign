@@ -116,6 +116,7 @@ type Rules struct {
 		Player      Text            `json:"player"`
 		Operator    Text            `json:"operator"`
 		AllStations Text            `json:"allStations"`
+		Contact     Text            `json:"contact"` // what an enemy squad in sight is called, before its id
 		Classes     map[string]Text `json:"classes"`
 	} `json:"callsigns"`
 	Factions map[string]Faction `json:"factions"`

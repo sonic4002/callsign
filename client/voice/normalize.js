@@ -91,6 +91,20 @@ function addressee(text, lang, rules) {
 
 // places puts the map's own spelling on words that sound like a point's callsign.
 function places(body, lang, rules) {
+  return contacts(placeNames(body, lang, rules), lang, rules);
+}
+
+// contacts respells a named enemy squad: "target three" → "Target 3".
+function contacts(body, lang, rules) {
+  const name = rules.callsigns.contact?.[lang];
+  if (!name) return body;
+  return body.replace(new RegExp(`(^|[\\s,.:;])${name}[\\s\\-#]*([^\\s,.:;!?]+)`, "gi"), (all, lead, word) => {
+    const n = numberOf(word, lang);
+    return n ? `${lead}${name} ${n}` : all;
+  });
+}
+
+function placeNames(body, lang, rules) {
   const points = rules.map.points.map((p) => p.callsign[lang]);
   const exact = (word) => points.find((p) => p.toLowerCase() === word.toLowerCase());
   const match = (word) => {

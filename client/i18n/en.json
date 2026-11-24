@@ -108,5 +108,7 @@
   "help.strict.2": "Every call opens with who you are calling and who you are: \"Viper 1, this is Hammer.\"",
   "help.strict.3": "Full procedure: the opening call, and Over or Out at the end. Anything else is refused.",
   "help.more": "The map",
-  "help.more.body": "Black ground has never been seen, dim ground was seen earlier, and clear ground is in sight of your troops right now. Land rigs are captured by infantry and sea rigs by boats; each one pumps gold. You win by destroying the enemy headquarters or by holding more points when the clock runs out."
+  "help.more.body": "Black ground has never been seen, dim ground was seen earlier, and clear ground is in sight of your troops right now. Land rigs are captured by infantry and sea rigs by boats; each one pumps gold. You win by destroying the enemy headquarters or by holding more points when the clock runs out.",
+  "help.attackTarget": "Attack an enemy squad in sight",
+  "help.attackTarget.say": "Viper 1 attack Target 3"
 }
