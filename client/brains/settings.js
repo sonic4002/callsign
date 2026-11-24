@@ -27,8 +27,10 @@ export function mountAgents({ t, system, server, side, seat, canAct }) {
     $("brains-keyline").textContent = agents.relayUp === false ? t("brains.norelay") : key.set ? t("brains.keyset", { provider: provider(key.provider), hint: key.hint }) : t("brains.nokey");
     for (const id of ["brains-provider", "brains-input", "brains-save"]) $(id).disabled = agents.relayUp === false;
     $("brains-remove").hidden = !key.set;
-    $("brains-note").hidden = !note;
-    $("brains-note").textContent = note ? t(`trouble.${note}`) : "";
+    // What went wrong: with the last save, or with the stored key when it was used.
+    const wrong = note || agents.blocked;
+    $("brains-note").hidden = !wrong;
+    $("brains-note").textContent = wrong ? t(`trouble.${wrong}`) : "";
     $("brains-demo").checked = agents.demo;
     $("brains-usage").textContent = t("brains.count", { calls: usage.calls, input: usage.input.toLocaleString("en"), output: usage.output.toLocaleString("en") });
     $("brains-open").classList.toggle("live", agents.status === "relay" || agents.status === "demo");

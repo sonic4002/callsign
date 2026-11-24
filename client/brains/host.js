@@ -17,6 +17,10 @@ import { WorkerAgent } from "./worker-agent.js";
 
 const RELAY = "/relay/v1";
 
+// tidy makes the relay's answer about a key what the page shows: the hint is the key's last
+// characters alone (the relay writes an ellipsis in front), and nothing is ever null.
+const tidy = (key) => ({ provider: key?.provider ?? "", set: Boolean(key?.set), hint: String(key?.hint ?? "").replace(/^…/, "") });
+
 export class BrowserAgents {
   // seat() gives the seat this page holds right now, from the lobby: { room, token }, with
   // an empty room for the open room of a server without seats, or null for none.
@@ -26,6 +30,7 @@ export class BrowserAgents {
     Object.assign(this, { server, side, seat, canAct, say, onChange });
     this.player = null; // this browser's token on the relay, once it has one
     this.sat = ""; // the seat the running host joined with
+    this.blocked = ""; // why the stored key cannot be used (a trouble code), until it is changed
     this.key = { provider: "", set: false, hint: "" };
     this.relayUp = null; // null until the relay has been asked
     this.demo = localStorage.getItem("callsign.agents") === "demo";
@@ -51,7 +56,7 @@ export class BrowserAgents {
   // agents to match.
   async refresh() {
     try {
-      this.key = await (await this.#keys()).get();
+      this.key = tidy(await (await this.#keys()).get());
       this.relayUp = true;
     } catch (err) {
       if (err.code === "not_your_seat" && this.player) {
@@ -72,12 +77,14 @@ export class BrowserAgents {
   }
 
   async saveKey(provider, key) {
-    this.key = await (await this.#keys()).set(provider, key);
+    this.key = tidy(await (await this.#keys()).set(provider, key));
+    this.blocked = "";
     await this.sync(true);
   }
 
   async removeKey() {
-    this.key = await (await this.#keys()).remove();
+    this.key = tidy(await (await this.#keys()).remove());
+    this.blocked = "";
     await this.sync();
   }
 
@@ -98,7 +105,9 @@ export class BrowserAgents {
   async sync(restart = false) {
     const seat = this.seat();
     const sat = seat ? `${seat.room}/${seat.token ?? ""}` : "";
-    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo, key: this.key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player) });
+    // A key the provider turned down is not tried again until the player changes it.
+    const key = this.blocked ? { set: false } : this.key;
+    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo, key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player) });
     // A host joined for another seat is of no use: a new match means a new host.
     if (want === this.mode && sat === this.sat && !restart) return this.onChange();
     this.sat = sat;
@@ -159,11 +168,11 @@ export class BrowserAgents {
   // when only the player can fix it, the side goes back to the server's agents.
   async #trouble(code) {
     if (needsPlayer.has(code) && this.mode === "relay") {
-      this.#stop();
-      this.mode = null;
-      this.key = { provider: "", set: false, hint: "" };
+      // Only the player can mend this. The side goes back to the server's agents, and
+      // stays there until the key is saved again or removed.
+      this.blocked = code;
       this.say("stopped", { code }, "warn");
-      await this.refresh().catch(() => {});
+      await this.sync();
       return;
     }
     if (this.throttle.pass(code)) this.say("skipped", { code }, "warn");
