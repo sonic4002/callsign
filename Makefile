@@ -20,7 +20,7 @@ test:
 play:
 	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
 	@docker volume create callsign-gocache >/dev/null
-	@mkdir -p assets/voice-cache
+	@mkdir -p assets/voice-cache .relay-data
 	CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) up
 
 stop:
@@ -86,3 +86,17 @@ tts-models:
 # The pronunciation table's tests. No models and no network needed.
 tts-test:
 	$(TTS) --network none -w /src/tts callsign-tts python -m unittest test_pronounce
+
+# ---- model relay: the players' AI keys and their agents' AI calls (relay/) ----
+.PHONY: relay relay-test
+
+# Run the relay alone on this machine, beside a game server on port 8080. `make play`
+# already starts one; this is for working on the relay itself. Keys go to .relay-data/.
+relay:
+	@mkdir -p .relay-data
+	$(DOCKER) --network host $(IMAGE) go run ./relay/cmd/relay -addr=127.0.0.1:8090 -data=.relay-data
+
+# The relay's tests alone, with the race detector. Every provider is played by a fake:
+# no key is needed and nothing leaves this machine.
+relay-test:
+	$(DOCKER) --network none $(IMAGE) go test -race -count=1 ./relay/... ./shared/...

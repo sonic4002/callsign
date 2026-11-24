@@ -12,3 +12,6 @@ assets/models/
 assets/voice-cache/
 client/vendor/ort/
 .claude/worktrees/
+
+# Model relay: the encrypted key store and its master key.
+.relay-data/

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "comment": "Brain tier to model, per provider. The relay reads this; nothing else chooses a model. Tiers 1 to 3 are squad brains (rules.json tiers), operator is Anvil. Numbers are starting points for balancing: keep one fixed model per tier per vendor and compare win rates.",
+  "maxTokens": 4096,
+  "effort": { "1": "low", "2": "medium", "3": "high", "operator": "medium" },
+  "providers": {
+    "anthropic": {
+      "1": "claude-haiku-5-5",
+      "2": "claude-sonnet-5-5",
+      "3": "claude-opus-5-5",
+      "operator": "claude-opus-5-5"
+    },
+    "openrouter": {
+      "1": "anthropic/claude-haiku-5.5",
+      "2": "anthropic/claude-sonnet-5.5",
+      "3": "anthropic/claude-opus-5.5",
+      "operator": "anthropic/claude-opus-5.5"
+    },
+    "openai": {
+      "1": "gpt-6-luna",
+      "2": "gpt-6.2-sol",
+      "3": "gpt-6.2-astra",
+      "operator": "gpt-6.2-astra"
+    },
+    "gemini": {
+      "1": "gemini-3.5-flash-lite",
+      "2": "gemini-4-hydrogen",
+      "3": "gemini-4-carbon",
+      "operator": "gemini-4-carbon"
+    }
+  }
+}
