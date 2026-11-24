@@ -887,6 +887,13 @@ export class Scene {
       const [sx, sy] = cam.screen(p.x, p.y);
       this.healthBar(sx, sy - 118 * buildScale, hp, null);
     }
+    // A bridge that is hit, or that engineers are mending, shows how much of it is left.
+    for (const b of rules.map.bridges ?? []) {
+      const seen = this.bridges.get(b.id);
+      if (!seen || !(seen.hp < 0.995) || (!seen.standing && !(seen.hp > 0))) continue;
+      const [sx, sy] = cam.screen((b.from[0] + b.to[0]) / 2, (b.from[1] + b.to[1]) / 2);
+      this.healthBar(sx, sy - 34 * buildScale, seen.hp, null);
+    }
   }
 
   // compass shows where north, east, south and west lie on the tilted map, in the corner
