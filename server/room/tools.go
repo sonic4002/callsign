@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"callsign/server/radio"
 	"callsign/server/sim"
@@ -17,11 +18,15 @@ const (
 	ToolAttack = "attack"
 	ToolReport = "report"
 	ToolBuy    = "buy"
+	ToolRepair = "repair"
 )
+
+// ErrWhichPlace is returned when the words for a place fit more than one landmark.
+var ErrWhichPlace = errors.New("which one")
 
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
-	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack},
+	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolRepair},
 	RoleAnvil: {ToolRadio, ToolReport, ToolBuy},
 }
 
@@ -39,6 +44,7 @@ func (n *names) UnmarshalJSON(b []byte) error {
 
 type toolArgs struct {
 	Point   string `json:"point"`
+	Place   string `json:"place"` // a point, a landmark or bridge by id or name, or "<bearing> of <point> [<metres>]"
 	Contact int    `json:"contact"`
 	Unit    string `json:"unit"`
 	Upgrade string `json:"upgrade"`
@@ -75,20 +81,33 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		return rm.toolBuy(side, a)
 	}
 
-	// move, hold, attack: always the caller's own squad.
+	// move, hold, attack, repair: always the caller's own squad.
 	cmd := sim.Command{Side: side, Kind: name, Squad: c.ID.Squad, Contact: a.Contact}
-	if a.Point != "" {
-		id, ok := rm.net.ResolvePoint(a.Point)
-		if !ok {
-			return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, a.Point)
+	where := a.Place
+	if where == "" {
+		where = a.Point
+	}
+	if where != "" && !(name == ToolHold && strings.EqualFold(strings.TrimSpace(where), "here")) {
+		place, choices, ok := rm.net.ResolvePlace(where)
+		switch {
+		case ok:
+			cmd.Place = place
+		case len(choices) > 1:
+			// The words fit more than one landmark: say which, so the squad can ask.
+			names := make([]string, len(choices))
+			for i, id := range choices {
+				names[i] = rm.net.PlaceName(id, "en") + " (" + id + ")"
+			}
+			return nil, fmt.Errorf("%w: %q could be %s", ErrWhichPlace, where, strings.Join(names, " or "))
+		default:
+			return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, where)
 		}
-		cmd.Point = id
 	}
 	sq, err := rm.sim.Apply(cmd)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"order": sq.Order.Kind, "point": sq.Order.Point, "contact": sq.Order.Contact}, nil
+	return map[string]any{"order": sq.Order.Kind, "point": sq.Order.Point, "place": sq.Order.Place, "contact": sq.Order.Contact}, nil
 }
 
 func (rm *Room) toolRadio(c *Client, a toolArgs) (any, error) {
@@ -151,6 +170,10 @@ func (rm *Room) toolReport(c *Client) (any, error) {
 		Alive    int           `json:"alive"`
 	}
 	out := map[string]any{"timeLeft": snap.TimeLeft, "points": snap.Points, "contacts": snap.Contacts}
+	if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
+		// The ground: cover, buildings and bridges in sight and around the points.
+		out["landmarks"] = rm.sim.LandmarksNear(sq)
+	}
 	friends := []friend{}
 	for _, sq := range snap.Squads {
 		if sq.ID == c.ID.Squad {

@@ -50,6 +50,8 @@ type Parsed struct {
 	Lang     string   // "en" or "he"
 	Prowords []string // procedure words found in the body, by their rules key
 	Points   []string // map point ids the body mentions, in order
+	// Landmarks are the ids of the landmarks and bridges the body clearly names.
+	Landmarks []string
 }
 
 var (
@@ -79,6 +81,7 @@ type Net struct {
 	out     []string
 	pro     []word // procedure word spellings, longest first
 	places  []word // place names and aliases, longest first; key is the point id
+	named   []namedPlace // landmarks and bridges by name
 }
 
 func NewNet(r *shared.Rules) *Net {
@@ -122,6 +125,7 @@ func NewNet(r *shared.Rules) *Net {
 		}
 	}
 	byLength(n.places)
+	n.initPlaces()
 	return n
 }
 
@@ -239,6 +243,7 @@ func (n *Net) parse(text string, relaxed bool) (Parsed, error) {
 	lowBody := lower(p.Body)
 	p.Prowords = n.prowords(lowBody)
 	p.Points = n.FindPoints(lowBody)
+	p.Landmarks = n.FindLandmarks(lowBody)
 	switch {
 	case marker == 1:
 		p.Lang = "he"
@@ -354,6 +359,13 @@ const hebrewPrefixes = "בלמהוכש"
 // FindPoints returns the ids of the map points a text mentions, in the order they appear.
 // Bare letters never count: "a" is a word long before it is point A.
 func (n *Net) FindPoints(text string) []string {
+	ids, _ := n.findPoints(text)
+	return ids
+}
+
+// findPoints is FindPoints that also returns the text, in lower case, with every point
+// name it found blanked out, for whoever reads the words around them.
+func (n *Net) findPoints(text string) ([]string, string) {
 	work := []byte(lower(text))
 	type hit struct {
 		at int
@@ -401,7 +413,7 @@ func (n *Net) FindPoints(text string) []string {
 			ids = append(ids, h.id)
 		}
 	}
-	return ids
+	return ids, string(work)
 }
 
 // ResolvePoint accepts a point id ("F") or any of its names and returns the id.

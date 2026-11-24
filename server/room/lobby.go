@@ -52,7 +52,9 @@ type SeatView struct {
 type LobbyView struct {
 	Room     string      `json:"room"`
 	Opponent string      `json:"opponent"`
-	Length   int         `json:"length"` // seconds
+	Length   int         `json:"length"`    // seconds
+	Map      string      `json:"map"`       // the map id
+	Gold     int         `json:"startGold"` // gold each side starts with
 	Watch    bool        `json:"watch"`
 	Level    string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
 	Phase    string      `json:"phase"`           // "lobby", "playing" or "over"
@@ -64,6 +66,10 @@ func (rm *Room) lobby() LobbyView {
 	v := LobbyView{
 		Room: rm.cfg.Code, Opponent: rm.cfg.Opponent, Watch: rm.cfg.Watch, Match: rm.match,
 		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby",
+		Map: rm.r.Map.ID, Gold: rm.cfg.StartGold,
+	}
+	if v.Gold == 0 {
+		v.Gold = rm.r.Match.StartGold
 	}
 	switch {
 	case rm.sim.Over:

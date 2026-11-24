@@ -20,6 +20,12 @@ const (
 	EvHQUnderAttack  = "hq_under_attack"
 	EvUpgraded       = "upgraded"
 	EvMatchEnd       = "match_end"
+
+	EvGarrisoned        = "garrisoned"          // a squad went inside a building; Place is the landmark
+	EvBuildingFell      = "building_fell"       // Place is the landmark; Count the fireteams that were inside
+	EvBridgeUnderAttack = "bridge_under_attack" // Place is the bridge
+	EvBridgeFell        = "bridge_fell"         // Place is the bridge; Count the side's fireteams lost on it
+	EvBridgeRepaired    = "bridge_repaired"     // Place is the bridge, standing again
 )
 
 // Event is something one side learns about. It never carries what that side cannot see.
@@ -31,6 +37,7 @@ type Event struct {
 	Unit    string `json:"unit,omitempty"`    // unit id, for a deployment
 	Contact int    `json:"contact,omitempty"` // enemy squad id
 	Point   string `json:"point,omitempty"`   // nearest map point
+	Place   string `json:"place,omitempty"`   // the landmark or bridge the event is about
 	Count   int    `json:"count,omitempty"`
 	Winner  *int   `json:"winner,omitempty"`
 	Reason  string `json:"reason,omitempty"`
@@ -44,15 +51,19 @@ const (
 	CmdAttack  = "attack"
 	CmdBuy     = "buy"
 	CmdUpgrade = "upgrade"
+	CmdRepair  = "repair"
 )
 
 // Command is one validated change a side asks for. Everything a player or agent does
 // to the match goes through Apply; nothing else writes to the simulation.
 type Command struct {
-	Side    int    `json:"side"`
-	Kind    string `json:"kind"`
-	Squad   int    `json:"squad,omitempty"`
-	Point   string `json:"point,omitempty"`
+	Side  int    `json:"side"`
+	Kind  string `json:"kind"`
+	Squad int    `json:"squad,omitempty"`
+	Point string `json:"point,omitempty"`
+	// Place is where a move, hold, attack or repair goes, in a form ResolvePlace reads.
+	// Point is the older name for the same thing and still works.
+	Place   string `json:"place,omitempty"`
 	Contact int    `json:"contact,omitempty"`
 	Unit    string `json:"unit,omitempty"`
 }
@@ -60,8 +71,10 @@ type Command struct {
 var (
 	ErrOver        = errors.New("the match is over")
 	ErrNoSquad     = errors.New("no such squad on your side")
-	ErrNoPoint     = errors.New("no such map point")
-	ErrUnreachable = errors.New("that squad cannot reach that point")
+	ErrNoPoint     = ErrNoPlace
+	ErrUnreachable = errors.New("that squad cannot reach that place")
+	ErrNoRepair    = errors.New("that squad cannot repair anything")
+	ErrNotBridge   = errors.New("only a bridge can be repaired")
 	ErrNoContact   = errors.New("no such contact in sight")
 	ErrNoUnit      = errors.New("your faction has no such unit")
 	ErrNoGold      = errors.New("not enough gold")
@@ -80,7 +93,7 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return nil, ErrBadCommand
 	}
 	switch c.Kind {
-	case CmdMove, CmdHold, CmdAttack:
+	case CmdMove, CmdHold, CmdAttack, CmdRepair:
 		return s.order(c)
 	case CmdBuy:
 		return s.buy(c)
@@ -96,6 +109,10 @@ func (s *Sim) order(c Command) (*Squad, error) {
 		return nil, ErrNoSquad
 	}
 	o := Order{Kind: c.Kind, Tick: s.Tick}
+	place := c.Place
+	if place == "" {
+		place = c.Point
+	}
 	switch {
 	case c.Kind == CmdAttack && c.Contact != 0:
 		enemy := s.Squad(c.Contact)
@@ -104,15 +121,29 @@ func (s *Sim) order(c Command) (*Squad, error) {
 		}
 		o.Contact = enemy.ID
 		o.X, o.Y = enemy.Center()
-	case c.Point != "":
-		p := s.pointState(c.Point)
-		if p == nil {
-			return nil, ErrNoPoint
+	case place != "":
+		pl, err := s.ResolvePlace(place)
+		if err != nil {
+			return nil, err
 		}
-		if sq.unit.Domain != "air" && (p.Y >= s.R.Map.WaterY) != (sq.unit.Domain == "sea") {
-			return nil, fmt.Errorf("%w: %s is a %s unit", ErrUnreachable, sq.unit.Name.En, sq.unit.Domain)
+		if c.Kind == CmdRepair {
+			if pl.Kind != PlaceBridge {
+				return nil, ErrNotBridge
+			}
+			if sq.unit.RepairPerSecond <= 0 {
+				return nil, ErrNoRepair
+			}
 		}
-		o.Point, o.X, o.Y = p.ID, p.X, p.Y
+		x, y, err := s.standAt(sq, c.Kind, pl)
+		if err != nil {
+			return nil, err
+		}
+		o.Place, o.X, o.Y, o.landmark, o.bridge = pl.ID, x, y, pl.landmark, pl.bridge
+		if pl.Kind == PlacePoint {
+			o.Point = pl.ID
+		}
+	case c.Kind == CmdRepair:
+		return nil, ErrNotBridge
 	case c.Kind == CmdHold:
 		o.X, o.Y = sq.Center() // hold where you stand
 	default:
@@ -120,6 +151,45 @@ func (s *Sim) order(c Command) (*Squad, error) {
 	}
 	sq.Order = o
 	return sq, nil
+}
+
+// standAt is where a squad ordered to a place actually goes: the place itself when its
+// unit can be there, the bank beside a bridge it is to shoot at or mend, the door of a
+// building. It refuses a place the squad's unit can never get to.
+func (s *Sim) standAt(sq *Squad, kind string, pl Place) (float64, float64, error) {
+	u := sq.unit
+	cannot := fmt.Errorf("%w: %s is a %s unit", ErrUnreachable, u.Name.En, u.Domain)
+	x, y := pl.X, pl.Y
+	if pl.Kind == PlaceBridge && u.Domain == "land" {
+		b := &s.Bridges[pl.bridge-1]
+		if kind == CmdAttack || kind == CmdRepair || !b.Standing {
+			x, y = s.nearEnd(b, sq)
+		}
+	}
+	switch u.Domain {
+	case "air":
+		return x, y, nil
+	case "sea":
+		if !s.Sailable(x, y) {
+			return 0, 0, cannot
+		}
+		return x, y, nil
+	}
+	if pl.Kind == PlaceLandmark && s.kindOf(&s.Landmarks[pl.landmark-1]).Size > 0 {
+		return x, y, nil // a building: the squad goes to its door, or inside
+	}
+	if !s.Walkable(x, y) {
+		// A step off the mark is fine; the far side of a lake is not.
+		sx, sy := s.nav.snapXY(navGround, x, y)
+		if dist(x, y, sx, sy) > 60 {
+			return 0, 0, cannot
+		}
+		x, y = sx, sy
+	}
+	if !s.Reachable(sq, x, y) {
+		return 0, 0, fmt.Errorf("%w: there is no way there on the ground", ErrUnreachable)
+	}
+	return x, y, nil
 }
 
 // visible reports whether any team of an enemy squad is in sight of the other side.

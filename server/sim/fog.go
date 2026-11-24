@@ -15,6 +15,22 @@ type pointMemory struct {
 	Visible  bool // in sight this tick
 }
 
+// landmarkMemory is a landmark as a side last saw it.
+type landmarkMemory struct {
+	Kind    string
+	HP      float64 // share 0…1
+	GSide   int     // who is inside, NoSide for nobody as far as the side knows
+	GTeams  int
+	Visible bool
+}
+
+// bridgeMemory is a bridge as a side last saw it.
+type bridgeMemory struct {
+	HP       float64 // share 0…1
+	Standing bool
+	Visible  bool
+}
+
 // FogView is the ground a side has seen at any time: a bitset of cells, row by row,
 // lowest bit first. What is in sight right now follows from the side's own teams.
 type FogView struct {
@@ -38,6 +54,14 @@ func (s *Sim) initFog() {
 			sd.points[i] = pointMemory{Owner: s.Points[i].Owner, CapSide: NoSide}
 		}
 		sd.enemyHQ = 1
+		sd.lands = make([]landmarkMemory, len(s.Landmarks))
+		for i := range s.Landmarks {
+			sd.lands[i] = landmarkMemory{Kind: s.Landmarks[i].Kind, HP: 1, GSide: NoSide}
+		}
+		sd.bridges = make([]bridgeMemory, len(s.Bridges))
+		for i := range s.Bridges {
+			sd.bridges[i] = bridgeMemory{HP: 1, Standing: true}
+		}
 	}
 	s.observe()
 }
@@ -136,6 +160,60 @@ func (s *Sim) observe() {
 		}
 		if enemy := s.R.HQPoint(1 - side); s.InSight(side, enemy.X, enemy.Y) {
 			sd.enemyHQ = math.Max(0, s.Sides[1-side].HQHP/s.R.HQ.HP)
+		}
+		s.observeMap(side)
+	}
+}
+
+// observeMap updates what a side knows of the landmarks and bridges. A building's
+// state is learned by seeing it. Who is inside is learned only from close by or when
+// they give themselves away; a side always knows about its own troops.
+func (s *Sim) observeMap(side int) {
+	sd := &s.Sides[side]
+	for i := range s.Landmarks {
+		l, m := &s.Landmarks[i], &sd.lands[i]
+		m.Visible = s.InSight(side, l.X, l.Y)
+		if s.R.LandmarkKinds[l.Landmark.Kind].Garrison == 0 {
+			continue
+		}
+		gside, teams := s.garrison(l.ID)
+		if gside == side {
+			m.Kind, m.HP, m.GSide, m.GTeams = l.Kind, s.landmarkShare(l), gside, teams
+			continue
+		}
+		if !m.Visible {
+			continue
+		}
+		m.Kind, m.HP = l.Kind, s.landmarkShare(l)
+		seen, close := 0, false
+		for _, sq := range s.Squads {
+			if !sq.Alive {
+				continue
+			}
+			for j := range sq.Teams {
+				t := &sq.Teams[j]
+				switch {
+				case t.Members == 0:
+				case sq.Side != side && t.In == l.ID && t.Spotted:
+					seen++
+				case sq.Side == side && dist(t.X, t.Y, l.X, l.Y) <= s.R.Match.GarrisonSight:
+					close = true
+				}
+			}
+		}
+		switch {
+		case seen > 0:
+			m.GSide, m.GTeams = gside, seen
+		case close || m.GSide == side || l.Kind == Rubble:
+			m.GSide, m.GTeams = NoSide, 0 // looked inside, or it was ours and we left
+		}
+	}
+	for i := range s.Bridges {
+		b, m := &s.Bridges[i], &sd.bridges[i]
+		mx, my := b.mid()
+		m.Visible = s.InSight(side, mx, my) || s.InSight(side, b.From[0], b.From[1]) || s.InSight(side, b.To[0], b.To[1])
+		if m.Visible {
+			m.HP, m.Standing = b.Share(), b.Standing
 		}
 	}
 }

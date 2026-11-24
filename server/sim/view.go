@@ -17,12 +17,41 @@ type TeamView struct {
 	Members int     `json:"members"`
 	Nerve   string  `json:"nerve,omitempty"`  // own teams only
 	Action  string  `json:"action,omitempty"` // own teams only
+	// Cover is the multiplier on hits the team takes from the cover it is in, when it
+	// is in any (own teams only). In is the building it is inside.
+	Cover float64 `json:"cover,omitempty"`
+	In    string  `json:"in,omitempty"`
 }
 
 type OrderView struct {
 	Kind    string `json:"kind"`
 	Point   string `json:"point,omitempty"`
+	Place   string `json:"place,omitempty"` // the landmark, bridge or offset the order named
 	Contact int    `json:"contact,omitempty"`
+}
+
+// GarrisonView is who is inside a building, as far as the viewer knows.
+type GarrisonView struct {
+	Side  int `json:"side"`
+	Teams int `json:"teams"`
+}
+
+// LandmarkView is a landmark whose state is no longer what the map says: a damaged or
+// fallen building, or one with a garrison. Untouched landmarks are not listed.
+type LandmarkView struct {
+	ID       string        `json:"id"`
+	Kind     string        `json:"kind"`               // "rubble" once fallen
+	HP       float64       `json:"hp"`                 // share 0…1
+	Garrison *GarrisonView `json:"garrison,omitempty"` // absent when empty or not known
+	Visible  bool          `json:"visible"`            // in sight now; otherwise as last seen
+}
+
+// BridgeView is a bridge as the viewer last saw it.
+type BridgeView struct {
+	ID       string  `json:"id"`
+	HP       float64 `json:"hp"` // share 0…1
+	Standing bool    `json:"standing"`
+	Visible  bool    `json:"visible"`
 }
 
 type SquadView struct {
@@ -74,21 +103,23 @@ type PointView struct {
 }
 
 type Snapshot struct {
-	Tick      int           `json:"tick"`
-	TimeLeft  int           `json:"timeLeft"` // seconds
-	Side      int           `json:"side"`
-	Faction   string        `json:"faction,omitempty"`
-	Gold      int           `json:"gold"`
-	Income    int           `json:"income"`
-	HQ        [2]float64    `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
-	Fog       *FogView      `json:"fog,omitempty"` // absent for spectators, who see everything
-	Points    []PointView   `json:"points"`
-	Squads    []SquadView   `json:"squads"`
-	Deploying []DeployView  `json:"deploying"` // own squads bought and on their way, oldest first
-	Contacts  []ContactView `json:"contacts"`
-	Over      bool          `json:"over"`
-	Winner    int           `json:"winner"`
-	Reason    string        `json:"reason,omitempty"`
+	Tick      int            `json:"tick"`
+	TimeLeft  int            `json:"timeLeft"` // seconds
+	Side      int            `json:"side"`
+	Faction   string         `json:"faction,omitempty"`
+	Gold      int            `json:"gold"`
+	Income    int            `json:"income"`
+	HQ        [2]float64     `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
+	Fog       *FogView       `json:"fog,omitempty"` // absent for spectators, who see everything
+	Points    []PointView    `json:"points"`
+	Landmarks []LandmarkView `json:"landmarks"` // only the ones that differ from the map
+	Bridges   []BridgeView   `json:"bridges"`
+	Squads    []SquadView    `json:"squads"`
+	Deploying []DeployView   `json:"deploying"` // own squads bought and on their way, oldest first
+	Contacts  []ContactView  `json:"contacts"`
+	Over      bool           `json:"over"`
+	Winner    int            `json:"winner"`
+	Reason    string         `json:"reason,omitempty"`
 }
 
 // Snapshot is the match as one side may see it. Enemy squads appear only as contacts,
@@ -103,6 +134,8 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		Winner:    s.Winner,
 		Reason:    s.Reason,
 		Squads:    []SquadView{},
+		Landmarks: []LandmarkView{},
+		Bridges:   []BridgeView{},
 		Deploying: []DeployView{},
 		Contacts:  []ContactView{},
 	}
@@ -129,6 +162,7 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		cols, rows := s.fogSize()
 		snap.Fog = &FogView{Cell: FogCell, Cols: cols, Rows: rows, Seen: append([]byte{}, s.Sides[side].explored...)}
 	}
+	s.viewMap(&snap, side)
 	for _, sq := range s.Squads {
 		if sq.Deploying() && (side == Spectator || sq.Side == side) {
 			snap.Deploying = append(snap.Deploying, DeployView{
@@ -155,14 +189,16 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 		ID: sq.ID, Side: sq.Side, Callsign: s.Callsign(sq), Unit: sq.Unit, Class: sq.unit.Class,
 		Tier: sq.Tier, X: round1(x), Y: round1(y), Near: s.nearestPoint(x, y),
 		Alive: alive, Full: full,
-		Order:    OrderView{Kind: sq.Order.Kind, Point: sq.Order.Point, Contact: sq.Order.Contact},
+		Order:    OrderView{Kind: sq.Order.Kind, Point: sq.Order.Point, Place: sq.Order.Place, Contact: sq.Order.Contact},
 		Contacts: append([]int{}, sq.Contacts...),
 	}
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 {
-			v.Teams = append(v.Teams, TeamView{
-				X: round1(t.X), Y: round1(t.Y), Members: t.Members, Nerve: s.Nerve(t), Action: t.Action,
-			})
+			tv := TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, Nerve: s.Nerve(t), Action: t.Action, In: t.In}
+			if t.Cover > 0 && t.Cover < 1 {
+				tv.Cover = t.Cover
+			}
+			v.Teams = append(v.Teams, tv)
 		}
 	}
 	return v
@@ -173,7 +209,7 @@ func (s *Sim) contactView(sq *Squad) ContactView {
 	var x, y float64
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 && t.Spotted {
-			v.Teams = append(v.Teams, TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members})
+			v.Teams = append(v.Teams, TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, In: t.In})
 			x, y = x+t.X, y+t.Y
 		}
 	}
@@ -212,12 +248,32 @@ func (s *Sim) Hash() uint64 {
 		put(uint64(int64(s.Points[i].Owner)))
 		put(uint64(s.Points[i].CapTicks))
 	}
+	for i := range s.Bridges {
+		f(s.Bridges[i].HP)
+		put(uint64(b2i(s.Bridges[i].Standing)))
+	}
+	for i := range s.Landmarks {
+		f(s.Landmarks[i].HP)
+		h.Write([]byte(s.Landmarks[i].Kind))
+	}
+	for i := range s.Sides {
+		for _, m := range s.Sides[i].lands {
+			f(m.HP)
+			put(uint64(int64(m.GSide)))
+			put(uint64(m.GTeams))
+		}
+		for _, m := range s.Sides[i].bridges {
+			f(m.HP)
+			put(uint64(b2i(m.Standing)))
+		}
+	}
 	for _, sq := range s.Squads {
 		put(uint64(sq.ID))
 		put(uint64(sq.Tier))
 		put(uint64(sq.DeployTicks))
 		h.Write([]byte(sq.Order.Kind))
 		h.Write([]byte(sq.Order.Point))
+		h.Write([]byte(sq.Order.Place))
 		for i := range sq.Teams {
 			t := &sq.Teams[i]
 			f(t.X)
@@ -227,7 +283,111 @@ func (s *Sim) Hash() uint64 {
 			put(uint64(t.Members))
 			put(uint64(t.Cooldown))
 			put(uint64(int64(t.lastFire)))
+			h.Write([]byte(t.In))
 		}
 	}
 	return h.Sum64()
+}
+
+func b2i(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
+}
+
+// viewMap adds the landmarks and bridges to a snapshot: as they are for a spectator, as
+// last seen for a side.
+func (s *Sim) viewMap(snap *Snapshot, side int) {
+	for i := range s.Landmarks {
+		l := &s.Landmarks[i]
+		m := landmarkMemory{Kind: l.Kind, HP: s.landmarkShare(l), GSide: NoSide, Visible: true}
+		if side == Spectator {
+			m.GSide, m.GTeams = s.garrison(l.ID)
+		} else {
+			m = s.Sides[side].lands[i]
+		}
+		if m.Kind == l.Landmark.Kind && m.HP >= 1 && m.GSide == NoSide {
+			continue
+		}
+		v := LandmarkView{ID: l.ID, Kind: m.Kind, HP: round3(m.HP), Visible: m.Visible}
+		if m.GSide != NoSide {
+			v.Garrison = &GarrisonView{Side: m.GSide, Teams: m.GTeams}
+		}
+		snap.Landmarks = append(snap.Landmarks, v)
+	}
+	for i := range s.Bridges {
+		b := &s.Bridges[i]
+		v := BridgeView{ID: b.ID, HP: round3(b.Share()), Standing: b.Standing, Visible: true}
+		if side != Spectator {
+			m := s.Sides[side].bridges[i]
+			v = BridgeView{ID: b.ID, HP: round3(m.HP), Standing: m.Standing, Visible: m.Visible}
+		}
+		snap.Bridges = append(snap.Bridges, v)
+	}
+}
+
+func round3(v float64) float64 { return math.Round(v*1000) / 1000 }
+
+// NearbyLandmark is a landmark as a squad leader is told about it.
+type NearbyLandmark struct {
+	ID       string        `json:"id"`
+	Name     string        `json:"name"` // English; the Hebrew name is in the rules
+	Kind     string        `json:"kind"`
+	Cover    float64       `json:"cover"`
+	Garrison *GarrisonView `json:"garrison,omitempty"`
+	Room     int           `json:"room,omitempty"` // fireteams a building still has room for
+}
+
+// LandmarksNear lists what a squad leader should know about the ground: the landmarks
+// in sight of its squad and those close to every map point, with who holds each building
+// as far as its side knows. Bridges come with them, as kind "bridge".
+func (s *Sim) LandmarksNear(sq *Squad) []NearbyLandmark {
+	const aroundPoint = 150
+	out := []NearbyLandmark{}
+	cx, cy := sq.Center()
+	near := func(x, y float64) bool {
+		if dist(cx, cy, x, y) <= sq.unit.Sight {
+			return true
+		}
+		for i := range s.Points {
+			if dist(s.Points[i].X, s.Points[i].Y, x, y) <= aroundPoint {
+				return true
+			}
+		}
+		return false
+	}
+	for i := range s.Landmarks {
+		l := &s.Landmarks[i]
+		if !near(l.X, l.Y) {
+			continue
+		}
+		m := s.Sides[sq.Side].lands[i]
+		k := s.R.LandmarkKinds[m.Kind]
+		v := NearbyLandmark{ID: l.ID, Name: l.Name.En, Kind: m.Kind, Cover: k.Cover}
+		if k.Garrison > 0 {
+			v.Cover, v.Room = k.GarrisonCover, k.Garrison
+			if m.GSide != NoSide {
+				v.Garrison = &GarrisonView{Side: m.GSide, Teams: m.GTeams}
+				v.Room = max(0, k.Garrison-m.GTeams)
+				if m.GSide != sq.Side {
+					v.Room = 0
+				}
+			}
+		}
+		out = append(out, v)
+	}
+	for i := range s.Bridges {
+		b := &s.Bridges[i]
+		if x, y := b.mid(); !near(x, y) {
+			continue
+		}
+		m := s.Sides[sq.Side].bridges[i]
+		kind := "bridge"
+		if !m.Standing {
+			kind = "fallen bridge"
+		}
+		out = append(out, NearbyLandmark{ID: b.ID, Name: b.Name.En, Kind: kind, Cover: round3(m.HP)})
+	}
+	return out
 }

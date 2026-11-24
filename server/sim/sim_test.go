@@ -116,8 +116,8 @@ func checkInvariants(t *testing.T, s *sim.Sim) {
 			if math.IsNaN(tm.X) || math.IsNaN(tm.Y) || tm.X < 0 || tm.X > rules.Map.Width || tm.Y < 0 || tm.Y > rules.Map.Height {
 				t.Fatalf("tick %d: squad %d left the map at %.1f,%.1f", s.Tick, sq.ID, tm.X, tm.Y)
 			}
-			if domain != "air" && (tm.Y >= rules.Map.WaterY) != (domain == "sea") {
-				t.Fatalf("tick %d: squad %d (%s) is in the wrong domain at y=%.1f", s.Tick, sq.ID, sq.Unit, tm.Y)
+			if (domain == "sea" && !s.Sailable(tm.X, tm.Y)) || (domain == "land" && tm.In == "" && !s.Walkable(tm.X, tm.Y)) {
+				t.Fatalf("tick %d: squad %d (%s) is where it cannot be, at %.1f,%.1f", s.Tick, sq.ID, sq.Unit, tm.X, tm.Y)
 			}
 			if tm.Stress < 0 || tm.Stress > 1 || tm.HP <= 0 {
 				t.Fatalf("tick %d: squad %d team has stress %.2f hp %.1f", s.Tick, sq.ID, tm.Stress, tm.HP)
@@ -600,7 +600,7 @@ func TestAirUnitsCrossLandAndSea(t *testing.T) {
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: heli.ID, Point: "S"})
 	run(s, 25)
 	sierra := rules.PointByID("S")
-	if x, y := heli.Center(); math.Hypot(x-sierra.X, y-sierra.Y) > 60 || y < rules.Map.WaterY {
+	if x, y := heli.Center(); math.Hypot(x-sierra.X, y-sierra.Y) > 60 || !s.Sailable(x, y) {
 		t.Fatalf("the helicopter is at %.0f,%.0f, not over Sierra", x, y)
 	}
 	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: heli.ID, Point: "D"})

@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -105,7 +106,17 @@ type Options struct {
 	LengthSeconds int    // 0 for the server's default
 	Watch         bool   // let spectators in
 	Bot           string // how hard the scripted enemy presses, "" for the server's usual
+	Map           string // the map id, "" for the default
+	StartGold     int    // gold each side starts with, 0 for the rules default
 }
+
+// The gold a match may start with: what the lobby offers, and the limits on a typed number.
+var StartGolds = []int{300, 1000, 2500, 5000}
+
+const (
+	MinStartGold = 100
+	MaxStartGold = 20000
+)
 
 // BotLevels are the scripted enemies a player may choose in the lobby, easiest first.
 // The rush style stays a server flag: it is a test opponent, not a difficulty.
@@ -144,6 +155,12 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.Bot != "" && !botLevel(o.Bot) {
 		return nil, 0, "", errors.New("the scripted enemy is easy, normal or standard")
 	}
+	if _, ok := h.r.Maps[o.Map]; o.Map != "" && !ok {
+		return nil, 0, "", errors.New("there is no such map")
+	}
+	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
+		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
+	}
 	if o.Side == -1 {
 		var b [1]byte
 		if _, err := rand.Read(b[:]); err != nil {
@@ -156,7 +173,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 		length = h.cfg.LengthSeconds
 	}
 	cfg := Config{
-		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
+		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, Map: o.Map, StartGold: o.StartGold,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey,
 	}
 	if o.Opponent == OpponentBot && h.cfg.Bot != "" {
@@ -342,6 +359,17 @@ func (h *Hub) share(code string) string {
 	return strings.TrimRight(h.cfg.Share, "/") + "/?room=" + code
 }
 
+// mapList is the maps as the lobby lists them. The drawing of each is made by the page
+// from the rules file, which holds every map.
+func (h *Hub) mapList() []map[string]any {
+	out := []map[string]any{}
+	for _, id := range h.r.MapIDs() {
+		m := h.r.Maps[id]
+		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points)})
+	}
+	return out
+}
+
 // getServer tells the lobby what it can offer before any room exists.
 func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 	length := h.cfg.LengthSeconds
@@ -354,6 +382,11 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"levels":   BotLevels,    // the scripted enemies on offer, easiest first
 		"level":    h.usualBot(), // the one the lobby starts on
 		"length":   length,
+		"maps":     h.mapList(), // the maps on offer, smallest first
+		"gold":     h.r.Match.StartGold,
+		"golds":    StartGolds, // what the lobby offers; a typed number may be minGold…maxGold
+		"minGold":  MinStartGold,
+		"maxGold":  MaxStartGold,
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
 		"open":     h.open != nil, // the open room of a server without an agent key
 		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
@@ -367,6 +400,8 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Length   int    `json:"length"`
 		Watch    bool   `json:"watch"`
 		Bot      string `json:"bot"`
+		Map      string `json:"map"`
+		Gold     int    `json:"startGold"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -377,7 +412,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Map: in.Map, StartGold: in.Gold}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}
