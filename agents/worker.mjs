@@ -3,7 +3,9 @@
 // in small messages. The Worker holds the player and seat tokens, never the player's key.
 //
 //   page → worker   { type: "start", server, side, role, squad, join, standByMs,
-//                     brain: { kind: "relay", base, room, token, seat } | { kind: "rule" } }
+//                     brain: { kind: "relay", base, room, token, seat, fast } | { kind: "jev", base, room, token, seat }
+//                            | { kind: "rule" } }
+//                   `fast` on a relay brain gives its tier-1 squads to the fast brain.
 //                   { type: "stop" }
 //   worker → page   { type: "joined", station }      on the net
 //                   { type: "log", text }
@@ -13,6 +15,7 @@
 
 import { Agent } from "./agent.mjs";
 import { RelayError, relayBrain } from "./brain-relay.mjs";
+import { jevBrain, tiered } from "./brain-jev.mjs";
 import { ruleBrain } from "./brain-rule.mjs";
 
 const post = (message) => self.postMessage(message);
@@ -20,9 +23,10 @@ let agent = null;
 
 function makeBrain(spec) {
   if (spec.kind === "rule" || spec.kind === "scripted") return ruleBrain();
-  if (spec.kind === "relay") {
-    return relayBrain({ base: spec.base, room: spec.room, token: spec.token, seat: spec.seat, onUsage: (usage, model, provider) => post({ type: "usage", usage, model, provider }) });
-  }
+  const onUsage = (usage, model, provider) => post({ type: "usage", usage, model, provider });
+  const seat = { base: spec.base, room: spec.room, token: spec.token, seat: spec.seat, onUsage };
+  if (spec.kind === "jev") return jevBrain(seat);
+  if (spec.kind === "relay") return spec.fast ? tiered({ fast: jevBrain(seat), rest: relayBrain(seat) }) : relayBrain(seat);
   throw new Error(`unknown brain "${spec.kind}"`);
 }
 

@@ -27,12 +27,17 @@ test("who thinks: this browser only with a key or the demo brain, never as a spe
   const key = { set: true, provider: "anthropic", hint: "abcd" };
   assert.equal(wanted({ canAct: true, demo: false, key: { set: false }, hiddenLong: false }), null, "no key: the server's agents keep the side");
   assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: false }), "relay");
-  assert.equal(wanted({ canAct: true, demo: true, key, hiddenLong: false }), "scripted", "the demo brain is a choice, and it wins");
-  assert.equal(wanted({ canAct: true, demo: true, key: { set: false }, hiddenLong: false }), "scripted");
+  assert.equal(wanted({ canAct: true, demo: true, key, hiddenLong: false }), "rule", "the rule brain here is a choice, and it wins");
+  assert.equal(wanted({ canAct: true, demo: true, key: { set: false }, hiddenLong: false }), "rule");
+  // The fast brain: the host turned it on and the relay has it. It needs a seat and no key; a key outranks it.
+  assert.equal(wanted({ canAct: true, demo: false, key: { set: false }, hiddenLong: false, fast: true }), "jev");
+  assert.equal(wanted({ canAct: true, demo: false, key: { set: false }, hiddenLong: false, fast: true, seated: false }), null);
+  assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: false, fast: true }), "relay");
+  assert.equal(wanted({ canAct: true, demo: false, key: { set: false }, hiddenLong: true, fast: true }), null);
   assert.equal(wanted({ canAct: false, demo: true, key, hiddenLong: false }), null);
   assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: true }), null);
   assert.equal(wanted({ canAct: true, demo: false, key, hiddenLong: false, seated: false }), null, "a key thinks only for a seat in a lobby match");
-  assert.equal(wanted({ canAct: true, demo: true, key, hiddenLong: false, seated: false }), "scripted", "the demo brain needs no seat");
+  assert.equal(wanted({ canAct: true, demo: true, key, hiddenLong: false, seated: false }), "rule", "the rule brain needs no seat");
 });
 
 test("usage: counts thoughts and tokens per match", () => {
@@ -116,7 +121,7 @@ test("worker agent: one that cannot join says why, and one that fails to load is
   assert.equal(made[0].terminated, true);
 
   ({ Worker, made } = fakeWorkers());
-  agent = new WorkerAgent(options, { kind: "scripted" }, {}, { Worker });
+  agent = new WorkerAgent(options, { kind: "rule" }, {}, { Worker });
   started = agent.start();
   made[0].listeners.error({ message: "404" });
   await assert.rejects(started, /404/);

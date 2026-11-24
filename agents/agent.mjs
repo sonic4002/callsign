@@ -110,6 +110,7 @@ export class Agent {
       this.system = operatorPrompt({ rules: this.rules, side: this.side, faction: this.faction });
       this.tools = operatorTools;
     }
+    this.tele.r.brain = this.#brainName();
     this.tele.joined({ tier: this.tier, planned: this.#planned() });
     // A call made just before this station came on the net is answered now: a commander
     // who sits down and gives an order at once would otherwise be met with silence.
@@ -123,6 +124,11 @@ export class Agent {
   // The model the brain means to use for the next thought, when it chooses one itself.
   #planned() {
     return this.brain?.plan?.({ role: this.role, tier: this.tier, level: this.level }) ?? null;
+  }
+
+  // Which brain thinks for this station: one brain may hand its squads to another by tier.
+  #brainName() {
+    return this.brain?.nameFor?.({ role: this.role, tier: this.tier }) ?? this.brain?.name ?? "";
   }
 
   #onFrame(frame) {
@@ -199,6 +205,7 @@ export class Agent {
       this.tier = status.you.tier;
       this.history = [];
       this.tele.reset("tier");
+      this.tele.r.brain = this.#brainName();
       this.tele.tier(this.tier, this.#planned());
     }
     const call = items.findLast((i) => i.kind === "radio")?.msg ?? null;
@@ -210,7 +217,7 @@ export class Agent {
 
     let answered = false;
     const timer =
-      call && this.brain.slow
+      call && (this.brain.slowFor?.({ role: this.role, tier: this.tier }) ?? this.brain.slow)
         ? setTimeout(() => {
             // Thinking takes a moment; say so, the way a real operator would.
             if (answered) return;

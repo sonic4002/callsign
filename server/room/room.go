@@ -52,6 +52,11 @@ type Config struct {
 	Watch    bool   // spectators, who see both sides, are let in
 	Speed    string // the pace the room is played at, for the lobby to show; "" is normal
 	Purse    bool   // the operators may buy on their own from the first second (a lobby option)
+	// The brains that need no key (agents/brain-rule.mjs, brain-jev.mjs) read these from
+	// the lobby view: the rule-brain operator's initiative, 1 to 3 (0 is 3), and whether
+	// squads take orders through the relay's fast decision model.
+	Anvil int
+	Fast  bool
 	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the

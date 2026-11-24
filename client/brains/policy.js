@@ -6,14 +6,17 @@
 export const HIDDEN_LIMIT_MS = 30_000;
 
 // wanted says which brain this browser should run, or null to leave the side to whoever
-// the server has: "relay" when the relay holds a key for this player and the player sits
-// in a match made in the lobby (the relay only thinks for a seat the game server vouches
-// for), "scripted" when the player chose the demo brain. A page hidden for long, or one
-// that commands nothing, runs nothing.
-export function wanted({ canAct, demo, key, hiddenLong, seated = true }) {
+// the server has (its agents run the rule brain, which needs no AI): "relay" when the
+// relay holds a key for this player and the player sits in a match made in the lobby (the
+// relay only thinks for a seat the game server vouches for); "jev" when the match's host
+// turned on the fast brain and the relay has it (`fast`), which needs the same seat and no
+// key; "rule" when the player chose to run the rule brain here, as the first lesson does.
+// A page hidden for long, or one that commands nothing, runs nothing.
+export function wanted({ canAct, demo, key, hiddenLong, seated = true, fast = false }) {
   if (!canAct || hiddenLong) return null;
-  if (demo) return "scripted";
-  return key?.set && seated ? "relay" : null;
+  if (demo) return "rule";
+  if (key?.set && seated) return "relay";
+  return fast && seated ? "jev" : null;
 }
 
 // Usage adds up what the relay reports for each thought of the current match.

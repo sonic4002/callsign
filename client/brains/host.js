@@ -34,7 +34,8 @@ export class BrowserAgents {
     this.key = { provider: "", set: false, hint: "" };
     this.relayUp = null; // null until the relay has been asked
     this.demo = localStorage.getItem("callsign.agents") === "demo";
-    this.mode = null; // what runs here now: "relay", "scripted" or null
+    this.mode = null; // what runs here now: "relay", "jev", "rule" or null
+    this.fastOn = false; // the relay has the fast decision model (its own key, not the player's)
     this.host = null;
     this.usage = new Usage();
     this.throttle = new Throttle();
@@ -45,7 +46,7 @@ export class BrowserAgents {
   // Where the side's thinking happens right now, for the dialog.
   get status() {
     if (this.mode && this.host && !this.host.active) return "standby";
-    return this.mode === "relay" ? "relay" : this.mode === "scripted" ? "demo" : "server";
+    return this.mode === "relay" ? "relay" : this.mode === "jev" ? "fast" : this.mode === "rule" ? "demo" : "server";
   }
 
   get workers() {
@@ -66,6 +67,14 @@ export class BrowserAgents {
       }
       this.key = { provider: "", set: false, hint: "" };
       this.relayUp = err.code !== "unreachable" && err.code !== "bad_request";
+    }
+    try {
+      // Whether squads can take orders through the fast brain: the relay says, and says
+      // nothing else about the key that pays for it.
+      const health = await (await fetch("/relay/healthz", { cache: "no-store" })).json();
+      this.fastOn = Boolean(health?.decide?.on);
+    } catch {
+      this.fastOn = false;
     }
     await this.sync();
   }
@@ -104,12 +113,13 @@ export class BrowserAgents {
   // for a key that changed under a running host.
   async sync(restart = false) {
     const seat = this.seat();
-    const sat = seat ? `${seat.room}/${seat.token ?? ""}` : "";
+    const fast = Boolean(seat?.fast) && this.fastOn;
+    const sat = seat ? `${seat.room}/${seat.token ?? ""}/${fast ? "fast" : ""}` : "";
     // A key the provider turned down is not tried again until the player changes it.
     const key = this.blocked ? { set: false } : this.key;
-    // In the first lesson the squads always think here with the scripted brain: the game
+    // In the first lesson the squads always think here with the rule brain: the game
     // server sends none of its own agents to a lesson, and a lesson spends nobody's key.
-    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo || Boolean(seat?.lesson), key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player) });
+    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo || Boolean(seat?.lesson), key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player), fast });
     // A host joined for another seat is of no use: a new match means a new host.
     if (want === this.mode && sat === this.sat && !restart) return this.onChange();
     this.sat = sat;
@@ -122,7 +132,10 @@ export class BrowserAgents {
 
   async #start(mode) {
     const seat = this.seat();
-    const brain = mode === "relay" ? { kind: "relay", base: RELAY, room: seat.room, token: this.player, seat: seat.token } : { kind: "scripted" };
+    // With a key, a match on the fast brain still gives its tier-1 squads to it; without
+    // one, every squad takes orders through it and Anvil is the rule brain.
+    const held = { base: RELAY, room: seat.room, token: this.player, seat: seat.token };
+    const brain = mode === "relay" ? { kind: "relay", ...held, fast: Boolean(seat.fast) && this.fastOn } : mode === "jev" ? { kind: "jev", ...held } : { kind: "rule" };
     const hooks = {
       log: (text) => console.debug(`[agents] ${text}`),
       usage: (usage, model) => {
@@ -146,7 +159,7 @@ export class BrowserAgents {
     this.host = host;
     try {
       await host.start();
-      this.say(mode === "relay" ? "relay" : "demo", { provider: this.key.provider });
+      this.say(mode === "relay" ? "relay" : mode === "jev" ? "fast" : "demo", { provider: this.key.provider });
       // If the game server drops us while we still mean to run, come back.
       host.closed.then(() => {
         if (this.host !== host) return;

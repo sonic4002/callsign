@@ -38,7 +38,7 @@ function structureName(rules, status, id, lang) {
 export function speaker(rules, lang, agent, mem, status) {
   const num = Number(agent.station?.key?.split("-").at(-1)) || agent.squad || 0;
   const name = (id) => {
-    if (typeof id !== "string") return id;
+    if (typeof id !== "string") return typeof id === "number" ? targetName(rules, id, lang) : id;
     return structureName(rules, status, id, lang) || placeName(rules, id, lang);
   };
   const say = (key, vars = {}, varied = false) => {
@@ -49,6 +49,7 @@ export function speaker(rules, lang, agent, mem, status) {
     if (v.side) v.side = phrase(rules, lang, `side.${v.side}`);
     if (v.options) v.options = v.options.map(name).join(phrase(rules, lang, "or"));
     if (v.orders) v.options = v.orders.map((o) => phrase(rules, lang, o)).join(phrase(rules, lang, "or"));
+    if (v.asks) v.options = v.asks.map((a) => say(a.key, a.vars)).join(phrase(rules, lang, "or"));
     return phrase(rules, lang, key, v, varied ? num + (mem.said[key] = (mem.said[key] ?? 0) + 1) - 1 : 0);
   };
   return say;

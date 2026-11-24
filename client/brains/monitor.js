@@ -108,7 +108,7 @@ export function barWidth(input, window, sliver = 0.02) {
 // ---- one row, as plain data ----
 
 const known = new Set(["idle", "thinking", "acting", "skipped", "stopped"]);
-const brains = new Set(["subscription", "claude", "relay", "scripted"]);
+const brains = new Set(["subscription", "claude", "relay", "rule", "jev"]);
 
 // rowOf turns what is known about a station into what its row shows. `agent` is the
 // Agents entry (or null for a station with no report yet), `now` the page's clock in the
@@ -131,7 +131,7 @@ export function rowOf(squad, agent, { now = 0, ended = false } = {}) {
   row.reason = (row.state === "skipped" || row.state === "stopped") && r.reason ? r.reason : null;
   row.tier = r.role === "squad" ? r.tier ?? null : null;
   row.role = r.role === "anvil" ? "anvil" : "squad";
-  row.brain = r.brain === "scripted" && r.where === "browser" ? "demo" : brains.has(r.brain) ? r.brain : "other";
+  row.brain = brains.has(r.brain) ? r.brain : "other";
   row.where = r.where === "browser" ? "browser" : "server";
   // The model that answered last; before the first thought, the one its brain plans to use.
   row.model = r.model ?? r.planned ?? null;

@@ -59,6 +59,8 @@ type LobbyView struct {
 	Speed     string      `json:"speed"`           // the pace: "relaxed", "normal" or "fast"
 	Pace      float64     `json:"pace"`            // match seconds per real second at that pace
 	Purse     bool        `json:"purse"`           // the operators may buy on their own from the start
+	Anvil     int         `json:"anvil"`           // the rule-brain operator's initiative, 1 to 3
+	Fast      bool        `json:"fast"`            // squads take orders through the fast decision model
 	StartGold int         `json:"startGold"`       // gold each side starts with
 	Phase     string      `json:"phase"`           // "lobby", "playing" or "over"
 	Match     int         `json:"match"`
@@ -93,6 +95,10 @@ func (rm *Room) lobby() LobbyView {
 	if v.StartGold == 0 {
 		v.StartGold = rm.r.Match.StartGold
 	}
+	if v.Anvil = rm.cfg.Anvil; v.Anvil < 1 || v.Anvil > 3 {
+		v.Anvil = 3
+	}
+	v.Fast = rm.cfg.Fast
 	if f, ok := speedFactor(rm.cfg.Speed); ok {
 		v.Speed, v.Pace = rm.cfg.Speed, f
 	}

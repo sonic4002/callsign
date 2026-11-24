@@ -35,6 +35,11 @@ type HubConfig struct {
 	MaxRooms      int
 	Share         string // address other machines reach this server at, "" when unknown
 	HostKey       string // password needed to make a match, "" for none; joining one by its code never needs it
+	// What the brains that need no key do in a match whose maker did not choose: the
+	// rule-brain operator's initiative (1 to 3, 0 for 3), and whether squads take orders
+	// through the relay's fast decision model.
+	Anvil int
+	Fast  bool
 }
 
 // agentGrace is how long a side's agents stay after its commander's last connection
@@ -89,7 +94,7 @@ func NewHub(ctx context.Context, r *shared.Rules, cfg HubConfig) (*Hub, error) {
 		// lands here and anyone may command a side, which tests and scripts rely on.
 		rm, err := New(r, Config{
 			Seed: cfg.Seed, Factions: cfg.Factions, LengthSeconds: cfg.LengthSeconds, FullBase: cfg.FullBase, Base: cfg.Base,
-			Bots: [2]string{"", cfg.Bot}, Opponent: OpponentBot, Watch: true,
+			Bots: [2]string{"", cfg.Bot}, Opponent: OpponentBot, Watch: true, Anvil: cfg.Anvil,
 		})
 		if err != nil {
 			return nil, err
@@ -112,6 +117,8 @@ type Options struct {
 	Purse         bool   // the operators may buy on their own from the start
 	Map           string // the map id, "" for the default
 	StartGold     int    // gold each side starts with, 0 for the rules default
+	Anvil         int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
+	Fast          *bool  // squads take orders through the fast decision model; nil for the server's usual
 }
 
 // Speed is a pace a match can be played at. It changes only how much real time one tick
@@ -212,6 +219,16 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
 		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
 	}
+	if o.Anvil < 0 || o.Anvil > 3 {
+		return nil, 0, "", errors.New("the operator's initiative is 1, 2 or 3")
+	}
+	if o.Anvil == 0 {
+		o.Anvil = h.cfg.Anvil
+	}
+	fast := h.cfg.Fast
+	if o.Fast != nil {
+		fast = *o.Fast
+	}
 	if o.Side == -1 {
 		var b [1]byte
 		if _, err := rand.Read(b[:]); err != nil {
@@ -231,6 +248,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase, Base: h.cfg.Base,
 		Map: o.Map, StartGold: o.StartGold,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
+		Anvil: o.Anvil, Fast: fast && !lesson, // a lesson spends nothing
 	}
 	if lesson {
 		cfg.Bots[1-o.Side] = bot.Tutorial // also on a server started without a scripted enemy
@@ -474,6 +492,8 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Purse     bool   `json:"purse"`
 		Map       string `json:"map"`
 		StartGold int    `json:"startGold"`
+		Anvil     int    `json:"anvil"`
+		Fast      *bool  `json:"fast"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -486,7 +506,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, Anvil: in.Anvil, Fast: in.Fast}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

@@ -86,10 +86,10 @@ test("what is not known is not invented", () => {
   const agents = new Agents(() => 0);
   // No report at all: the station is listed and says so.
   assert.deepEqual(rowOf(3, agents.get(3)), { squad: 3, station: null, reported: false, online: false, state: "none" });
-  // A scripted agent: no model, no context, no window.
-  agents.frame({ agent: { squad: 3, station, online: true, telemetry: report({ brain: "scripted", where: "browser", model: null, planned: null, state: "idle", context: { input: null, cached: null, window: null }, output: null, totals: { thoughts: 0, input: 0, output: 0, cached: 0, ms: 0, lastMs: null } }) } });
+  // A rule-brain agent: no model, no context, no window.
+  agents.frame({ agent: { squad: 3, station, online: true, telemetry: report({ brain: "rule", where: "browser", model: null, planned: null, state: "idle", context: { input: null, cached: null, window: null }, output: null, totals: { thoughts: 0, input: 0, output: 0, cached: 0, ms: 0, lastMs: null } }) } });
   const row = rowOf(3, agents.get(3));
-  assert.equal(row.brain, "demo");
+  assert.equal(row.brain, "rule");
   assert.equal(row.model, null);
   assert.equal(row.input, null);
   assert.equal(row.bar, null);

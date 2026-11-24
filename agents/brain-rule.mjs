@@ -61,10 +61,14 @@ export function ruleBrain({ operatorLevel = 3 } = {}) {
     name: "rule",
     slow: false,
     plan: ({ role, tier, level }) => `rule-${role === "anvil" ? (level ?? operatorLevel) : Math.max(1, Math.min(3, tier || 1))}`,
-    think(ctx) {
+    async think(ctx) {
       const agent = ctx.agent.role === "anvil" ? { ...ctx.agent, level: ctx.agent.level ?? operatorLevel } : ctx.agent;
       const c = { ...ctx, agent };
-      return steps.next(ctx, () => (agent.role === "anvil" ? operatorPlan : leaderPlan)(c, memory(agent)));
+      let planned = false;
+      const res = await steps.next(ctx, () => ((planned = true), (agent.role === "anvil" ? operatorPlan : leaderPlan)(c, memory(agent))));
+      // The first turn of a wake is the thought; it names the brain's level as its "model",
+      // so the commander's view shows which brain answered and how fast.
+      return planned ? { ...res, model: this.plan(agent) } : res;
     },
   };
 }
