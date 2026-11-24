@@ -100,7 +100,9 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 			}
 			return nil, fmt.Errorf("%w: %q could be %s", ErrWhichPlace, where, strings.Join(names, " or "))
 		default:
-			return nil, fmt.Errorf("%w: %q", sim.ErrNoPoint, where)
+			// Not a name the map has. It may be the id of something built since, which
+			// the simulation knows and the net does not: let it say.
+			cmd.Place = strings.TrimSpace(where)
 		}
 	}
 	sq, err := rm.sim.Apply(cmd)

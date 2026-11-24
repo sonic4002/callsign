@@ -111,6 +111,16 @@ func TestOrdersGoToPlaces(t *testing.T) {
 	if _, err := rm.Tool(viper1, ToolHold, json.RawMessage(`{"place":"the lighthouse"}`)); !errors.Is(err, sim.ErrNoPoint) {
 		t.Fatalf("a place the map does not have: %v", err)
 	}
+	// The id of something another part of the game put on the map goes straight through.
+	rm.View(func(s *sim.Sim) {
+		s.Places = append(s.Places, func(id string) (sim.Place, bool) {
+			return sim.Place{Kind: sim.PlaceStructure, ID: "works-1", X: 300, Y: 480}, id == "works-1"
+		})
+	})
+	tool(t, rm, viper1, ToolHold, `{"place":"works-1"}`)
+	if o := order(); o.Place != "works-1" {
+		t.Fatalf("hold at a structure: the order goes to %q", o.Place)
+	}
 	// "here" still holds the ground the squad stands on.
 	tool(t, rm, viper1, ToolHold, `{"place":"here"}`)
 	if o := order(); o.Place != "" || o.Kind != sim.OrderHold {
