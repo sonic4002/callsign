@@ -54,6 +54,10 @@ export const operatorTools = [
     unit: { type: "string", description: 'Unit id to buy, or "".' },
     upgrade: { type: "string", description: 'Callsign of the squad to upgrade, for example "Viper 2", or "".' },
   }),
+  tool("haul", "Tell your gold haulers which field to work. They keep working it until told otherwise, even under threat, so use it on purpose.", {
+    field: { type: "string", description: 'The gold field, by the map point it lies at ("K", "Kilo", "כרמל"), or "auto" to let the haulers choose a safe field themselves.' },
+    hauler: { type: "integer", description: "One hauler's id from your status, or 0 for all of them." },
+  }),
 ];
 
 // normalize drops the empty placeholders strict schemas force the model to send.

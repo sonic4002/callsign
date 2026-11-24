@@ -9,7 +9,7 @@ import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
 import { leaderTools, normalize, operatorTools } from "./tools.mjs";
 
 const leaderEvents = new Set(["contact", "pinned", "losses", "arrived"]);
-const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack"]);
+const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "hauler_attacked", "hauler_lost"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
@@ -226,12 +226,17 @@ export function compactStatus(status, side) {
     contacts: s.contacts,
   });
   if (status.you) {
-    return { secondsLeft: status.timeLeft, you: squad(status.you), friends: status.friends, contacts, points };
+    const haulers = (status.haulers ?? []).map((h) => ({ id: h.id, state: h.state, field: h.field || undefined, x: h.x, y: h.y }));
+    return { secondsLeft: status.timeLeft, you: squad(status.you), friends: status.friends, haulers, contacts, points };
   }
   return {
     secondsLeft: status.timeLeft,
     gold: status.gold,
-    goldPerSecond: status.income,
+    goldPerMinute: status.income,
+    // Gold haulers work on their own; `field` is the gold field (by map point) each one works.
+    haulers: (status.haulers ?? []).filter((h) => h.side === side).map((h) => ({ id: h.id, state: h.state, load: h.load, field: h.field || undefined, sentTo: h.assigned || undefined })),
+    enemyHaulersSeen: (status.haulers ?? []).filter((h) => h.side !== side).map((h) => ({ contact: h.id, x: h.x, y: h.y, inSight: h.visible })),
+    goldFields: (status.fields ?? []).map((f) => ({ field: f.gusher, full: f.gold, inSight: f.visible })),
     hqHealth: status.hq,
     squads: status.squads.map((s) => ({ callsign: s.callsign.en, unit: s.unit, class: s.class, ...squad(s) })),
     // Bought and on their way: they count toward the cap and cannot be ordered yet.
@@ -269,6 +274,10 @@ function describe(item) {
       return `The enemy took ${e.point}.`;
     case "hq_under_attack":
       return "Your headquarters is under attack.";
+    case "hauler_attacked":
+      return `One of your gold haulers (id ${e.hauler}) is under attack near ${e.point}${e.field ? `, at the ${e.field} field` : ""}. It is running for home.`;
+    case "hauler_lost":
+      return `One of your gold haulers (id ${e.hauler}) was destroyed near ${e.point}${e.count ? ` with ${e.count} gold on board` : ""}.`;
   }
   return `Event: ${e.kind}.`;
 }

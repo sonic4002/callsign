@@ -10,6 +10,9 @@ const doctrine = {
 
 // unitFacts says in words what a unit's numbers mean for whoever commands or buys it.
 export function unitFacts(u, rules) {
+  if (u.class === "hauler") {
+    return `an unarmed gold hauler that works on its own: it carries ${u.capacity} gold a trip from a gold field to the headquarters; not a squad, it has no leader and takes no radio calls`;
+  }
   const facts = [];
   if (u.domain === "air") facts.push("flies over land and sea alike");
   else if (u.domain === "sea") facts.push("moves only at sea");
@@ -31,7 +34,9 @@ function mapTable(rules, side) {
         ? p.owner === side
           ? "your headquarters"
           : "the enemy headquarters; destroying it wins the match"
-        : p.kind === "landRig"
+        : (rules.gushers ?? []).some((g) => g.point === p.id)
+          ? `a gold field: a gusher throws up gold here and haulers collect it; anyone's haulers may load, so whoever controls the ground gets the gold${p.kind === "point" || p.kind === "landRig" ? `; ${canTake(rules, p.kind)} squads can capture the point` : ""}`
+          : p.kind === "landRig"
           ? `land oil rig, +${rules.rigs.landRig.income} gold/s, only ${canTake(rules, "landRig")} squads can capture it`
           : p.kind === "seaRig"
             ? `sea oil rig, +${rules.rigs.seaRig.income} gold/s, only ${canTake(rules, "seaRig")} squads can reach or capture it`
@@ -99,7 +104,9 @@ You hear the whole net: every transmission wakes you, also those not addressed t
 
 On a call from Hammer: task the squads that fit, then answer Hammer. Tell Hammer what you did in one sentence, or ask one question if the intent is unclear. For a status question, read the report and answer in one or two sentences.
 
-Purchases. Gold comes from oil rigs; there are at most ${rules.match.populationCap} squads per side. Units you can buy:
+Gold. Gold is collected, not given: gushers throw gold into the fields around them, and your haulers drive out, load, and bring it home to the headquarters, where it becomes gold you can spend. The headquarters also makes ${rules.match.hqTrickle} gold a second on its own, and a captured sea rig pumps gold without haulers. Haulers are unarmed and work by themselves; they are not squads, have no leader and no callsign, and you may have ${rules.match.haulerCap} of them besides your squads. Your status lists your haulers (state, load, field), every field (how full it is, as last seen) and your income per minute. A hauler left alone picks the nearest field with gold that it believes is safe and runs home when shot at; the haul tool sends haulers to a field you choose, or back to choosing for themselves. More haulers mean more income only while the fields have gold to give. Haulers are easy to kill: when you are woken because one is attacked or lost, tell Hammer in one short line and, if Hammer has given you the fight, send a squad to guard the field or move the haulers. A lost hauler costs gold to replace; buy one when Hammer asks or the plan needs it.
+
+Purchases. There are at most ${rules.match.populationCap} squads per side. Units you can buy:
 ${units}
 A squad's brain can be upgraded: ${tiers}. A bought squad takes a few seconds to deploy (the buy result gives deploySeconds, and your status lists squads still deploying): it counts toward the cap at once, but it cannot be ordered or upgraded until it is in the field, so do not buy the same thing twice and task it once it has arrived. Buy when Hammer asks, and confirm the cost. If the purchase is refused, tell Hammer why.
 
