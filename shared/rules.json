@@ -8,7 +8,8 @@
     "captureSeconds": 10,
     "captureRadius": 70,
     "holdRadius": 45,
-    "pointSight": 220
+    "pointSight": 220,
+    "revealSeconds": 3
   },
   "hq": { "hp": 3000, "sight": 300 },
   "nerve": {
@@ -69,7 +70,7 @@
   "rigs": {
     "hq": { "income": 10, "captureBy": [] },
     "landRig": { "income": 15, "captureBy": ["infantry"] },
-    "seaRig": { "income": 30, "captureBy": ["naval"] },
+    "seaRig": { "income": 30, "captureBy": ["naval", "air"] },
     "point": { "income": 0, "captureBy": ["infantry", "vehicle"] }
   },
   "tiers": [
@@ -99,21 +100,39 @@
           "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 4,
           "teams": 3, "members": 2, "hp": 66, "armor": 0,
           "speed": 29, "range": 190, "sight": 280,
-          "damage": 15, "cooldownTicks": 8, "accuracy": 0.6, "nerveResist": 0.7
+          "damage": 15, "cooldownTicks": 8, "accuracy": 0.6, "nerveResist": 0.7,
+          "vs": { "air": 0.5 }
         },
         "tank": {
           "name": { "en": "Main battle tank", "he": "טנק מערכה" },
           "class": "vehicle", "domain": "land", "cost": 250, "deploySeconds": 7,
           "teams": 2, "members": 1, "hp": 450, "armor": 0.6,
           "speed": 34, "range": 260, "sight": 260,
-          "damage": 60, "cooldownTicks": 25, "accuracy": 0.7, "nerveResist": 0.5
+          "damage": 60, "cooldownTicks": 25, "accuracy": 0.7, "nerveResist": 0.5,
+          "vs": { "air": 0 }
         },
         "patrolBoat": {
           "name": { "en": "Patrol boat", "he": "סירת סיור" },
           "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 7,
           "teams": 2, "members": 1, "hp": 300, "armor": 0.3,
           "speed": 43, "range": 230, "sight": 300,
-          "damage": 30, "cooldownTicks": 10, "accuracy": 0.6, "nerveResist": 0.6
+          "damage": 30, "cooldownTicks": 10, "accuracy": 0.6, "nerveResist": 0.6,
+          "vs": { "air": 0.6 }
+        },
+        "helicopter": {
+          "name": { "en": "Attack helicopter", "he": "מסוק קרב" },
+          "class": "air", "domain": "air", "cost": 400, "deploySeconds": 8,
+          "teams": 2, "members": 1, "hp": 240, "armor": 0.2,
+          "speed": 75, "range": 220, "sight": 320,
+          "damage": 30, "cooldownTicks": 8, "accuracy": 0.65, "nerveResist": 0.5
+        },
+        "rocketLauncher": {
+          "name": { "en": "Precision rocket launcher", "he": "משגר רקטות מדויק" },
+          "class": "vehicle", "domain": "land", "cost": 300, "deploySeconds": 7,
+          "teams": 2, "members": 1, "hp": 150, "armor": 0.1,
+          "speed": 30, "range": 420, "minRange": 150, "sight": 260,
+          "damage": 150, "cooldownTicks": 40, "accuracy": 0.7, "nerveResist": 0.8,
+          "vs": { "air": 0, "hq": 0.3 }
         }
       }
     },
@@ -126,7 +145,8 @@
           "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3,
           "teams": 4, "members": 3, "hp": 40, "armor": 0,
           "speed": 30, "range": 160, "sight": 265,
-          "damage": 9, "cooldownTicks": 8, "accuracy": 0.5, "nerveResist": 0.8
+          "damage": 9, "cooldownTicks": 8, "accuracy": 0.5, "nerveResist": 0.8,
+          "vs": { "air": 0.4 }
         },
         "technical": {
           "name": { "en": "Technical", "he": "טנדר חמוש" },
@@ -140,7 +160,26 @@
           "class": "naval", "domain": "sea", "cost": 250, "deploySeconds": 5,
           "teams": 3, "members": 1, "hp": 190, "armor": 0.1,
           "speed": 52, "range": 185, "sight": 265,
-          "damage": 21, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9
+          "damage": 21, "cooldownTicks": 6, "accuracy": 0.5, "nerveResist": 0.9,
+          "vs": { "air": 0.6 }
+        },
+        "fpvSwarm": {
+          "name": { "en": "Drone swarm", "he": "נחיל רחפנים" },
+          "class": "air", "domain": "air", "cost": 150, "deploySeconds": 4,
+          "teams": 4, "members": 2, "hp": 28, "armor": 0,
+          "speed": 90, "range": 70, "sight": 265,
+          "damage": 25, "cooldownTicks": 14, "accuracy": 0.6, "nerveResist": 0.2,
+          "noCapture": true,
+          "vs": { "air": 0.5, "hq": 0.2 }
+        },
+        "rpgTeam": {
+          "name": { "en": "Rocket team", "he": "חוליית טילי כתף" },
+          "class": "infantry", "domain": "land", "cost": 150, "deploySeconds": 3,
+          "teams": 2, "members": 3, "hp": 32, "armor": 0,
+          "speed": 30, "range": 210, "sight": 265,
+          "damage": 55, "cooldownTicks": 22, "accuracy": 0.55, "nerveResist": 0.8,
+          "pierce": 0.8,
+          "vs": { "infantry": 0.18, "air": 0.5, "hq": 0.3 }
         }
       }
     }

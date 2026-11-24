@@ -50,6 +50,25 @@ function leaderPlan({ agent, wake, rules }) {
   ];
 }
 
+// wantedUnit reads which unit a buy call asks for: a unit named in either language first
+// ("rocket launcher", "מסוק"), otherwise the cheapest unit of the class it mentions.
+const classWords = [
+  ["air", /\b(air|aircraft|helicopter|chopper|drones?)\b|אוויר|מסוק|רחפן|רחפנים|נחיל/],
+  ["vehicle", /\b(tank|vehicle|technical|armou?r)|טנק|רכב|טנדר|שריון/],
+  ["naval", /\b(boat|naval|ship)|סירה|סירת|ימי/],
+];
+const small = new Set(["team", "squad", "main", "cell", "the", "חוליית", "כיתת"]);
+export function wantedUnit(text, units) {
+  const low = text.toLowerCase();
+  const entries = Object.entries(units);
+  const words = (u) => [...u.name.en.toLowerCase().split(/\s+/), ...u.name.he.split(/\s+/)].filter((w) => w.length >= 3 && !small.has(w));
+  const score = ([, u]) => words(u).filter((w) => low.includes(w)).length;
+  const named = entries.filter((e) => score(e) > 0).sort((a, b) => score(b) - score(a))[0];
+  if (named) return named[0];
+  const cls = classWords.find(([, re]) => re.test(low))?.[0] ?? "infantry";
+  return entries.filter(([, u]) => u.class === cls).sort((a, b) => a[1].cost - b[1].cost)[0]?.[0];
+}
+
 function operatorPlan({ wake, rules, agent }) {
   const call = wake.call;
   if (!call || call.from.key !== "player") return []; // Anvil answers to Hammer only
@@ -65,8 +84,7 @@ function operatorPlan({ wake, rules, agent }) {
     return [{ name: "buy", input: { unit: "", upgrade: squad.callsign.en }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }
   if (/\b(buy|purchase)\b|קנה|קנו|רכוש/.test(text)) {
-    const wanted = /\b(tank|vehicle|technical)|טנק|רכב|טנדר/.test(text) ? "vehicle" : /\b(boat|naval|ship)|סירה|ימי/.test(text) ? "naval" : "infantry";
-    const [unit] = Object.entries(rules.factions[wake.status?.faction ?? ""]?.units ?? {}).find(([, u]) => u.class === wanted) ?? [];
+    const unit = wantedUnit(text, rules.factions[wake.status?.faction ?? ""]?.units ?? {});
     if (!unit) return [radio(back, say.sayAgain[lang], "over")];
     return [{ name: "buy", input: { unit, upgrade: "" }, orElse: negative }, radio(back, say.wilco[lang], "out")];
   }

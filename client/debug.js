@@ -274,6 +274,7 @@ const classWords = {
   infantry: /infantry|soldier|squad of men|חי"ר|חיר|רגלים|חיילים/i,
   vehicle: /vehicle|armou?r|tank|truck|רכב|שריון|טנק|טנדר/i,
   naval: /boat|naval|ship|סירה|סירת|סירות|ימי/i,
+  air: /\bair\b|aircraft|helicopter|drone|אוויר|מסוק|רחפן|נחיל/i,
 };
 
 function noteBuy(text) {

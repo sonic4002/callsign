@@ -33,6 +33,7 @@
   "class.infantry": "infantry",
   "class.vehicle": "vehicle",
   "class.naval": "naval",
+  "class.air": "air",
   "callPrefix": "{to}, this is {from}. ",
   "call.hold": "{to}, this is {from}. Hold {point}. Over.",
   "call.move": "{to}, this is {from}. Move to {point}. Over.",

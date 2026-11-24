@@ -75,6 +75,7 @@ type Team struct {
 	Action   string
 	Spotted  bool // seen by the other side this tick
 	lastShot int  // tick this team was last shot at
+	lastFire int  // tick this team last fired; firing gives it away for a while
 
 	// scratch for the tick being resolved
 	dmg     float64
@@ -200,7 +201,7 @@ func (s *Sim) Callsign(sq *Squad) shared.Text {
 	return shared.Text{En: c.En + " " + n, He: c.He + " " + n}
 }
 
-// Class is the squad's unit class (infantry, vehicle, naval).
+// Class is the squad's unit class (infantry, vehicle, naval, air).
 func (sq *Squad) Class() string { return sq.unit.Class }
 
 // Center is the middle of the squad's living teams.
@@ -272,7 +273,7 @@ func (s *Sim) field(sq *Squad) {
 		x, y := s.clamp(u.Domain, cx+ox, cy+oy)
 		sq.Teams = append(sq.Teams, Team{
 			X: x, Y: y, HP: u.HP * float64(u.Members), Members: u.Members,
-			Action: ActIdle, lastShot: never,
+			Action: ActIdle, lastShot: never, lastFire: never,
 		})
 	}
 	sq.Alive, sq.DeployTicks = true, 0
@@ -312,9 +313,12 @@ func formation(i, n, side int) (float64, float64) {
 func (s *Sim) clamp(domain string, x, y float64) (float64, float64) {
 	const edge = 10
 	x = math.Max(edge, math.Min(s.R.Map.Width-edge, x))
-	if domain == "sea" {
+	switch domain {
+	case "air":
+		y = math.Max(edge, math.Min(s.R.Map.Height-edge, y))
+	case "sea":
 		y = math.Max(s.R.Map.WaterY+edge, math.Min(s.R.Map.Height-edge, y))
-	} else {
+	default:
 		y = math.Max(edge, math.Min(s.R.Map.WaterY-edge, y))
 	}
 	return x, y
@@ -412,7 +416,9 @@ func (s *Sim) spot(live []*teamRef) {
 	}
 	for _, tr := range live {
 		enemy := 1 - tr.sq.Side
-		tr.t.Spotted = s.postSees(enemy, tr.t.X, tr.t.Y)
+		// A team that has just fired is seen wherever it is: the shot gives it away.
+		tr.t.Spotted = s.postSees(enemy, tr.t.X, tr.t.Y) ||
+			float64(s.Tick-tr.t.lastFire) <= s.R.Match.RevealSeconds*float64(s.R.TickRate)
 		for _, o := range live {
 			if o.sq.Side != enemy || dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y) > o.u.Sight {
 				continue
@@ -456,13 +462,14 @@ func (s *Sim) fire(tr *teamRef) {
 		return
 	}
 	nerve := s.Nerve(t)
+	t.lastFire = s.Tick
 	t.Cooldown = tr.u.CooldownTicks
 	if nerve == Shaken {
 		t.Cooldown = tr.u.CooldownTicks * 8 / 5
 	}
 	if tr.plan.hq {
 		enemy := &s.Sides[1-tr.sq.Side]
-		enemy.HQHP -= tr.u.Damage * float64(t.Members)
+		enemy.HQHP -= tr.u.Damage * tr.u.Against("hq") * float64(t.Members)
 		if s.Tick-enemy.hqAlarm > 20*s.R.TickRate {
 			enemy.hqAlarm = s.Tick
 			s.emit(Event{Side: enemy.ID, Kind: EvHQUnderAttack, Point: s.R.HQPoint(enemy.ID).ID})
@@ -484,7 +491,7 @@ func (s *Sim) fire(tr *teamRef) {
 	for i := 0; i < t.Members; i++ {
 		if s.rng.Float64() < chance {
 			tgt.t.hits++
-			tgt.t.dmg += tr.u.Damage * (1 - tgt.u.Armor)
+			tgt.t.dmg += tr.u.Damage * tr.u.Against(tgt.u.Class) * (1 - tgt.u.Armor*(1-tr.u.Pierce))
 		} else {
 			tgt.t.misses++
 		}
@@ -579,7 +586,7 @@ func (s *Sim) capture(live []*teamRef) {
 		}
 		var present [2]bool
 		for _, tr := range live {
-			if tr.t.Members > 0 && slices.Contains(by, tr.u.Class) &&
+			if tr.t.Members > 0 && !tr.u.NoCapture && slices.Contains(by, tr.u.Class) &&
 				dist(tr.t.X, tr.t.Y, p.X, p.Y) <= s.R.Match.CaptureRadius {
 				present[tr.sq.Side] = true
 			}

@@ -108,7 +108,7 @@ func checkInvariants(t *testing.T, s *sim.Sim) {
 			continue
 		}
 		alive[sq.Side]++
-		sea := rules.Factions[s.Sides[sq.Side].Faction].Units[sq.Unit].Domain == "sea"
+		domain := rules.Factions[s.Sides[sq.Side].Faction].Units[sq.Unit].Domain
 		for _, tm := range sq.Teams {
 			if tm.Members == 0 {
 				continue
@@ -116,7 +116,7 @@ func checkInvariants(t *testing.T, s *sim.Sim) {
 			if math.IsNaN(tm.X) || math.IsNaN(tm.Y) || tm.X < 0 || tm.X > rules.Map.Width || tm.Y < 0 || tm.Y > rules.Map.Height {
 				t.Fatalf("tick %d: squad %d left the map at %.1f,%.1f", s.Tick, sq.ID, tm.X, tm.Y)
 			}
-			if (tm.Y >= rules.Map.WaterY) != sea {
+			if domain != "air" && (tm.Y >= rules.Map.WaterY) != (domain == "sea") {
 				t.Fatalf("tick %d: squad %d (%s) is in the wrong domain at y=%.1f", s.Tick, sq.ID, sq.Unit, tm.Y)
 			}
 			if tm.Stress < 0 || tm.Stress > 1 || tm.HP <= 0 {
@@ -436,7 +436,9 @@ func TestFactionsAreRoughlyEven(t *testing.T) {
 }
 
 // A unit that can be shot from beyond its own sight never learns what is killing it and
-// cannot answer. Until firing gives a shooter away, sight must cover every enemy weapon.
+// cannot answer, so sight covers every direct-fire enemy weapon. Indirect fire (a weapon
+// with a minimum range) may outreach sight: its shot gives it away instead, see
+// TestFiringGivesTheShooterAway.
 func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
 	for mine, f := range rules.Factions {
 		for theirs, g := range rules.Factions {
@@ -445,7 +447,7 @@ func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
 			}
 			for id, u := range f.Units {
 				for enemyID, e := range g.Units {
-					if u.Sight < e.Range {
+					if e.MinRange == 0 && u.Sight < e.Range {
 						t.Errorf("%s %s sees %.0f but %s %s shoots %.0f", mine, id, u.Sight, theirs, enemyID, e.Range)
 					}
 				}
@@ -569,5 +571,225 @@ func TestPacedEnemiesAreBeatable(t *testing.T) {
 	t.Logf("relentless Aegis won, of %d: %v", seeds, wins)
 	if wins[bot.Easy] < seeds*9/10 || wins[bot.Normal] < seeds*3/4 || wins[bot.Easy] < wins[bot.Normal] {
 		t.Fatalf("paced enemies are not clearly beatable: %v of %d", wins, seeds)
+	}
+}
+
+// place moves every team of a squad to one spot, for staging a fight.
+func place(sq *sim.Squad, x, y float64) {
+	for i := range sq.Teams {
+		sq.Teams[i].X, sq.Teams[i].Y = x+float64(i)*6, y
+	}
+}
+
+func buyFielded(t *testing.T, s *sim.Sim, side int, unit string) *sim.Squad {
+	t.Helper()
+	cost := rules.Factions[s.Sides[side].Faction].Units[unit].Cost
+	for s.Gold(side) < cost { // nobody has orders yet, so waiting for the well changes nothing else
+		s.Step()
+	}
+	return fielded(s, must(t, s, sim.Command{Side: side, Kind: sim.CmdBuy, Unit: unit}))
+}
+
+func TestAirUnitsCrossLandAndSea(t *testing.T) {
+	s := newSim(t, 1)
+	heli := buyFielded(t, s, 0, "helicopter")
+	if got := s.Callsign(heli); got.En != "Hawk 1" || got.He != "בז 1" {
+		t.Fatalf("callsign = %+v", got)
+	}
+	// It may be sent to a sea point and to a land point alike, and it gets there.
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: heli.ID, Point: "S"})
+	run(s, 25)
+	sierra := rules.PointByID("S")
+	if x, y := heli.Center(); math.Hypot(x-sierra.X, y-sierra.Y) > 60 || y < rules.Map.WaterY {
+		t.Fatalf("the helicopter is at %.0f,%.0f, not over Sierra", x, y)
+	}
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdMove, Squad: heli.ID, Point: "D"})
+	// Ground and sea units keep their own element.
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdMove, Squad: 1, Point: "S"}); !errors.Is(err, sim.ErrUnreachable) {
+		t.Fatalf("infantry sent to sea: %v", err)
+	}
+}
+
+func TestHelicopterTakesTheSeaRigAndDronesCannot(t *testing.T) {
+	s := newSim(t, 1)
+	heli := buyFielded(t, s, 0, "helicopter")
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: heli.ID, Point: "S"})
+	run(s, 40)
+	if owner(s, "S") != 0 {
+		t.Fatalf("Sierra owner = %d after a helicopter held it", owner(s, "S"))
+	}
+
+	s = newSim(t, 1)
+	drones := buyFielded(t, s, 1, "fpvSwarm")
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: drones.ID, Point: "S"})
+	run(s, 40)
+	if owner(s, "S") != sim.NoSide {
+		t.Fatalf("Sierra owner = %d: a drone swarm cannot hold ground", owner(s, "S"))
+	}
+}
+
+// The tank's gun cannot be brought to bear on aircraft; the technical's machine gun can.
+func TestWhoCanShootAtAircraft(t *testing.T) {
+	duel := func(shooterSide int, shooter string) (heliHP float64) {
+		s := newSim(t, 3)
+		heli := buyFielded(t, s, 1-shooterSide, map[int]string{0: "helicopter", 1: "fpvSwarm"}[1-shooterSide])
+		gun := buyFielded(t, s, shooterSide, shooter)
+		place(heli, 800, 300)
+		place(gun, 800, 400)
+		must(t, s, sim.Command{Side: shooterSide, Kind: sim.CmdHold, Squad: gun.ID})
+		must(t, s, sim.Command{Side: 1 - shooterSide, Kind: sim.CmdHold, Squad: heli.ID})
+		before := 0.0
+		for i := range heli.Teams {
+			before += heli.Teams[i].HP
+		}
+		run(s, 8)
+		after := 0.0
+		for i := range heli.Teams {
+			if heli.Teams[i].Members > 0 {
+				after += heli.Teams[i].HP
+			}
+		}
+		return before - after
+	}
+	if lost := duel(1, "technical"); lost <= 0 {
+		t.Fatal("a technical did no damage to a helicopter in range")
+	}
+	if lost := duel(0, "tank"); lost != 0 {
+		t.Fatalf("a tank damaged aircraft (%.0f hp)", lost)
+	}
+}
+
+// An RPG goes through armor that shrugs off rifle fire, and is poor against infantry.
+func TestRPGTeamIsAnAntiArmorWeapon(t *testing.T) {
+	rpg := rules.Factions["ashfall"].Units["rpgTeam"]
+	militia := rules.Factions["ashfall"].Units["militia"]
+	tank := rules.Factions["aegis"].Units["tank"]
+	commandos := rules.Factions["aegis"].Units["commandos"]
+	perHit := func(u, target shared.Unit) float64 {
+		return u.Damage * u.Against(target.Class) * (1 - target.Armor*(1-u.Pierce))
+	}
+	if perHit(rpg, tank) < 4*perHit(militia, tank) {
+		t.Fatalf("rpg does %.1f to a tank per hit, militia %.1f", perHit(rpg, tank), perHit(militia, tank))
+	}
+	if perHit(rpg, commandos) >= perHit(rpg, tank) {
+		t.Fatalf("rpg does %.1f to infantry and %.1f to a tank", perHit(rpg, commandos), perHit(rpg, tank))
+	}
+
+	// In the field: a rocket team, half the size of a militia cell, hurts a tank squad half
+	// again as much.
+	damage := func(unit string) float64 {
+		s := newSim(t, 5)
+		tanks := buyFielded(t, s, 0, "tank")
+		shooters := buyFielded(t, s, 1, unit)
+		place(tanks, 800, 300)
+		place(shooters, 800, 440)
+		must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: shooters.ID})
+		run(s, 10)
+		left := 0.0
+		for i := range tanks.Teams {
+			if tanks.Teams[i].Members > 0 {
+				left += tanks.Teams[i].HP
+			}
+		}
+		return 2*tank.HP - left
+	}
+	if r, m := damage("rpgTeam"), damage("militia"); r < 1.5*m {
+		t.Fatalf("in 10 s rpg teams did %.0f to tanks, militia %.0f", r, m)
+	}
+}
+
+// The rocket launcher reaches far, cannot hit what is close, and backs away from it.
+func TestRocketLauncherFiresFarAndNotClose(t *testing.T) {
+	launcher := rules.Factions["aegis"].Units["rocketLauncher"]
+	stage := func(gap float64) (s *sim.Sim, rockets, enemy *sim.Squad) {
+		s = newSim(t, 2)
+		rockets = buyFielded(t, s, 0, "rocketLauncher")
+		enemy = s.Squads[2] // an Ashfall militia cell
+		spotter := s.Squads[0]
+		place(rockets, 400, 400)
+		place(enemy, 400+gap, 400)
+		place(spotter, 400+gap-200, 300) // eyes on the target, out of its reach
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: rockets.ID})
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: spotter.ID})
+		must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: enemy.ID})
+		return
+	}
+	hp := func(sq *sim.Squad) (total float64) {
+		for i := range sq.Teams {
+			if sq.Teams[i].Members > 0 {
+				total += sq.Teams[i].HP
+			}
+		}
+		return
+	}
+
+	s, rockets, enemy := stage(launcher.Range - 60)
+	before := hp(enemy)
+	run(s, 15)
+	if hp(enemy) >= before {
+		t.Fatal("the launcher did not hit a spotted target at long range")
+	}
+	if x, _ := rockets.Center(); math.Abs(x-400) > 30 {
+		t.Fatalf("the launcher left its post (x=%.0f) though it could fire from it", x)
+	}
+
+	s, rockets, enemy = stage(launcher.MinRange - 60)
+	s.Squads[0].Teams[0].X = 100 // the spotter is not needed: the enemy is in plain sight
+	run(s, 6)
+	if x, _ := rockets.Center(); x >= 400 {
+		t.Fatalf("the launcher stayed at x=%.0f with an enemy inside its minimum range", x)
+	}
+}
+
+// A weapon that outreaches the enemy's sight is seen when it fires, so it can be hunted.
+func TestFiringGivesTheShooterAway(t *testing.T) {
+	s := newSim(t, 2)
+	rockets := buyFielded(t, s, 0, "rocketLauncher")
+	enemy := s.Squads[2]
+	place(rockets, 300, 300)
+	place(enemy, 300+rules.Factions["aegis"].Units["rocketLauncher"].Range-40, 300)
+	place(s.Squads[0], 520, 200)
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: rockets.ID})
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdHold, Squad: enemy.ID})
+	seen := func() bool {
+		for _, c := range s.Snapshot(1).Contacts {
+			if c.ID == rockets.ID {
+				return true
+			}
+		}
+		return false
+	}
+	if seen() {
+		t.Fatal("the launcher is seen before it has fired")
+	}
+	fired := false
+	for i := 0; i < 15*rules.TickRate && !fired; i++ {
+		s.Step()
+		fired = seen()
+	}
+	if !fired {
+		t.Fatal("the launcher fired from beyond the enemy's sight and was never seen")
+	}
+	// It fades from view again once it stops firing.
+	place(enemy, 1500, 700)
+	place(s.Squads[3], 1500, 700)
+	run(s, rules.Match.RevealSeconds+6)
+	if seen() {
+		t.Fatal("the launcher is still seen long after its last shot")
+	}
+}
+
+func TestScriptedPlayersBuyTheNewUnits(t *testing.T) {
+	bought := map[string]bool{}
+	for seed := uint64(1); seed <= 3; seed++ {
+		s, _ := playMatch(t, seed, [2]string{bot.Standard, bot.Standard})
+		for _, sq := range s.Squads {
+			bought[sq.Unit] = true
+		}
+	}
+	for _, unit := range []string{"helicopter", "rocketLauncher", "fpvSwarm", "rpgTeam"} {
+		if !bought[unit] {
+			t.Errorf("no scripted player bought %s in three matches", unit)
+		}
 	}
 }

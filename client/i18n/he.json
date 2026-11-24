@@ -33,6 +33,7 @@
   "class.infantry": "רגלים",
   "class.vehicle": "רכב",
   "class.naval": "ימית",
+  "class.air": "אוויר",
   "callPrefix": "{to}, כאן {from}, ",
   "call.hold": "{to}, כאן {from}, תחזיקו את {point}, עבור.",
   "call.move": "{to}, כאן {from}, נועו ל{point}, עבור.",

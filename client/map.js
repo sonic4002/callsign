@@ -110,7 +110,10 @@ export class Scene {
         group = { visuals: [] };
         this.groups.set(g.id, group);
       }
-      Object.assign(group, { id: g.id, side: g.side, unit: g.unit, cls: g.class, faction, own: g.own, view: g });
+      // `small` is a squad of many small figures (soldiers, drones) and not one big machine;
+      // `air` is anything that flies.
+      const stats = this.unitOf[g.unit];
+      Object.assign(group, { id: g.id, side: g.side, unit: g.unit, cls: g.class, faction, own: g.own, view: g, small: (stats?.members ?? 1) > 1, air: stats?.domain === "air" });
       // Teams arrive as a list of the living, so each is matched to the nearest one
       // already on screen instead of by its place in the list.
       const free = new Set(group.visuals);
@@ -126,7 +129,7 @@ export class Scene {
         else best = { x: tm.x, y: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
         if (tm.members < best.members) {
           this.lose(group, best, false);
-          if (group.cls === "infantry") this.fall(group, best, best.members - tm.members);
+          if (group.small) this.fall(group, best, best.members - tm.members);
         }
         Object.assign(best, { tx: tm.x, ty: tm.y, members: tm.members, action: tm.action, nerve: tm.nerve });
         next.push(best);
@@ -157,7 +160,7 @@ export class Scene {
   fall(group, v, count) {
     const ttl = casualtySeconds(group.unit, group.cls) * 1000;
     if (!ttl) return;
-    const one = group.cls !== "infantry";
+    const one = !group.small;
     for (let i = 0; i < (one ? 1 : count); i++) {
       const spread = () => (one ? 0 : (Math.random() - 0.5) * 14);
       this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.x + spread(), y: v.y + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl });
@@ -168,7 +171,8 @@ export class Scene {
   // vehicle, a plume for a boat going under.
   lose(group, v, whole) {
     const now = performance.now();
-    if (group.cls === "infantry") return this.fx.dust(v.x, v.y, now, whole ? 1.6 : 1.1);
+    if (group.small && group.air) return this.fx.pop(v.x, v.y, now); // a drone shot out of the air
+    if (group.small) return this.fx.dust(v.x, v.y, now, whole ? 1.6 : 1.1);
     if (!whole) return this.fx.shell(v.x, v.y, now, 0.6);
     if (group.cls === "naval") {
       this.fx.sinking(v.x, v.y, now);
@@ -528,7 +532,7 @@ export class Scene {
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      const wide = group.cls === "infantry" ? 13 : 24;
+      const wide = group.small ? 13 : 24;
       for (const v of group.visuals) {
         const [sx, sy] = S(v.x, v.y);
         ctx.beginPath();
@@ -567,7 +571,7 @@ export class Scene {
     for (const group of this.groups.values()) {
       for (const v of group.visuals) {
         things.push({
-          depth: v.x + v.y,
+          depth: v.x + v.y + (group.air ? 90 : 0), // what flies is drawn over what stands under it
           x: v.x,
           y: v.y,
           scale: unitScale,

@@ -109,7 +109,7 @@ func (s *Sim) order(c Command) (*Squad, error) {
 		if p == nil {
 			return nil, ErrNoPoint
 		}
-		if (p.Y >= s.R.Map.WaterY) != (sq.unit.Domain == "sea") {
+		if sq.unit.Domain != "air" && (p.Y >= s.R.Map.WaterY) != (sq.unit.Domain == "sea") {
 			return nil, fmt.Errorf("%w: %s is a %s unit", ErrUnreachable, sq.unit.Name.En, sq.unit.Domain)
 		}
 		o.Point, o.X, o.Y = p.ID, p.X, p.Y

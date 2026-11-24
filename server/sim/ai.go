@@ -48,6 +48,7 @@ func (s *Sim) trackContacts() {
 //	                -0.20 shaken (-0.30 more under fire)   -0.70 pinned
 //	cover     0.20  +0.25 under fire   +0.20 shaken   +0.60 pinned
 //	fall back 0.10  +0.45 shaken and outnumbered
+//	                +0.60 an enemy inside the weapon's minimum range and nothing to shoot
 //	                +0.30 under fire with nothing in range and nowhere to go
 func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	sq, t, u := tr.sq, tr.t, tr.u
@@ -55,7 +56,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	nerve := s.Nerve(t)
 
 	var target, wanted, closest *teamRef
-	targetD, wantedD, nearest := math.MaxFloat64, math.MaxFloat64, math.MaxFloat64
+	targetD, wantedD, nearest, reach := math.MaxFloat64, math.MaxFloat64, math.MaxFloat64, math.MaxFloat64
+	tooClose := false // an enemy stands inside this weapon's minimum range
 	friends, enemies := 0, 0
 	for _, o := range live {
 		d := dist(t.X, t.Y, o.t.X, o.t.Y)
@@ -72,7 +74,18 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 			enemies++
 		}
 		if d < nearest {
-			closest, nearest = o, d
+			nearest = d
+		}
+		// What this weapon cannot hurt is no target, and nothing to close with.
+		if u.Against(o.u.Class) == 0 {
+			continue
+		}
+		if d < u.MinRange {
+			tooClose = true
+			continue
+		}
+		if d < reach {
+			closest, reach = o, d
 		}
 		if d > u.Range {
 			continue
@@ -88,7 +101,7 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 		target, targetD = wanted, wantedD
 	}
 	enemyHQ := s.R.HQPoint(1 - sq.Side)
-	hq := target == nil && (order == OrderAttack || order == OrderHold) &&
+	hq := target == nil && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
 		dist(t.X, t.Y, enemyHQ.X, enemyHQ.Y) <= u.Range
 	canFire := target != nil || hq
 
@@ -155,7 +168,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 		}
 	}
 	if nearest < math.MaxFloat64 || underFire {
-		v := 0.1 + b(shaken && outnumbered, 0.45) + b(underFire && !canFire && !needMove, 0.3)
+		v := 0.1 + b(shaken && outnumbered, 0.45) + b(underFire && !canFire && !needMove, 0.3) +
+			b(tooClose && !canFire, 0.6)
 		if v > score {
 			home := s.R.HQPoint(sq.Side)
 			x, y := s.clamp(u.Domain, home.X, home.Y)
