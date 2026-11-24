@@ -105,16 +105,17 @@ art:
 art-units-image:
 	docker build -t callsign-blender -f art/Dockerfile.blender art
 
-# Render every unit's sprite sheets into assets/sprites/units, and the pieces that are
-# laid end to end (walls, fences, the bridge) and the gold lying in a field into
-# assets/sprites/segments and props. Runs on the CPU with the network off, in a few minutes.
+# Render every unit's sprite sheets (the two heroes among them) into assets/sprites/units,
+# the pieces that are laid end to end (walls, fences, the bridge) and the gold lying in a
+# field into assets/sprites/segments and props, and the sandbag position into landmarks. Runs on the CPU with the network off, in a few minutes.
 art-units:
 	$(ART) -e HOME=/tmp --network none -w /src callsign-blender sh -c 'python art/units.py && python art/props.py'
 
 # One picture of every finished sprite standing on the game's ground at game size, to
 # look at before it goes in: art-sheet.png in this directory.
 art-sheet:
-	$(ART) --network none -w /src callsign-art python art/sheet.py scene art-sheet.png
+	$(ART) --network none -w /src callsign-art sh -c 'python art/sheet.py scene art-sheet.png && \
+		python art/sheet.py stages art-stages.png && python art/sheet.py leaving art-leaving.png'
 
 # ---- radio voices: the squads' replies spoken aloud (tts/, client/speech/) ----
 TTS := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v $(CURDIR):/src

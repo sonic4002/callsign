@@ -4,7 +4,10 @@
     "ruin": "Redraw this exact building after it has been destroyed by explosions: {subject}. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No flames, no fire, no smoke, no people, no surrounding ground, no cast shadow. No text, no letters, no numbers, no logos, no flags, no insignia.",
     "terrain": "Seamless tileable game ground texture seen from directly above: {subject}. Hand-painted pixel-art look, muted colours, even flat lighting with no shadows, uniform detail from edge to edge, no objects, no buildings, no horizon, no border, no text.",
     "scenery": "Isometric 2D strategy game scenery sprite: {subject}. Three-quarter isometric view from above, camera raised about 35 degrees. Hand-painted pixel-art look with crisp clean edges and a bold readable silhouette, muted natural colours, soft light from the upper left. One single object, complete and uncropped, centred with empty margin on every side, on a plain flat solid light grey studio background with no surrounding ground, no scenery and no cast shadow. No people, no text, no letters, no numbers, no logos, no flags.",
-    "site": "Redraw this exact building as a construction site where it is only half built: {subject}. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow. No text, no letters, no numbers, no logos, no flags, no insignia."
+    "site": "Redraw this exact building as a construction site where it is only half built: {subject}. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow. No text, no letters, no numbers, no logos, no flags, no insignia.",
+    "stage": "Redraw this exact building at an earlier moment of its construction: {subject}. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow, no smoke. No text, no letters, no numbers, no logos, no flags, no insignia. ",
+    "door": "Redraw this exact building with one single change: {subject}. Everything else stays exactly as it is, every wall, roof and detail unchanged. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow, no smoke. No text, no letters, no numbers, no logos, no flags, no insignia. ",
+    "portrait": "Character portrait for the roster of a 2D strategy game: {subject}. Head and shoulders, three-quarter view, filling the square picture. Hand-painted pixel-art look with crisp clean edges, muted military colours, soft light from the upper left, on a plain flat solid dark slate-blue background. One person only. No text, no letters, no numbers, no logos, no flags, no insignia. "
   },
   "sprites": [
     {
@@ -23,21 +26,6 @@
       "draw": 96
     },
     {
-      "id": "hq_ashfall",
-      "kind": "building",
-      "style": "building",
-      "height": 256,
-      "seeds": [
-        11,
-        12,
-        13,
-        14
-      ],
-      "keep": 11,
-      "subject": "a rugged improvised militia headquarters, a fortified concrete compound with sandbag walls, corrugated metal roofs, camouflage netting, oil drums and a tall radio antenna",
-      "draw": 80
-    },
-    {
       "id": "hq_aegis_ruin",
       "kind": "building",
       "style": "ruin",
@@ -52,6 +40,21 @@
       "keep": 21,
       "subject": "the roof and upper floor have collapsed inward, the walls are broken, torn open and blackened with soot, the radar dish and antenna masts are snapped and fallen, and heaps of grey rubble, bent panels and twisted metal lie inside the footprint",
       "draw": 96
+    },
+    {
+      "id": "hq_ashfall",
+      "kind": "building",
+      "style": "building",
+      "height": 256,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "keep": 11,
+      "subject": "a rugged improvised militia headquarters, a fortified concrete compound with sandbag walls, corrugated metal roofs, camouflage netting, oil drums and a tall radio antenna",
+      "draw": 80
     },
     {
       "id": "hq_ashfall_ruin",
@@ -154,21 +157,38 @@
         14
       ],
       "subject": "a compact military barracks made of clean angular prefabricated modules in blue-grey and white, two long low dormitory blocks joined by a covered entrance, with a small antenna mast and stacked supply crates by the door",
-      "keep": 11
+      "keep": 11,
+      "door": {
+        "box": [
+          0.26,
+          0.44,
+          0.42,
+          0.78
+        ],
+        "exit": [
+          0.33,
+          0.74
+        ],
+        "rally": [
+          0.12,
+          0.93
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "aegis_barracks_site",
+      "id": "aegis_barracks_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "aegis_barracks",
       "height": 160,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
-      "keep": 33
+      "subject": "its main entrance door now stands wide open, showing a dark interior",
+      "keep": 53
     },
     {
       "id": "aegis_barracks_ruin",
@@ -185,6 +205,62 @@
       "keep": 21
     },
     {
+      "id": "aegis_barracks_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_barracks",
+      "height": 160,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_barracks_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_barracks",
+      "height": 160,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 43
+    },
+    {
+      "id": "aegis_barracks_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_barracks",
+      "height": 160,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 33
+    },
+    {
+      "id": "aegis_barracks_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_barracks",
+      "height": 160,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 43
+    },
+    {
       "id": "aegis_works",
       "kind": "building",
       "style": "building",
@@ -196,21 +272,38 @@
         14
       ],
       "subject": "a compact armoured vehicle factory made of clean angular prefabricated modules in blue-grey and white, a tall assembly hall with one large roll-up vehicle door, a gantry crane on the roof and two exhaust stacks",
-      "keep": 13
+      "keep": 13,
+      "door": {
+        "box": [
+          0.17,
+          0.38,
+          0.41,
+          0.76
+        ],
+        "exit": [
+          0.29,
+          0.72
+        ],
+        "rally": [
+          0.08,
+          0.92
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "aegis_works_site",
+      "id": "aegis_works_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "aegis_works",
       "height": 184,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "its large vehicle bay door is now rolled all the way up, showing the dark empty interior of the garage",
+      "keep": 52
     },
     {
       "id": "aegis_works_ruin",
@@ -227,6 +320,62 @@
       "keep": 23
     },
     {
+      "id": "aegis_works_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_works",
+      "height": 184,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_works_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_works",
+      "height": 184,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_works_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_works",
+      "height": 184,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "aegis_works_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_works",
+      "height": 184,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 43
+    },
+    {
       "id": "aegis_airbase",
       "kind": "building",
       "style": "building",
@@ -238,21 +387,39 @@
         14
       ],
       "subject": "a compact military air base building made of clean angular prefabricated modules in blue-grey and white, a small control tower with a glass cab beside a low hangar with an open front, and a round helicopter landing pad on the flat roof",
-      "keep": 12
+      "keep": 12,
+      "door": {
+        "box": [
+          0.3,
+          0.56,
+          0.44,
+          0.78
+        ],
+        "exit": [
+          0.59,
+          0.27
+        ],
+        "rally": [
+          0.59,
+          0.27
+        ],
+        "faces": "SW",
+        "lift": true
+      }
     },
     {
-      "id": "aegis_airbase_site",
+      "id": "aegis_airbase_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "aegis_airbase",
       "height": 168,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "its hangar door is now fully open, showing the dark empty interior of the hangar",
+      "keep": 53
     },
     {
       "id": "aegis_airbase_ruin",
@@ -269,6 +436,62 @@
       "keep": 23
     },
     {
+      "id": "aegis_airbase_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_airbase",
+      "height": 168,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_airbase_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_airbase",
+      "height": 168,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 43
+    },
+    {
+      "id": "aegis_airbase_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_airbase",
+      "height": 168,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "aegis_airbase_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_airbase",
+      "height": 168,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 42
+    },
+    {
       "id": "aegis_dockyard",
       "kind": "building",
       "style": "building",
@@ -280,21 +503,38 @@
         14
       ],
       "subject": "a compact naval dockyard building made of clean angular prefabricated modules in blue-grey and white, a covered boat hall with an open front and a sloping concrete slipway, a harbour crane and a short quay with bollards",
-      "keep": 12
+      "keep": 12,
+      "door": {
+        "box": [
+          0.27,
+          0.4,
+          0.5,
+          0.7
+        ],
+        "exit": [
+          0.36,
+          0.66
+        ],
+        "rally": [
+          0.78,
+          0.93
+        ],
+        "faces": "S"
+      }
     },
     {
-      "id": "aegis_dockyard_site",
+      "id": "aegis_dockyard_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "aegis_dockyard",
       "height": 168,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "the big door of its boat hall is now fully open, showing a dark empty interior",
+      "keep": 52
     },
     {
       "id": "aegis_dockyard_ruin",
@@ -311,6 +551,62 @@
       "keep": 23
     },
     {
+      "id": "aegis_dockyard_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_dockyard",
+      "height": 168,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_dockyard_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_dockyard",
+      "height": 168,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_dockyard_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_dockyard",
+      "height": 168,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "aegis_dockyard_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_dockyard",
+      "height": 168,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 41
+    },
+    {
       "id": "aegis_refinery",
       "kind": "building",
       "style": "building",
@@ -322,21 +618,38 @@
         14
       ],
       "subject": "a compact ore refinery made of clean angular prefabricated modules in blue-grey and white, a processing hall with three tall cylindrical silos, pipes, a conveyor ramp leading up to a loading hopper and one chimney",
-      "keep": 12
+      "keep": 12,
+      "door": {
+        "box": [
+          0.26,
+          0.62,
+          0.44,
+          0.8
+        ],
+        "exit": [
+          0.33,
+          0.82
+        ],
+        "rally": [
+          0.12,
+          0.95
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "aegis_refinery_site",
+      "id": "aegis_refinery_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "aegis_refinery",
       "height": 196,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "the large vehicle door of its unloading bay is now fully open, showing a dark empty interior",
+      "keep": 51
     },
     {
       "id": "aegis_refinery_ruin",
@@ -353,6 +666,62 @@
       "keep": 23
     },
     {
+      "id": "aegis_refinery_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_refinery",
+      "height": 196,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_refinery_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_refinery",
+      "height": 196,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 41
+    },
+    {
+      "id": "aegis_refinery_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_refinery",
+      "height": 196,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "aegis_refinery_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_refinery",
+      "height": 196,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 43
+    },
+    {
       "id": "ashfall_safehouse",
       "kind": "building",
       "style": "building",
@@ -364,21 +733,38 @@
         14
       ],
       "subject": "a rugged improvised militia safehouse, a low fortified concrete house with sandbagged windows, a corrugated metal roof, camouflage netting, a tarpaulin awning and oil drums",
-      "keep": 14
+      "keep": 14,
+      "door": {
+        "box": [
+          0.18,
+          0.46,
+          0.36,
+          0.72
+        ],
+        "exit": [
+          0.27,
+          0.72
+        ],
+        "rally": [
+          0.1,
+          0.9
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "ashfall_safehouse_site",
+      "id": "ashfall_safehouse_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "ashfall_safehouse",
       "height": 150,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "its main entrance door now stands wide open, showing a dark interior",
+      "keep": 51
     },
     {
       "id": "ashfall_safehouse_ruin",
@@ -395,6 +781,62 @@
       "keep": 21
     },
     {
+      "id": "ashfall_safehouse_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_safehouse",
+      "height": 150,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 41
+    },
+    {
+      "id": "ashfall_safehouse_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_safehouse",
+      "height": 150,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_safehouse_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_safehouse",
+      "height": 150,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "ashfall_safehouse_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_safehouse",
+      "height": 150,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 41
+    },
+    {
       "id": "ashfall_chopShop",
       "kind": "building",
       "style": "building",
@@ -406,21 +848,38 @@
         14
       ],
       "subject": "a rugged improvised militia vehicle workshop, a big rusty corrugated metal shed with a wide open garage door, a welded steel hoist frame beside it, stacked tyres, scrap metal and oil drums",
-      "keep": 12
+      "keep": 12,
+      "door": {
+        "box": [
+          0.2,
+          0.33,
+          0.46,
+          0.68
+        ],
+        "exit": [
+          0.33,
+          0.66
+        ],
+        "rally": [
+          0.12,
+          0.88
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "ashfall_chopShop_site",
+      "id": "ashfall_chopShop_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "ashfall_chopShop",
       "height": 170,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "its large garage door is now pulled all the way open, showing the dark empty interior of the workshop",
+      "keep": 52
     },
     {
       "id": "ashfall_chopShop_ruin",
@@ -437,6 +896,62 @@
       "keep": 21
     },
     {
+      "id": "ashfall_chopShop_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_chopShop",
+      "height": 170,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_chopShop_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_chopShop",
+      "height": 170,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_chopShop_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_chopShop",
+      "height": 170,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "ashfall_chopShop_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_chopShop",
+      "height": 170,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 43
+    },
+    {
       "id": "ashfall_launchYard",
       "kind": "building",
       "style": "building",
@@ -448,21 +963,39 @@
         14
       ],
       "subject": "a rugged improvised militia drone launch yard, a small walled compound with a low concrete shed, launch rails made of welded scaffolding on the flat roof, camouflage netting, antenna poles and crates",
-      "keep": 13
+      "keep": 13,
+      "door": {
+        "box": [
+          0.24,
+          0.48,
+          0.4,
+          0.7
+        ],
+        "exit": [
+          0.5,
+          0.27
+        ],
+        "rally": [
+          0.5,
+          0.27
+        ],
+        "faces": "SW",
+        "lift": true
+      }
     },
     {
-      "id": "ashfall_launchYard_site",
+      "id": "ashfall_launchYard_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "ashfall_launchYard",
       "height": 150,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
-      "keep": 33
+      "subject": "the door of its launch shed is now fully open, showing a dark empty interior",
+      "keep": 52
     },
     {
       "id": "ashfall_launchYard_ruin",
@@ -479,6 +1012,62 @@
       "keep": 21
     },
     {
+      "id": "ashfall_launchYard_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_launchYard",
+      "height": 150,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 41
+    },
+    {
+      "id": "ashfall_launchYard_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_launchYard",
+      "height": 150,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_launchYard_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_launchYard",
+      "height": 150,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
+      "keep": 33
+    },
+    {
+      "id": "ashfall_launchYard_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_launchYard",
+      "height": 150,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 43
+    },
+    {
       "id": "ashfall_boatShed",
       "kind": "building",
       "style": "building",
@@ -490,21 +1079,38 @@
         14
       ],
       "subject": "a rugged improvised militia boat shed, a rusty corrugated metal shed on wooden stilts with a wooden slipway and a short jetty, old tyres hung as fenders, fuel drums and fishing nets",
-      "keep": 12
+      "keep": 12,
+      "door": {
+        "box": [
+          0.22,
+          0.34,
+          0.42,
+          0.58
+        ],
+        "exit": [
+          0.3,
+          0.62
+        ],
+        "rally": [
+          0.12,
+          0.93
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "ashfall_boatShed_site",
+      "id": "ashfall_boatShed_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "ashfall_boatShed",
       "height": 156,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "the big door of its boat shed is now fully open, showing a dark empty interior",
+      "keep": 52
     },
     {
       "id": "ashfall_boatShed_ruin",
@@ -521,6 +1127,62 @@
       "keep": 21
     },
     {
+      "id": "ashfall_boatShed_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_boatShed",
+      "height": 156,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 41
+    },
+    {
+      "id": "ashfall_boatShed_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_boatShed",
+      "height": 156,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_boatShed_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_boatShed",
+      "height": 156,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "ashfall_boatShed_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_boatShed",
+      "height": 156,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 43
+    },
+    {
       "id": "ashfall_smelter",
       "kind": "building",
       "style": "building",
@@ -532,21 +1194,38 @@
         14
       ],
       "subject": "a rugged improvised militia ore smelter, a brick furnace with a tall rusty chimney, a corrugated metal lean-to roof, a rough loading ramp of timber and heaps of dark ore",
-      "keep": 12
+      "keep": 12,
+      "door": {
+        "box": [
+          0.2,
+          0.42,
+          0.56,
+          0.86
+        ],
+        "exit": [
+          0.36,
+          0.74
+        ],
+        "rally": [
+          0.12,
+          0.9
+        ],
+        "faces": "SW"
+      }
     },
     {
-      "id": "ashfall_smelter_site",
+      "id": "ashfall_smelter_open",
       "kind": "building",
-      "style": "site",
+      "style": "door",
       "from": "ashfall_smelter",
       "height": 190,
       "seeds": [
-        31,
-        32,
-        33
+        51,
+        52,
+        53
       ],
-      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "the large vehicle door of its unloading bay is now fully open, showing a dark empty interior",
+      "keep": 51
     },
     {
       "id": "ashfall_smelter_ruin",
@@ -561,6 +1240,62 @@
       ],
       "subject": "the roof has caved in, the walls are cracked, broken open and scorched black, and heaps of rubble, bent corrugated sheets and charred timber lie inside the footprint",
       "keep": 21
+    },
+    {
+      "id": "ashfall_smelter_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_smelter",
+      "height": 190,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_smelter_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_smelter",
+      "height": 190,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_smelter_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_smelter",
+      "height": 190,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "ashfall_smelter_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_smelter",
+      "height": 190,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 43
     },
     {
       "id": "aegis_sentryGun",
@@ -591,6 +1326,48 @@
       "keep": 21
     },
     {
+      "id": "aegis_sentryGun_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_sentryGun",
+      "height": 100,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no weapon at all, only a small low concrete pad on the same footprint, with anchor bolts and two closed equipment crates standing on it",
+      "keep": 43
+    },
+    {
+      "id": "aegis_sentryGun_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_sentryGun",
+      "height": 100,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is half assembled, the base and the turret mount stand on the pad but the weapon itself is not fitted, the gun barrels lie in an open crate beside the mount and a small tripod hoist stands over it",
+      "keep": 42
+    },
+    {
+      "id": "aegis_sentryGun_stage3",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_sentryGun",
+      "height": 100,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is almost finished, the weapon is mounted on its base but the armour shields and covers are still missing so the bare mechanism shows, and one open crate stands beside it",
+      "keep": 43
+    },
+    {
       "id": "aegis_flakBattery",
       "kind": "building",
       "style": "building",
@@ -617,6 +1394,48 @@
       ],
       "subject": "the four barrels are bent and broken, the platform is split open and blackened with soot, the radar dish has fallen, with scattered metal fragments",
       "keep": 21
+    },
+    {
+      "id": "aegis_flakBattery_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_flakBattery",
+      "height": 108,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no weapon at all, only a small low concrete pad on the same footprint, with anchor bolts and two closed equipment crates standing on it",
+      "keep": 43
+    },
+    {
+      "id": "aegis_flakBattery_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_flakBattery",
+      "height": 108,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is half assembled, the base and the turret mount stand on the pad but the weapon itself is not fitted, the gun barrels lie in an open crate beside the mount and a small tripod hoist stands over it",
+      "keep": 43
+    },
+    {
+      "id": "aegis_flakBattery_stage3",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_flakBattery",
+      "height": 108,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is almost finished, the weapon is mounted on its base but the armour shields and covers are still missing so the bare mechanism shows, and one open crate stands beside it",
+      "keep": 43
     },
     {
       "id": "ashfall_gunNest",
@@ -647,6 +1466,48 @@
       "keep": 22
     },
     {
+      "id": "ashfall_gunNest_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_gunNest",
+      "height": 84,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no weapon at all, only a small levelled dirt pit on the same footprint, ringed with a few sandbags, with two wooden crates and an oil drum in it",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_gunNest_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_gunNest",
+      "height": 84,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is half assembled, a low ring of sandbags and a welded scrap mount stand ready but the weapon itself is not fitted, the gun lies in an open wooden crate beside the mount under a tarpaulin",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_gunNest_stage3",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_gunNest",
+      "height": 84,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is almost finished, the weapon is mounted behind its sandbags but the scrap shields and the camouflage netting are still missing so the bare mount shows, and an open wooden crate stands beside it",
+      "keep": 41
+    },
+    {
       "id": "ashfall_rocketNest",
       "kind": "building",
       "style": "building",
@@ -673,6 +1534,48 @@
       ],
       "subject": "the rocket rack is twisted and fallen, the sandbag ring is burst and scattered, everything is scorched black with broken crates",
       "keep": 21
+    },
+    {
+      "id": "ashfall_rocketNest_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_rocketNest",
+      "height": 100,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no weapon at all, only a small levelled dirt pit on the same footprint, ringed with a few sandbags, with two wooden crates and an oil drum in it",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_rocketNest_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_rocketNest",
+      "height": 100,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is half assembled, a low ring of sandbags and a welded scrap mount stand ready but the weapon itself is not fitted, the gun lies in an open wooden crate beside the mount under a tarpaulin",
+      "keep": 41
+    },
+    {
+      "id": "ashfall_rocketNest_stage3",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_rocketNest",
+      "height": 100,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "it is almost finished, the weapon is mounted behind its sandbags but the scrap shields and the camouflage netting are still missing so the bare mount shows, and an open wooden crate stands beside it",
+      "keep": 43
     },
     {
       "id": "house_1",
@@ -764,13 +1667,13 @@
       "style": "building",
       "height": 84,
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        31,
+        32,
+        33,
+        34
       ],
-      "subject": "a low old concrete bunker half sunk in the ground, with a thick rounded roof, a narrow firing slit and a heavy rusty steel door",
-      "keep": 12
+      "subject": "a very low squat concrete pillbox bunker half sunk in the ground, wide and flat, only waist high, with a thick slab roof, one long narrow horizontal firing slit, a heavy steel door at the back and sandbags piled along its base",
+      "keep": 33
     },
     {
       "id": "bunker_ruin",
@@ -779,12 +1682,12 @@
       "from": "bunker",
       "height": 84,
       "seeds": [
-        21,
-        22,
-        23
+        31,
+        32,
+        33
       ],
       "subject": "the thick roof is cracked through and half collapsed, the front wall is blown open, the steel door hangs off, and broken concrete lumps with bent reinforcing bars lie inside the footprint",
-      "keep": 21
+      "keep": 31
     },
     {
       "id": "ruin",
@@ -876,13 +1779,13 @@
       "style": "scenery",
       "height": 256,
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        31,
+        32,
+        33,
+        34
       ],
-      "subject": "a steep rocky mountain peak of grey-brown stone with sharp ridges and a little snow at the very top",
-      "keep": 12
+      "subject": "a single steep bare rock peak rising straight out of the ground, grey-brown stone with sharp ridges, ledges and a little snow at the top, its foot breaking up into an irregular scatter of boulders and scree with a ragged uneven outline, with no platform, no slab and no base under it",
+      "keep": 31
     },
     {
       "id": "mountain_2",
@@ -890,13 +1793,13 @@
       "style": "scenery",
       "height": 220,
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        31,
+        32,
+        33,
+        34
       ],
-      "subject": "a rugged rocky ridge with two uneven peaks of grey-brown stone and patches of snow",
-      "keep": 11
+      "subject": "a cluster of two jagged bare rock peaks rising straight out of the ground, grey-brown stone with snow in the gullies, their foot breaking up into an irregular scatter of boulders and scree with a ragged uneven outline, with no platform, no slab and no base under them",
+      "keep": 34
     },
     {
       "id": "gusher",
@@ -916,7 +1819,7 @@
       "id": "ice",
       "kind": "terrain",
       "style": "terrain",
-      "height": 320,
+      "height": 512,
       "seeds": [
         11,
         12,
@@ -924,13 +1827,14 @@
         14
       ],
       "subject": "the frozen surface of a lake, pale blue-white ice with faint hairline cracks and thin drifts of snow",
-      "keep": 12
+      "keep": 12,
+      "even": true
     },
     {
       "id": "mountain",
       "kind": "terrain",
       "style": "terrain",
-      "height": 320,
+      "height": 512,
       "seeds": [
         11,
         12,
@@ -938,7 +1842,64 @@
         14
       ],
       "subject": "bare rocky mountain ground, grey-brown stone with cracks, small ledges and loose scree",
-      "keep": 14
+      "keep": 14,
+      "even": true
+    },
+    {
+      "id": "portrait_sentinel",
+      "kind": "portrait",
+      "style": "portrait",
+      "height": 192,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a lean veteran marksman of a high-tech army, wearing a blue-grey hooded camouflage cloak over light armour, a matte visor pushed up on the forehead, a calm watchful face with a scar through one eyebrow, and the long barrel of a rifle rising behind one shoulder",
+      "keep": 13
+    },
+    {
+      "id": "portrait_oracle",
+      "kind": "portrait",
+      "style": "portrait",
+      "height": 192,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a quiet middle-aged infiltrator of a desert militia, in a plain sand-coloured travelling robe with a deep hood and a faded ochre scarf, a lined weathered face half in shadow with a steady unsettling gaze, and an old brass amulet at the collar",
+      "keep": 12
+    },
+    {
+      "id": "house_4",
+      "kind": "landmark",
+      "style": "building",
+      "height": 120,
+      "seeds": [
+        31,
+        32,
+        33,
+        34
+      ],
+      "subject": "a small plain flat-roofed village house, a simple whitewashed cube with a low parapet around its flat roof, one wooden door, two small shuttered windows and a water tank on the roof",
+      "keep": 33
+    },
+    {
+      "id": "house_4_ruin",
+      "kind": "landmark",
+      "style": "ruin",
+      "from": "house_4",
+      "height": 120,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the flat roof has fallen in, the walls are broken, cracked open and blackened with soot, and heaps of pale rubble and splintered wood lie inside the footprint",
+      "keep": 21
     }
   ]
 }
