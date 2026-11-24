@@ -8,6 +8,22 @@ const doctrine = {
     "Ashfall Network doctrine: cheap and many. Be aggressive but avoid open fights, pull back early when a fight turns, and come back from a new angle. On the radio you are loose and fast.",
 };
 
+// unitFacts says in words what a unit's numbers mean for whoever commands or buys it.
+export function unitFacts(u, rules) {
+  const facts = [];
+  if (u.domain === "air") facts.push("flies over land and sea alike");
+  else if (u.domain === "sea") facts.push("moves only at sea");
+  const blind = Object.keys(rules.callsigns.classes).filter((c) => u.vs?.[c] === 0);
+  if (blind.length) facts.push(`cannot hit ${blind.join(" or ")} targets`);
+  if (u.pierce) facts.push("its weapon goes through armor, and is poor against infantry");
+  if (u.minRange) facts.push(`fires far (${u.range}) but cannot hit anything closer than ${u.minRange}, and needs another squad to see the target; keep it back and screened`);
+  if (u.range < 100) facts.push("must close to point-blank range to strike");
+  if (u.noCapture) facts.push("cannot capture or hold points");
+  return facts.join("; ");
+}
+
+const canTake = (rules, kind) => rules.rigs[kind].captureBy.join(" or ");
+
 function mapTable(rules, side) {
   const lines = rules.map.points.map((p) => {
     const what =
@@ -16,10 +32,10 @@ function mapTable(rules, side) {
           ? "your headquarters"
           : "the enemy headquarters; destroying it wins the match"
         : p.kind === "landRig"
-          ? `land oil rig, +${rules.rigs.landRig.income} gold/s, only infantry can capture it`
+          ? `land oil rig, +${rules.rigs.landRig.income} gold/s, only ${canTake(rules, "landRig")} squads can capture it`
           : p.kind === "seaRig"
-            ? `sea oil rig, +${rules.rigs.seaRig.income} gold/s, only naval squads can reach or capture it`
-            : "control point, infantry or vehicles can capture it";
+            ? `sea oil rig, +${rules.rigs.seaRig.income} gold/s, only ${canTake(rules, "seaRig")} squads can reach or capture it`
+            : `control point, ${canTake(rules, "point")} squads can capture it`;
     return `- ${p.id}: ${p.callsign.en} / ${p.callsign.he} ("${p.name.en}", "${p.name.he}") at x=${p.x}, y=${p.y}: ${what}`;
   });
   return [
@@ -53,7 +69,7 @@ Chain of command. Hammer (פטיש) is the human commander. Anvil (סדן) is Ha
 
 ${wakes}
 
-On an order: first act with move, hold or attack, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : "Your squad is a land unit: it cannot go to points in the sea."}
+On an order: first act with move, hold or attack, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
 
 ${procedure}
 
@@ -64,7 +80,7 @@ ${doctrine[faction] ?? ""}`;
 
 export function operatorPrompt({ rules, side, faction }) {
   const units = Object.entries(rules.factions[faction].units)
-    .map(([id, u]) => `- ${id}: ${u.name.en}, ${u.class}, ${u.cost} gold`)
+    .map(([id, u]) => `- ${id}: ${u.name.en} (${u.name.he}), ${u.class}, ${u.cost} gold${unitFacts(u, rules) ? `; ${unitFacts(u, rules)}` : ""}`)
     .join("\n");
   const tiers = rules.tiers
     .filter((t) => t.upgradeCost > 0)
@@ -73,7 +89,7 @@ export function operatorPrompt({ rules, side, faction }) {
   const cs = rules.callsigns.classes;
   return `You are Anvil (סדן), the operator for Hammer (פטיש), the human commander, in Callsign, a real-time strategy game commanded over a military radio net. You play the ${rules.factions[faction].name.en}.
 
-Hammer gives you intent. You turn it into tasks for the squad leaders, handle purchases, and keep Hammer informed. You do not move squads yourself: each squad has its own leader who acts on what you tell it over the radio. Address one squad, or several in one call when they share a task. Squad callsigns: ${cs.infantry.en} (${cs.infantry.he}) for infantry, ${cs.vehicle.en} (${cs.vehicle.he}) for vehicles, ${cs.naval.en} (${cs.naval.he}) for naval squads, each with a number.
+Hammer gives you intent. You turn it into tasks for the squad leaders, handle purchases, and keep Hammer informed. You do not move squads yourself: each squad has its own leader who acts on what you tell it over the radio. Address one squad, or several in one call when they share a task. Squad callsigns: ${cs.infantry.en} (${cs.infantry.he}) for infantry, ${cs.vehicle.en} (${cs.vehicle.he}) for vehicles, ${cs.naval.en} (${cs.naval.he}) for naval squads, ${cs.air.en} (${cs.air.he}) for aircraft and drones, each with a number.
 
 Hammer outranks you. When Hammer orders a squad directly, plan around that order and never against it, until Hammer hands the squad back.
 
