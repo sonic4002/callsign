@@ -108,7 +108,7 @@ func TestOnlyTheOperatorBuildsAndTheBuildTreeIsEnforced(t *testing.T) {
 }
 
 func TestSquadsAreSentAtStructuresAndOnlyEngineersCapture(t *testing.T) {
-	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, FullBase: true})
+	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, FullBase: true, Purse: true})
 	if err != nil {
 		t.Fatal(err)
 	}
