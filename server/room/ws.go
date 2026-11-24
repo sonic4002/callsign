@@ -100,6 +100,11 @@ func (rm *Room) handle(c *Client, in inbound) {
 		if err := rm.Stand(c); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
 		}
+	case "lesson":
+		// The first lesson has reached the fight: its enemy may move now.
+		if err := rm.Release(c); err != nil {
+			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
+		}
 	case "restart":
 		if err := rm.Restart(c); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})

@@ -30,6 +30,8 @@ const dynamic = {
   "lobby.about.": ["easy", "normal", "standard"],
   "agents.": ["relay", "demo", "server", "paused", "stopped", "skipped"],
   "provider.": ["anthropic", "openrouter", "gemini", "openai"],
+  "tut.": ["welcome", "select", "order", "answer", "orders", "capture", "fog", "buy", "deploy", "upgrade", "enemy", "voice", "win"],
+  "tutTouch.": ["select", "order", "buy", "upgrade", "enemy"],
   "trouble.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "failed", "join"],
 };
 

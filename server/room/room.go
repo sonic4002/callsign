@@ -47,6 +47,11 @@ type Config struct {
 	Opponent string // "bot" or "friend", for the lobby to show
 	Watch    bool   // spectators, who see both sides, are let in
 	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
+
+	// Tutorial marks the first lesson's room. Its learner's squads are run by the
+	// learner's own browser with the scripted brain, never by this machine's agents, so a
+	// lesson costs the host nothing and anyone may start one.
+	Tutorial bool
 }
 
 // Name is a station as clients see it: the stable key and the callsign in both languages.

@@ -58,12 +58,31 @@ type LobbyView struct {
 	Phase    string      `json:"phase"`           // "lobby", "playing" or "over"
 	Match    int         `json:"match"`
 	Seats    [2]SeatView `json:"seats"`
+	Tutorial bool        `json:"tutorial,omitempty"` // the first lesson (see Config.Tutorial)
+}
+
+// ErrNoLesson refuses a lesson frame outside a lesson.
+var ErrNoLesson = errors.New("this match is not a lesson")
+
+// Release lets the lesson's enemy move. Only the learner may say so, and only in a lesson.
+func (rm *Room) Release(c *Client) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if !rm.cfg.Tutorial || c.ID.Role != RoleHammer {
+		return ErrNoLesson
+	}
+	for _, b := range rm.bots {
+		if b != nil {
+			b.Released = true
+		}
+	}
+	return nil
 }
 
 func (rm *Room) lobby() LobbyView {
 	v := LobbyView{
 		Room: rm.cfg.Code, Opponent: rm.cfg.Opponent, Watch: rm.cfg.Watch, Match: rm.match,
-		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby",
+		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby", Tutorial: rm.cfg.Tutorial,
 	}
 	switch {
 	case rm.sim.Over:

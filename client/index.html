@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest" id="manifest">
 <link rel="stylesheet" href="debug.css">
 <link rel="stylesheet" href="mobile.css">
+<link rel="stylesheet" href="tutorial.css">
 </head>
 <body>
 <main>
@@ -25,6 +26,21 @@
         <button type="button" id="zoom-out" data-i18n-aria="zoomOut">−</button>
         <button type="button" id="zoom-fit" data-i18n-aria="zoomFit">⤢</button>
       </div>
+      <!-- The first lesson's coach: one line at a time over a real match (tutorial.js). -->
+      <aside id="coach" aria-live="polite" hidden>
+        <header>
+          <strong data-i18n="tut.title"></strong>
+          <bdi id="coach-count" dir="ltr"></bdi>
+          <button type="button" id="coach-leave" data-i18n-aria="tut.leave">×</button>
+        </header>
+        <p id="coach-text"></p>
+        <div class="row">
+          <button type="button" id="coach-skip" data-i18n="tut.skip"></button>
+          <button type="button" class="primary" id="coach-next" data-i18n="tut.next"></button>
+          <button type="button" id="coach-stay" data-i18n="tut.stay" hidden></button>
+          <button type="button" class="primary" id="coach-real" data-i18n="tut.real" hidden></button>
+        </div>
+      </aside>
       <div id="orders" hidden>
         <strong id="orders-title"></strong>
         <div>
@@ -124,6 +140,11 @@
     <h1 id="overlay-title"></h1>
     <p id="overlay-line"></p>
     <p id="overlay-side"></p>
+    <!-- The first lesson: offered before anything else on the start screen. -->
+    <div id="learn" hidden>
+      <button type="button" class="primary" id="learn-start" data-i18n="tut.learn"></button>
+      <p data-i18n="tut.learnAbout"></p>
+    </div>
     <!-- The lobby: make a match, or join one by its code; then the seats until both are ready. -->
     <form id="lobby-new" hidden>
       <fieldset>
@@ -191,8 +212,17 @@
       <button type="button" role="tab" data-tab="examples" data-i18n="help.tab.examples"></button>
     </div>
     <section data-pane="guide">
+      <p class="learn-again"><button type="button" id="help-learn" data-i18n="tut.again"></button> <span data-i18n="tut.againAbout"></span></p>
       <h2 data-i18n="help.talk"></h2>
       <p data-i18n="help.talk.body"></p>
+      <h2 data-i18n="help.asked"></h2>
+      <dl class="asked">
+        <dt data-i18n="help.q.move"></dt><dd data-i18n="help.a.move"></dd>
+        <dt data-i18n="help.q.auto"></dt><dd data-i18n="help.a.auto"></dd>
+        <dt data-i18n="help.q.upgrade"></dt><dd data-i18n="help.a.upgrade"></dd>
+        <dt data-i18n="help.q.speed"></dt><dd data-i18n="help.a.speed"></dd>
+        <dt data-i18n="help.q.units"></dt><dd data-i18n="help.a.units"></dd>
+      </dl>
       <h2 data-i18n="strict"></h2>
       <ul>
         <li><strong data-i18n="strict.1"></strong> <span data-i18n="help.strict.1"></span></li>

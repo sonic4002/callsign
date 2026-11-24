@@ -15,6 +15,7 @@ const (
 	Rush     = "rush"     // one squad on the home rig, everything else at the enemy HQ
 	Normal   = "normal"   // Standard, but it buys at a human pace, fields fewer squads and attacks later
 	Easy     = "easy"     // slower and smaller again, and it leaves the enemy HQ alone for a long while
+	Tutorial = "tutorial" // the first lesson's enemy: it stands still until released, then sends one squad
 )
 
 // pace is how hard a style presses: seconds between purchases, the most squads it fields,
@@ -32,11 +33,18 @@ type Player struct {
 	R     *shared.Rules
 
 	lastBuy int // tick of the last purchase, for the styles that pace themselves
+
+	// Released lets the lesson's enemy move. The page sets it when the lesson reaches the
+	// fight; until then that enemy does nothing at all.
+	Released bool
 }
 
 // Act looks at what its side can see and returns the commands it wants this turn.
 // It only ever reads the fogged snapshot, the same one a human player gets.
 func (p *Player) Act(snap sim.Snapshot) []sim.Command {
+	if p.Style == Tutorial {
+		return p.lesson(snap)
+	}
 	var cmds []sim.Command
 	enemyHQ := p.R.HQPoint(1 - p.Side).ID
 	plan := p.infantryPlan()
@@ -202,4 +210,30 @@ func sortedIDs(units map[string]shared.Unit) []string {
 	}
 	sort.Strings(ids)
 	return ids
+}
+
+// lesson is the whole plan of the first lesson's enemy: nothing until it is released, then
+// its first squad walks at the land rig nearest the learner's headquarters, so that the
+// learner meets one enemy in sight and can be shown how to attack it. It never buys.
+func (p *Player) lesson(snap sim.Snapshot) []sim.Command {
+	if !p.Released || len(snap.Squads) == 0 {
+		return nil
+	}
+	first := snap.Squads[0]
+	for _, sq := range snap.Squads {
+		if sq.ID < first.ID {
+			first = sq
+		}
+	}
+	there := p.R.HQPoint(1 - p.Side)
+	target, best := "", math.MaxFloat64
+	for _, pt := range p.R.Map.Points {
+		if d := math.Hypot(pt.X-there.X, pt.Y-there.Y); pt.Kind == "landRig" && d < best {
+			target, best = pt.ID, d
+		}
+	}
+	if target == "" || (first.Order.Kind == sim.CmdAttack && first.Order.Point == target) {
+		return nil
+	}
+	return []sim.Command{{Side: p.Side, Squad: first.ID, Kind: sim.CmdAttack, Point: target}}
 }

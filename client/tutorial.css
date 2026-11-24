@@ -1,0 +1,69 @@
+/* The first lesson: the coach's card over the map, the glow on what to use next, and the
+   lesson's place on the start screen and in Help. The steps are in lesson.js. */
+
+#coach {
+  position: absolute; z-index: 4; inset-block-start: .6rem; left: 50%; transform: translateX(-50%);
+  inline-size: min(38rem, calc(100% - 8rem)); padding: .6rem .8rem .7rem;
+  background: #10161af5; border: 1px solid var(--brass-dim); border-block-start: 3px solid var(--brass);
+  box-shadow: 0 6px 24px #000a;
+}
+#coach[hidden] { display: none; }
+#coach header { display: flex; align-items: center; gap: .6rem; }
+#coach header strong { color: var(--brass); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; }
+#coach-count { color: var(--muted); font-size: .72rem; font-variant-numeric: tabular-nums; margin-inline-end: auto; }
+#coach-leave { padding: 0 .45rem; font-size: 1rem; line-height: 1.4; clip-path: none; border-color: transparent; background: none; color: var(--muted); }
+#coach-text { margin: .35rem 0 .55rem; font-size: .95rem; line-height: 1.45; color: var(--text); }
+#coach .row { display: flex; justify-content: flex-end; gap: .45rem; flex-wrap: wrap; }
+#coach .row button { padding: .3rem .8rem; font-size: .8rem; }
+#coach .row button[hidden] { display: none; }
+#coach-skip { margin-inline-end: auto; opacity: .75; }
+#coach-next:disabled { opacity: .45; }
+
+/* What the step is about: a brass glow that breathes. */
+@keyframes coach-glow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--brass), 0 0 0 0 #e8b23a66; }
+  50% { box-shadow: 0 0 0 2px var(--brass), 0 0 0 9px #e8b23a00; }
+}
+.coach-target { animation: coach-glow 1.3s ease-out infinite; position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .coach-target { animation: none; box-shadow: 0 0 0 2px var(--brass); }
+}
+
+/* ---- the start screen and Help ---- */
+#learn { margin-block-start: 1rem; text-align: center; }
+#learn[hidden] { display: none; }
+#learn p { margin: .35rem 0 0; font-size: .8rem; color: var(--muted); }
+#learn button { padding: .45rem 1.1rem; }
+/* A browser that has not been through the lesson is shown it first, and large. */
+#learn:not(.first) button { background: #263037; color: var(--text); border-color: var(--edge-hi); font-weight: 400; }
+#learn.first { padding: .9rem; border: 1px solid var(--brass); background: #1c232899; }
+#learn.first button { inline-size: 100%; padding: .7rem 1rem; font-size: 1.05rem; }
+#help .learn-again { display: flex; align-items: center; gap: .6rem; margin-block-start: .8rem; }
+#help .learn-again button { flex: none; }
+#help .asked { margin: 0; }
+#help .asked dt { margin-block-start: .5rem; font-size: .88rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); white-space: normal; }
+#help .asked dd { margin: .1rem 0 0; font-size: .88rem; line-height: 1.5; color: var(--muted); font-weight: 400; }
+
+/* ---- phones ---- */
+@media (max-width: 700px), (max-height: 500px) {
+  #coach { padding: .4rem .6rem .5rem; }
+  #coach-text { font-size: .9rem; line-height: 1.4; margin: .2rem 0 .4rem; }
+  #coach .row button { min-block-size: 40px; padding: .3rem .7rem; font-size: .85rem; }
+  #coach-leave { min-inline-size: 44px; min-block-size: 36px; }
+}
+/* Held upright, the card is a band under the treasury and the map begins below it, so the
+   card never covers a point the player is told to touch. --coach is the card's height,
+   kept by tutorial.js. Sheets open from the bottom and leave the card in view. */
+@media (max-width: 700px) and (min-height: 501px) {
+  #coach {
+    position: fixed; z-index: 6; inset-block-start: calc(var(--strip) + var(--safe-t)); left: 0; right: 0; transform: none;
+    inline-size: auto; border-inline: 0; box-shadow: none;
+    padding-inline: max(.6rem, var(--safe-s)) max(.6rem, var(--safe-e));
+  }
+  body.in-lesson #map-wrap { inset-block-start: calc(var(--strip) + var(--safe-t) + var(--coach, 0px)); }
+}
+/* Held sideways there is little height: the card keeps to the side of the map away from
+   the zoom buttons, and stays narrow. */
+@media (max-height: 500px) {
+  #coach { inline-size: min(22rem, 52%); left: auto; right: .4rem; transform: none; }
+}

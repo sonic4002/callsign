@@ -107,7 +107,9 @@ export class BrowserAgents {
     const sat = seat ? `${seat.room}/${seat.token ?? ""}` : "";
     // A key the provider turned down is not tried again until the player changes it.
     const key = this.blocked ? { set: false } : this.key;
-    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo, key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player) });
+    // In the first lesson the squads always think here with the scripted brain: the game
+    // server sends none of its own agents to a lesson, and a lesson spends nobody's key.
+    const want = wanted({ canAct: this.canAct() && seat !== null, demo: this.demo || Boolean(seat?.lesson), key, hiddenLong: this.hiddenLong, seated: Boolean(seat?.room && seat.token && this.player) });
     // A host joined for another seat is of no use: a new match means a new host.
     if (want === this.mode && sat === this.sat && !restart) return this.onChange();
     this.sat = sat;
