@@ -263,7 +263,7 @@ class Soldier:
                    ("coverFire", [0]), ("die", [0.2, 0.45, 0.7, 0.9, 1])]}
     manifest = {"per": "member", "fps": {"walk": 11, "die": 9}}
 
-    def __init__(self, look, militia):
+    def __init__(self, look, militia, rocket=False):
         c = look
         self.root = joint(None, name="root")
         self.fall = joint(self.root)  # tips the whole body over when it dies
@@ -308,7 +308,19 @@ class Soldier:
             self.arms.append((shoulder, elbow))
 
         self.rifle = joint(self.torso, (0.3, -0.08, 0.3))
-        if militia:
+        if rocket:
+            # A shoulder launcher: a long tube, the rocket's head at the front, a flared end.
+            cyl(self.rifle, 0.055, 1.05, (0.0, 0, 0.04), c["armour"], axis="X", sides=8)
+            cyl(self.rifle, 0.09, 0.16, (-0.56, 0, 0.04), c["gun"], axis="X", sides=8, top=0.055)  # flared rear
+            cyl(self.rifle, 0.1, 0.3, (0.66, 0, 0.04), c["rust"], axis="X", sides=8, top=0.02)  # warhead
+            box(self.rifle, (0.07, 0.06, 0.2), (0.05, 0, -0.1), c["wood"])  # grip
+            box(self.rifle, (0.06, 0.05, 0.12), (0.22, 0, 0.14), c["gun"])  # sight
+            self.muzzle = flash(self.rifle, (0.85, 0, 0.04), 0.95)
+            # Two spare rockets carried on the back.
+            for dy in (0.09, -0.09):
+                cyl(self.torso, 0.045, 0.5, (-0.3, dy, 0.42), c["armour"], sides=6)
+                cyl(self.torso, 0.07, 0.2, (-0.3, dy, 0.76), c["rust"], sides=6, top=0.02)
+        elif militia:
             box(self.rifle, (0.34, 0.07, 0.13), (-0.3, 0, -0.03), c["wood"])  # stock
             box(self.rifle, (0.5, 0.08, 0.11), (0.05, 0, 0), c["gun"])
             box(self.rifle, (0.3, 0.07, 0.07), (0.3, 0, -0.01), c["wood"])  # handguard
@@ -574,6 +586,162 @@ class Speedboat(Vehicle):
         self.gun.location = (-0.07 * k, 0, 0.98)
 
 
+class RocketLauncher(Vehicle):
+    """A six-wheeled carrier with a pod of rockets that turns and elevates on the bed."""
+
+    cell, centre = 8.6, 1.0
+    pivot = -1.2
+
+    def build(self, c):
+        b = self.body
+        for x in (1.75, -0.55, -1.75):
+            for side in (1, -1):
+                cyl(b, 0.42, 0.34, (x, 0.9 * side, 0.42), "#17191b", axis="Y", sides=10)
+                cyl(b, 0.2, 0.36, (x, 0.9 * side, 0.42), c["hull2"], axis="Y", sides=6)
+        box(b, (5.0, 1.5, 0.26), (0, 0, 0.72), c["low"])  # frame
+        # Armoured cab, sloped at the front, with a slit windscreen.
+        prism_y(b, [(1.0, 0.85), (2.5, 0.85), (2.5, 1.35), (2.05, 1.95), (1.0, 1.95)], 1.7, c["hull"])
+        prism_y(b, [(2.52, 1.4), (2.1, 1.92), (2.02, 1.92), (2.44, 1.4)], 1.4, "#1f2a33")
+        box(b, (0.5, 1.72, 0.26), (1.45, 0, 1.6), "#1f2a33")  # side windows
+        box(b, (0.14, 1.76, 0.22), (2.52, 0, 0.82), c["low"])  # bumper
+        box(b, (0.3, 0.06, 0.06), (2.5, 0.5, 1.12), c["trim"], glow=0.6)
+        box(b, (0.3, 0.06, 0.06), (2.5, -0.5, 1.12), c["trim"], glow=0.6)
+        box(b, (3.4, 1.7, 0.12), (-0.75, 0, 0.9), c["hull2"])  # bed
+        box(b, (0.6, 1.5, 0.5), (0.55, 0, 1.2), c["hull2"])  # generator and reload stowage
+        for side in (1, -1):
+            box(b, (0.16, 0.16, 0.5), (-2.2, 0.75 * side, 0.6), c["low"])  # stabiliser legs
+        cyl(b, 0.02, 1.1, (1.1, -0.7, 2.5), c["low"], sides=4)  # aerial
+
+        t = self.turret
+        cyl(t, 0.5, 0.16, (0, 0, 1.04), c["low"], sides=10)  # turntable
+        box(t, (0.3, 1.0, 0.5), (-0.35, 0, 1.3), c["hull2"])  # cradle
+        self.pod = joint(t, (-0.2, 0, 1.55))
+        self.pod.rotation_euler = (0, -0.38, 0)  # raised to fire over the cab
+        box(self.pod, (2.3, 1.2, 0.74), (0.75, 0, 0.2), c["deck"])
+        box(self.pod, (2.34, 1.24, 0.08), (0.75, 0, 0.2), c["hull"])  # band round the pod
+        for y in (-0.38, 0, 0.38):
+            for z in (0.03, 0.37):
+                cyl(self.pod, 0.14, 0.06, (1.91, y, z), "#14181b", axis="X", sides=8)  # tube mouths
+        box(self.pod, (0.1, 1.24, 0.1), (-0.42, 0, 0.6), c["trim"], glow=0.5)
+        self.muzzle = flash(self.pod, (2.0, 0, 0.2), 1.9)
+
+    def recoil(self, k):
+        self.pod.location = (-0.2 - 0.12 * k, 0, 1.55)
+
+
+class Helicopter(Vehicle):
+    """An attack helicopter. It is rendered standing on its skids; the page lifts it and
+    lays its shadow on the ground. The rotor turns through the three idle frames."""
+
+    cell, centre = 10.4, 1.5
+    pivot = 1.5
+    manifest = {"altitude": 3.0, "fps": {"idle": 16}}
+
+    def __init__(self, look):
+        super().__init__(look)
+        self.sheets[""] = [("idle", [0, 1, 2]), ("wreck", [0])]
+
+    def build(self, c):
+        b = self.body
+        # Fuselage: a narrow body, stepped cockpits, a tail boom rising to the fin.
+        prism_y(b, [(2.6, 0.75), (2.9, 1.05), (2.2, 1.55), (1.2, 2.05), (-0.9, 2.05), (-1.5, 1.5), (-1.5, 0.95), (-0.6, 0.6), (1.7, 0.6)], 0.95, c["hull"])
+        prism_y(b, [(2.28, 1.55), (1.3, 2.04), (0.35, 2.04), (0.6, 1.55)], 0.8, "#1f2a33")  # canopy
+        box(b, (0.08, 0.84, 0.5), (1.3, 0, 1.78), c["hull2"])  # frame between the two seats
+        prism_y(b, [(-1.4, 1.5), (-4.4, 1.62), (-4.4, 1.3), (-1.4, 1.0)], 0.34, c["hull2"])  # tail boom
+        prism_y(b, [(-3.9, 1.6), (-4.5, 2.6), (-4.85, 2.6), (-4.5, 1.45)], 0.1, c["hull"])  # fin
+        box(b, (0.5, 1.5, 0.06), (-4.3, 0, 1.75), c["hull2"])  # tailplane
+        cyl(b, 0.5, 0.04, (-4.7, 0.12, 2.35), c["low"], axis="Y", sides=10)  # tail rotor disc
+        box(b, (1.1, 0.7, 0.4), (-0.1, 0, 2.2), c["hull2"])  # engine housing
+        box(b, (0.3, 0.74, 0.2), (-0.75, 0, 2.2), c["low"])  # exhaust
+        for side in (1, -1):
+            box(b, (0.9, 1.3, 0.08), (0.3, 0.95 * side, 1.2), c["hull2"])  # stub wing
+            cyl(b, 0.17, 1.0, (0.4, 1.4 * side, 1.02), c["deck"], axis="X", sides=8)  # rocket pod
+            cyl(b, 0.17, 0.04, (0.92, 1.4 * side, 1.02), "#14181b", axis="X", sides=8)
+            box(b, (2.4, 0.07, 0.07), (0.6, 0.62 * side, 0.04), c["low"])  # skid
+            for x in (1.3, -0.1):
+                box(b, (0.07, 0.07, 0.62), (x, 0.56 * side, 0.34), c["low"], rot=(0.18 * side, 0, 0))
+        box(b, (0.3, 0.06, 0.06), (2.7, 0, 1.12), c["trim"], glow=0.8)  # sensor at the nose
+        cyl(b, 0.08, 0.5, (0.3, 0, 2.6), c["low"], sides=6)  # mast
+        self.rotor = joint(b, (0.3, 0, 2.86))
+        for a in (0, math.pi / 2):
+            blade = box(self.rotor, (7.6, 0.2, 0.04), (0, 0, 0), c["low"], rot=(0, 0, a))
+            blade["blade"] = True
+        cyl(self.rotor, 0.2, 0.1, (0, 0, 0), c["hull2"], sides=8)
+
+        t = self.turret
+        self.gun = joint(t, (0, 0, 0.72))
+        box(self.gun, (0.4, 0.3, 0.26), (0, 0, 0), c["low"])
+        cyl(self.gun, 0.05, 0.9, (0.55, 0, -0.04), c["gun"], axis="X", sides=6)
+        self.muzzle = flash(self.gun, (1.05, 0, -0.04), 0.9)
+
+    def recoil(self, k):
+        self.gun.location = (-0.08 * k, 0, 0.72)
+
+    def pose(self, anim, t, sheet):
+        super().pose(anim, t, sheet)
+        self.rotor.rotation_euler = (0, 0, (t * math.pi / 6) if anim == "idle" else 0.5)
+        if anim == "wreck":
+            # Down on its side with the boom broken and the blades bent to the ground.
+            self.body.rotation_euler = (0.5, -0.1, 0)
+            self.body.location = (0, 0.3, -0.35)
+            self.rotor.rotation_euler = (0.35, 0.25, 0.5)
+            self.turret.location = (self.pivot - 0.3, 0.5, -0.4)
+
+
+class Drone:
+    """One small attack drone of a swarm: four arms, four rotors, a charge slung under it.
+    Rendered at ground level; the page lifts it to its height and lays the shadow."""
+
+    cell, centre = 3.6, 0.8
+    sheets = {"": [("idle", [0, 1]), ("walk", [0, 1, 2, 3]), ("fire", [0, 1]), ("die", [0.2, 0.45, 0.7, 0.9, 1])]}
+    manifest = {"per": "member", "altitude": 1.5, "fps": {"walk": 14, "idle": 10, "die": 9}}
+    height = 1.5  # the height it flies at, which it falls from when it is shot down
+
+    def __init__(self, look):
+        c = look
+        self.root = joint(None, name="root")
+        self.body = joint(self.root, (0, 0, 0.2))
+        box(self.body, (0.46, 0.2, 0.1), (0, 0, 0), c["gun"])  # frame
+        box(self.body, (0.24, 0.16, 0.1), (-0.04, 0, 0.09), c["rust"])  # battery, taped on
+        box(self.body, (0.26, 0.05, 0.03), (-0.04, 0, 0.15), c["trim"])  # the tape
+        box(self.body, (0.08, 0.1, 0.08), (0.25, 0, 0.03), "#14181b")  # camera
+        cyl(self.body, 0.02, 0.26, (-0.2, 0.05, 0.2), c["gun"], sides=4)  # aerial
+        cyl(self.body, 0.075, 0.42, (0.06, 0, -0.12), c["armour"], axis="X", sides=8)  # the charge
+        cyl(self.body, 0.09, 0.18, (0.36, 0, -0.12), c["rust"], axis="X", sides=8, top=0.02)
+        self.props = []
+        for sx in (1, -1):
+            for sy in (1, -1):
+                box(self.body, (0.5, 0.05, 0.04), (0.2 * sx, 0.2 * sy, 0.02), c["low"], rot=(0, 0, sx * sy * 0.78))  # arm
+                cyl(self.body, 0.035, 0.08, (0.36 * sx, 0.36 * sy, 0.06), c["gun"], sides=6)  # motor
+                prop = joint(self.body, (0.36 * sx, 0.36 * sy, 0.12))
+                box(prop, (0.44, 0.05, 0.015), (0, 0, 0), c["trim"])
+                self.props.append(prop)
+        self.muzzle = flash(self.body, (0.46, 0, -0.12), 0.8)
+
+    def pose(self, anim, t):
+        show(self.root, True)
+        show(self.muzzle, False)
+        tilt, z, roll, turn = 0.0, 0.0, 0.0, 0.0
+        spin = t * 1.3
+        if anim == "idle":
+            z = 0.04 * t
+        if anim == "walk":
+            tilt, z, spin = 0.3, 0.05 * math.sin(t * math.pi / 2), t * 0.9
+        if anim == "fire":
+            tilt = 0.55
+            show(self.muzzle, t == 1)
+        if anim == "die":
+            # It tumbles out of the air and lies broken where it lands.
+            z = self.height * (1 - t**1.6)
+            roll, tilt, turn, spin = 2.4 * t, 1.1 * t, 1.5 * t, 0.4
+            if t == 1:
+                z, roll, tilt = -0.08, 2.9, 0.35
+        self.body.location = (0, 0, 0.2 + z)
+        self.body.rotation_euler = (roll, tilt, turn)
+        for i, prop in enumerate(self.props):
+            prop.rotation_euler = (0, 0, spin + i * 0.8)
+
+
 UNITS = {
     "commandos": lambda: Soldier(AEGIS, militia=False),
     "militia": lambda: Soldier(ASHFALL, militia=True),
@@ -581,6 +749,10 @@ UNITS = {
     "technical": lambda: Technical(ASHFALL),
     "patrolBoat": lambda: PatrolBoat(AEGIS),
     "speedboat": lambda: Speedboat(ASHFALL),
+    "helicopter": lambda: Helicopter(AEGIS),
+    "rocketLauncher": lambda: RocketLauncher(AEGIS),
+    "fpvSwarm": lambda: Drone(ASHFALL),
+    "rpgTeam": lambda: Soldier(ASHFALL, militia=True, rocket=True),
 }
 
 # ---------------------------------------------------------------- render and pack
