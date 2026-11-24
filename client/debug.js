@@ -102,6 +102,12 @@ function switchLanguage() {
   localStorage.setItem("callsign.lang", lang);
   applyLanguage();
   voice.prepare(lang); // the other language has its own speech model
+  tellLanguage();
+}
+// tellLanguage tells the game which language this commander reads, so that what it is
+// told unasked (the operator's base cues) comes in it from the first line.
+function tellLanguage() {
+  if (me && open()) ws.send(JSON.stringify({ type: "lang", text: lang }));
 }
 $("lang").addEventListener("click", switchLanguage);
 $("overlay-lang").addEventListener("click", switchLanguage);
@@ -284,6 +290,7 @@ function onFrame(frame) {
       state = frame.state;
       me = frame.station ?? null;
       faction = frame.faction;
+      tellLanguage();
       lobby = frame.lobby ?? null;
       lobbyError = null;
       readyUp();

@@ -76,3 +76,19 @@ func (rm *Room) Act(c *Client, act string, raw json.RawMessage) (any, error) {
 	rm.broadcast(side, map[string]any{"type": "direct", "act": act, "tick": rm.sim.Tick, "result": res})
 	return res, nil
 }
+
+// SetLang records the language a commander's page is in, until the commander speaks on
+// the net (which sets it too). The operator's base cues are written in it: a commander
+// who builds from the panel before saying a word still hears of it in their own language.
+func (rm *Room) SetLang(c *Client, lang string) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if c.ID.Role != RoleHammer || c.ID.Side < 0 || c.ID.Side > 1 {
+		return ErrNotCommander
+	}
+	if lang != "he" && lang != "en" {
+		return fmt.Errorf("unknown language %q", lang)
+	}
+	rm.lang[c.ID.Side]["player"] = lang
+	return nil
+}
