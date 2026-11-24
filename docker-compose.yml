@@ -66,6 +66,9 @@ services:
     environment:
       HOME: /tmp
       CALLSIGN_RELAY_MASTER_KEY: "${CALLSIGN_RELAY_MASTER_KEY:-}"
+      # The game's own TypeSafe key for the squads' fast brain (Jev). Its value lives in .env
+      # and is never written here. Empty: the fast brain is off, the rule brain plays.
+      CALLSIGN_JEV_KEY: "${CALLSIGN_JEV_KEY:-}"
       CALLSIGN_AGENT_KEY: "${CALLSIGN_AGENT_KEY:-}"
     volumes:
       - .:/src:ro

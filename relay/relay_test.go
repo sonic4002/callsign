@@ -73,7 +73,7 @@ type rig struct {
 	logMu  sync.Mutex
 }
 
-func newRig(t *testing.T, limits Limits) *rig {
+func newRig(t *testing.T, limits Limits, with ...func(*Config)) *rig {
 	t.Helper()
 	rules, err := shared.Load()
 	if err != nil {
@@ -96,7 +96,7 @@ func newRig(t *testing.T, limits Limits) *rig {
 		r.brains[name] = &brain{name: name}
 		providers[name] = r.brains[name]
 	}
-	r.relay, err = New(Config{
+	cfg := Config{
 		Game: r.game, Keys: r.keys, TokenKey: TokenKey(master), Models: models, Rules: rules, Providers: providers, Limits: limits,
 		Origins: []string{"https://play.example"},
 		Logf: func(format string, args ...any) {
@@ -104,7 +104,11 @@ func newRig(t *testing.T, limits Limits) *rig {
 			defer r.logMu.Unlock()
 			fmt.Fprintf(r.logs, format+"\n", args...)
 		},
-	})
+	}
+	for _, change := range with {
+		change(&cfg)
+	}
+	r.relay, err = New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
