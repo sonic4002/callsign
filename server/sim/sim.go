@@ -184,6 +184,7 @@ type Sim struct {
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
 	slots           [2][][2]float64 // where each side's base slots lie on this map (structures.go)
+	power           [2]powerState   // each side's power this tick (power.go)
 	landIdx         map[string]int  // landmark id → index
 	rng             *rand.Rand
 	events          []Event
@@ -381,8 +382,8 @@ func (s *Sim) field(sq *Squad) {
 // deploy counts down the squads on their way and fields the ones whose time has come.
 func (s *Sim) deploy() {
 	for _, sq := range s.Squads {
-		if sq.DeployTicks == 0 {
-			continue
+		if sq.DeployTicks == 0 || !s.power[sq.Side].works {
+			continue // nothing on its way, or the side is short of power this tick
 		}
 		if sq.DeployTicks--; sq.DeployTicks == 0 {
 			s.field(sq)
@@ -476,6 +477,7 @@ func (s *Sim) Step() []Event {
 	if s.Over {
 		return nil
 	}
+	s.powerStep()
 	s.deploy()
 	s.construct()
 
@@ -506,6 +508,7 @@ func (s *Sim) Step() []Event {
 	s.recover(live)
 	s.capture(live)
 	s.engineers()
+	s.repairStructures()
 	s.haulWork()
 	s.squadEvents(live)
 	s.countGarrisons()

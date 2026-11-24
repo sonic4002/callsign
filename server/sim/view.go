@@ -110,6 +110,8 @@ type Snapshot struct {
 	Faction   string         `json:"faction,omitempty"`
 	Gold      int            `json:"gold"`
 	Income    int            `json:"income"`        // gold per minute, over the last minute
+	Power     PowerView      `json:"power"`         // what the side's structures supply and use
+	Radar     bool           `json:"radar"`         // the mini map is on: a radar structure stands and has power
 	HQ        [2]float64     `json:"hq"`            // headquarters health 0…1, by side; the enemy's as last seen
 	Fog       *FogView       `json:"fog,omitempty"` // absent for spectators, who see everything
 	Points    []PointView    `json:"points"`
@@ -150,6 +152,9 @@ func (s *Sim) Snapshot(side int) Snapshot {
 		snap.Faction = s.Sides[side].Faction
 		snap.Gold = s.Gold(side)
 		snap.Income = s.Income(side)
+		snap.Power, snap.Radar = s.Power(side), s.Radar(side)
+	} else {
+		snap.Radar = true // a spectator sees everything
 	}
 	for i := range s.Sides {
 		snap.HQ[i] = math.Max(0, s.Sides[i].HQHP/s.R.HQ.HP)
@@ -308,6 +313,7 @@ func (s *Sim) Hash() uint64 {
 		}
 	}
 	s.hashStructures(put, f)
+	s.hashPower(put, f)
 	s.hashHaul(put, f)
 	return h.Sum64()
 }

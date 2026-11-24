@@ -16,6 +16,8 @@ const (
 	RoleRefinery = "refinery"
 	RoleDefence  = "defence"
 	RoleFence    = "fence"
+	RolePower    = "power" // supplies the power the other structures use (sim/power.go)
+	RoleRadar    = "radar" // turns the mini map on, and is what the airbase needs
 )
 
 // Target classes a weapon's `vs` table may name besides the unit classes and "hq".
@@ -25,7 +27,7 @@ const (
 )
 
 // BaseRoles are the structures that stand in a base slot, in the order a base grows.
-var BaseRoles = []string{RoleBarracks, RoleRefinery, RoleWorks, RoleDockyard, RoleAirbase}
+var BaseRoles = []string{RolePower, RoleBarracks, RoleRefinery, RoleWorks, RoleRadar, RoleDockyard, RoleAirbase}
 
 // Structure is something a side builds: a base structure that unlocks units, a defence
 // that fires on its own, or a fence that stops ground units.
@@ -41,6 +43,9 @@ type Structure struct {
 	Footprint    float64  `json:"footprint"` // radius of the ground it stands on
 	Sight        float64  `json:"sight"`
 	Capturable   bool     `json:"capturable,omitempty"`
+	// Power is what the structure supplies (above zero) or uses (below zero) while it
+	// stands. A side that uses more than it supplies is on low power.
+	Power float64 `json:"power,omitempty"`
 
 	// Defences fire like a unit's weapon.
 	Range         float64            `json:"range,omitempty"`
@@ -110,7 +115,11 @@ func (r *Rules) checkStructures(name string, f *Faction) error {
 			return fmt.Errorf("structure %s has a bad stat", id)
 		}
 		switch st.Role {
-		case RoleHQ, RoleBarracks, RoleWorks, RoleAirbase, RoleDockyard, RoleRefinery:
+		case RoleHQ, RoleBarracks, RoleWorks, RoleAirbase, RoleDockyard, RoleRefinery, RoleRadar:
+		case RolePower:
+			if st.Power <= 0 {
+				return fmt.Errorf("power structure %s supplies no power", id)
+			}
 		case RoleDefence:
 			if st.Range <= 0 || st.Damage <= 0 || st.CooldownTicks <= 0 || st.Accuracy <= 0 {
 				return fmt.Errorf("defence %s needs a weapon", id)

@@ -70,6 +70,10 @@ type Structure struct {
 	Ruin           bool // destroyed; the wreck stays where it stood
 	Gone           bool // a ruin that was cleared to build again
 	Cooldown       int
+	// Repairing is set while the owner pays to have the structure mended (sell.go).
+	Repairing  bool
+	repairDebt float64 // gold owed for the mending done so far, under one unit
+	repairSide int     // the side that asked for it
 
 	def  *shared.Structure
 	seen [2]structMemory
@@ -127,7 +131,12 @@ func (s *Sim) inward(side int) float64 {
 
 // The base layout: where base structures go around a headquarters, in the order they
 // are taken. Offsets are for a western base; an eastern one is mirrored.
-var baseSlots = [][2]float64{{-60, -170}, {-60, 170}, {80, -280}, {200, -160}, {200, 160}}
+var baseSlots = [][2]float64{{-60, -170}, {-60, 170}, {80, -280},
+	// Room for the power structures and the radar, close in beside and behind the first.
+	{80, 280}, {-60, -330}, {-60, 330}, {-190, -90}, {-190, 90},
+	// The two forward sites are taken last (a refinery takes one sooner when it is the
+	// nearest to gold): they stand nearest the middle of the map.
+	{200, -160}, {200, 160}}
 
 // baseSlot is where a base slot lies on this map: its place in the layout when that is
 // open land, otherwise the nearest open land to it. It depends on the map alone, so it is
@@ -462,10 +471,15 @@ func (s *Sim) build(c Command) (*Structure, error) {
 	case shared.RoleFence:
 		return s.buildFence(c, kind, def)
 	}
+	have := 0
 	for _, st := range s.Structures {
 		if st.Side == c.Side && !st.Ruin && st.def.Role == def.Role {
-			return nil, fmt.Errorf("%w: the %s", ErrAlreadyBuilt, st.def.Name.En)
+			have++
 		}
+	}
+	// One of each, except power: a base grows by adding power structures.
+	if limit := max(1, b2i(def.Role == shared.RolePower, s.R.Match.PowerStructures)); have >= limit {
+		return nil, fmt.Errorf("%w: the %s", ErrAlreadyBuilt, def.Name.En)
 	}
 	if s.freeSlot(c.Side, def.Role) == -1 {
 		return nil, ErrNoRoom
@@ -694,8 +708,8 @@ func (s *Sim) buildFence(c Command, kind string, def *shared.Structure) (*Struct
 func (s *Sim) construct() {
 	runBuilt := map[int]bool{}
 	for _, st := range s.Structures {
-		if st.Ruin || st.BuildTicks == 0 {
-			continue
+		if st.Ruin || st.BuildTicks == 0 || !s.power[st.Side].works {
+			continue // done, or its side is short of power this tick
 		}
 		st.HP = math.Min(st.def.HP, st.HP+st.def.HP*(1-buildStartHP)/float64(st.BuildTotal))
 		if st.BuildTicks--; st.BuildTicks > 0 {
@@ -748,9 +762,11 @@ func (s *Sim) unitFor(side int, unitID string) (shared.Unit, bool) {
 func (s *Sim) mayBuy(side int, unitID string) (shared.Unit, error) {
 	own := s.faction(side)
 	if u, ok := own.Units[unitID]; ok {
-		if u.Requires != "" && !s.Has(side, u.Requires) {
-			_, need := own.StructureOfRole(u.Requires)
-			return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))
+		for _, role := range append([]string{u.Requires}, u.Needs...) {
+			if role != "" && !s.Has(side, role) {
+				_, need := own.StructureOfRole(role)
+				return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))
+			}
 		}
 		return u, nil
 	}
@@ -858,7 +874,7 @@ func (s *Sim) structureTarget(tr *teamRef, order string) *Structure {
 			return false
 		}
 		d := math.Max(0, s.reach(t, st))
-		return d <= u.Range && d >= u.MinRange
+		return d <= siegeReach(u) && d >= u.MinRange
 	}
 	if st := s.structure(t.blocked); inReach(st) {
 		return st
@@ -901,7 +917,7 @@ func (s *Sim) fireAtStructure(tr *teamRef, st *Structure) {
 	if s.Nerve(t) == Shaken {
 		chance *= 0.75
 	}
-	if far := math.Max(0, s.reach(t, st)) / u.Range; far > 0.6 {
+	if far := math.Max(0, s.reach(t, st)) / siegeReach(u); far > 0.6 {
 		chance *= 1 - 0.75*(far-0.6)
 	}
 	for i := 0; i < t.Members; i++ {
@@ -915,8 +931,8 @@ func (s *Sim) fireAtStructure(tr *teamRef, st *Structure) {
 // defencesFire lets every standing defence shoot the nearest enemy team it can see and hurt.
 func (s *Sim) defencesFire(live []*teamRef) {
 	for _, st := range s.Structures {
-		if st.def.Role != shared.RoleDefence || !st.Standing() {
-			continue
+		if st.def.Role != shared.RoleDefence || !s.powered(st) {
+			continue // not built, fallen, or its side is short of power
 		}
 		if st.Cooldown > 0 {
 			st.Cooldown--
@@ -1007,6 +1023,9 @@ func (s *Sim) trackStructures() {
 			continue
 		}
 		st := s.structure(sq.Order.Structure)
+		if st != nil && !st.Ruin && st.Side == sq.Side && sq.Order.Kind == OrderRepair {
+			continue // engineers on their way to mend their own structure
+		}
 		if st == nil || st.Ruin || st.Side == sq.Side {
 			x, y := sq.Center()
 			sq.Order = Order{Kind: OrderHold, X: x, Y: y, Tick: s.Tick}
@@ -1024,7 +1043,13 @@ func (s *Sim) orderStructure(c Command, sq *Squad, pl Place) (*Squad, error) {
 	o := Order{Kind: c.Kind, Tick: s.Tick, X: pl.X, Y: pl.Y, Place: st.PlaceID()}
 	switch {
 	case c.Kind == CmdRepair:
-		return nil, ErrNoBridge // mending structures comes with the third wave
+		// Engineers go into a damaged structure of their own side and mend it (sell.go).
+		if err := s.mayMend(sq, st); err != nil {
+			return nil, err
+		}
+		o.Structure = st.ID
+		dx, dy := s.towardEnemy(c.Side, st.X, st.Y)
+		o.X, o.Y = st.X+dx*(st.def.Footprint+35), st.Y+dy*(st.def.Footprint+35)
 	case c.Kind == CmdAttack && st.Side != c.Side && !st.Ruin:
 		if sq.unit.Against(st.def.TargetClass()) == 0 {
 			return nil, fmt.Errorf("%w: %s cannot hurt a structure", ErrUnreachable, sq.unit.Name.En)
@@ -1207,6 +1232,8 @@ type StructureView struct {
 	Ruin     bool    `json:"ruin,omitempty"`
 	Visible  bool    `json:"visible"` // in sight now; otherwise as last seen
 	Run      int     `json:"run,omitempty"`
+	// Repairing is set on an own structure that is being mended for gold.
+	Repairing bool `json:"repairing,omitempty"`
 	// A fence segment's ends.
 	AX float64 `json:"ax,omitempty"`
 	AY float64 `json:"ay,omitempty"`
@@ -1227,6 +1254,7 @@ func (s *Sim) structureViews(side int) []StructureView {
 				continue
 			}
 			v.HP, v.Ruin, v.Building = math.Max(0, st.HP/st.def.HP), st.Ruin, 1
+			v.Repairing = st.Repairing
 			if st.BuildTotal > 0 {
 				v.Building = 1 - float64(st.BuildTicks)/float64(st.BuildTotal)
 			}
@@ -1258,6 +1286,10 @@ func (s *Sim) hashStructures(put func(uint64), f func(float64)) {
 		if st.Gone {
 			flags |= 2
 		}
+		if st.Repairing {
+			flags |= 4
+		}
+		f(st.repairDebt)
 		put(flags)
 		for side := range st.seen {
 			m := st.seen[side]
@@ -1266,4 +1298,13 @@ func (s *Sim) hashStructures(put func(uint64), f func(float64)) {
 			put(uint64(int64(m.Side)) ^ uint64(b2i(m.Known, 8)) ^ uint64(b2i(m.Ruin, 16)) ^ uint64(b2i(m.Gone, 32)))
 		}
 	}
+}
+
+// siegeReach is how far a unit reaches against structures and fences: its siege range
+// when it has one, else its ordinary range.
+func siegeReach(u *shared.Unit) float64 {
+	if u.SiegeRange > 0 {
+		return u.SiegeRange
+	}
+	return u.Range
 }

@@ -182,12 +182,12 @@ func TestSquadsAreSentAtStructuresAndOnlyEngineersCapture(t *testing.T) {
 			t.Fatalf("attack %s: %v %v", args, res, err)
 		}
 	}
-	// Only engineers take structures over; nobody repairs one.
+	// Only engineers take structures over; they mend their own side's, never the enemy's.
 	if _, err := rm.Tool(viper1, ToolCapture, json.RawMessage(`{"place":"`+works+`"}`)); !errors.Is(err, sim.ErrNotEngineers) {
 		t.Fatalf("commandos capturing: err = %v", err)
 	}
-	if _, err := rm.Tool(engineers, ToolRepair, json.RawMessage(`{"place":"`+works+`"}`)); !errors.Is(err, sim.ErrNoBridge) {
-		t.Fatalf("repairing a structure: err = %v", err)
+	if _, err := rm.Tool(engineers, ToolRepair, json.RawMessage(`{"place":"`+works+`"}`)); !errors.Is(err, sim.ErrNotYours) {
+		t.Fatalf("repairing an enemy structure: err = %v", err)
 	}
 	if _, err := rm.Tool(anvil, ToolCapture, json.RawMessage(`{"place":"`+works+`"}`)); err == nil || !strings.Contains(err.Error(), "may not use") {
 		t.Fatalf("the operator capturing: err = %v", err)
