@@ -84,8 +84,7 @@ export class Agent {
     const fresh = hello.state.tick - 15 * this.rules.tickRate;
     const spoke = hello.log.findLastIndex((m) => m.from.key === this.me.key);
     for (const m of hello.log.slice(spoke + 1)) {
-      const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
-      if (m.tick >= fresh && forMe && m.from.key !== this.me.key && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
+      if (m.tick >= fresh && m.from.key !== this.me.key && callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
     }
   }
 
@@ -102,10 +101,7 @@ export class Agent {
       if (this.traffic.length > 8) this.traffic.shift();
       if (m.from.key === "player") this.netLang = m.lang; // the net follows the commander's language
       if (m.from.key === this.me.key) return;
-      const forMe = m.to.some((t) => t.key === this.me.key || t.key === "all");
-      // "Out" means no reply is expected, so it wakes nobody; it stays in the traffic the
-      // next wake shows. Hammer is the exception: a commander may end an order with Out.
-      if (forMe && (m.end !== "out" || m.from.key === "player")) this.#enqueue({ kind: "radio", msg: m });
+      if (callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
       // The operator runs the fight, so every other transmission on the net wakes it too.
       else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
       return;
@@ -304,6 +300,16 @@ function describe(item) {
       return "Your headquarters is under attack.";
   }
   return `Event: ${e.kind}.`;
+}
+
+// callsFor reports whether a transmission is a call this station must act on. "Out" means
+// no reply is expected, so an Out from a squad wakes nobody; it stays in the traffic the
+// next wake shows. Those who give orders are the exception: Hammer and the operator may
+// end an order with Out, and it is still an order.
+export function callsFor(m, me) {
+  const forMe = m.to.some((t) => t.key === me.key || t.key === "all");
+  const commander = m.from.key === "player" || m.from.key === "operator";
+  return forMe && m.from.key !== me.key && (m.end !== "out" || commander);
 }
 
 export function renderWake(items, status, traffic, lang) {
