@@ -173,7 +173,7 @@ test("rule-brain operator: relays tasks, buys, reports", async () => {
     ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
   ]);
   assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Upgrade the good ones")) }), [["radio", { to: ["Hammer"], body: "Say again: upgrade what?", end: "over" }]]);
-  assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("What's the status?")) }), [["radio", { to: ["Hammer"], body: "3 squads, 300 gold, holding A B", end: "over" }]]);
+  assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("What's the status?")) }), [["radio", { to: ["Hammer"], body: "3 squads, 300 gold, holding Alpha, Bravo", end: "over" }]]);
   // A squad's Wilco must not start a conversation.
   assert.deepEqual(await think(brain, { agent: anvil, wake: wake(call("Wilco", { from: viper2, end: "out" })) }), []);
 });

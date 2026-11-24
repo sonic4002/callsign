@@ -824,7 +824,7 @@
       "side.south": { "en": ["south"], "he": ["דרום"] },
       "side.east": { "en": ["east"], "he": ["מזרח"] },
       "side.west": { "en": ["west"], "he": ["מערב"] },
-      "opStatus": { "en": ["{squads} squads, {gold} gold, holding {points}"], "he": ["{squads} כיתות, {gold} זהב, מחזיקים ב {points}"] },
+      "opStatus": { "en": ["{squads} squads, {gold} gold, holding {points}"], "he": ["{squads} כיתות, {gold} זהב, מחזיקים {b_points}"] },
       "opStatusLowPower": { "en": [", power is low"], "he": [", חסר חשמל"] },
       "opHold": { "en": ["Hold {place}"], "he": ["תחזיקו את {place}"] },
       "opAttack": { "en": ["Attack {place}"], "he": ["תקפו את {place}"] },

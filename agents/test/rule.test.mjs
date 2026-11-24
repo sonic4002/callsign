@@ -228,6 +228,17 @@ test("the operator reads counts, several orders in one call, and orders for ever
   assert.deepEqual(await ask(1, "sing me a song", st), [["radio", { to: ["Hammer"], body: "Say again", end: "over" }]]);
 });
 
+test("a squad does not report an enemy the net has just heard named", async () => {
+  const contact = { kind: "contact", point: "G", contact: 3 };
+  const heardIt = (traffic) => run(ruleBrain(), { agent: leader("en", 1), wake: { ...event(contact), traffic } });
+  assert.equal((await heardIt([])).length, 1);
+  assert.equal((await heardIt(["Anvil, this is Rhino 2. Contact, Target 3 near Golf. Over."])).length, 0);
+  assert.equal((await heardIt(["סדן, כאן קרנף 2, מגע, מטרה 3 ליד גימל, עבור."])).length, 0);
+  assert.equal((await heardIt(["Anvil, this is Rhino 2. Contact, Target 31 near Golf. Over."])).length, 1, "Target 31 is not Target 3");
+  // What it does about the enemy is not silenced, only the report.
+  assert.deepEqual((await run(ruleBrain(), { agent: leader("en", 2), wake: { ...event(contact), traffic: ["Hammer, this is Viper 2. Contact, Target 3 near Golf. Over."] } }))[0], ["attack", { place: "", contact: 3 }]);
+});
+
 test("the operator's three levels: orders only, the economy with the purse, the fight when handed it", async () => {
   const heard = (level, st) => run(ruleBrain(), { agent: anvil(level), wake: { items: [{ kind: "heard", msg: call("Wilco", { from: viper1, end: "out" }) }], call: null, status: st } });
   // Level 1 never acts on its own, whatever it holds, and says so when handed more.
@@ -242,6 +253,17 @@ test("the operator's three levels: orders only, the economy with the purse, the 
     ["buy", { unit: "commandos", upgrade: "" }],
   ]);
   assert.deepEqual(await ask(2, "you may buy", base("orders", true)), [["radio", { to: ["Hammer"], body: "Wilco", end: "out" }], ["buy", { unit: "commandos", upgrade: "" }]]);
+  // The field full and gold to spare: a better leader for a squad instead of gold lying unspent.
+  const full = base("orders", true, { gold: 1200, squads: [1, 2, 3, 4].map((n) => squad(n, { id: n, tier: n === 1 ? 2 : 1, order: { kind: "hold", point: "D" } })).concat([5, 6, 7, 8].map((n) => squad(n, { id: n, tier: 1, class: "vehicle", unit: "tank", callsign: { en: `Rhino ${n - 4}` }, order: { kind: "hold", point: "D" } }))), structures: [...base("orders", true).structures, { id: "s3", kind: "vehicleWorks", role: "works", name: "Vehicle Works", side: 0, yours: true, hp: 1, building: 1 }] });
+  assert.deepEqual(await heard(2, full), [["buy", { unit: "", upgrade: "Viper 2" }]]);
+  // A hauler shot at: no new hauler is sent into the same guns; a squad is bought instead.
+  const works = base("orders", true, { haulers: [{ id: 1001, side: 0 }], structures: [...base("orders", true).structures, { id: "s3", kind: "vehicleWorks", role: "works", name: "Vehicle Works", side: 0, yours: true, hp: 1, building: 1 }] });
+  assert.deepEqual(await heard(2, works), [["buy", { unit: "crawler", upgrade: "" }]]);
+  const shot = ruleBrain();
+  const lost = { items: [{ kind: "event", event: { kind: "hauler_lost", hauler: 1002, point: "B" } }], call: null, status: works };
+  assert.deepEqual(await run(shot, { agent: anvil(2), wake: lost }), [["buy", { unit: "commandos", upgrade: "" }]]);
+  assert.deepEqual(await run(shot, { agent: anvil(2), wake: { items: [{ kind: "heard", msg: call("Wilco", { from: viper1, end: "out" }) }], call: null, status: { ...works, timeLeft: 440 } } }), [["buy", { unit: "commandos", upgrade: "" }]], "a minute later, still not");
+  assert.deepEqual(await run(shot, { agent: anvil(2), wake: { items: [{ kind: "heard", msg: call("Wilco", { from: viper1, end: "out" }) }], call: null, status: { ...works, timeLeft: 400 } } }), [["buy", { unit: "crawler", upgrade: "" }]], "once the field has been quiet, the hauler is replaced");
   // Level 3 with the fight also sends the idle squad to the nearest point nobody of ours is on.
   assert.deepEqual(await heard(3, base("fight", true)), [["buy", { unit: "commandos", upgrade: "" }], ["radio", { to: ["Viper 1"], body: "Hold Bravo", end: "over" }]]);
   assert.deepEqual(await heard(3, base("orders", false)), [], "on orders it waits, at every level");

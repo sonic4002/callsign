@@ -126,7 +126,7 @@ function pointsIn(text, ids, rules) {
     .map((p) => p.id);
 }
 
-export const freshOperator = () => ({ tasked: new Map(), told: new Map(), massing: null });
+export const freshOperator = () => ({ tasked: new Map(), told: new Map(), haulerHit: undefined });
 export const operatorLevel = (agent) => Math.max(1, Math.min(3, Number(agent.level) || 3));
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -173,7 +173,11 @@ function ownMoves({ wake, rules, agent }, mem) {
     // match is well under way; with no hauler left at all the works comes before any squad.
     const elapsed = typeof s.timeLeft === "number" ? Math.max(0, (rules.map.lengthSeconds ?? rules.match.lengthSeconds) - s.timeLeft) : 0;
     const wantHaulers = Math.min(elapsed > 240 ? 3 : 2, rules.match.haulerCap ?? 0);
-    const more = hauler && haulers < wantHaulers;
+    // A hauler shot at or lost: no new one is sent out into the same guns. The gold goes
+    // to squads until the field has been quiet for a minute and a half.
+    if (wake.items.some((i) => i.kind === "event" && ["hauler_attacked", "hauler_lost"].includes(i.event.kind))) mem.haulerHit = s.timeLeft;
+    const quiet = typeof s.timeLeft !== "number" || mem.haulerHit === undefined || mem.haulerHit - s.timeLeft > 90 || mem.haulerHit < s.timeLeft;
+    const more = hauler && haulers < wantHaulers && quiet;
     const short = s.power?.low && sparePower(s, agent.side, defs) < 0 && base.filter((st) => st.role === "power").length < (rules.match.powerStructures ?? 1);
     // The base grows in the order of the opening, which the game works out (status.opening):
     // power, the refinery and the barracks come before anything is bought, and what follows
@@ -182,6 +186,8 @@ function ownMoves({ wake, rules, agent }, mem) {
     // no rally point is set: those are Hammer's to ask for.
     const next = s.opening ?? "";
     const spare = 2 * (pick?.[1].cost ?? 0);
+    // Eight squads as a rule; with gold piling up, as many as the game allows but two.
+    const room = Math.min(rules.match.populationCap, s.gold >= 1500 ? Math.max(8, rules.match.populationCap - 2) : 8);
     const hurt = base.filter((st) => !st.building && !st.repairing && st.health < 0.66).sort((a, b) => a.health - b.health)[0];
     if (short) raise("power");
     else if (["power", "refinery", "barracks"].includes(next)) raise(next);
@@ -192,9 +198,15 @@ function ownMoves({ wake, rules, agent }, mem) {
     } else if (more && haulers === 0) raise(hauler[1].requires);
     else if (next && !rising && s.gold >= cost(next) + spare) raise(next);
     else if (hurt && s.gold >= 2 * spare) moves.push({ name: "repair", input: { place: hurt.id } });
-    else if (pick && fielded < Math.min(rules.match.populationCap, 8)) {
+    else if (pick && fielded < room) {
       if (pick[1].requires && !stands(pick[1].requires)) raise(pick[1].requires);
       else if (s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
+    } else {
+      // The field is full and there is gold to spare: a better leader for a squad, the
+      // lowest tier first, rather than gold lying unspent.
+      const squad = s.squads.filter((sq) => !units.find(([id]) => id === sq.unit)?.[1].hero && (sq.tier ?? 1) < rules.tiers.length).sort((a, b) => (a.tier ?? 1) - (b.tier ?? 1) || (a.id ?? 0) - (b.id ?? 0))[0];
+      const cost = squad && rules.tiers.find((t) => t.tier === (squad.tier ?? 1) + 1)?.upgradeCost;
+      if (cost && s.gold >= cost + spare) moves.push({ name: "buy", input: { unit: "", upgrade: squad.callsign.en } });
     }
   }
   if (!fight) return moves; // the purse without the fight: it buys, and tasks nobody
@@ -395,7 +407,7 @@ function clause(text, ctx, part, mem) {
   }
   if (statusWords.test(text) && !verb && status) {
     const held = status.points.filter((p) => p.owner === agent.side).map((p) => p.id);
-    const body = say("opStatus", { squads: squads.length, gold: status.gold, points: held.join(" ") }) + (status.power?.low ? say("opStatusLowPower") : "");
+    const body = say("opStatus", { squads: squads.length, gold: status.gold, points: held.map((id) => pointName(rules, id, lang)).join(", ") }) + (status.power?.low ? say("opStatusLowPower") : "");
     return { reply: radio(back, body, "over"), answered: true };
   }
   // "Everyone dig in": passed on to the infantry that can.

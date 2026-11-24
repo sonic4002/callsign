@@ -237,7 +237,7 @@ export class Agent {
           system: this.system,
           tools: this.tools,
           messages: this.history,
-          wake: { items, status, call },
+          wake: { items, status, call, traffic: this.traffic },
           rules: this.rules,
         });
         this.history.push({ role: "assistant", content: res.content });

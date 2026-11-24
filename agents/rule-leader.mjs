@@ -169,7 +169,10 @@ export function leaderEvent(ctx, mem) {
   const arrival = e.kind === "arrived" || e.kind === "garrisoned";
   const twice = arrival && mem.there && !mem.next?.arrive;
   if (arrival) mem.there = true;
-  const tell = (body) => (twice && body === undefined ? [] : [radio(to, body ?? line(), "over")]).flat();
+  // An enemy squad the net has just heard named is not reported again, by this squad or another.
+  const named = e.kind === "contact" && e.contact ? [targetName(rules, e.contact, "en"), targetName(rules, e.contact, "he")] : [];
+  const known = (wake.traffic ?? []).some((said) => named.some((n) => new RegExp(`${n}(?!\\d)`).test(said)));
+  const tell = (body) => ((twice || known) && body === undefined ? [] : [radio(to, body ?? line(), "over")]);
   if (level < 2 || !you) return tell();
 
   const teams = (you.teams ?? []).filter((t) => t.members === undefined || t.members > 0);
