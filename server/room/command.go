@@ -152,6 +152,8 @@ func (rm *Room) toolCommand(side int, a toolArgs) (any, error) {
 func (rm *Room) mayBuy(side int) (own bool, err error) {
 	c := rm.cmd[side]
 	switch {
+	case rm.direct:
+		return false, nil // the commander's own hand: no leave needed, nothing to announce
 	case rm.ordered(side):
 		return false, nil
 	case c.buy:

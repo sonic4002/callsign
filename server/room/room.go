@@ -123,6 +123,9 @@ type Room struct {
 
 	// The tick each kind of base cue was last said to each side; see cues.go.
 	cued [2]map[string]int
+	// direct is set while the commander's own hand is at work (act.go): what it builds or
+	// buys needs nobody's leave and is not announced as the operator's doing.
+	direct bool
 
 	// What each side's agents last said about themselves; see telemetry.go.
 	tele [2]map[int]*agentReport

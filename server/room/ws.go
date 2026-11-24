@@ -95,6 +95,15 @@ func (rm *Room) handle(c *Client, in inbound) {
 			res["data"] = data
 		}
 		rm.reply(c, res)
+	case "act":
+		// The commander's panel: build, buy, cancel, sell, repair or rally, done at once.
+		res := map[string]any{"type": "acted", "id": in.ID, "act": in.Name, "ok": true}
+		if data, err := rm.Act(c, in.Name, in.Args); err != nil {
+			res["ok"], res["error"] = false, err.Error()
+		} else {
+			res["data"] = data
+		}
+		rm.reply(c, res)
 	case "ready":
 		if err := rm.Ready(c, in.Ready == nil || *in.Ready); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "reason": err.Error()})
