@@ -219,5 +219,8 @@
   "lobby.level.standard": "Relentless",
   "lobby.about.easy": "Slow to buy, fields few squads, and leaves your headquarters alone for five minutes.",
   "lobby.about.normal": "Buys at a human pace and attacks after a few minutes.",
-  "lobby.about.standard": "Buys the moment it can and attacks at once."
+  "lobby.about.standard": "Buys the moment it can and attacks at once.",
+  "lobby.hostKey": "Host password",
+  "lobby.hostOnly": "Only this server's host can make a match here. If a friend invited you, type their join code below.",
+  "lobby.guessing": "Too many wrong join codes. Wait a minute and try again."
 }

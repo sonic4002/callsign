@@ -12,6 +12,7 @@ services:
       # empty leaves the server trusting every agent, which is only safe on this machine.
       CALLSIGN_AGENT_KEY: "${CALLSIGN_AGENT_KEY:-}"
       CALLSIGN_SHARE: "${CALLSIGN_SHARE:-}" # set by `make play-lan`: the address a friend opens
+      CALLSIGN_HOST_KEY: "${CALLSIGN_HOST_KEY:-}" # set by `make play-public`: only the host makes matches
     volumes:
       - .:/src:ro
       - callsign-gocache:/gocache
@@ -71,6 +72,18 @@ services:
       - callsign-gocache:/gocache
       - ./.relay-data:/data
     command: ["go", "run", "./relay/cmd/relay", "-addr=:8090", "-game=http://server:8080/internal/tier", "-data=/data"]
+
+  # `make play-public`: a Cloudflare Tunnel carries https://<your name> to the game server.
+  # Cloudflare ends the TLS; nothing is opened on the router. See docs/FRIEND-MATCH.md.
+  tunnel:
+    image: cloudflare/cloudflared:2026.11.2
+    profiles: ["public"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: "${CALLSIGN_TUNNEL_TOKEN:-}"
+    depends_on:
+      - server
 
 volumes:
   callsign-gocache:

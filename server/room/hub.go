@@ -31,18 +31,31 @@ type HubConfig struct {
 	IdleAfter     time.Duration // a room nobody is in is dropped after this long
 	MaxRooms      int
 	Share         string // address other machines reach this server at, "" when unknown
+	HostKey       string // password needed to make a match, "" for none; joining one by its code never needs it
 }
 
 // agentGrace is how long a side's agents stay after its commander's last connection
 // closed, so that a reload does not cost the squads their leaders.
 const agentGrace = 20 * time.Second
 
-var ErrFull = errors.New("this server is running as many matches as it can")
+var (
+	ErrFull     = errors.New("this server is running as many matches as it can")
+	ErrHostOnly = errors.New("only this server's host can make a match here")
+	ErrGuessing = errors.New("too many wrong join codes; wait a minute")
+)
+
+// guessesPerMinute is how many wrong join codes the whole server answers in a minute.
+// A code has about 33 million values, so guessing one at this pace is hopeless.
+const guessesPerMinute = 40
 
 // Hub holds every room on the server. Each room is its own match with its own seed,
 // clock and radio nets; nothing is shared between them but the rules.
 type Hub struct {
 	mu    sync.Mutex
+
+	guessFrom time.Time // start of the minute wrong join codes are being counted in
+	guesses   int
+
 	r     *shared.Rules
 	cfg   HubConfig
 	ctx   context.Context
@@ -343,6 +356,7 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"length":   length,
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
 		"open":     h.open != nil, // the open room of a server without an agent key
+		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
 	})
 }
 
@@ -355,6 +369,12 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Bot      string `json:"bot"`
 	}
 	if !readJSON(w, r, &in) {
+		return
+	}
+	// On a server that strangers can reach, only the host may start matches: each one
+	// runs agents on the host's machine.
+	if key := h.cfg.HostKey; key != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Callsign-Host")), []byte(key)) != 1 {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
 	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot}
@@ -373,10 +393,27 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// wrongCode answers a join code that names no match, and slows down whoever is guessing.
+func (h *Hub) wrongCode(w http.ResponseWriter) {
+	h.mu.Lock()
+	now := time.Now()
+	if now.Sub(h.guessFrom) > time.Minute {
+		h.guessFrom, h.guesses = now, 0
+	}
+	h.guesses++
+	over := h.guesses > guessesPerMinute
+	h.mu.Unlock()
+	if over {
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": ErrGuessing.Error()})
+		return
+	}
+	writeJSON(w, http.StatusNotFound, map[string]any{"error": ErrNoRoom.Error()})
+}
+
 func (h *Hub) getRoom(w http.ResponseWriter, r *http.Request) {
 	rm := h.Room(r.PathValue("code"))
 	if rm == nil || r.PathValue("code") == "" {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": ErrNoRoom.Error()})
+		h.wrongCode(w)
 		return
 	}
 	l := rm.Lobby()
@@ -392,7 +429,7 @@ func (h *Hub) postSeat(w http.ResponseWriter, r *http.Request) {
 	}
 	rm := h.Room(r.PathValue("code"))
 	if rm == nil {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": ErrNoRoom.Error()})
+		h.wrongCode(w)
 		return
 	}
 	want := -1

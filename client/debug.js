@@ -773,7 +773,7 @@ async function lobbyStep(step) {
     await step();
   } catch (err) {
     const reason = err.message;
-    lobbyError = err.status === 404 ? () => t("lobby.noRoom") : err.status === 409 ? () => t("lobby.full") : err.status === 503 ? () => t("lobby.busy") : () => t("lobby.failed", { reason });
+    lobbyError = err.status === 404 ? () => t("lobby.noRoom") : err.status === 409 ? () => t("lobby.full") : err.status === 503 ? () => t("lobby.busy") : err.status === 403 && offer?.locked ? () => t("lobby.hostOnly") : err.status === 429 ? () => t("lobby.guessing") : () => t("lobby.failed", { reason });
   }
   lobbyBusy = false;
   renderOverlay();
@@ -792,7 +792,13 @@ function sitDown(got) {
   connect();
 }
 
-const makeMatch = (options) => lobbyStep(async () => sitDown(await createRoom(options)));
+const makeMatch = (options) =>
+  lobbyStep(async () => {
+    const hostKey = $("lobby-host-key").value || localStorage.getItem("callsign.hostkey") || "";
+    const seat = await createRoom(options, hostKey);
+    if (hostKey) localStorage.setItem("callsign.hostkey", hostKey); // it worked: this browser is the host's
+    sitDown(seat);
+  });
 const takeFreeSeat = () => lobbyStep(async () => sitDown(await takeSeat(room)));
 
 // lookUp reads a room this browser has no seat in, to offer the free one.
@@ -882,6 +888,8 @@ requestAnimationFrame(frame);
 
 // What the lobby can offer, and the match lengths to choose from.
 offer = await serverInfo().catch(() => null);
+// Only the host makes matches on a locked server; a browser that has done so once is remembered.
+$("lobby-host").hidden = !offer?.locked || Boolean(localStorage.getItem("callsign.hostkey"));
 const usual = offer?.length ?? baseRules?.match.lengthSeconds ?? 600;
 for (const seconds of [...new Set([300, 600, 900, usual])].sort((a, b) => a - b)) {
   const option = el("option");

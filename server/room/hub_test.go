@@ -785,3 +785,53 @@ func TestLobbyChoosesTheScriptedEnemysLevel(t *testing.T) {
 		t.Errorf("the usual level of a rush server = %q", got)
 	}
 }
+
+func TestHostKeyGuardsMakingAMatchAndWrongCodesAreSlowed(t *testing.T) {
+	h := newHub(t, HubConfig{AgentKey: "agents", HostKey: "open sesame"})
+	mux := http.NewServeMux()
+	h.Routes(mux)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	post := func(path, key string) *http.Response {
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(`{"opponent":"friend"}`))
+		if key != "" {
+			req.Header.Set("X-Callsign-Host", key)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	if res := post("/api/rooms", ""); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("a match was made without the host password: %d", res.StatusCode)
+	}
+	if res := post("/api/rooms", "guess"); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("a match was made with a wrong host password: %d", res.StatusCode)
+	}
+	res := post("/api/rooms", "open sesame")
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("the host could not make a match: %d", res.StatusCode)
+	}
+	var made struct{ Room string }
+	json.NewDecoder(res.Body).Decode(&made)
+	// A friend takes the free seat with the code alone.
+	if res := post("/api/rooms/"+made.Room+"/seat", ""); res.StatusCode != http.StatusOK {
+		t.Fatalf("a friend with the code could not sit down: %d", res.StatusCode)
+	}
+	// Guessing codes is answered for a while, then refused.
+	last := 0
+	for i := 0; i < guessesPerMinute+5; i++ {
+		res, err := http.Get(srv.URL + "/api/rooms/ZZZZ9")
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = res.StatusCode
+	}
+	if last != http.StatusTooManyRequests {
+		t.Fatalf("wrong codes were never slowed: last answer %d", last)
+	}
+	if res, _ := http.Get(srv.URL + "/api/rooms/" + made.Room); res.StatusCode != http.StatusOK {
+		t.Fatalf("a right code was refused while guesses are slowed: %d", res.StatusCode)
+	}
+}

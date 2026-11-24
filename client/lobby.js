@@ -20,8 +20,8 @@ export const forgetSeat = (room) => localStorage.removeItem(seatKey(room));
 
 // An answer the server refused carries its HTTP status, so the page can say why in the
 // player's language.
-async function call(method, path, body) {
-  const res = await fetch(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+async function call(method, path, body, headers = {}) {
+  const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error ?? `HTTP ${res.status}`), { status: res.status });
   return data;
@@ -29,11 +29,12 @@ async function call(method, path, body) {
 
 const at = (code) => `/api/rooms/${encodeURIComponent(code.trim().toUpperCase())}`;
 
-// What this server offers: { factions: [west, east], bot, levels, level, length, share, open }.
+// What this server offers: { factions: [west, east], bot, levels, level, length, share, open, locked }.
 export const serverInfo = () => call("GET", "/api/server");
 // createRoom({ opponent: "bot" | "friend", side: 0 | 1 | -1, length, watch, bot: "easy" | "normal" | "standard" | "" })
 //   → { room, side, token, share, lobby }
-export const createRoom = (options) => call("POST", "/api/rooms", options);
+// On a server open to the internet only its host makes matches: `hostKey` is the password.
+export const createRoom = (options, hostKey = "") => call("POST", "/api/rooms", options, hostKey ? { "X-Callsign-Host": hostKey } : {});
 // roomInfo(code) → { lobby, share }
 export const roomInfo = (code) => call("GET", at(code));
 // takeSeat(code) takes whichever seat is free → { room, side, token, share, lobby }

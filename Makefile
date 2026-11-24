@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play play-lan stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
+.PHONY: image test play play-lan play-public stop shell voice-models voice-test art-image art-models art art-units-image art-units tts-image tts-models tts-test
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -26,7 +26,7 @@ play:
 	@docker image inspect $(IMAGE) >/dev/null 2>&1 || $(MAKE) image
 	@docker volume create callsign-gocache >/dev/null
 	@mkdir -p assets/voice-cache .relay-data
-	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) up
+	CALLSIGN_AGENT_KEY=$(AGENT_KEY) CALLSIGN_UID=$(shell id -u) CALLSIGN_GID=$(shell id -g) docker compose $(VOICES) $(MORE_PROFILES) up
 
 # The same, opened to the local network so a friend can join from another machine.
 # Read docs/FRIEND-MATCH.md first: there is no encryption and no accounts.
@@ -36,8 +36,22 @@ play-lan:
 	@echo "Anyone on this network who has that code can join the free seat. Nothing is encrypted."
 	CALLSIGN_BIND=0.0.0.0 CALLSIGN_SHARE=http://$(LAN_IP):8080 $(MAKE) play
 
+# The same over https for a friend anywhere, through a Cloudflare Tunnel on your own domain.
+# Needs CALLSIGN_PUBLIC_URL and CALLSIGN_TUNNEL_TOKEN in .env (docs/FRIEND-MATCH.md says how).
+# Only the host can make matches: the password is CALLSIGN_HOST_KEY in .env, or made here.
+PUBLIC_URL = $(shell sed -n 's/^CALLSIGN_PUBLIC_URL=//p' .env 2>/dev/null)
+HOST_KEY   = $(or $(shell sed -n 's/^CALLSIGN_HOST_KEY=//p' .env 2>/dev/null),$(shell head -c 9 /dev/urandom | base64 | tr '+/' 'ab'))
+play-public:
+	@grep -q '^CALLSIGN_TUNNEL_TOKEN=.' .env 2>/dev/null || { echo "set CALLSIGN_TUNNEL_TOKEN in .env (docs/FRIEND-MATCH.md)"; exit 1; }
+	@test -n "$(PUBLIC_URL)" || { echo "set CALLSIGN_PUBLIC_URL=https://<your name> in .env"; exit 1; }
+	$(eval KEY := $(HOST_KEY))
+	@echo "Your game is at  $(PUBLIC_URL)"
+	@echo "Host password (asked once, when you make a match):  $(KEY)"
+	@echo "Your friend needs only the join link or code. Anyone else on the internet can reach the lobby but cannot start a match."
+	@CALLSIGN_SHARE=$(PUBLIC_URL) CALLSIGN_HOST_KEY=$(KEY) $(MAKE) play MORE_PROFILES="--profile public"
+
 stop:
-	docker compose --profile voice down
+	docker compose --profile voice --profile public down
 
 shell:
 	$(DOCKER) -it $(IMAGE) bash

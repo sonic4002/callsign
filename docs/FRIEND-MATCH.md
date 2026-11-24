@@ -91,3 +91,33 @@ Not protected:
   `X-Callsign-Seat: <seat token>`.
 - Frames added: `{"type":"lobby","lobby":{...}}` from the server on every change, and
   `{"type":"ready","ready":true}` and `{"type":"leave"}` from a commander.
+
+## Over the internet, with https
+
+`make play-public` puts the game on an https address of your own domain through a
+Cloudflare Tunnel. Cloudflare holds the certificate and ends the encryption; the tunnel
+dials out from this machine, so nothing is opened on the router and your home address is
+not published. With https the microphone works on phones and for your friend.
+
+Once, in the Cloudflare dashboard (Zero Trust → Networks → Tunnels):
+
+1. Create a tunnel of type *Cloudflared* and copy its token.
+2. Add a public hostname to it, for example `callsign.<your domain>`, with service
+   `http://server:8080`.
+3. Put both in `.env`:
+
+       CALLSIGN_PUBLIC_URL=https://callsign.<your domain>
+       CALLSIGN_TUNNEL_TOKEN=<the token>
+
+Then `make play-public`. It prints the address and the **host password**. Open the
+address, choose a friend match, type the password once (the browser remembers it), and
+send your friend the join link.
+
+What changes on a public address:
+
+- **Only the host makes matches.** Every match runs agents on this machine, so making one
+  needs the host password. Joining a match by its code or link does not.
+- **Wrong join codes are slowed**: the server answers 40 a minute in total.
+- **Traffic is encrypted** between the players and Cloudflare, and inside the tunnel.
+  Cloudflare itself can read it.
+- Still true: the join code is not a password. Whoever has the link can take the free seat.
