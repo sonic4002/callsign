@@ -357,7 +357,9 @@ test("placing a structure, a production line, a cancel and a rally point, end to
   await eventually("gold for three squads", () => latest().gold >= 3 * commandos.cost, 20000);
   const bought = hammer.frames.length;
   const buy = say("en", "call.buy", { class: strings.en["class.vehicle"], unit: commandos.name.en });
-  for (let i = 0; i < 3; i++) await ask(buy, "Hammer, this is Anvil. Wilco. Out."); // one call at a time, as a commander speaks
+  // Three presses in a burst, none waiting for the answer: three purchases, each answered.
+  for (let i = 0; i < 3; i++) hammer.say(buy);
+  await eventually("three answers", () => hammer.frames.slice(bought).filter((f) => f.type === "radio" && f.message.from.en === "Anvil" && f.message.text === "Hammer, this is Anvil. Wilco. Out.").length === 3, 20000);
   const lined = await since("three squads in one line", bought, (f) => f.type === "state" && f.state.deploying.filter((d) => d.side === 0).length === 3);
   const line = lined.state.deploying.filter((d) => d.side === 0);
   assert.equal(new Set(line.map((d) => d.from)).size, 1, "one works, one line");

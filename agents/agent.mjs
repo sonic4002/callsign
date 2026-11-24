@@ -152,13 +152,17 @@ export class Agent {
     this.#pump();
   }
 
-  // One wake at a time. Whatever arrives while thinking is handled together in the next one.
+  // One wake at a time, and one call to a wake. News that arrives while thinking is handled
+  // together in the next wake, up to and including the first call for this station; a
+  // second call waits for a wake of its own, so each call is acted on and answered. Three
+  // purchases asked for in a burst are three purchases.
   async #pump() {
     if (this.busy) return;
     this.busy = true;
     try {
       while (this.inbox.length && !this.over && !this.stopped) {
-        await this.#wake(this.inbox.splice(0));
+        const call = this.inbox.findIndex((i) => i.kind === "radio");
+        await this.#wake(this.inbox.splice(0, call < 0 ? this.inbox.length : call + 1));
       }
     } finally {
       this.busy = false;
