@@ -3,6 +3,7 @@
 // all; a painted gusher base or a hauler sheet, when the sprite manifest has one under
 // the same id the rules use, is drawn by art.js and this module adds the life on top.
 
+import { drawProp } from "./art.js";
 import { groundEllipse } from "./iso.js";
 
 const TAU = Math.PI * 2;
@@ -86,6 +87,14 @@ export function drawField(ctx, S, zoom, gusher, share, time) {
   ctx.arc(sx, sy, rx, 0, TAU);
   ctx.fill();
   ctx.restore();
+  // The painted patch for how full the field is, lying under the nuggets.
+  const patch = share > 0.66 ? "gold_field_3" : share > 0.33 ? "gold_field_2" : share > 0.02 ? "gold_field_1" : "";
+  if (patch) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    drawProp(ctx, patch, rx * 1.5);
+    ctx.restore();
+  }
   // Nuggets: more of them, and farther out, the fuller the field is.
   const all = flecks(gusher.id);
   const shown = Math.round(all.length * (0.25 + 0.75 * share));

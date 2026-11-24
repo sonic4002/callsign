@@ -97,7 +97,7 @@ art-models:
 # Runs with the network off. Pick candidates by setting "keep" in art/sprites.json.
 art:
 	$(ART) --network none --device nvidia.com/gpu=all -v callsign-art-models:/models:ro callsign-art \
-		sh -c 'python art/generate.py && python art/cleanup.py'
+		sh -c 'python art/generate.py && python art/cleanup.py && python art/rename_keys.py'
 
 # ---- unit sheets: animated units rendered from models built in code (art/units.py) ----
 
@@ -109,7 +109,7 @@ art-units-image:
 # laid end to end (walls, fences, the bridge) and the gold lying in a field into
 # assets/sprites/segments and props. Runs on the CPU with the network off, in a few minutes.
 art-units:
-	$(ART) -e HOME=/tmp --network none -w /src callsign-blender sh -c 'python art/units.py && python art/props.py'
+	$(ART) -e HOME=/tmp --network none -w /src callsign-blender sh -c 'python art/units.py && python art/props.py && python art/rename_keys.py'
 
 # One picture of every finished sprite standing on the game's ground at game size, to
 # look at before it goes in: art-sheet.png in this directory.

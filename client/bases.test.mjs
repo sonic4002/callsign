@@ -2,7 +2,7 @@
 // the pictures every structure can fall back on.
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { buildVerb, captureVerb, namedStructure, placeOf, wantedStructure } from "../agents/bases.mjs";
@@ -119,4 +119,52 @@ test("every structure in the rules has a picture to fall back on", () => {
       assert.ok(new RegExp(`\\n  ${def.role}\\(ctx`).test(table), `${id}: no fallback picture for the role ${def.role}`);
     }
   }
+});
+
+// The manifest key of a picture IS the rules id of the thing. Every structure and unit
+// in the rules is drawn from the manifest when the picture is there and from the page's
+// own drawing when it is not; nothing in the manifest still carries a pipeline name.
+test("rules ids and the sprite manifest: every thing has a painted picture or a fallback, and none is orphaned", () => {
+  const manifest = JSON.parse(read("../assets/sprites/manifest.json"));
+  const art = read("art.js");
+  for (const [faction, f] of Object.entries(rules.factions)) {
+    for (const [id, def] of Object.entries(f.structures)) {
+      if (def.role === "hq") {
+        assert.ok(manifest.buildings[`hq_${faction}`] && manifest.buildings[`hq_${faction}_ruin`], `${faction}: no headquarters picture`);
+        continue;
+      }
+      if (def.role === "fence") {
+        const seg = manifest.segments[id];
+        assert.ok(seg?.x && seg?.y && seg?.ruin?.x && seg?.ruin?.y, `${id}: the run has no painted pieces`);
+        continue;
+      }
+      assert.ok(manifest.buildings[id], `${id}: no picture`);
+      assert.ok(manifest.buildings[`${id}_ruin`], `${id}: no ruin`);
+      if (def.role !== "defence") assert.ok(manifest.buildings[`${id}_site`], `${id}: no building site`);
+    }
+    for (const [id, u] of Object.entries(f.units)) {
+      const entry = manifest.units[id];
+      assert.ok(entry, `${id}: no sheet`);
+      if (u.class === "hauler") for (const anim of ["idle", "move", "full", "moveFull", "load", "unload", "wreck"]) assert.ok(entry.anims[anim], `${id}: no ${anim} frames`);
+      // And the page still draws it when the sheet does not load.
+      assert.ok(u.class !== "hauler" || art.includes('if (cls === "hauler")'), "haulers have no code-drawn fallback");
+    }
+  }
+  const leftover = [...Object.keys(manifest.buildings), ...Object.keys(manifest.units), ...Object.keys(manifest.segments)].filter((k) => /^(aegis|ashfall)_/.test(k));
+  assert.deepEqual(leftover, [], "pipeline names in the manifest: run art/rename_keys.py");
+  for (const group of ["buildings", "units", "landmarks", "props"]) {
+    for (const [id, entry] of Object.entries(manifest[group])) {
+      assert.ok(existsSync(new URL(`../assets/sprites/${entry.image}`, import.meta.url)), `${group}.${id}: ${entry.image} is missing`);
+    }
+  }
+});
+
+test("a hauler's frames follow what it is doing and how full it is", async () => {
+  const { haulerAnim } = await import("./art.js");
+  assert.equal(haulerAnim({ haul: "loading", load: 0.2 }), "load");
+  assert.equal(haulerAnim({ haul: "unloading", load: 0.9 }), "unload");
+  assert.equal(haulerAnim({ haul: "out", load: 0, moving: true }), "move");
+  assert.equal(haulerAnim({ haul: "returning", load: 1, moving: true }), "moveFull");
+  assert.equal(haulerAnim({ haul: "waiting", load: 0 }), "idle");
+  assert.equal(haulerAnim({ haul: "fleeing", load: 0.8 }), "full");
 });

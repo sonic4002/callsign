@@ -3,7 +3,7 @@
 // otherwise each role has a code-drawn picture here, in the faction's colours, so a
 // missing sprite never leaves a gap.
 
-import { drawBuilding, isoBox, shadow, sprites } from "./art.js";
+import { drawBuilding, isoBox, shadow, sprites, drawSegment } from "./art.js";
 import { toIso } from "./iso.js";
 
 const palettes = {
@@ -154,8 +154,17 @@ export function drawStructure(ctx, st, def, color, time) {
     if (!sprites.buildings[st.kind] && st.role !== "defence") flag(ctx, color, -30, 2, time);
     return;
   }
-  // Going up: a ghost of the whole thing, and the built part rising from the ground.
+  // Going up: the building site, or a ghost of the whole thing, and the built part rising
+  // from the ground.
   const h = heights[st.role] ?? 56;
+  if (sprites.buildings[`${st.kind}_site`]) {
+    drawBuilding(ctx, `${st.kind}_site`, color, time);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, st.building * 1.4 - 0.4)); // the finished walls fade in over the frame
+    paint();
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.globalAlpha = 0.28;
   paint();
@@ -177,6 +186,20 @@ export function drawFence(ctx, st, color) {
   const [ax, ay] = toIso(st.ax - st.x, st.ay - st.y);
   const [bx, by] = toIso(st.bx - st.x, st.by - st.y);
   const p = palettes[st.faction] ?? palettes.aegis;
+  // A run along the map's east-west or north-south line has a painted piece; a diagonal
+  // one is drawn here.
+  const [dx, dy] = [st.bx - st.ax, st.by - st.ay];
+  const axis = Math.abs(dy) < 1 ? "x" : Math.abs(dx) < 1 ? "y" : null;
+  if (axis && sprites.segments[st.kind]) {
+    ctx.save();
+    if (!st.ruin && st.building < 1) ctx.globalAlpha = 0.35 + 0.65 * st.building;
+    const painted = drawSegment(ctx, st.kind, axis, Math.hypot(dx, dy), st.ruin ? "ruin" : "");
+    ctx.restore();
+    if (painted) {
+      if (!st.ruin) line(ctx, color, 1.2, ax, ay + 1.5, bx, by + 1.5); // whose it is
+      return;
+    }
+  }
   if (st.ruin) {
     for (const t of [0.2, 0.55, 0.85]) disc(ctx, "rgba(40,36,30,0.7)", ax + (bx - ax) * t, ay + (by - ay) * t, 5, 2.5);
     return;

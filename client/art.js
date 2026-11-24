@@ -185,6 +185,27 @@ function animatedVehicle(ctx, entry, o) {
   ctx.restore();
 }
 
+// haulerAnim picks the frames a hauler shows: what it is doing, and whether its bed is
+// full. `haul` is its working state from the server; `load` the share of its capacity.
+export function haulerAnim({ haul, load = 0, moving = false }) {
+  if (haul === "loading") return "load";
+  if (haul === "unloading") return "unload";
+  const full = load >= 0.5;
+  if (moving) return full ? "moveFull" : "move";
+  return full ? "full" : "idle";
+}
+
+// A hauler is one sheet with no weapon: it rolls, loads and unloads.
+function animatedHauler(ctx, entry, o) {
+  const anim = haulerAnim(o);
+  const [, count] = entry.anims[anim] ?? entry.anims.idle;
+  shadow(ctx, 28, 12);
+  ctx.save();
+  if (o.moving) ctx.translate(0, Math.sin(o.time * 34 + o.seed) * 0.35);
+  drawFrame(ctx, entry, entry, anim, count > 1 ? Math.floor(o.time * (entry.fps?.[anim] ?? 5) + o.seed) % count : 0, rowOf(entry, o.turn));
+  ctx.restore();
+}
+
 // hasAnimation reports whether a unit is drawn from an animated sheet.
 export const hasAnimation = (unit) => Boolean(sprites.units[unit]?.anims);
 
@@ -356,7 +377,7 @@ export function drawUnit(ctx, o) {
   const { unit, cls, faction, members, moving, firing, time, turn, seed } = o;
   const entry = sprites.units[unit];
   // A sheet drawn once per member is a squad of small figures, on foot or in the air.
-  if (entry?.anims) return (entry.per === "member" ? animatedInfantry : animatedVehicle)(ctx, entry, o);
+  if (entry?.anims) return (entry.per === "member" ? animatedInfantry : cls === "hauler" ? animatedHauler : animatedVehicle)(ctx, entry, o);
   if (entry) {
     shadow(ctx, cls === "infantry" ? 9 : 20);
     drawSprite(ctx, entry, unitHeight[cls] ?? 28, turn);
@@ -529,6 +550,8 @@ function rubble(ctx, wall, light) {
 
 // drawBuilding draws what stands on a map point. `color` is the owner's colour.
 export function drawBuilding(ctx, kind, color, time) {
+  // The gusher's vent is a landmark that belongs to nobody: no shadow blob, no pennant.
+  if (kind === "gusher" && sprites.landmarks.gusher) return drawSprite(ctx, sprites.landmarks.gusher, sprites.landmarks.gusher.height ?? 29, 0);
   const entry = sprites.buildings[kind];
   if (entry) {
     shadow(ctx, 30, 13, 0.3);
@@ -541,6 +564,28 @@ export function drawBuilding(ctx, kind, color, time) {
   }
   if (kind === "gusher") return drawVent(ctx);
   drawn[kind]?.(ctx, color, time);
+}
+
+// drawProp draws a flat thing lying on the ground (a patch of gold), `width` screen pixels
+// wide, centred on its own anchor. It returns false when there is no picture for it.
+export function drawProp(ctx, key, width) {
+  const entry = sprites.props[key];
+  if (!entry) return false;
+  const k = width / entry.size[0];
+  ctx.drawImage(entry.img, -entry.anchor[0] * entry.size[0] * k, -entry.anchor[1] * entry.size[1] * k, entry.size[0] * k, entry.size[1] * k);
+  return true;
+}
+
+// drawSegment draws one piece of a wall, fence or bridge run. The context sits on the
+// piece's middle with one unit being one map unit on screen; `length` is how much of the
+// run this piece stands for. It returns false when the run has no picture on that axis.
+export function drawSegment(ctx, id, axis, length, state = "") {
+  const seg = sprites.segments[id];
+  const node = state ? seg?.[state]?.[axis] : seg?.[axis];
+  if (!node?.img) return false;
+  const k = seg.scale * (length / seg.length);
+  ctx.drawImage(node.img, -node.anchor[0] * node.size[0] * k, -node.anchor[1] * node.size[1] * k, node.size[0] * k, node.size[1] * k);
+  return true;
 }
 
 // ---- ground props (baked into the terrain once) ----
