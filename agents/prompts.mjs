@@ -73,7 +73,7 @@ function mapTable(rules, side) {
     `The map is "${rules.map.name?.en ?? "the map"}", ${rules.map.width} wide and ${rules.map.height} tall; x grows east, y grows south, distances are in metres.`,
     ...lines,
     "Ground. Water stops land units except at a bridge; mountains stop them; ice can be crossed but slowly and with no cover. Boats keep to the water, aircraft cross everything. The server refuses a place a squad's unit cannot get to.",
-    ...(bridges.length ? ["Bridges. A bridge can be shot down, and everything on it is lost with it; a squad told to hold or attack will not start across one that is about to fall, a squad told to move will. Your status lists bridges that are damaged or down. Never shoot at a bridge, and never order one destroyed, unless Hammer ordered that bridge destroyed in so many words: a fallen bridge cuts your own side off too, and it is Hammer's decision alone.", ...bridges] : []),
+    ...(bridges.length ? ["Bridges. A bridge can be shot down, and everything on it is lost with it; a squad told to hold or attack will not start across one that is about to fall, a squad told to move will. Your status lists bridges that are damaged or down.", ...bridges] : []),
     ...(landmarks.length
       ? [
           "Landmarks. Each has an id and a name, and an order can go to it by either. A fireteam standing still behind one is harder to hit; infantry inside a building are harder still to hit and are seen only from close by or once they fire, but heavy weapons bring a building down. Your status lists the buildings that are held, damaged or fallen.",

@@ -517,7 +517,8 @@ export class Scene {
       const t0 = now + i * w.gap;
       const x2 = target.x + miss();
       const y2 = target.y + miss();
-      this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
+      if (w.rocket) this.effects.push({ kind: "rocket", x1: v.px, y1: v.py, x2, y2, arc: w.rocket, t0, ttl: w.travel + 500, flight: w.travel });
+      else this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
       const at = t0 + w.travel;
       if (w.impact === "shell") this.fx.shell(x2, y2, at, 1.25);
       else if (w.impact === "pop") this.fx.pop(x2, y2, at);
@@ -851,6 +852,45 @@ export class Scene {
     this.effects = this.effects.filter((e) => now - e.t0 < e.ttl);
     for (const e of this.effects) {
       const life = (now - e.t0) / e.ttl;
+      if (e.kind === "rocket" && life >= 0) {
+        // A rocket climbs and falls along its way; the smoke it left hangs and thins.
+        const [ax, ay] = S(e.x1, e.y1);
+        const [bx, by] = S(e.x2, e.y2);
+        const span = Math.hypot(bx - ax, by - ay);
+        const at = (k) => [ax + (bx - ax) * k, ay + (by - ay) * k - 12 * unitScale * (1 - k) - Math.sin(Math.PI * k) * span * 0.45 * e.arc];
+        const k = Math.min(1, (now - e.t0) / e.flight);
+        const fade = Math.max(0, 1 - Math.max(0, now - e.t0 - e.flight) / 500);
+        ctx.lineCap = "round";
+        const steps = 14;
+        for (let i = 0; i < steps; i++) {
+          const k0 = (k * i) / steps;
+          const k1 = (k * (i + 1)) / steps;
+          const [x0, y0] = at(k0);
+          const [x1, y1] = at(k1);
+          const age = (i + 1) / steps; // 1 at the rocket, 0 at the launcher
+          ctx.strokeStyle = `rgba(214,214,206,${0.5 * fade * (0.25 + 0.75 * age)})`;
+          ctx.lineWidth = (2 + 3.5 * (1 - age)) * unitScale;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        }
+        if (k < 1) {
+          const [hx, hy] = at(k);
+          const [px, py] = at(Math.max(0, k - 0.03));
+          ctx.strokeStyle = "#fff3c4";
+          ctx.lineWidth = 2.6 * unitScale;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(255,170,60,0.9)";
+          ctx.beginPath();
+          ctx.arc(px, py, 3.2 * unitScale, 0, TAU);
+          ctx.fill();
+        }
+        ctx.lineCap = "butt";
+      }
       if (e.kind === "tracer" && life >= 0) {
         const [ax, ay] = S(e.x1, e.y1);
         const [bx, by] = S(e.x2, e.y2);
@@ -912,6 +952,32 @@ export class Scene {
     }
   }
 
+  // objectAimedAt is the thing, not a unit, that a firing team of ours is shooting at: the
+  // bridge or landmark its order names, else the nearest enemy structure within `reach`.
+  objectAimedAt(group, v, reach) {
+    const { rules, state } = this;
+    const place = group.view?.order?.kind === "attack" ? group.view.order.place : null;
+    if (place) {
+      const b = (rules.map.bridges ?? []).find((x) => x.id === place);
+      if (b) {
+        // The nearest part of the deck, so that the rounds land on the bridge itself.
+        const [ax, ay] = b.from;
+        const [bx, by] = b.to;
+        const k = Math.max(0.15, Math.min(0.85, ((v.x - ax) * (bx - ax) + (v.y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+        return { x: ax + k * (bx - ax), y: ay + k * (by - ay) };
+      }
+      const l = (rules.map.landmarks ?? []).find((x) => x.id === place);
+      if (l) return { x: l.x, y: l.y };
+    }
+    let best = null;
+    for (const st of state.structures ?? []) {
+      if (st.side === group.side || st.ruin) continue;
+      const d = Math.hypot(st.x - v.x, st.y - v.y);
+      if (d < reach) [best, reach] = [{ x: st.x, y: st.y }, d];
+    }
+    return best;
+  }
+
   // gunfire turns "this team is firing" into tracers. The server says which of our own
   // teams fire; for an enemy in sight it is inferred from having one of ours in its range.
   gunfire(now) {
@@ -930,6 +996,9 @@ export class Scene {
             if (d < bd) [target, bd] = [o, d];
           }
         }
+        // With no enemy team in reach, one of ours that fires is shooting at what it was
+        // ordered to bring down: a bridge or a building, or an enemy structure in reach.
+        if (!target && group.own) target = this.objectAimedAt(group, v, bd);
         // With no enemy team in reach, a firing team is shooting at the headquarters.
         if (!target && (group.own || now - this.hqHitAt[1 - group.side] < 1500)) {
           const hq = this.rules.map.points.find((p) => p.kind === "hq" && p.owner === 1 - group.side);
@@ -1117,6 +1186,13 @@ export class Scene {
       if (!(hp < 0.995) || !(hp > 0)) continue;
       const [sx, sy] = cam.screen(p.x, p.y);
       this.healthBar(sx, sy - 118 * buildScale, hp, null);
+    }
+    // A bridge that is hit, or that engineers are mending, shows how much of it is left.
+    for (const b of rules.map.bridges ?? []) {
+      const seen = this.bridges.get(b.id);
+      if (!seen || !(seen.hp < 0.995) || (!seen.standing && !(seen.hp > 0))) continue;
+      const [sx, sy] = cam.screen((b.from[0] + b.to[0]) / 2, (b.from[1] + b.to[1]) / 2);
+      this.healthBar(sx, sy - 34 * buildScale, seen.hp, null);
     }
   }
 
