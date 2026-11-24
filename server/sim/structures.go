@@ -308,6 +308,17 @@ func structureByKey(f *shared.Faction, key string) (string, *shared.Structure) {
 	return f.StructureOfRole(key)
 }
 
+// Build starts a structure and returns it. Apply does the same for a build command.
+func (s *Sim) Build(c Command) (*Structure, error) {
+	if s.Over {
+		return nil, ErrOver
+	}
+	if c.Side != 0 && c.Side != 1 {
+		return nil, ErrBadCommand
+	}
+	return s.build(c)
+}
+
 // build starts a structure. Base structures take the next free slot of the base;
 // defences and fences take a place.
 func (s *Sim) build(c Command) (*Structure, error) {

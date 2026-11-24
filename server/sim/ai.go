@@ -162,7 +162,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if canFire {
 		v := 0.55 + b(order == OrderHold || order == OrderAttack, 0.3) + b(order == OrderNone, 0.2) -
 			b(order == OrderMove, 0.1) + b(target != nil && targetD <= u.Range/2, 0.15) -
-			b(shaken, 0.15) - b(pinned, 0.9)
+			b(shaken, 0.15) - b(pinned, 0.9) +
+			b(structure != nil && structure.ID == t.blocked, 0.6) // a fence in the way is shot down
 		if v > score {
 			best, score = plan{act: ActFire, target: target, hq: hq, st: structure}, v
 		}
