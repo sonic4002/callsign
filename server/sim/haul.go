@@ -75,7 +75,8 @@ type haul struct {
 type fieldMemory struct {
 	Gold    float64
 	Visible bool
-	danger  int // tick until which this side treats the field as under fire
+	Known   bool // this side has had the field in sight at least once
+	danger  int  // tick until which this side treats the field as under fire
 }
 
 // haulerMemory is an enemy hauler as a side last saw it.
@@ -506,6 +507,7 @@ func (s *Sim) observeHaul(side int) {
 	for i := range s.Fields {
 		f, m := &s.Fields[i], &sd.fields[i]
 		m.Visible = s.InSight(side, f.X, f.Y)
+		m.Known = m.Known || m.Visible
 		if m.Visible {
 			m.Gold = f.Gold
 		}
@@ -544,6 +546,9 @@ type FieldView struct {
 	Gusher  string  `json:"gusher"`
 	Gold    float64 `json:"gold"`    // 0…1 of the field's cap
 	Visible bool    `json:"visible"` // in sight now; otherwise as last seen
+	// Seen is false until the side has had the field in sight once: until then how full
+	// it is is a guess, and the page does not show a figure.
+	Seen bool `json:"seen"`
 }
 
 // HaulerView is a hauler: a side's own, or an enemy one as last seen.
@@ -578,10 +583,10 @@ func (s *Sim) snapHaul(snap *Snapshot, side int) {
 	snap.Fields, snap.Haulers = []FieldView{}, []HaulerView{}
 	for i := range s.Fields {
 		f := &s.Fields[i]
-		v := FieldView{Gusher: f.ID, Gold: round2(f.Gold / f.FieldCap), Visible: true}
+		v := FieldView{Gusher: f.ID, Gold: round2(f.Gold / f.FieldCap), Visible: true, Seen: true}
 		if side != Spectator {
 			m := s.Sides[side].fields[i]
-			v.Gold, v.Visible = round2(m.Gold/f.FieldCap), m.Visible
+			v.Gold, v.Visible, v.Seen = round2(m.Gold/f.FieldCap), m.Visible, m.Known
 		}
 		snap.Fields = append(snap.Fields, v)
 	}

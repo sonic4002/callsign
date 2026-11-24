@@ -87,6 +87,15 @@ func (rm *Room) structureNamed(side int, low string, enemy bool, x, y float64) s
 	}
 	best, bd := "", math.MaxFloat64
 	for _, st := range rm.sim.Snapshot(side).Structures {
+		// A tech building called by its own name on the map ("the clinic east of Delta")
+		// is that one, whoever holds it.
+		if !st.Ruin && st.Site != "" {
+			for _, site := range rm.r.Map.TechBuildings {
+				if site.ID == st.Site && (strings.Contains(low, strings.ToLower(site.Name.En)) || strings.Contains(low, site.Name.He)) {
+					return st.ID
+				}
+			}
+		}
 		if st.Ruin || (st.Side != side) != enemy {
 			continue
 		}
@@ -229,6 +238,9 @@ type StructureBrief struct {
 	// A tech building: whose it is ("yours", "enemy" or "nobody") and what holding it gives.
 	Holder string `json:"holder,omitempty"`
 	Gives  string `json:"gives,omitempty"`
+	// What this one is called on the map, in both languages ("the clinic east of Delta").
+	Site   string `json:"site,omitempty"`
+	SiteHe string `json:"siteHe,omitempty"`
 }
 
 // structureBriefs lists the structures a side knows of, for a leader's report: its own
@@ -247,6 +259,11 @@ func (rm *Room) structureBriefs(snap sim.Snapshot) []StructureBrief {
 		}
 		if st.Role == shared.RoleTech {
 			b.Gives = def.About.En
+			for _, site := range rm.r.Map.TechBuildings {
+				if site.ID == st.Site {
+					b.Site, b.SiteHe = site.Name.En, site.Name.He
+				}
+			}
 			switch st.Side {
 			case snap.Side:
 				b.Holder = "yours"

@@ -1117,7 +1117,12 @@ func (s *Sim) engineers() {
 				continue
 			}
 			s.remember(st, side)
-			s.emit(Event{Side: side, Kind: EvStructureCaptured, Structure: st.PlaceID(), Unit: st.Kind,
+			// Reason "seen" marks the side that only watched: it neither took it nor lost it.
+			reason := ""
+			if side != sq.Side && side != from {
+				reason = "seen"
+			}
+			s.emit(Event{Side: side, Kind: EvStructureCaptured, Structure: st.PlaceID(), Unit: st.Kind, Reason: reason,
 				Squad: b2i(side == sq.Side, sq.ID), Point: s.nearestPoint(st.X, st.Y), Owner: &st.Side})
 		}
 		s.techTaken(st, from)

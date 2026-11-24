@@ -63,6 +63,9 @@ func (rm *Room) cueOf(e sim.Event) (key string, vars map[string]string) {
 		if mine {
 			return "structureTaken", vars
 		}
+		if e.Reason == "seen" {
+			return "", nil // it was never ours: the squad that saw it reports it
+		}
 		return "structureLost", vars
 	case sim.EvTechLost:
 		vars["structure"] = structure()

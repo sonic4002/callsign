@@ -56,6 +56,7 @@ export function compactStructures(status, side) {
       // A tech building belongs to no army until engineers take it: "nobody".
       whose: s.holder ?? (s.side === -1 ? "nobody" : (s.yours ?? s.side === side) ? "yours" : "enemy"),
       ...(s.gives && { gives: s.gives }),
+      ...(s.site && { site: s.site, siteHe: s.siteHe }),
       near: s.near,
       x: s.x,
       y: s.y,
@@ -130,6 +131,9 @@ export function namedStructure(text, structures, { enemy }) {
   // the way an enemy structure is. A tech building named by its own word comes first,
   // so that "the service yard" is not read as the enemy's works.
   const theirs = (s) => (s.whose !== "yours") === enemy;
+  // Called by its own name on the map, it is that one and no other of its kind.
+  const site = (structures ?? []).find((s) => theirs(s) && s.site && (low.includes(s.site.toLowerCase()) || (s.siteHe && low.includes(s.siteHe))));
+  if (site) return site;
   const tech = (structures ?? []).find((s) => theirs(s) && s.role === "tech" && (has(low, s.name) || techWords[s.kind ?? s.name]?.test(low) || Object.values(techWords).some((re) => re.test(s.name) && re.test(low))));
   if (tech) return tech;
   return (structures ?? []).find((s) => {

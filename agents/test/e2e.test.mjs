@@ -67,7 +67,13 @@ class Hammer {
   }
 
   async hears(from) {
-    return (await this.next(`a transmission from ${from}`, (f) => f.type === "radio" && f.message.from.en === from)).message.text;
+    // What the station itself said: the base cues the server words in Anvil's name are not that.
+    return (await this.next(`a transmission from ${from}`, (f) => f.type === "radio" && f.message.from.en === from && !f.message.cue)).message.text;
+  }
+
+  // cues are the base cues heard so far, by kind.
+  cues() {
+    return this.frames.filter((f) => f.type === "radio" && f.message.cue).map((f) => [f.message.cue, f.message.text]);
   }
 
   radioLog() {
@@ -119,6 +125,9 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
   await hammer.next("the works standing", (f) => f.type === "event" && f.event.kind === "structure_built" && f.event.unit === "vehicleWorks");
   const works = hammer.frames.findLast((f) => f.type === "state").state.structures.find((s) => s.kind === "vehicleWorks");
   assert.equal(works.side, 0);
+  // The operator says so by itself, in the language of the net, and nobody answers it.
+  await hammer.next("the cue for the works", (f) => f.type === "radio" && f.message.cue === "newOptions");
+  assert.deepEqual(hammer.cues().at(-1), ["newOptions", "פטיש, כאן סדן, הבנייה הושלמה: מפעל הרכב. נפתחו אפשרויות חדשות, סוף."]);
 
   // Anvil buys; the new squad gets its own leader, who answers a radio check.
   hammer.say("Anvil, this is Hammer. Buy a tank. Over.");

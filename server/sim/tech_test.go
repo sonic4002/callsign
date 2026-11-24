@@ -344,3 +344,55 @@ func TestATechBuildingsHolderIsShownAsLastSeen(t *testing.T) {
 		t.Fatalf("side 1 looking again is shown %+v", got)
 	}
 }
+
+func TestAFieldIsMarkedSeenOnlyOnceASideHasLookedAtIt(t *testing.T) {
+	s := baseSim(t, 1)
+	run(s, 1)
+	var far string
+	for _, f := range s.Snapshot(0).Fields {
+		if !f.Seen {
+			far = f.Gusher
+		}
+	}
+	if far == "" {
+		t.Fatal("side 0 has seen every field at the first second")
+	}
+	for _, f := range s.Snapshot(sim.Spectator).Fields {
+		if !f.Seen {
+			t.Fatalf("the spectator is shown %s as unseen", f.Gusher)
+		}
+	}
+	for _, g := range rules.Map.Gushers {
+		if g.ID == far {
+			place(s.Squad(1), g.X+30, g.Y)
+		}
+	}
+	run(s, 1)
+	place(s.Squad(1), 80, 80)
+	run(s, 1)
+	for _, f := range s.Snapshot(0).Fields {
+		if f.Gusher == far && (!f.Seen || f.Visible) {
+			t.Fatalf("after a look and a walk away the field reads %+v", f)
+		}
+	}
+}
+
+func TestASideThatOnlyWatchesATakeoverIsToldItSawOne(t *testing.T) {
+	s := baseSim(t, 1)
+	office := tech(t, s, "tech_goldworks", true)
+	place(s.Squad(3), office.X+100, office.Y+60) // side 1 is looking on
+	run(s, 1)
+	events := take(t, s, 0, "engineers", office)
+	watched := false
+	for _, e := range events {
+		if e.Kind == sim.EvStructureCaptured && e.Side == 1 {
+			watched = e.Reason == "seen" && e.Owner != nil && *e.Owner == 0
+		}
+		if e.Kind == sim.EvTechLost {
+			t.Fatal("nobody lost a building that was nobody's")
+		}
+	}
+	if !watched {
+		t.Fatal("the side looking on should be told it saw the takeover")
+	}
+}

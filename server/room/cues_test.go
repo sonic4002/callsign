@@ -177,3 +177,69 @@ func TestCuesForHaulersTechBuildingsAndEventsNamedInTheRules(t *testing.T) {
 		}
 	}
 }
+
+func TestATechBuildingIsTakenByTheNameItHasOnTheMap(t *testing.T) {
+	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, FullBase: true, Purse: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	anvil := join(t, rm, 0, RoleAnvil, 0)
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	tool(t, rm, anvil, ToolBuy, `{"unit":"engineers"}`)
+	ticks(rm, 6)
+	engineers := join(t, rm, 0, RoleSquad, 5)
+	var west, east sim.StructureView
+	rm.View(func(s *sim.Sim) {
+		for _, st := range s.Snapshot(sim.Spectator).Structures {
+			switch st.Site {
+			case "tech-assay-w":
+				west = st
+			case "tech-assay-e":
+				east = st
+			}
+		}
+		// The engineers stand by the western office, a squad of ours looks at the eastern
+		// one, and the enemy is far away.
+		place := func(id int, x, y float64) {
+			for i := range s.Squad(id).Teams {
+				s.Squad(id).Teams[i].X, s.Squad(id).Teams[i].Y = x+float64(i*6), y
+			}
+		}
+		place(5, west.X-70, west.Y)
+		place(1, east.X-80, east.Y)
+		place(3, 1500, 900)
+		place(4, 1500, 900)
+	})
+	ticks(rm, 0.3)
+	res, err := rm.Tool(engineers, ToolReport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, b := range res.(map[string]any)["structures"].([]StructureBrief) {
+		if b.ID == east.ID {
+			found = b.Holder == "nobody" && b.Site == "the assay office east of Golf" && b.SiteHe != "" && b.Gives != "" && !b.Yours
+		}
+	}
+	if !found {
+		t.Fatalf("the report should list the eastern office as nobody's, by its name, with what it gives")
+	}
+	// Named in Hebrew, the far one is the one taken, though the near one is the same kind.
+	tool(t, rm, engineers, ToolCapture, `{"place":"בית הבוחן ממזרח לגימל"}`)
+	drain(t, hammer)
+	ticks(rm, 60)
+	rm.View(func(s *sim.Sim) {
+		for _, st := range s.Snapshot(0).Structures {
+			if st.ID == west.ID && st.Side != sim.NoSide {
+				t.Errorf("the near office was taken instead: side %d", st.Side)
+			}
+			if st.ID == east.ID && st.Side != 0 {
+				t.Errorf("the office named was not taken: side %d", st.Side)
+			}
+		}
+	})
+	got := cuesHeard(t, hammer)
+	if len(got) != 1 || got[0].Cue != "structureTaken" || got[0].Text != "Hammer, this is Anvil. Assay Office is ours. Out." {
+		t.Fatalf("after the takeover Hammer heard %+v", got)
+	}
+}
