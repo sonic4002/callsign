@@ -56,7 +56,15 @@ func main() {
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*assets))))
 	mux.Handle("/", http.FileServer(http.Dir(*client)))
 
-	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	// Cross-origin isolation lets the page's speech recogniser use WebAssembly threads.
+	// Everything the page loads comes from this server, so nothing is shut out by it.
+	isolated := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
+		mux.ServeHTTP(w, r)
+	})
+
+	srv := &http.Server{Addr: *addr, Handler: isolated, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shut, cancel := context.WithTimeout(context.Background(), 2*time.Second)

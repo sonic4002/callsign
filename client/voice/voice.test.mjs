@@ -1,0 +1,133 @@
+// Speech recognition: the parts that are plain code run in every `make test`. The last
+// test runs the real Hebrew model on a recording and is opt-in (`make voice-test`).
+
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { test } from "node:test";
+
+import { Recognizer, isNoise, readWav, trimSilence } from "./engine.js";
+import { LogMel, parseMelFilters } from "./mel.js";
+import { normalize, similarity } from "./normalize.js";
+import { Tokenizer } from "./tokenizer.js";
+
+const read = (name) => readFileSync(new URL(name, import.meta.url));
+const rules = JSON.parse(read("../../shared/rules.json"));
+const manifest = JSON.parse(read("models.json"));
+
+// What the recognisers really wrote for spoken calls (three voices), and the call it must become.
+const heard = {
+  en: [
+    ["Viper 2, this is hammer, hold foxtrot over.", "Viper 2, this is Hammer. Hold Foxtrot. Over."],
+    ["Viper 2 this is hammer hold fox strut over", "Viper 2, this is Hammer. Hold Foxtrot. Over."],
+    ["Viper, too, this is hammer, hold fox-trot over.", "Viper 2, this is Hammer. Hold Foxtrot. Over."],
+    ["Viper 2: This is Hammer! Take your squad to the town and dig in. Then tell me what you see. Over!", "Viper 2, this is Hammer. Take your squad to the town and dig in. Then tell me what you see. Over."],
+    ["Vipah 1: This is Hannah. Move to the bridge. Over.", "Viper 1, this is Hammer. Move to the bridge. Over."],
+    ["Vapour one, this is hammer, attack gulf, then hold bravo out.", "Viper 1, this is Hammer. Attack Golf, then hold Bravo. Out."],
+    ["Jack won this is hammer hold sierra over", "Shark 1, this is Hammer. Hold Sierra. Over."],
+    ["Rhino 1, this is hammer. Attack kilo over.", "Rhino 1, this is Hammer. Attack Kilo. Over."],
+    ["Amble, this is hammer by one infantry squad, commandos over.", "Anvil, this is Hammer. Buy one infantry squad, commandos. Over."],
+    ["All stations this is hammer radio check over", "All stations, this is Hammer. Radio check. Over."],
+    ["Viper one and Rhino too, this is hammer, kill everything at kylo and go to hotel over.", "Viper 1 and Rhino 2, this is Hammer. Kill everything at Kilo and go to Hotel. Over."],
+  ],
+  he: [
+    ["צפע שתיים כאן פטיש תחזיקו את פסל עבור.", "צפע 2, כאן פטיש, תחזיקו את פסל, עבור."],
+    ["ענף אחת כאן - פטיש תקפו את קרמל עבור.", "קרנף 1, כאן פטיש, תקפו את כרמל, עבור."],
+    ["ריש אחת כאן פטישה חזק בשמח עבור", "כריש 1, כאן פטיש, חזק בסמך, עבור."],
+    ["צפע אחת וקרנף אחת כאן פטיש נועו לכרמל סוף", "צפע 1 וקרנף 1, כאן פטיש, נועו לכרמל, סוף."],
+    ["סדן, כאן פטיש, קנה טנק, עבור.", "סדן, כאן פטיש, קנה טנק, עבור."],
+  ],
+};
+
+test("normalize: a heard call becomes proper procedure with the net's own names", () => {
+  for (const lang of ["en", "he"]) {
+    for (const [said, want] of heard[lang]) assert.equal(normalize(said, { lang, rules }), want, said);
+  }
+});
+
+test("normalize: the calls the page itself writes pass through unchanged", () => {
+  for (const lang of ["en", "he"]) {
+    const strings = JSON.parse(read(`../i18n/${lang}.json`));
+    const cs = rules.callsigns;
+    for (const p of rules.map.points) {
+      for (const verb of ["hold", "move", "attack"]) {
+        const call = strings[`call.${verb}`].replace("{to}", `${cs.classes.infantry[lang]} 2`).replace("{from}", cs.player[lang]).replace("{point}", p.callsign[lang]);
+        assert.equal(normalize(call, { lang, rules }), call);
+      }
+    }
+  }
+});
+
+test("normalize: no guessing where there is nothing to go on", () => {
+  // No call at the front: plain dictation, left alone.
+  assert.equal(normalize("  hello   there ", { lang: "en", rules }), "hello there");
+  // A missing Over is never added; the player ends the call.
+  assert.equal(normalize("Viper 1, this is Hammer, hold bravo", { lang: "en", rules }), "Viper 1, this is Hammer. Hold Bravo.");
+  // An unknown name in front stays as heard.
+  assert.match(normalize("Tango one, this is Hammer, wait, over", { lang: "en", rules }), /^Tango 1, this is Hammer\. Wait\. Over\.$/);
+  // Ordinary words that sound like a point are not renamed.
+  assert.match(normalize("Viper 1, this is Hammer, kill them and hold the gold, over", { lang: "en", rules }), /Kill them and hold the gold\./);
+  assert.ok(similarity("vapour", "viper", "en") > similarity("vapour", "rhino", "en"));
+});
+
+test("tokenizer: both kinds decode ids to text and skip special tokens", () => {
+  const bytes = new Tokenizer({ model: { vocab: { "<s>": 1, "</s>": 2, "Ġ×©×ľ": 5, "×ķ×Ŀ": 6 } }, added_tokens: [{ id: 1 }, { id: 2 }] }, "bytes");
+  assert.equal(bytes.decode([1, 5, 6, 2]), "שלום");
+  const pieces = new Tokenizer({ model: { vocab: { "<s>": 1, "▁Hold": 7, "▁Fox": 8, "trot": 9, "<0x2E>": 10 } }, added_tokens: [{ id: 1 }] }, "pieces");
+  assert.equal(pieces.decode([1, 7, 8, 9, 10]), "Hold Foxtrot.");
+});
+
+test("log-mel: the features of the test recording are the reference's", () => {
+  const mel = new LogMel(parseMelFilters(read("mel_filters.bin"))).compute(readWav(read("testdata/sample-he.wav")).samples);
+  assert.equal(mel.length, 80 * 3000);
+  // Checked equal, value for value, to spec/golden/sample-he.mel.bin of the Ozen project.
+  const at = (i) => Number(mel[i].toFixed(6));
+  assert.deepEqual([at(0), at(1234), at(100000), at(239999)], [0.911415, -0.562888, 0.366259, -0.562888]);
+  assert.equal(Number(mel.reduce((a, v) => a + v, 0).toFixed(1)), -41845.8);
+});
+
+test("a decoder stuck on one phrase is treated as noise", () => {
+  assert.ok(isNoise("thank you ".repeat(10)));
+  assert.ok(!isNoise("Viper 2, this is Hammer. Take your squad to the town and dig in, then tell me what you see. Over."));
+});
+
+test("silence around the speech is cut, with a margin", () => {
+  const audio = new Float32Array(16000 * 5);
+  for (let i = 32000; i < 48000; i++) audio[i] = 0.3 * Math.sin(i / 5);
+  for (let i = 0; i < audio.length; i += 7) audio[i] += 0.0005; // a quiet room
+  const cut = trimSilence(audio);
+  assert.ok(cut.length >= 16000 && cut.length <= 16000 + 2 * 4000 + 1000, `kept ${cut.length} samples`);
+  assert.equal(trimSilence(new Float32Array(16000)).length, 0);
+});
+
+test("models.json names every file with its size and checksum", () => {
+  for (const f of [...manifest.runtime.files, ...Object.values(manifest.models).flatMap((m) => Object.values(m.files))]) {
+    assert.ok(f.path && f.bytes > 0 && /^[0-9a-f]{64}$/.test(f.sha256), JSON.stringify(f));
+  }
+  assert.deepEqual(Object.keys(manifest.models).sort(), ["en", "he"]);
+});
+
+// The real thing: the Hebrew model on a 12 s recording, through the same runtime the
+// page uses (single thread here). Opt-in because it needs 180 MB of weights.
+const root = new URL("../../", import.meta.url);
+const spec = manifest.models.he;
+const weights = Object.values(spec.files).map((f) => new URL(`assets/models/${spec.dir}/${f.path}`, root));
+const runtime = new URL("client/vendor/ort/", root);
+const skip = !process.env.CALLSIGN_VOICE_MODELS ? "set CALLSIGN_VOICE_MODELS=1 (make voice-test)" : !weights.every(existsSync) || !existsSync(new URL("ort.wasm.min.mjs", runtime)) ? "weights are not here: make voice-models" : false;
+
+test("the Hebrew model transcribes the test recording word for word", { skip }, async () => {
+  const ort = await import(new URL("ort.wasm.min.mjs", runtime));
+  ort.env.wasm.numThreads = 1;
+  ort.env.wasm.wasmBinary = readFileSync(new URL("ort-wasm-simd-threaded.wasm", runtime));
+  ort.env.logLevel = "error";
+  const [enc, dec, tok] = weights.map((u) => readFileSync(u));
+  const r = new Recognizer({
+    ort,
+    encoder: await ort.InferenceSession.create(enc, { executionProviders: ["wasm"] }),
+    decoder: await ort.InferenceSession.create(dec, { executionProviders: ["wasm"] }),
+    tokenizer: new Tokenizer(JSON.parse(tok), spec.tokenizer),
+    spec,
+    melFilters: parseMelFilters(read("mel_filters.bin")),
+  });
+  const text = await r.transcribe(readWav(read("testdata/sample-he.wav")).samples);
+  assert.equal(text, "אני הייתי, נגיד, אומר דבר כזה. קודם כל הייתי רוצה לתאר את החברה, זאת אומרת, מה החברה עושה, מה הטכנולוגיה, מה האתגרים שלך.");
+});

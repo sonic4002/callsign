@@ -6,6 +6,8 @@
 import { drawUnit, loadSprites } from "./art.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
+import { normalize } from "./voice/normalize.js";
+import { Voice } from "./voice/voice.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -40,6 +42,7 @@ function applyLanguage() {
   for (const node of document.querySelectorAll("[data-i18n-placeholder]")) node.placeholder = t(node.dataset.i18nPlaceholder);
   for (const node of document.querySelectorAll("[data-i18n-aria]")) node.setAttribute("aria-label", t(node.dataset.i18nAria));
   syncInputDirection();
+  renderVoice();
   renderLog();
   drawn.roster = drawn.build = "";
   renderSidebar();
@@ -184,10 +187,86 @@ function draft(text) {
   $("text").focus();
 }
 
+// Calls already sent, oldest first. Up and Down in the box walk through them.
+const sent = [];
+let recall = 0; // index into `sent`; sent.length means the box holds a new call
+let unsent = "";
+
 $("send").addEventListener("submit", (ev) => {
   ev.preventDefault();
-  if (transmit($("text").value.trim())) draft("");
+  const text = $("text").value.trim();
+  if (!transmit(text)) return;
+  if (sent.at(-1) !== text) sent.push(text);
+  recall = sent.length;
+  draft("");
 });
+
+$("text").addEventListener("keydown", (ev) => {
+  if (ev.key !== "ArrowUp" && ev.key !== "ArrowDown") return;
+  const next = recall + (ev.key === "ArrowUp" ? -1 : 1);
+  if (next < 0 || next > sent.length) return;
+  ev.preventDefault();
+  if (recall === sent.length) unsent = $("text").value;
+  recall = next;
+  draft(recall === sent.length ? unsent : sent[recall]);
+});
+
+// ---- voice ----
+// Push-to-talk: hold the button, or the key left of 1, and speak a call. It is recognised
+// in this browser, tidied into procedure, and put in the box to check and send.
+
+let voiceState = "idle";
+let voiceDetail = {};
+let wasMuted = null; // the music's mute switch before we started listening
+const voice = new Voice({
+  onState(next, detail = {}) {
+    voiceState = next;
+    voiceDetail = detail;
+    renderVoice();
+  },
+});
+
+function renderVoice() {
+  const status = $("voice-status");
+  status.hidden = voiceState === "idle";
+  status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
+  status.className = ["unsupported", "denied", "missing", "failed"].includes(voiceState) ? "warn" : "";
+  $("ptt").title = t("voiceHint");
+  $("ptt").classList.toggle("live", voiceState === "listening");
+  $("ptt").classList.toggle("busy", ["asking", "loading", "working"].includes(voiceState));
+}
+
+function talk() {
+  if (role === "spectator" || voice.held) return;
+  if (wasMuted === null) {
+    wasMuted = music.muted; // the music would be heard as speech
+    music.setMuted(true);
+  }
+  voice.start(lang);
+}
+
+async function talkEnd() {
+  if (wasMuted !== null) music.setMuted(wasMuted);
+  wasMuted = null;
+  if (!voice.held) return;
+  const spoke = lang;
+  const text = await voice.stop(spoke);
+  if (text && rules) draft(normalize(text, { lang: spoke, rules }));
+}
+
+$("ptt").addEventListener("pointerdown", (ev) => {
+  ev.preventDefault();
+  $("ptt").setPointerCapture(ev.pointerId);
+  talk();
+});
+for (const kind of ["pointerup", "pointercancel"]) $("ptt").addEventListener(kind, talkEnd);
+addEventListener("keydown", (ev) => {
+  if (ev.code !== "Backquote" || ev.ctrlKey || ev.altKey || ev.metaKey) return;
+  ev.preventDefault();
+  if (!ev.repeat) talk();
+});
+addEventListener("keyup", (ev) => ev.code === "Backquote" && talkEnd());
+addEventListener("blur", talkEnd);
 
 $("restart").addEventListener("click", () => open() && ws.send(JSON.stringify({ type: "restart" })));
 

@@ -86,6 +86,11 @@ button.primary:hover:not(:disabled) { background: #f4c552; }
   border: 1px solid var(--edge-hi); padding: .45rem .6rem;
 }
 #text:focus { outline: 1px solid var(--brass); }
+#ptt { touch-action: none; user-select: none; -webkit-user-select: none; }
+#ptt.live { background: var(--warn); color: #0a100f; }
+#ptt.busy { opacity: .6; }
+#voice-status { margin: .35rem 0 0; font-size: .85em; color: #6f8d83; }
+#voice-status.warn { color: var(--warn); }
 
 /* ---- sidebar ---- */
 #sidebar {

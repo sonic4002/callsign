@@ -3,7 +3,7 @@ IMAGE  := callsign-dev
 DOCKER := docker run --rm --init -u $(shell id -u):$(shell id -g) -e HOME=/tmp \
           -v $(CURDIR):/src -v callsign-gocache:/gocache -w /src
 
-.PHONY: image test play stop shell art-image art-models art
+.PHONY: image test play stop shell voice-models voice-test art-image art-models art art-units-image art-units
 
 # Build the dev image. Needed once, and again only when go.mod, go.sum or
 # agents/package-lock.json changes.
@@ -28,6 +28,15 @@ stop:
 shell:
 	$(DOCKER) -it $(IMAGE) bash
 
+# Download the in-browser speech recognisers (Hebrew and English) and their runtime, about
+# 245 MB, into assets/models/ and client/vendor/ort/. Pinned versions, checked by SHA-256.
+voice-models:
+	$(DOCKER) $(IMAGE) node client/voice/fetch-models.mjs
+
+# Transcribe the test recording with the real models (needs voice-models first).
+voice-test:
+	$(DOCKER) --network none -e CALLSIGN_VOICE_MODELS=1 $(IMAGE) node --test client/voice/voice.test.mjs
+
 # ---- art: sprites generated on this machine's GPU (see art/ and assets/sprites/CREDITS.md) ----
 ART := docker run --rm --init -u $(shell id -u):$(shell id -g) -v $(CURDIR):/src
 
@@ -46,3 +55,14 @@ art-models:
 art:
 	$(ART) --network none --device nvidia.com/gpu=all -v callsign-art-models:/models:ro callsign-art \
 		sh -c 'python art/generate.py && python art/cleanup.py'
+
+# ---- unit sheets: animated units rendered from models built in code (art/units.py) ----
+
+# Build the Blender image. About 2.7 GB.
+art-units-image:
+	docker build -t callsign-blender -f art/Dockerfile.blender art
+
+# Render every unit's sprite sheets into assets/sprites/units. Runs on the CPU with the
+# network off, in well under a minute.
+art-units:
+	$(ART) -e HOME=/tmp --network none -w /src callsign-blender python art/units.py

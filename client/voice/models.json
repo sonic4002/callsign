@@ -1,0 +1,49 @@
+{
+  "runtime": {
+    "name": "onnxruntime-web",
+    "version": "1.30.0",
+    "licence": "MIT",
+    "source": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/",
+    "dir": "client/vendor/ort",
+    "files": [
+      { "path": "ort.wasm.min.mjs", "bytes": 50126, "sha256": "219e6a1fc8a9938268d18efca3c91d310bd2f4a59bbd13744df5b2b7fc6cee3b" },
+      { "path": "ort-wasm-simd-threaded.mjs", "bytes": 24381, "sha256": "e13f7f94fc51b4ca72b12faeb1ee95f4ace6dfbc8939bc718aabdc0a27c4299b" },
+      { "path": "ort-wasm-simd-threaded.wasm", "bytes": 14239897, "sha256": "3398c10d07d229bd91b364548e130e0e51a8e5704b88c7c083ebbeb78842dee2" }
+    ]
+  },
+  "models": {
+    "he": {
+      "name": "itayinbar/Ozen-v1",
+      "licence": "Apache-2.0",
+      "revision": "82aae03decb5592029922ea15e19ed96d1e8ece3",
+      "dir": "ozen-v1",
+      "kind": "whisper",
+      "tokenizer": "bytes",
+      "heads": 8,
+      "headDim": 64,
+      "maxTokens": 220,
+      "files": {
+        "encoder": { "path": "onnx/encoder_model_fp16.onnx", "bytes": 79134919, "sha256": "ec63a2dab9fe408baab3d7f16bf8316e7988c8982ba86f427354fb4a3b8b613b" },
+        "decoder": { "path": "onnx/decoder_model_merged.onnx", "bytes": 85187076, "sha256": "e490fa4dd2f15b859ad5b7c94c3fdbe819262bebd18680a7742fed1ec863386b" },
+        "tokenizer": { "path": "tokenizer.json", "bytes": 703265, "sha256": "050f0aff338e5779ebe80f25c760da76857e009dc17c2caef8424d613ee7dbfa" }
+      }
+    },
+    "en": {
+      "name": "onnx-community/moonshine-base-ONNX",
+      "licence": "MIT",
+      "revision": "b1e9b6aae3c3c7298f10c3798393fdf38e8fbbad",
+      "dir": "moonshine-base",
+      "kind": "moonshine",
+      "tokenizer": "pieces",
+      "heads": 8,
+      "headDim": 52,
+      "maxTokens": 194,
+      "tokensPerSecond": 6.5,
+      "files": {
+        "encoder": { "path": "onnx/encoder_model_quantized.onnx", "bytes": 20513063, "sha256": "1dd9ab0a7f987113d30affcba5a068d11c8f90fa0223caa3e491ade431ad9751" },
+        "decoder": { "path": "onnx/decoder_model_merged_quantized.onnx", "bytes": 42498870, "sha256": "cc9f3cd6698a369c6008b41aa60aa3fb3322e7f03c9bdf19d8e6b7200afca4f3" },
+        "tokenizer": { "path": "tokenizer.json", "bytes": 3761754, "sha256": "7b913404bdd039af4756783218af4440bc07fb7d6d8258d677e34f95b3ec416f" }
+      }
+    }
+  }
+}

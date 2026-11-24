@@ -23,6 +23,7 @@ const dynamic = {
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer"],
   "order.": ["none", "move", "hold", "attack"],
   "call.": ["hold", "move", "attack", "buy", "upgrade"],
+  "voice.": ["asking", "loading", "listening", "working", "unsupported", "denied", "missing", "nothing", "failed"],
   "class.": classes,
   "side.": ["0", "1"],
 };

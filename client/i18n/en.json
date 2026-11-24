@@ -65,5 +65,16 @@
   "over.lost": "Defeat",
   "over.draw": "Draw",
   "over.hq_destroyed": "A headquarters was destroyed.",
-  "over.timer": "Time ran out; points held decided it."
+  "over.timer": "Time ran out; points held decided it.",
+  "voiceButton": "Hold to talk",
+  "voiceHint": "Hold to talk, or hold the ` key (left of 1). The speech is recognised on this device.",
+  "voice.asking": "Waiting for the microphone…",
+  "voice.loading": "Loading the speech model: {percent}%",
+  "voice.listening": "Listening. Release to finish.",
+  "voice.working": "Transcribing…",
+  "voice.unsupported": "This browser cannot record from the microphone here.",
+  "voice.denied": "The microphone is blocked. Allow it for this page in the browser's site settings.",
+  "voice.missing": "The speech models are not installed on this server. Run: make voice-models",
+  "voice.nothing": "Heard nothing. Hold the button while you speak.",
+  "voice.failed": "Speech recognition failed: {message}"
 }
