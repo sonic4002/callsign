@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { STEPS, advance, answered, bought, canGoOn, engaged, holds, indexOf, nearest, ordered, released, upgraded, stands, hauling } from "./lesson.js";
+import { STEPS, advance, answered, bought, canGoOn, engaged, holds, indexOf, nearest, ordered, placed, released, upgraded, stands, hauling } from "./lesson.js";
 
 const rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8"));
 rules.map ??= rules.maps.small; // the default map, as the server sends it to a page
@@ -67,9 +67,19 @@ test("the answer step offers Next only once a squad has answered", () => {
   assert.equal(answered(match({ log: [say(viper1, { key: "operator" }, "Anvil, this is Viper 1. Contact. Over.")] })), false);
 });
 
-test("the refinery and its hauler, the barracks, buying, the squad arriving and the upgrade are read from the match", () => {
+test("the power structure, the refinery and its hauler, the barracks, buying, the squad arriving and the upgrade are read from the match", () => {
   const c = match();
   const built = (role, more = {}) => ({ id: `s-${role}`, kind: role, role, side: 0, building: 1, ...more });
+  // The power structure is done with as soon as it is on the map: the lesson does not
+  // wait for it to finish before the refinery is placed.
+  assert.equal(advance(indexOf("power"), c), indexOf("power"));
+  const powered = match();
+  powered.state.structures = [built("power", { building: 0.2 })];
+  assert.equal(placed(powered, "power"), true);
+  assert.equal(advance(indexOf("power"), powered), indexOf("refinery"));
+  const theirPower = match();
+  theirPower.state.structures = [built("power", { side: 1 })];
+  assert.equal(placed(theirPower, "power"), false);
   assert.equal(advance(indexOf("refinery"), c), indexOf("refinery"));
   // Going up is not standing, and a refinery with no hauler out yet is not an economy.
   const rising = match();
@@ -126,14 +136,16 @@ test("the fight: a squad sent at a named enemy, by click, by voice or by typing"
 
 test("skip ends any step, steps already done are passed over, and the lesson ends after the last", () => {
   const c = match();
+  assert.equal(advance(indexOf("power"), c, { skip: true }), indexOf("refinery"));
   assert.equal(advance(indexOf("refinery"), c, { skip: true }), indexOf("fog"));
   // Everything up to the fight was done ahead of the coach: reading steps still wait.
   const ahead = match({ selected: 1, log: [say(player, viper1, "Viper 1 hold Delta"), say(viper1, player, "Wilco")] });
-  ahead.state.structures = ["refinery", "barracks"].map((role) => ({ id: role, kind: role, role, side: 0, building: 1 }));
+  ahead.state.structures = ["power", "refinery", "barracks"].map((role) => ({ id: role, kind: role, role, side: 0, building: 1 }));
   ahead.state.haulers = [{ id: 1001, side: 0, state: "out" }];
   ahead.state.squads.push(squad(5, { tier: 2 }));
   assert.equal(advance(indexOf("select"), ahead), indexOf("answer"));
-  assert.equal(advance(indexOf("orders"), ahead, { next: true }), indexOf("fog"));
+  assert.equal(advance(indexOf("orders"), ahead, { next: true }), indexOf("cover"));
+  assert.equal(advance(indexOf("cover"), ahead, { next: true }), indexOf("fog"));
   assert.equal(advance(indexOf("fog"), ahead, { next: true }), indexOf("deploy"));
   const last = STEPS.length - 1;
   assert.equal(STEPS[last].id, "win");

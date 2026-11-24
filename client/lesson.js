@@ -26,6 +26,8 @@ export const answered = (c) => said(c, (m) => Boolean(m.from?.squad) && (m.to ??
 export const holds = (c, id) => (c.state?.points ?? []).some((p) => p.id === id && p.owner === c.side);
 // stands: this side has a finished structure of a role (a refinery, a barracks).
 export const stands = (c, role) => (c.state?.structures ?? []).some((s) => s.side === c.side && s.role === role && !s.ruin && s.building >= 1);
+// placed: this side has put a structure of a role on the map, standing or still going up.
+export const placed = (c, role) => (c.state?.structures ?? []).some((s) => s.side === c.side && s.role === role && !s.ruin);
 // hauling: the refinery stands and its hauler has come out of it.
 export const hauling = (c) => stands(c, "refinery") && (c.state?.haulers ?? []).some((h) => h.side === c.side);
 // bought: a squad beyond the ones the match started with is on its way or in the field.
@@ -65,9 +67,13 @@ export const STEPS = [
   { id: "order", touch: true, mark: "first", focus: "#send", done: ordered },
   { id: "answer", manual: true, focus: "#log", tab: "radio", ready: answered },
   { id: "orders", manual: true },
+  { id: "cover", manual: true },
+  // The base, in the order every base opens in: power, the refinery, the barracks. Each
+  // is placed with the ghost; the refinery's step ends when its hauler has driven out.
+  { id: "power", touch: true, focus: "#structures", tab: "build", pane: "structures", done: (c) => placed(c, "power") },
   { id: "refinery", touch: true, focus: "#structures", tab: "build", pane: "structures", done: hauling },
   { id: "fog", manual: true },
-  { id: "barracks", touch: true, focus: "#structures", tab: "build", pane: "structures", done: (c) => stands(c, "barracks") },
+  { id: "barracks", focus: "#structures", tab: "build", pane: "structures", done: (c) => stands(c, "barracks") },
   { id: "buy", touch: true, focus: "#build", tab: "build", pane: "units", done: bought },
   { id: "deploy", manual: true, focus: "#roster", tab: "squads", ready: arrived },
   { id: "upgrade", touch: true, focus: "#roster", tab: "squads", done: upgraded },

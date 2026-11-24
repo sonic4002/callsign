@@ -980,6 +980,8 @@ function renderStructures(canAct) {
     if (!button) continue;
     button.querySelector(".fill").style.blockSize = card.state === "rising" ? `${card.progress * 100}%` : "0";
     button.classList.toggle("requested", card.state !== "rising" && waiting(`s:${card.id}`).length > 0);
+    // What a base usually builds next, as the game works it out: marked, never pressed for.
+    button.classList.toggle("next", Boolean(me) && card.def.role === state.opening && ["ready", "poor"].includes(card.state));
     if (card.state === "rising") button.querySelector(".why").textContent = t("structure.rising", { percent: Math.round(card.progress * 100) });
   }
   renderRally(canAct);

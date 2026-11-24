@@ -492,3 +492,6 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   #sidebar > .panel[data-sheet="build"] { flex: 0 1 auto; min-block-size: 9rem; max-block-size: 40%; overflow-y: auto; }
   #sidebar > footer.panel, #sidebar > #music { flex: none; }
 }
+/* The structure a base usually builds next (the opening): a brass corner, nothing louder. */
+#structures button.next { border-color: var(--brass); }
+#structures button.next::before { content: ""; position: absolute; inset-block-start: 0; inset-inline-start: 0; border: .4rem solid transparent; border-block-start-color: var(--brass); border-inline-start-color: var(--brass); }
