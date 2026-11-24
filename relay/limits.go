@@ -19,6 +19,9 @@ type Limits struct {
 // DefaultLimits fits a full army in a hard fight with room to spare.
 var DefaultLimits = Limits{Concurrent: 8, PerMinute: 120, Burst: 30, KeyChanges: 20, Idle: 10 * time.Minute}
 
+// maxSeats is the most seats counted at once, which bounds the relay's memory.
+const maxSeats = 50_000
+
 type seatUse struct {
 	inFlight int
 	tokens   float64 // thoughts that may start now
@@ -51,6 +54,11 @@ func (l *limiter) use(seat string) *seatUse {
 				}
 			}
 		}
+		if len(l.seats) >= maxSeats {
+			// A flood of made-up tokens: no new seat is counted, and so none is served,
+			// until old ones go idle. Seats already known are not affected.
+			return nil
+		}
 		u = &seatUse{tokens: float64(l.Burst), keyOps: float64(l.KeyChanges), seen: now}
 		l.seats[seat] = u
 		return u
@@ -68,6 +76,9 @@ func (l *limiter) begin(seat string) (ok bool, wait time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	u := l.use(seat)
+	if u == nil {
+		return false, time.Minute
+	}
 	if u.inFlight >= l.Concurrent {
 		return false, time.Second
 	}
@@ -92,7 +103,7 @@ func (l *limiter) keyOp(seat string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	u := l.use(seat)
-	if u.keyOps < 1 {
+	if u == nil || u.keyOps < 1 {
 		return false
 	}
 	u.keyOps--
