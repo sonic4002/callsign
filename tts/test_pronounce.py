@@ -47,7 +47,10 @@ class Pronounce(unittest.TestCase):
         self.assertEqual(fix(text, text, heard, "he"), "<he>maɡˈa lejˈad fˈɑːkstɹɑːt, ʔavˈoʁ</he>")
 
     def test_every_hebrew_callsign_and_point_is_in_the_table(self):
-        names = [p["callsign"]["he"] for p in RULES["map"]["points"]]
+        names = [p["callsign"]["he"] for m in RULES["maps"].values() for p in m["points"]]
+        # The landmark words too, but for "בית": it is read two ways (bayit, and beit in
+        # "בית זיקוק"), and the reader tells them apart better than a table can.
+        names += [k["word"]["he"] for k in RULES["landmarkKinds"].values() if k["word"]["he"] != "בית"]
         names += [c["he"] for c in RULES["callsigns"]["classes"].values()]
         names += [RULES["callsigns"]["player"]["he"], RULES["callsigns"]["operator"]["he"]]
         self.assertEqual([n for n in names if n not in TABLE["he"]], [])

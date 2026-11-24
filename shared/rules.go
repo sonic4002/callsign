@@ -172,11 +172,17 @@ type Bridge struct {
 // Map is one battlefield. Terrain is a grid of Cell-sized squares, one letter each, row
 // by row from the north; the letters are the keys of Rules.TerrainKinds.
 type Map struct {
-	ID        string     `json:"id"`
-	Name      Text       `json:"name"`
-	Width     float64    `json:"width"`
-	Height    float64    `json:"height"`
-	Cell      float64    `json:"cell"`
+	ID     string  `json:"id"`
+	Name   Text    `json:"name"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+	Cell   float64 `json:"cell"`
+	// LengthSeconds is how long a match on this map lasts when nobody chose a length: a
+	// bigger map takes longer to cross. 0 uses the match default.
+	LengthSeconds int `json:"lengthSeconds,omitempty"`
+	// Pace multiplies how fast everything moves on this map, so that a bigger map does
+	// not turn a match into a long walk. 0 means 1.
+	Pace      float64    `json:"pace,omitempty"`
 	Terrain   []string   `json:"terrain"`
 	Points    []Point    `json:"points"`
 	Gushers   []Gusher   `json:"gushers"`

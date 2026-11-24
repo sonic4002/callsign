@@ -44,8 +44,8 @@ RICH = {"ratePerSecond": 18, "fieldRadius": 70, "fieldCap": 2400, "startGold": 1
 
 
 class Map:
-    def __init__(self, key, name, cols, rows):
-        self.key, self.name, self.cols, self.rows = key, name, cols, rows
+    def __init__(self, key, name, cols, rows, minutes=10, pace=1):
+        self.key, self.name, self.cols, self.rows, self.minutes, self.pace = key, name, cols, rows, minutes, pace
         self.w, self.h = cols * CELL, rows * CELL
         self.grid = [["L"] * cols for _ in range(rows)]
         self.points, self.bridges, self.marks, self.fields = [], [], [], []
@@ -208,7 +208,7 @@ class Map:
         self.check()
         return {
             "name": {"en": self.name[0], "he": self.name[1]},
-            "width": self.w, "height": self.h, "cell": CELL,
+            "width": self.w, "height": self.h, "cell": CELL, "lengthSeconds": self.minutes * 60, "pace": self.pace,
             "terrain": ["".join(row) for row in self.grid],
             "points": self.points,
             "gushers": self.fields,
@@ -273,7 +273,7 @@ def small():
 
 
 def medium():
-    m = Map("medium", ("Frozen River", "הנהר הקפוא"), 60, 38)
+    m = Map("medium", ("Frozen River", "הנהר הקפוא"), 60, 38, minutes=15, pace=1.5)
     m.rect(400, 0, 1040, 160, "M")           # the northern range, open at the pass
     m.rect(0, 1280, 2400, 1520, "W")         # the sea
     m.rect(1120, 160, 1200, 1280, "W")       # the river
@@ -315,7 +315,7 @@ def medium():
 
 
 def large():
-    m = Map("large", ("Mountain Passes", "מעברי ההרים"), 80, 50)
+    m = Map("large", ("Mountain Passes", "מעברי ההרים"), 80, 50, minutes=20, pace=1.9)
     m.rect(1440, 0, 1600, 1400, "M")         # the central range
     m.rect(1440, 120, 1600, 320, "L")        # north pass
     m.rect(1440, 520, 1600, 720, "L")        # middle pass
@@ -375,7 +375,7 @@ def write(maps):
     blocks = []
     for key, d in maps.items():
         lines = [f'    "{key}": {{', f'      "name": {one(d["name"])},',
-                 f'      "width": {d["width"]}, "height": {d["height"]}, "cell": {d["cell"]},', '      "terrain": [']
+                 f'      "width": {d["width"]}, "height": {d["height"]}, "cell": {d["cell"]}, "lengthSeconds": {d["lengthSeconds"]}, "pace": {d["pace"]},', '      "terrain": [']
         lines += [f'        "{row}"' + ("," if i < len(d["terrain"]) - 1 else "") for i, row in enumerate(d["terrain"])]
         lines.append("      ],")
         for field in ("points", "gushers", "bridges", "landmarks"):

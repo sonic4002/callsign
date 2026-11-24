@@ -512,11 +512,12 @@ func TestAGarrisonIsHiddenUntilCloseOrFiring(t *testing.T) {
 	}
 }
 
-// fight puts militia against commandos at the ridge and returns how many commandos and
-// militia are left after a minute. The commandos are in the bunker or in the open.
-func fight(t *testing.T, garrisoned bool) (commandos, militia int) {
+// fight puts militia against commandos at the ridge and returns the health the commandos
+// and the militia have left after a minute. The commandos are in the bunker or in the open.
+func fight(t *testing.T, garrisoned bool, seed uint64) (commandos, militia float64) {
 	t.Helper()
-	s, _ := simOn(t, rules, "small", sim.Config{Seed: 7})
+	// No base: its buildings would stand where the attackers are put down.
+	s, _ := simOn(t, rules, "small", sim.Config{Seed: seed, Base: []string{}})
 	place(s.Squad(1), 450, 600)
 	if garrisoned {
 		must(t, s, sim.Command{Side: 0, Kind: sim.CmdHold, Squad: 1, Place: "D-bunker-1"})
@@ -535,24 +536,30 @@ func fight(t *testing.T, garrisoned bool) (commandos, militia int) {
 		}
 	}
 	run(s, 60)
-	if sq := s.Squad(1); sq != nil {
-		commandos, _ = sq.Strength()
-	}
-	for _, id := range []int{3, 4} {
+	health := func(id int) (hp float64) {
 		if sq := s.Squad(id); sq != nil {
-			n, _ := sq.Strength()
-			militia += n
+			for i := range sq.Teams {
+				hp += math.Max(0, sq.Teams[i].HP)
+			}
 		}
+		return hp
 	}
-	return commandos, militia
+	return health(1), health(3) + health(4)
 }
 
+// Over several fights, so that one lucky minute does not decide it: health left is
+// counted, not heads, because a short fight may kill nobody either way.
 func TestABuildingProtectsItsGarrison(t *testing.T) {
-	inC, inM := fight(t, true)
-	outC, outM := fight(t, false)
-	t.Logf("in the bunker: %d commandos and %d militia left; in the open: %d and %d", inC, inM, outC, outM)
+	var inC, inM, outC, outM float64
+	for seed := uint64(7); seed < 13; seed++ {
+		c, m := fight(t, true, seed)
+		inC, inM = inC+c, inM+m
+		c, m = fight(t, false, seed)
+		outC, outM = outC+c, outM+m
+	}
+	t.Logf("in the bunker: commandos keep %.0f health and militia %.0f; in the open: %.0f and %.0f", inC, inM, outC, outM)
 	if inC-inM <= outC-outM {
-		t.Fatalf("a bunker made no difference: %d:%d inside against %d:%d in the open", inC, inM, outC, outM)
+		t.Fatalf("a bunker made no difference: %.0f:%.0f inside against %.0f:%.0f in the open", inC, inM, outC, outM)
 	}
 }
 
@@ -779,7 +786,11 @@ func TestFactionsAreRoughlyEvenOnEveryMap(t *testing.T) {
 		seeds, limit = v, 0.55
 	}
 	for _, id := range rules.MapIDs() {
+		if only := os.Getenv("CALLSIGN_BALANCE_MAP"); only != "" && only != id {
+			continue // one map at a time, while tuning
+		}
 		wins, games, hq := map[string]int{}, 0, 0
+		how := map[string]int{} // how the matches ended, and for whom
 		for _, factions := range [][2]string{{"aegis", "ashfall"}, {"ashfall", "aegis"}} {
 			for seed := 1; seed <= seeds; seed++ {
 				s, _ := playOn(t, id, uint64(seed), factions)
@@ -790,12 +801,67 @@ func TestFactionsAreRoughlyEvenOnEveryMap(t *testing.T) {
 				if s.Reason == "hq_destroyed" {
 					hq++
 				}
+				if s.Winner != sim.NoSide {
+					how[[]string{"west", "east"}[s.Winner]]++
+					how[s.Reason+" "+factions[s.Winner]]++
+				} else {
+					how["draw"]++
+				}
 			}
 		}
-		t.Logf("%s: %d games: %v, %d by a fallen headquarters", id, games, wins, hq)
+		t.Logf("%s: %d games: %v, %d by a fallen headquarters; %v", id, games, wins, hq, how)
 		for faction, n := range wins {
 			if share := float64(n) / float64(games); share > limit {
 				t.Errorf("%s: %s won %d of %d scripted matches (%.0f%%), over the %.0f%% limit", id, faction, n, games, 100*share, 100*limit)
+			}
+		}
+	}
+}
+
+// Every level of the scripted enemy plays the whole game on every map, from a bare
+// headquarters: it builds a refinery, its hauler brings gold home, it raises squads from
+// a barracks it built, and it takes a point. No command of its is refused on the way.
+func TestEveryEnemyLevelPlaysTheWholeGameOnEveryMap(t *testing.T) {
+	for _, id := range rules.MapIDs() {
+		for _, style := range []string{bot.Easy, bot.Normal, bot.Standard} {
+			s, r := simOn(t, rules, id, sim.Config{Seed: 5, Factions: [2]string{"aegis", "ashfall"}, Base: []string{}})
+			players := [2]*bot.Player{{Side: 0, Style: bot.Standard, R: r}, {Side: 1, Style: style, R: r}}
+			built, squads, captured, most := map[string]bool{}, 0, 0, 0 // most: the most gold it held at once
+			for !s.Over {
+				if s.Tick%r.TickRate == 0 {
+					for _, p := range players {
+						for _, c := range p.Act(s.Snapshot(p.Side)) {
+							if _, err := s.Apply(c); err != nil {
+								t.Fatalf("%s, %s enemy, tick %d: command %+v refused: %v", id, style, s.Tick, c, err)
+							}
+						}
+					}
+					most = max(most, s.Gold(1))
+				}
+				for _, ev := range s.Step() {
+					if ev.Side != 1 {
+						continue
+					}
+					switch ev.Kind {
+					case sim.EvSquadSpawned:
+						squads++
+					case sim.EvCaptured:
+						captured++
+					}
+				}
+			}
+			for _, st := range s.Snapshot(1).Structures {
+				if st.Side == 1 {
+					built[st.Role] = true
+				}
+			}
+			t.Logf("%s, %s enemy: structures %v, %d squads raised, %d points taken, most gold in hand %d, ended by %s", id, style, built, squads, captured, most, s.Reason)
+			if !built["refinery"] || !built["barracks"] {
+				t.Errorf("%s, %s enemy: built %v, wanted at least a refinery and a barracks", id, style, built)
+			}
+			// It starts with two squads: a third was bought, from a barracks it built itself.
+			if squads < 3 || captured == 0 {
+				t.Errorf("%s, %s enemy: %d squads raised, %d points taken", id, style, squads, captured)
 			}
 		}
 	}

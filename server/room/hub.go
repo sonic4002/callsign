@@ -434,7 +434,7 @@ func (h *Hub) mapList() []map[string]any {
 	out := []map[string]any{}
 	for _, id := range h.r.MapIDs() {
 		m := h.r.Maps[id]
-		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points)})
+		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points), "length": m.LengthSeconds})
 	}
 	return out
 }

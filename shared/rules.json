@@ -52,7 +52,7 @@
   "maps": {
     "small": {
       "name": {"en": "Twin Bridges", "he": "שני הגשרים"},
-      "width": 1600, "height": 1000, "cell": 40,
+      "width": 1600, "height": 1000, "cell": 40, "lengthSeconds": 600, "pace": 1,
       "terrain": [
         "LLLLLLLLLLLLLLMMMLWWWWLMMMLLLLLLLLLLLLLL",
         "LLLLLLLLLLLLLLMMMLWWWWLMMMLLLLLLLLLLLLLL",
@@ -132,7 +132,7 @@
     },
     "medium": {
       "name": {"en": "Frozen River", "he": "הנהר הקפוא"},
-      "width": 2400, "height": 1520, "cell": 40,
+      "width": 2400, "height": 1520, "cell": 40, "lengthSeconds": 900, "pace": 1.5,
       "terrain": [
         "LLLLLLLLLLMMMMMMMMMMMMMMMMLLLLLLLLMMMMMMMMMMMMMMMMLLLLLLLLLL",
         "LLLLLLLLLLMMMMMMMMMMMMMMMMLLLLLLLLMMMMMMMMMMMMMMMMLLLLLLLLLL",
@@ -245,7 +245,7 @@
     },
     "large": {
       "name": {"en": "Mountain Passes", "he": "מעברי ההרים"},
-      "width": 3200, "height": 2000, "cell": 40,
+      "width": 3200, "height": 2000, "cell": 40, "lengthSeconds": 1200, "pace": 1.9,
       "terrain": [
         "MMMMMMMMLLLLLLLLLLLLLLLLLLLLLLLLLLLLMMMMMMMMLLLLLLLLLLLLLLLLLLLLLLLLLLLLMMMMMMMM",
         "MMMMMMMMLLLLLLLLLLLLLLLLLLLLLLLLLLLLMMMMMMMMLLLLLLLLLLLLLLLLLLLLLLLLLLLLMMMMMMMM",
@@ -550,9 +550,9 @@
           "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
           "requires": "barracks",
           "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3,
-          "teams": 4, "members": 3, "hp": 40, "armor": 0,
+          "teams": 4, "members": 3, "hp": 41, "armor": 0,
           "speed": 30, "range": 160, "sight": 265,
-          "damage": 9, "cooldownTicks": 8, "accuracy": 0.5, "nerveResist": 0.8,
+          "damage": 9, "cooldownTicks": 8, "accuracy": 0.46, "nerveResist": 0.8,
           "vs": { "air": 0.4, "structure": 0.25, "fence": 0.5 }
         },
         "technical": {

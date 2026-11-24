@@ -256,6 +256,7 @@ func (s *Sim) Hash() uint64 {
 	for i := range s.Sides {
 		put(uint64(s.Sides[i].goldUnit))
 		f(s.Sides[i].HQHP)
+		f(s.Sides[i].Destroyed)
 		h.Write(s.Sides[i].explored)
 		f(s.Sides[i].enemyHQ)
 		for _, m := range s.Sides[i].points {

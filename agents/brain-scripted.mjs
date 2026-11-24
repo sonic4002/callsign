@@ -184,7 +184,7 @@ function ownMoves({ wake, rules, agent }) {
     tasked.set(`${agent.side}:${sq.callsign.en}`, s.timeLeft);
     const domain = units.find(([id]) => id === sq.unit)?.[1].domain;
     const goal = rules.map.points
-      .filter((p) => p.kind !== "hq" && !mine(p) && !taken.has(p.id) && (domain === "air" || (domain === "sea") === p.y >= rules.map.waterY))
+      .filter((p) => p.kind !== "hq" && !mine(p) && !taken.has(p.id) && (domain === "air" || (domain === "sea") === (p.kind === "seaRig")))
       .sort((a, b) => Math.hypot(a.x - sq.x, a.y - sq.y) - Math.hypot(b.x - sq.x, b.y - sq.y))[0];
     if (goal) taken.add(goal.id);
     if (goal) moves.push(radio([sq.callsign.en], lang === "he" ? `תחזיקו את ${goal.callsign.he}` : `Hold ${goal.callsign.en}`, "over"));

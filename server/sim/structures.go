@@ -984,6 +984,7 @@ func (s *Sim) destroy(st *Structure) {
 	st.Ruin, st.HP, st.BuildTicks = true, 0, 0
 	s.blockGround(st, false)
 	owner := st.Side
+	s.Sides[1-owner].Destroyed += float64(st.def.Cost)
 	for side := range s.Sides {
 		if side != owner && !st.seen[side].Visible {
 			continue // the other side learns of it when it next looks

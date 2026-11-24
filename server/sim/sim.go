@@ -58,8 +58,11 @@ type Side struct {
 	Faction  string
 	goldUnit int64 // gold × tick rate, so income per tick stays a whole number
 	HQHP     float64
-	nextNum  map[string]int // next callsign number per unit class
-	hqAlarm  int            // tick of the last "HQ under attack" event
+	// Destroyed is what this side has destroyed of the other's, in gold: fallen soldiers
+	// and vehicles at their share of the squad's cost, and structures at theirs.
+	Destroyed float64
+	nextNum   map[string]int // next callsign number per unit class
+	hqAlarm   int            // tick of the last "HQ under attack" event
 
 	// Fog of war: what this side has seen, and what it last knew.
 	explored []byte        // bitset of fog cells seen at any time
@@ -198,6 +201,9 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		dt:     1 / float64(r.TickRate),
 	}
 	length := cfg.LengthSeconds
+	if length <= 0 {
+		length = r.Map.LengthSeconds // a bigger map is given more time
+	}
 	if length <= 0 {
 		length = r.Match.LengthSeconds
 	}
@@ -548,6 +554,9 @@ func (s *Sim) move(tr *teamRef) {
 		return
 	}
 	speed := tr.u.Speed * s.dt
+	if p := s.R.Map.Pace; p > 0 {
+		speed *= p // a bigger map is crossed faster, so the match keeps its pace
+	}
 	if tr.u.Domain == "land" && s.bridgeAt(t.X, t.Y) == nil {
 		speed *= s.R.TerrainKinds[string(s.R.Map.TerrainAt(t.X, t.Y))].Speed
 	}
@@ -673,6 +682,9 @@ func (s *Sim) resolveDamage(live []*teamRef) {
 		}
 		lost := t.Members - left
 		t.Members = left
+		if lost > 0 {
+			s.Sides[1-tr.sq.Side].Destroyed += float64(tr.u.Cost) * float64(lost) / float64(max(1, tr.u.Teams*tr.u.Members))
+		}
 		t.Stress = math.Min(1, t.Stress+tr.u.NerveResist*
 			(float64(t.misses)*n.PerMiss+float64(t.hits)*n.PerHit+float64(lost)*n.PerMemberLost))
 		if left == 0 {
@@ -847,12 +859,18 @@ func (s *Sim) checkEnd() {
 	case dead1:
 		s.end(0, "hq_destroyed")
 	case s.Tick+1 >= s.lengthTicks:
+		// Points held decide it. Level on points, the healthier headquarters does; level
+		// there too, the side that destroyed more of the other's. Only then is it a draw.
 		a, b := s.PointsHeld(0), s.PointsHeld(1)
+		ha, hb := s.Sides[0].HQHP, s.Sides[1].HQHP
+		da, db := math.Round(s.Sides[0].Destroyed), math.Round(s.Sides[1].Destroyed)
 		switch {
-		case a > b:
-			s.end(0, "timer")
-		case b > a:
-			s.end(1, "timer")
+		case a != b:
+			s.end(b2i(b > a, 1), "timer")
+		case math.Abs(ha-hb) > 0.01*s.R.HQ.HP:
+			s.end(b2i(hb > ha, 1), "timer_hq")
+		case da != db:
+			s.end(b2i(db > da, 1), "timer_force")
 		default:
 			s.end(NoSide, "timer")
 		}
