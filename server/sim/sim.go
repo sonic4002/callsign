@@ -122,13 +122,14 @@ type Team struct {
 	Cover float64
 
 	// The way to where the team is going, when it cannot walk there in a straight line.
-	path     [][2]float64
-	pathGoal int
-	pathVer  int
-	pathMode int
-	pathTick int
-	pathOpen bool // the path gets all the way to where the team is going
-	atPost   bool // standing where its orders put it
+	path      [][2]float64
+	pathGoal  int
+	pathVer   int
+	pathMode  int
+	pathTick  int
+	pathOpen  bool // the path gets all the way to where the team is going
+	pathRound bool // the path was found round the bodies in the way (bodies.go)
+	atPost    bool // standing where its orders put it
 
 	// scratch for the tick being resolved
 	dmg     float64
@@ -139,6 +140,27 @@ type Team struct {
 	// Where the team stood a tick ago, and when a vehicle last ran one of its men down (crush.go).
 	prevX, prevY float64
 	crushTick    int
+
+	// The team's body among the others (bodies.go).
+	dx, dy     float64 // the step it has made this tick
+	pdx, pdy   float64 // the step it made last tick
+	hx, hy     float64 // the way it last wanted to go, as a unit vector; 0 when it wanted to stand
+	jam        int     // ticks in a row it has wanted to move and been blocked
+	lean       int     // the side it goes round what blocks it: +1 or -1, 0 when not chosen
+	leanTick   int     // tick it last went round something
+	yield      int     // it stands aside for a friend until this tick
+	detour     int     // its path goes round the bodies in its way until this tick
+	detourNext int     // it does not look for a way round again before this tick
+	detourAll  bool    // the way round avoids standing friends too
+	// The spot it has claimed to stand on (post): for which place, where, since when (the
+	// older claim wins), the tick after it last asked for it, and when it may look again
+	// after finding no spot.
+	claimed        bool
+	claimFor       [2]float64
+	claimX, claimY float64
+	claimTick      int
+	claimSeen      int
+	claimWait      int
 }
 
 type Squad struct {
@@ -211,6 +233,8 @@ type Sim struct {
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
+	bodies, spots   bodyGrid        // where the bodies are this tick, and the spots they claim (bodies.go)
+	live            []*teamRef      // this tick's teams
 	slots           [2][][2]float64 // where each side's base slots lie on this map (structures.go)
 	power           [2]powerState   // each side's power this tick (power.go)
 	landIdx         map[string]int  // landmark id → index
@@ -405,8 +429,9 @@ func (s *Sim) field(sq *Squad) {
 		cx, cy = s.nav.snapXY(navWater, cx+inward*slot*50, cy+40)
 	}
 	for i := 0; i < u.Teams; i++ {
-		ox, oy := formation(i, u.Teams, side)
+		ox, oy := s.formation(u, i, side)
 		x, y := s.clamp(u.Domain, cx+ox, cy+oy)
+		x, y = s.room(sq, nil, x, y) // squads of two kinds have the same place in the column
 		sq.Teams = append(sq.Teams, Team{
 			X: x, Y: y, HP: u.HP * float64(u.Members), Members: u.Members,
 			Action: ActIdle, lastShot: never, lastFire: never, Cover: 1,
@@ -439,13 +464,16 @@ func (s *Sim) gathered(sq *Squad) bool {
 func (sq *Squad) Deploying() bool { return sq.DeployTicks > 0 }
 
 // formation is a team's slot around the squad's position. The shape is mirrored for the
-// east side, so both sides meet the enemy with the same teams in front.
-func formation(i, n, side int) (float64, float64) {
+// east side, so both sides meet the enemy with the same teams in front. The ring is as
+// wide as the teams' bodies need to stand on it side by side.
+func (s *Sim) formation(u *shared.Unit, i, side int) (float64, float64) {
+	n := u.Teams
 	if n == 1 {
 		return 0, 0
 	}
 	a := 2 * math.Pi * float64(i) / float64(n)
-	x, y := 22*math.Cos(a), 22*math.Sin(a)
+	ring := math.Max(22, (s.R.BodyOf(u)+postSlack/2)/math.Sin(math.Pi/float64(n)))
+	x, y := ring*math.Cos(a), ring*math.Sin(a)
 	if side == 1 {
 		x = -x
 	}
@@ -499,6 +527,12 @@ type teamRef struct {
 	u    *shared.Unit
 	slot int // index of the team inside its squad
 	plan plan
+
+	i     int     // its place among the tick's teams
+	r     float64 // the radius of its body
+	layer int     // ground, water or air
+	cell  int     // its cell on the grid of bodies, -1 when it takes no room
+	spot  int     // its cell on the grid of claimed spots, -1 when it claims none
 }
 
 func (s *Sim) liveTeams() []*teamRef {
@@ -507,9 +541,11 @@ func (s *Sim) liveTeams() []*teamRef {
 		if !sq.Alive {
 			continue
 		}
+		r, layer := s.R.BodyOf(sq.unit), layerOf(sq.unit)
 		for i := range sq.Teams {
 			if sq.Teams[i].Members > 0 {
-				out = append(out, &teamRef{sq: sq, t: &sq.Teams[i], u: sq.unit, slot: i})
+				out = append(out, &teamRef{sq: sq, t: &sq.Teams[i], u: sq.unit, slot: i,
+					i: len(out), r: r, layer: layer, cell: -1, spot: -1})
 			}
 		}
 	}
@@ -526,6 +562,7 @@ func (s *Sim) Step() []Event {
 	s.construct()
 
 	live := s.liveTeams()
+	s.buildBodies(live)
 	s.countGarrisons()
 	s.spot(live)
 	s.trackContacts()
@@ -535,11 +572,18 @@ func (s *Sim) Step() []Event {
 	for _, tr := range live {
 		tr.plan = s.decide(tr, live)
 	}
-	for _, tr := range live {
-		s.move(tr)
+	// One at a time, and the other way round every second tick: neither side always
+	// gets the step both want.
+	s.startMoves(live)
+	for k := range live {
+		if s.Tick%2 == 1 {
+			k = len(live) - 1 - k
+		}
+		s.move(live[k])
 	}
 	s.crush(live)
 	s.enterBuildings(live)
+	s.settle(live)
 	for _, tr := range live {
 		s.fire(tr)
 	}
@@ -607,15 +651,13 @@ func (s *Sim) move(tr *teamRef) {
 	t, p := tr.t, tr.plan
 	t.Action = p.act
 	if (p.act != ActAdvance && p.act != ActFallBack) || t.In != "" {
+		t.hx, t.hy, t.jam = 0, 0, 0
 		return
 	}
-	speed := tr.u.Speed * s.dt
-	if p := s.R.Map.Pace; p > 0 {
-		speed *= p // a bigger map is crossed faster, so the match keeps its pace
+	if s.Tick < t.yield {
+		return // standing aside for a friend that is going past
 	}
-	if tr.u.Domain == "land" && s.bridgeAt(t.X, t.Y) == nil {
-		speed *= s.R.TerrainKinds[string(s.R.Map.TerrainAt(t.X, t.Y))].Speed
-	}
+	speed := s.stride(tr)
 	// Around water, mountains and whatever has been built: head for the next corner.
 	goalX, goalY := p.x, p.y
 	x, y, ok := s.steer(tr, p.x, p.y)
@@ -627,15 +669,10 @@ func (s *Sim) move(tr *teamRef) {
 		}
 	}
 	if !ok {
+		t.hx, t.hy = 0, 0
 		return
 	}
 	p.x, p.y = x, y
-	switch s.Nerve(t) {
-	case Shaken:
-		speed *= 0.6
-	case Pinned:
-		speed *= 0.15
-	}
 	d := dist(t.X, t.Y, p.x, p.y)
 	nx, ny := p.x, p.y
 	if d > speed {
@@ -646,7 +683,8 @@ func (s *Sim) move(tr *teamRef) {
 		t.blocked = st.ID
 		return
 	}
-	t.X, t.Y = nx, ny
+	// And so does any body it would walk into (bodies.go).
+	s.step(tr, nx, ny, p.x, p.y)
 	if t.pathOpen {
 		t.blocked = 0
 	}

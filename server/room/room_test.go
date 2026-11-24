@@ -156,7 +156,10 @@ func TestViperTwoHoldsFoxtrot(t *testing.T) {
 			f := rules.PointByID("F")
 			v2, v1 := s.Squad(2), s.Squad(1)
 			x, y := v2.Center()
-			if d := math.Hypot(x-f.X, y-f.Y); d > rules.Match.HoldRadius || v2.Order.Kind != sim.OrderHold || v2.Order.Point != "F" {
+			// Bodies take room: the teams go in at the house's door one after another, so
+			// the squad is no longer bunched on the point when it reports. It reports from
+			// its post, which is the house beside Foxtrot: as far off as cover is looked for.
+			if d := math.Hypot(x-f.X, y-f.Y); d > rules.Match.CoverSeek || v2.Order.Kind != sim.OrderHold || v2.Order.Point != "F" {
 				t.Fatalf("Viper 2 is %.0f from Foxtrot with order %+v", d, v2.Order)
 			}
 			if v1.Order.Kind != sim.OrderNone {

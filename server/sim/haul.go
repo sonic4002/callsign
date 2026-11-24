@@ -291,8 +291,6 @@ func (s *Sim) haulPlan(tr *teamRef, live []*teamRef) plan {
 	sq, t, h := tr.sq, tr.t, tr.sq.haul
 	rate := s.R.TickRate
 	home := s.nearestDropoff(sq.Side, t.X, t.Y)
-	hx, hy := s.unloadSpot(home, sq.ID)
-	atHome := dist(t.X, t.Y, hx, hy) <= 3
 
 	if s.Tick-t.lastShot <= haulFleeSeconds*rate {
 		// Under fire: run for home, and remember that the field is not safe.
@@ -308,6 +306,7 @@ func (s *Sim) haulPlan(tr *teamRef, live []*teamRef) plan {
 		h.State, h.Field = HaulFleeing, ""
 		safe := s.refuge(sq.Side, t.X, t.Y)
 		sx, sy := s.unloadSpot(safe, sq.ID)
+		sx, sy = s.post(tr, sx, sy)
 		if dist(t.X, t.Y, sx, sy) <= 3 {
 			return plan{act: ActCover}
 		}
@@ -341,6 +340,7 @@ func (s *Sim) haulPlan(tr *teamRef, live []*teamRef) plan {
 				h.State, h.Field = HaulOut, f.ID
 			}
 			fx, fy := s.loadSpot(f, sq.ID)
+			fx, fy = s.post(tr, fx, fy)
 			if dist(t.X, t.Y, fx, fy) > 3 {
 				h.State = HaulOut
 				return plan{act: ActAdvance, x: fx, y: fy}
@@ -349,15 +349,15 @@ func (s *Sim) haulPlan(tr *teamRef, live []*teamRef) plan {
 			return plan{act: ActIdle}
 		}
 	}
-	switch h.State {
-	case HaulReturning:
-		if !atHome {
+	if h.State == HaulReturning || h.State == HaulWaiting {
+		// Its place at the drop-off, or the nearest free one when that is taken (bodies.go).
+		hx, hy := s.unloadSpot(home, sq.ID)
+		hx, hy = s.post(tr, hx, hy)
+		if dist(t.X, t.Y, hx, hy) > 3 {
 			return plan{act: ActAdvance, x: hx, y: hy}
 		}
-		h.State, h.work = HaulUnloading, 0
-	case HaulWaiting:
-		if !atHome {
-			return plan{act: ActAdvance, x: hx, y: hy}
+		if h.State == HaulReturning {
+			h.State, h.work = HaulUnloading, 0
 		}
 	}
 	return plan{act: ActIdle}

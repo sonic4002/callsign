@@ -32,7 +32,9 @@
     "fortifySeconds": 6,
     "sandbagLimit": 2,
     "crushRadius": 13,
-    "crushSeconds": 1.5
+    "crushSeconds": 1.5,
+    "body": { "infantry": 8, "vehicle": 14, "naval": 14, "air": 10, "hauler": 15 },
+    "bodyStandoff": 26
   },
   "hq": { "hp": 3000, "sight": 300 },
   "nerve": {

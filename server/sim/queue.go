@@ -235,8 +235,9 @@ func (s *Sim) comeOut(sq *Squad) bool {
 	u := sq.unit
 	ex, ey := s.exitOf(st, u)
 	for i := 0; i < u.Teams; i++ {
-		ox, oy := formation(i, u.Teams, sq.Side)
-		x, y := s.clamp(u.Domain, ex+ox*0.3, ey+oy*0.3)
+		ox, oy, _ := s.huddle(u, i, sq.Side) // out of the door shoulder to shoulder
+		x, y := s.clamp(u.Domain, ex+ox, ey+oy)
+		x, y = s.room(sq, nil, x, y) // beside whoever stands at the door, not on them
 		sq.Teams = append(sq.Teams, Team{
 			X: x, Y: y, HP: u.HP * float64(u.Members), Members: u.Members,
 			Action: ActIdle, lastShot: never, lastFire: never, Cover: 1,

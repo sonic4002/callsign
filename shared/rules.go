@@ -126,6 +126,9 @@ type Unit struct {
 	// Dread is the stress per second its presence puts on enemy fireteams within DreadRadius.
 	Dread       float64 `json:"dread,omitempty"`
 	DreadRadius float64 `json:"dreadRadius,omitempty"`
+	// Body is the radius of the room one of the unit's teams takes up on the map, when
+	// it is not its class's (Match.Body).
+	Body float64 `json:"body,omitempty"`
 	// Crushes marks a heavy vehicle that kills infantry it drives through in the open.
 	Crushes bool `json:"crushes,omitempty"`
 }
@@ -311,6 +314,13 @@ type Rules struct {
 		// two men of one fireteam going under.
 		CrushRadius  float64 `json:"crushRadius"`
 		CrushSeconds float64 `json:"crushSeconds"`
+		// Body is the room a fireteam, a vehicle, a boat or an aircraft takes up on the
+		// map, as a radius per unit class (a unit's own `body` wins): two bodies never
+		// stand closer than their radii added. BodyStandoff is how much farther apart
+		// than that two enemy bodies on the ground or on the water are kept, so that
+		// nobody squeezes past an enemy: one fireteam standing on a bridge holds it.
+		Body         map[string]float64 `json:"body"`
+		BodyStandoff float64            `json:"bodyStandoff"`
 		// GarrisonSight is how close an enemy must be to see a fireteam inside a building.
 		GarrisonSight float64 `json:"garrisonSight"`
 		// GarrisonDamageShare is the share of the damage aimed at a garrison that the building takes too.
@@ -480,9 +490,20 @@ type Cue struct {
 	Events []string `json:"events,omitempty"` // event kinds, by name, that call for it
 }
 
+// BodyOf is the radius of the room one team of a unit takes up on the map.
+func (r *Rules) BodyOf(u *Unit) float64 {
+	if u.Body > 0 {
+		return u.Body
+	}
+	return r.Match.Body[u.Class]
+}
+
 func (r *Rules) check() error {
 	if r.TickRate <= 0 {
 		return fmt.Errorf("tickRate must be positive")
+	}
+	if r.Match.BodyStandoff < 0 {
+		return fmt.Errorf("bodyStandoff must not be negative")
 	}
 	if _, ok := r.Maps[DefaultMap]; !ok {
 		return fmt.Errorf("maps need a %q map", DefaultMap)
@@ -542,6 +563,9 @@ func (r *Rules) check() error {
 			}
 			if u.Teams <= 0 || u.Members <= 0 || u.HP <= 0 || u.CooldownTicks <= 0 || u.Speed <= 0 {
 				return fmt.Errorf("unit %s has a non-positive stat", id)
+			}
+			if r.BodyOf(&u) <= 0 || u.Body < 0 {
+				return fmt.Errorf("unit %s takes up no room: its class %q needs a body radius", id, u.Class)
 			}
 		}
 		if err := r.checkStructures(name, &f); err != nil {

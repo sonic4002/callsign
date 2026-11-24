@@ -64,6 +64,12 @@ type nav struct {
 	closed []uint32
 	search uint32
 	heap   navHeap
+
+	// Cells closed for one team's path search by the bodies standing in its way
+	// (bodies.go): a cell is shut when its mark is shutID, and only while avoid is set.
+	shut   []uint32
+	shutID uint32
+	avoid  bool
 }
 
 func (s *Sim) initNav() {
@@ -329,8 +335,11 @@ func (n *nav) lineClear(mode int, ax, ay, bx, by float64) bool {
 }
 
 func (n *nav) open(mode, c, r int) bool {
-	return c >= 0 && r >= 0 && c < n.cols && r < n.rows && n.passable(mode, r*n.cols+c)
+	return c >= 0 && r >= 0 && c < n.cols && r < n.rows && n.passable(mode, r*n.cols+c) && !n.shutAt(r*n.cols+c)
 }
+
+// shutAt reports whether a cell is closed by a body for the search in hand.
+func (n *nav) shutAt(i int) bool { return n.avoid && n.shut[i] == n.shutID }
 
 type navNode struct {
 	i    int
@@ -409,13 +418,13 @@ func (n *nav) path(mode int, ax, ay, bx, by float64) (way [][2]float64, reached 
 				continue
 			}
 			j := nr*n.cols + nc
-			if n.closed[j] == id || !n.passable(mode, j) {
+			if n.closed[j] == id || !n.passable(mode, j) || n.shutAt(j) {
 				continue
 			}
 			step := 1.0
 			if k >= 4 {
 				// No cutting a corner between two blocked cells.
-				if !n.passable(mode, r*n.cols+nc) || !n.passable(mode, nr*n.cols+c) {
+				if !n.passable(mode, r*n.cols+nc) || !n.passable(mode, nr*n.cols+c) || n.shutAt(r*n.cols+nc) || n.shutAt(nr*n.cols+c) {
 					continue
 				}
 				step = math.Sqrt2
@@ -466,7 +475,27 @@ func (s *Sim) modeFor(sq *Squad) int {
 // steer returns where a team should head this tick to get to (x, y): the place itself
 // when the way is clear, otherwise the next corner of its path. ok is false when there
 // is nowhere to go.
+//
+// A team that has waited on bodies in its way (bodies.go) is steered round them for a
+// while: the cells they keep it out of count as closed. When that leaves no way to where
+// it is going, it is steered as ever and waits for the way to clear.
 func (s *Sim) steer(tr *teamRef, x, y float64) (float64, float64, bool) {
+	t, n := tr.t, s.nav
+	if s.Tick < t.detour && s.modeFor(tr.sq) != navAir {
+		if s.shutBodies(tr, x, y) {
+			n.avoid = true
+			rx, ry, ok := s.steerOn(tr, x, y, true)
+			n.avoid = false
+			if t.pathOpen {
+				return rx, ry, ok
+			}
+		}
+		t.detour, t.detourNext, t.path = 0, s.Tick+detourRetry*s.R.TickRate, nil
+	}
+	return s.steerOn(tr, x, y, false)
+}
+
+func (s *Sim) steerOn(tr *teamRef, x, y float64, round bool) (float64, float64, bool) {
 	mode := s.modeFor(tr.sq)
 	t, n := tr.t, s.nav
 	if mode == navAir || n.lineClear(mode, t.X, t.Y, x, y) {
@@ -474,10 +503,14 @@ func (s *Sim) steer(tr *teamRef, x, y float64) (float64, float64, bool) {
 		return x, y, true
 	}
 	goal := n.index(x, y)
-	stale := t.path == nil || t.pathVer != n.ver || t.pathMode != mode
+	stale := t.path == nil || t.pathVer != n.ver || t.pathMode != mode || t.pathRound != round ||
+		(round && s.Tick-t.pathTick >= s.R.TickRate) || // the bodies in the way move: look again every second
+		// Going round a body, or making way for one, takes a team off its path: the
+		// straight walk back to the next corner may no longer be clear.
+		(len(t.path) > 0 && !n.lineClear(mode, t.X, t.Y, t.path[0][0], t.path[0][1]))
 	if stale || (t.pathGoal != goal && s.Tick-t.pathTick >= s.R.TickRate/2) {
 		t.path, t.pathOpen = n.path(mode, t.X, t.Y, x, y)
-		t.pathGoal, t.pathVer, t.pathMode, t.pathTick = goal, n.ver, mode, s.Tick
+		t.pathGoal, t.pathVer, t.pathMode, t.pathTick, t.pathRound = goal, n.ver, mode, s.Tick, round
 	}
 	// Skip the corners that can already be walked past in a straight line.
 	for len(t.path) > 1 && n.lineClear(mode, t.X, t.Y, t.path[1][0], t.path[1][1]) {
