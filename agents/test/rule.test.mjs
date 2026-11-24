@@ -283,7 +283,7 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
   const far = held({ squads: [squad(1, { x: 800, y: 500, order: { kind: "hold", point: "F" } }), squad(2, { x: 450, y: 690, order: { kind: "hold", point: "D" } }), squad(3, { x: 1150, y: 690, order: { kind: "hold", point: "H" } })] });
   assert.deepEqual(await on(far, { kind: "hq_under_attack" }), [
     ["radio", { to: ["Viper 2", "Viper 1"], body: "Hold Alpha", end: "over" }],
-    ["radio", { to: ["Hammer"], body: "Pulling 2 squads back to defend the base", end: "out" }],
+    ["radio", { to: ["Hammer"], body: "Pulling back to defend the base: Viper 2 and Viper 1", end: "out" }],
   ]);
   // Every point ours, one squad on each, and three more without work: those three gather at the
   // point nearest the enemy, then go in together. The squads on the points stay.
@@ -298,6 +298,10 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
     ["radio", { to: ["Viper 4", "Viper 5", "Viper 6"], body: "Attack Zulu", end: "over" }],
     ["radio", { to: ["Hammer"], body: "Attacking Zulu with 3 squads", end: "out" }],
   ]);
+  // A free point in the middle is taken by one squad, unless an enemy squad is seen by it.
+  const middle = (contacts) => base("fight", false, { squads: [squad(1, { order: { kind: "hold", point: "B" } }), squad(2, { order: { kind: "hold", point: "D" } }), squad(3)], points: [{ id: "A", owner: 0 }, { id: "B", owner: 0 }, { id: "D", owner: 0 }, { id: "F", owner: -1 }, { id: "G", owner: 0 }, { id: "H", owner: 1 }, { id: "K", owner: 1 }, { id: "S", owner: -1 }, { id: "Z", owner: 1 }], contacts });
+  assert.deepEqual(await on(middle([]), { kind: "quiet" }), [["radio", { to: ["Viper 3"], body: "Hold Foxtrot", end: "over" }]]);
+  assert.deepEqual(await on(middle([{ id: 9, class: "vehicle", unit: "technical", x: 840, y: 560 }]), { kind: "quiet" }), [["radio", { to: ["Viper 3"], body: "Hold Golf", end: "over" }]], "with the enemy on it, the squad waits at the forward point instead");
   // What Anvil says about it goes to Hammer, also when a squad was the last to call it.
   const toHammer = await run(ruleBrain(), { agent: { ...anvil(3), commander: "Rhino 1" }, wake: { items: [{ kind: "event", event: { kind: "quiet" } }], call: null, status: held({ squads: [...posts, ...atHotel] }) } });
   assert.deepEqual(toHammer[1][1].to, ["Hammer"]);

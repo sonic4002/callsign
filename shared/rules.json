@@ -832,7 +832,7 @@
       "opMassing": { "en": ["Massing at {place} before the attack"], "he": ["מרכז כוחות {b_place} לפני ההתקפה"] },
       "opAttacking": { "en": ["Attacking {place} with {count} squads"], "he": ["תוקפים את {place} עם {count} כיתות"] },
       "opGuarding": { "en": ["{squad} is going to guard the haulers at {place}"], "he": ["{squad} יוצא לאבטח את המשאיות {b_place}"] },
-      "opDefending": { "en": ["Pulling {count} squads back to defend the base"], "he": ["מחזיר {count} כיתות להגן על הבסיס"] },
+      "opDefending": { "en": ["Pulling back to defend the base: {squad}"], "he": ["חוזרים להגן על הבסיס: {squad}"] },
       "opRetaking": { "en": ["{squad} is going to take back {place}"], "he": ["{squad} יוצא לכבוש חזרה את {place}"] }
     },
     "spelledOut": {

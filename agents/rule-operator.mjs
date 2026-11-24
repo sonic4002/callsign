@@ -264,7 +264,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     if (back.length && home < 2) {
       task(back, say("opHold", { place: name(where.id) }));
       back.forEach((sq) => busy.add(sq.callsign.en));
-      if (once("defending", 60)) moves.push(radio([boss], say("opDefending", { count: back.length }), "out"));
+      if (once("defending", 60)) moves.push(radio([boss], say("opDefending", { squad: back.map((sq) => sq.callsign[lang] ?? sq.callsign.en).join(say("and")) }), "out"));
     }
   }
   // A hauler under attack: the nearest free squad guards its field.
@@ -283,7 +283,8 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
   // Points nobody holds on our half of the map: every squad without orders goes to the
   // nearest one none of ours is on. A boat goes for the sea rig whoever holds it; nothing
   // else can. Ground on the enemy's half is not for one squad alone: see below.
-  const ours = (p) => !hq || !enemyHQ || dist(p, hq) <= dist(p, enemyHQ) + 1;
+  // "Our half" reaches the middle of the map, and stops short of any enemy squad in sight.
+  const ours = (p) => (!hq || !enemyHQ || dist(p, hq) <= dist(p, enemyHQ) + 1) && !(s.contacts ?? []).some((c) => c.class !== "hauler" && dist(c, p) <= 260);
   const free = (id) => owner(id) !== side && owner(id) !== 1 - side;
   const taken = new Set(s.squads.map((q) => q.order?.point).filter(Boolean)); // one squad per point
   const idle = s.squads.filter((q) => q.order?.kind === "none" && !fresh(q) && !busy.has(q.callsign.en));
