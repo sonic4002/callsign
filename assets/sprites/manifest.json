@@ -553,6 +553,246 @@
           5
         ]
       }
+    },
+    "aegis_hauler": {
+      "facings": 8,
+      "order": [
+        "E",
+        "SE",
+        "S",
+        "SW",
+        "W",
+        "NW",
+        "N",
+        "NE"
+      ],
+      "heading": "map",
+      "ppm": 40,
+      "fps": {
+        "move": 6,
+        "moveFull": 6,
+        "load": 4,
+        "unload": 4
+      },
+      "image": "units/aegis_hauler.png",
+      "frame": [
+        326,
+        220
+      ],
+      "anchor": [
+        0.5,
+        0.6984
+      ],
+      "anims": {
+        "idle": [
+          0,
+          1
+        ],
+        "move": [
+          1,
+          2
+        ],
+        "full": [
+          3,
+          1
+        ],
+        "moveFull": [
+          4,
+          2
+        ],
+        "load": [
+          6,
+          3
+        ],
+        "unload": [
+          9,
+          3
+        ],
+        "wreck": [
+          12,
+          1
+        ]
+      }
+    },
+    "ashfall_hauler": {
+      "facings": 8,
+      "order": [
+        "E",
+        "SE",
+        "S",
+        "SW",
+        "W",
+        "NW",
+        "N",
+        "NE"
+      ],
+      "heading": "map",
+      "ppm": 40,
+      "fps": {
+        "move": 6,
+        "moveFull": 6,
+        "load": 4,
+        "unload": 4
+      },
+      "image": "units/ashfall_hauler.png",
+      "frame": [
+        330,
+        223
+      ],
+      "anchor": [
+        0.5,
+        0.6935
+      ],
+      "anims": {
+        "idle": [
+          0,
+          1
+        ],
+        "move": [
+          1,
+          2
+        ],
+        "full": [
+          3,
+          1
+        ],
+        "moveFull": [
+          4,
+          2
+        ],
+        "load": [
+          6,
+          3
+        ],
+        "unload": [
+          9,
+          3
+        ],
+        "wreck": [
+          12,
+          1
+        ]
+      }
+    },
+    "aegis_engineer": {
+      "facings": 8,
+      "order": [
+        "E",
+        "SE",
+        "S",
+        "SW",
+        "W",
+        "NW",
+        "N",
+        "NE"
+      ],
+      "heading": "map",
+      "ppm": 40,
+      "per": "member",
+      "fps": {
+        "walk": 11,
+        "die": 9,
+        "work": 5
+      },
+      "image": "units/aegis_engineer.png",
+      "frame": [
+        138,
+        119
+      ],
+      "anchor": [
+        0.5,
+        0.6385
+      ],
+      "anims": {
+        "idle": [
+          0,
+          1
+        ],
+        "walk": [
+          1,
+          8
+        ],
+        "fire": [
+          9,
+          2
+        ],
+        "cover": [
+          11,
+          1
+        ],
+        "coverFire": [
+          12,
+          1
+        ],
+        "die": [
+          13,
+          5
+        ],
+        "work": [
+          18,
+          2
+        ]
+      }
+    },
+    "ashfall_sapper": {
+      "facings": 8,
+      "order": [
+        "E",
+        "SE",
+        "S",
+        "SW",
+        "W",
+        "NW",
+        "N",
+        "NE"
+      ],
+      "heading": "map",
+      "ppm": 40,
+      "per": "member",
+      "fps": {
+        "walk": 11,
+        "die": 9,
+        "work": 5
+      },
+      "image": "units/ashfall_sapper.png",
+      "frame": [
+        138,
+        119
+      ],
+      "anchor": [
+        0.5,
+        0.6385
+      ],
+      "anims": {
+        "idle": [
+          0,
+          1
+        ],
+        "walk": [
+          1,
+          8
+        ],
+        "fire": [
+          9,
+          2
+        ],
+        "cover": [
+          11,
+          1
+        ],
+        "coverFire": [
+          12,
+          1
+        ],
+        "die": [
+          13,
+          5
+        ],
+        "work": [
+          18,
+          2
+        ]
+      }
     }
   },
   "buildings": {
@@ -565,7 +805,8 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 96
     },
     "hq_ashfall": {
       "image": "buildings/hq_ashfall.png",
@@ -576,7 +817,8 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 80
     },
     "hq_aegis_ruin": {
       "image": "buildings/hq_aegis_ruin.png",
@@ -587,7 +829,8 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 96
     },
     "hq_ashfall_ruin": {
       "image": "buildings/hq_ashfall_ruin.png",
@@ -598,7 +841,8 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 80
     },
     "landRig": {
       "image": "buildings/landRig.png",
@@ -609,7 +853,8 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 84
     },
     "seaRig": {
       "image": "buildings/seaRig.png",
@@ -620,7 +865,8 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 80
     },
     "point": {
       "image": "buildings/point.png",
@@ -631,11 +877,964 @@
       "anchor": [
         0.5,
         0.8
-      ]
+      ],
+      "height": 52
+    },
+    "aegis_barracks": {
+      "image": "buildings/aegis_barracks.png",
+      "size": [
+        209,
+        160
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 62
+    },
+    "aegis_barracks_site": {
+      "image": "buildings/aegis_barracks_site.png",
+      "size": [
+        209,
+        160
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 62
+    },
+    "aegis_barracks_ruin": {
+      "image": "buildings/aegis_barracks_ruin.png",
+      "size": [
+        209,
+        160
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 62
+    },
+    "aegis_works": {
+      "image": "buildings/aegis_works.png",
+      "size": [
+        190,
+        184
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 71
+    },
+    "aegis_works_site": {
+      "image": "buildings/aegis_works_site.png",
+      "size": [
+        190,
+        184
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 71
+    },
+    "aegis_works_ruin": {
+      "image": "buildings/aegis_works_ruin.png",
+      "size": [
+        190,
+        184
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 71
+    },
+    "aegis_airbase": {
+      "image": "buildings/aegis_airbase.png",
+      "size": [
+        218,
+        168
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "aegis_airbase_site": {
+      "image": "buildings/aegis_airbase_site.png",
+      "size": [
+        218,
+        168
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "aegis_airbase_ruin": {
+      "image": "buildings/aegis_airbase_ruin.png",
+      "size": [
+        218,
+        168
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "aegis_dockyard": {
+      "image": "buildings/aegis_dockyard.png",
+      "size": [
+        269,
+        168
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "aegis_dockyard_site": {
+      "image": "buildings/aegis_dockyard_site.png",
+      "size": [
+        269,
+        168
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "aegis_dockyard_ruin": {
+      "image": "buildings/aegis_dockyard_ruin.png",
+      "size": [
+        269,
+        168
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "aegis_refinery": {
+      "image": "buildings/aegis_refinery.png",
+      "size": [
+        218,
+        196
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 75
+    },
+    "aegis_refinery_site": {
+      "image": "buildings/aegis_refinery_site.png",
+      "size": [
+        218,
+        196
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 75
+    },
+    "aegis_refinery_ruin": {
+      "image": "buildings/aegis_refinery_ruin.png",
+      "size": [
+        218,
+        196
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 75
+    },
+    "ashfall_safehouse": {
+      "image": "buildings/ashfall_safehouse.png",
+      "size": [
+        156,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 58
+    },
+    "ashfall_safehouse_site": {
+      "image": "buildings/ashfall_safehouse_site.png",
+      "size": [
+        156,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 58
+    },
+    "ashfall_safehouse_ruin": {
+      "image": "buildings/ashfall_safehouse_ruin.png",
+      "size": [
+        156,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 58
+    },
+    "ashfall_chopShop": {
+      "image": "buildings/ashfall_chopShop.png",
+      "size": [
+        214,
+        170
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "ashfall_chopShop_site": {
+      "image": "buildings/ashfall_chopShop_site.png",
+      "size": [
+        214,
+        170
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "ashfall_chopShop_ruin": {
+      "image": "buildings/ashfall_chopShop_ruin.png",
+      "size": [
+        214,
+        170
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 65
+    },
+    "ashfall_launchYard": {
+      "image": "buildings/ashfall_launchYard.png",
+      "size": [
+        174,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 58
+    },
+    "ashfall_launchYard_site": {
+      "image": "buildings/ashfall_launchYard_site.png",
+      "size": [
+        174,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 58
+    },
+    "ashfall_launchYard_ruin": {
+      "image": "buildings/ashfall_launchYard_ruin.png",
+      "size": [
+        174,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 58
+    },
+    "ashfall_boatShed": {
+      "image": "buildings/ashfall_boatShed.png",
+      "size": [
+        167,
+        156
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 60
+    },
+    "ashfall_boatShed_site": {
+      "image": "buildings/ashfall_boatShed_site.png",
+      "size": [
+        167,
+        156
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 60
+    },
+    "ashfall_boatShed_ruin": {
+      "image": "buildings/ashfall_boatShed_ruin.png",
+      "size": [
+        167,
+        156
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 60
+    },
+    "ashfall_smelter": {
+      "image": "buildings/ashfall_smelter.png",
+      "size": [
+        199,
+        190
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 73
+    },
+    "ashfall_smelter_site": {
+      "image": "buildings/ashfall_smelter_site.png",
+      "size": [
+        199,
+        190
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 73
+    },
+    "ashfall_smelter_ruin": {
+      "image": "buildings/ashfall_smelter_ruin.png",
+      "size": [
+        199,
+        190
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 73
+    },
+    "aegis_sentryGun": {
+      "image": "buildings/aegis_sentryGun.png",
+      "size": [
+        114,
+        100
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 38
+    },
+    "aegis_sentryGun_ruin": {
+      "image": "buildings/aegis_sentryGun_ruin.png",
+      "size": [
+        114,
+        100
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 38
+    },
+    "aegis_flakBattery": {
+      "image": "buildings/aegis_flakBattery.png",
+      "size": [
+        108,
+        108
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 42
+    },
+    "aegis_flakBattery_ruin": {
+      "image": "buildings/aegis_flakBattery_ruin.png",
+      "size": [
+        108,
+        108
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 42
+    },
+    "ashfall_gunNest": {
+      "image": "buildings/ashfall_gunNest.png",
+      "size": [
+        83,
+        84
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 32
+    },
+    "ashfall_gunNest_ruin": {
+      "image": "buildings/ashfall_gunNest_ruin.png",
+      "size": [
+        83,
+        84
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 32
+    },
+    "ashfall_rocketNest": {
+      "image": "buildings/ashfall_rocketNest.png",
+      "size": [
+        107,
+        100
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 38
+    },
+    "ashfall_rocketNest_ruin": {
+      "image": "buildings/ashfall_rocketNest_ruin.png",
+      "size": [
+        107,
+        100
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 38
+    }
+  },
+  "landmarks": {
+    "house_1": {
+      "image": "landmarks/house_1.png",
+      "size": [
+        130,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 46
+    },
+    "house_1_ruin": {
+      "image": "landmarks/house_1_ruin.png",
+      "size": [
+        130,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 46
+    },
+    "house_2": {
+      "image": "landmarks/house_2.png",
+      "size": [
+        115,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 46
+    },
+    "house_2_ruin": {
+      "image": "landmarks/house_2_ruin.png",
+      "size": [
+        115,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 46
+    },
+    "house_3": {
+      "image": "landmarks/house_3.png",
+      "size": [
+        105,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 46
+    },
+    "house_3_ruin": {
+      "image": "landmarks/house_3_ruin.png",
+      "size": [
+        105,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 46
+    },
+    "bunker": {
+      "image": "landmarks/bunker.png",
+      "size": [
+        95,
+        84
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 32
+    },
+    "bunker_ruin": {
+      "image": "landmarks/bunker_ruin.png",
+      "size": [
+        95,
+        84
+      ],
+      "anchor": [
+        0.5,
+        0.8
+      ],
+      "height": 32
+    },
+    "ruin": {
+      "image": "landmarks/ruin.png",
+      "size": [
+        92,
+        92
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 35
+    },
+    "grove_1": {
+      "image": "landmarks/grove_1.png",
+      "size": [
+        140,
+        140
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 54
+    },
+    "grove_2": {
+      "image": "landmarks/grove_2.png",
+      "size": [
+        135,
+        150
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 58
+    },
+    "grove_3": {
+      "image": "landmarks/grove_3.png",
+      "size": [
+        136,
+        120
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 46
+    },
+    "rocks_1": {
+      "image": "landmarks/rocks_1.png",
+      "size": [
+        74,
+        72
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 28
+    },
+    "rocks_2": {
+      "image": "landmarks/rocks_2.png",
+      "size": [
+        97,
+        72
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 28
+    },
+    "mountain_1": {
+      "image": "landmarks/mountain_1.png",
+      "size": [
+        258,
+        256
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 98
+    },
+    "mountain_2": {
+      "image": "landmarks/mountain_2.png",
+      "size": [
+        229,
+        220
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 85
+    },
+    "gusher": {
+      "image": "landmarks/gusher.png",
+      "size": [
+        89,
+        76
+      ],
+      "anchor": [
+        0.5,
+        0.9
+      ],
+      "height": 29
     }
   },
   "terrain": {
     "land": "terrain/land.png",
-    "sea": "terrain/sea.png"
+    "sea": "terrain/sea.png",
+    "ice": "terrain/ice.png",
+    "mountain": "terrain/mountain.png"
+  },
+  "segments": {
+    "aegis_wall": {
+      "length": 60,
+      "scale": 0.5303,
+      "x": {
+        "image": "segments/aegis_wall_x.png",
+        "size": [
+          136,
+          147
+        ],
+        "anchor": [
+          0.5,
+          0.7626
+        ]
+      },
+      "y": {
+        "image": "segments/aegis_wall_y.png",
+        "size": [
+          136,
+          147
+        ],
+        "anchor": [
+          0.5,
+          0.7626
+        ]
+      },
+      "ruin": {
+        "x": {
+          "image": "segments/aegis_wall_ruin_x.png",
+          "size": [
+            144,
+            110
+          ],
+          "anchor": [
+            0.5,
+            0.6828
+          ]
+        },
+        "y": {
+          "image": "segments/aegis_wall_ruin_y.png",
+          "size": [
+            143,
+            113
+          ],
+          "anchor": [
+            0.4755,
+            0.6646
+          ]
+        }
+      },
+      "post": {
+        "image": "segments/aegis_wall_post.png",
+        "size": [
+          44,
+          114
+        ],
+        "anchor": [
+          0.5,
+          0.9038
+        ]
+      }
+    },
+    "ashfall_fence": {
+      "length": 60,
+      "scale": 0.5303,
+      "x": {
+        "image": "segments/ashfall_fence_x.png",
+        "size": [
+          122,
+          125
+        ],
+        "anchor": [
+          0.5,
+          0.8531
+        ]
+      },
+      "y": {
+        "image": "segments/ashfall_fence_y.png",
+        "size": [
+          121,
+          125
+        ],
+        "anchor": [
+          0.4959,
+          0.8531
+        ]
+      },
+      "ruin": {
+        "x": {
+          "image": "segments/ashfall_fence_ruin_x.png",
+          "size": [
+            151,
+            111
+          ],
+          "anchor": [
+            0.4702,
+            0.6544
+          ]
+        },
+        "y": {
+          "image": "segments/ashfall_fence_ruin_y.png",
+          "size": [
+            173,
+            79
+          ],
+          "anchor": [
+            0.526,
+            0.5018
+          ]
+        }
+      },
+      "post": {
+        "image": "segments/ashfall_fence_post.png",
+        "size": [
+          26,
+          93
+        ],
+        "anchor": [
+          0.4231,
+          0.9466
+        ]
+      }
+    },
+    "wall": {
+      "length": 60,
+      "scale": 0.5303,
+      "x": {
+        "image": "segments/wall_x.png",
+        "size": [
+          134,
+          96
+        ],
+        "anchor": [
+          0.5,
+          0.6443
+        ]
+      },
+      "y": {
+        "image": "segments/wall_y.png",
+        "size": [
+          134,
+          94
+        ],
+        "anchor": [
+          0.5,
+          0.6474
+        ]
+      }
+    },
+    "bridge": {
+      "length": 60,
+      "scale": 0.5303,
+      "width": 105,
+      "x": {
+        "image": "segments/bridge_x.png",
+        "size": [
+          318,
+          202
+        ],
+        "anchor": [
+          0.5,
+          0.6227
+        ]
+      },
+      "y": {
+        "image": "segments/bridge_y.png",
+        "size": [
+          318,
+          202
+        ],
+        "anchor": [
+          0.5,
+          0.6227
+        ]
+      },
+      "end": {
+        "x": {
+          "image": "segments/bridge_end_x.png",
+          "size": [
+            334,
+            249
+          ],
+          "anchor": [
+            0.5,
+            0.6497
+          ]
+        },
+        "y": {
+          "image": "segments/bridge_end_y.png",
+          "size": [
+            334,
+            249
+          ],
+          "anchor": [
+            0.5,
+            0.6497
+          ]
+        }
+      },
+      "broken": {
+        "x": {
+          "image": "segments/bridge_broken_x.png",
+          "size": [
+            321,
+            196
+          ],
+          "anchor": [
+            0.4984,
+            0.6009
+          ]
+        },
+        "y": {
+          "image": "segments/bridge_broken_y.png",
+          "size": [
+            312,
+            192
+          ],
+          "anchor": [
+            0.5,
+            0.577
+          ]
+        }
+      }
+    }
+  },
+  "props": {
+    "gold_field_1": {
+      "image": "props/gold_field_1.png",
+      "size": [
+        195,
+        104
+      ],
+      "anchor": [
+        0.5128,
+        0.5038
+      ],
+      "height": 19
+    },
+    "gold_field_2": {
+      "image": "props/gold_field_2.png",
+      "size": [
+        165,
+        94
+      ],
+      "anchor": [
+        0.5697,
+        0.5467
+      ],
+      "height": 22
+    },
+    "gold_field_3": {
+      "image": "props/gold_field_3.png",
+      "size": [
+        208,
+        112
+      ],
+      "anchor": [
+        0.5144,
+        0.5035
+      ],
+      "height": 25
+    }
+  },
+  "variants": {
+    "house": [
+      "house_1",
+      "house_2",
+      "house_3"
+    ],
+    "grove": [
+      "grove_1",
+      "grove_2",
+      "grove_3"
+    ],
+    "rocks": [
+      "rocks_1",
+      "rocks_2"
+    ],
+    "mountain": [
+      "mountain_1",
+      "mountain_2"
+    ],
+    "gold_field": [
+      "gold_field_1",
+      "gold_field_2",
+      "gold_field_3"
+    ]
   }
 }
