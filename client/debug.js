@@ -20,6 +20,7 @@ import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
+import { hintWords } from "./voice/hints.js";
 import { Voice } from "./voice/voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -585,7 +586,8 @@ $("text").addEventListener("keydown", (ev) => {
 
 // ---- voice ----
 // Push-to-talk: hold the button, or the key left of 1, and speak a call. It is recognised
-// in this browser, tidied into procedure, and put in the box to check and send.
+// by the game server when it offers that (the recording is sent there and not kept), else
+// in this browser; then tidied into procedure, and put in the box to check and send.
 
 let voiceState = "idle";
 let voiceDetail = {};
@@ -596,6 +598,7 @@ const voice = new Voice({
     voiceDetail = detail;
     renderVoice();
   },
+  onLimit: () => talkEnd(), // the longest recording: it is sent as if the button were let go
 });
 
 function renderVoice() {
@@ -607,7 +610,7 @@ function renderVoice() {
   status.hidden = voiceState === "idle";
   status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
   status.className = ["unsupported", "insecure", "denied", "missing", "failed"].includes(voiceState) ? "warn" : "";
-  $("ptt").title = t("voiceHint");
+  $("ptt").title = t(voice.remote ? "voiceHint.server" : "voiceHint");
   $("ptt").classList.toggle("live", voiceState === "listening");
   $("ptt").classList.toggle("busy", ["asking", "loading", "working"].includes(voiceState));
 }
@@ -646,7 +649,7 @@ async function talkEnd() {
   } catch (err) {
     console.warn("callsign list failed", err);
   }
-  const text = await voice.stop(spoke, openers);
+  const text = await voice.stop(spoke, openers, rules ? hintWords(rules, spoke) : []);
   if (!text || !rules) return;
   let said = tidy(text, { lang: spoke, rules });
   // Tap a squad, then speak: an order that names nobody goes to the squad that is selected.
@@ -1424,6 +1427,8 @@ requestAnimationFrame(frame);
 
 // What the lobby can offer, and the match lengths to choose from.
 offer = await serverInfo().catch(() => null);
+// A server with a listening service transcribes the calls of a seated commander.
+if (offer?.stt) voice.useServer(() => (role !== "hammer" ? null : room ? seat && { room, side, token: seat.token } : { room: "", side }));
 // Starting gold: the server's amounts, or one the player types, kept for next time.
 const golds = offer?.startGolds ?? [];
 const [goldMin, goldMax] = offer?.goldLimits ?? [400, 20000];
@@ -1516,7 +1521,7 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
 }
 renderOverlay();
 // The speech model for the page's language is fetched now, in the lobby, so the talk
-// button answers at once when the match starts.
+// button answers at once when the match starts. (Not when the server transcribes.)
 voice.prepare(lang);
 
 // For debugging from the console.
