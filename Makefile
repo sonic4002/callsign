@@ -158,6 +158,12 @@ SEEDS ?= 100
 balance:
 	$(DOCKER) --network none -e CALLSIGN_BALANCE=$(SEEDS) $(IMAGE) go test ./server/sim -run TestFactionsAreRoughlyEvenOnEveryMap -v -timeout 60m
 
+# What a match costs the server on each map, on one core: the time of a tick and of the
+# two snapshots a room sends with it, their size, and the gold a base makes a minute.
+.PHONY: cost
+cost:
+	$(DOCKER) --network none --cpus 1 -e CALLSIGN_COST=1 $(IMAGE) go test ./server/sim -run 'TestWhatATickCosts|TestWhatAMapPays' -v -count=1
+
 # Rewrite the maps in shared/rules.json from tools/mapgen.py; `python3 tools/mapgen.py --show` draws them as text.
 .PHONY: maps
 maps:
