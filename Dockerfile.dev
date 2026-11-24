@@ -10,6 +10,8 @@ FROM golang:1.27.4-trixie
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 # Node looks for packages in every parent directory, so /node_modules serves /src/agents.
 COPY --from=node /deps/node_modules /node_modules
+# Claude Code, for the subscription brain (agents/brain-subscription.mjs).
+ENV PATH=/node_modules/.bin:$PATH
 ENV GOMODCACHE=/go/pkg/mod \
     GOCACHE=/gocache \
     GOFLAGS=-mod=readonly \
@@ -19,4 +21,5 @@ COPY go.mod go.sum ./
 RUN go mod download \
  && mkdir -p /gocache \
  && chmod -R a+rwX /go/pkg/mod /gocache \
- && node --version
+ && node --version \
+ && claude --version

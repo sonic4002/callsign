@@ -23,9 +23,6 @@ export function claudeBrain({ apiKey, client = new Anthropic({ apiKey }), operat
     // check makes one tiny call so a key that cannot be used is found before the match,
     // not as squads that never answer.
     async check() {
-      if (apiKey?.startsWith("sk-ant-oat")) {
-        throw new Error("CALLSIGN_ANTHROPIC_KEY holds a Claude subscription token (sk-ant-oat...), not an API key. Create an API key in the Claude Console; it starts with sk-ant-api");
-      }
       try {
         await client.messages.create({ model: models.tiers[1], max_tokens: 1, messages: [{ role: "user", content: "Radio check." }] });
       } catch (err) {

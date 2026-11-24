@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Phase 0 agent runtime: the operator and squad leaders as a Node script.",
   "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.331",
     "@anthropic-ai/sdk": "1.13.0"
   }
 }

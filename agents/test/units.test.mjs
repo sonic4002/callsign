@@ -206,9 +206,37 @@ test("makeBrain: scripted without a usable key, and never a downgrade when Claud
   assert.equal((await makeBrain({})).name, "scripted");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "" })).name, "scripted");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "claude" })).name, "claude");
-  // A subscription token is not an API key: found at start, said in the log, scripted instead.
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x" })).name, "scripted");
+  // A subscription token is not an API key: it selects the Claude Code brain.
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_BRAIN: "subscription" })).name, "subscription");
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_CLAUDE_BIN: "/no/such/claude" })).name, "scripted");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "scripted" })).name, "scripted");
   await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "claude" }), /needs CALLSIGN_ANTHROPIC_KEY/);
   await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "gpt" }), /unknown CALLSIGN_BRAIN/);
+});
+
+test("subscription brain: actions become tool calls, and it thinks again only on a refusal or a report", async () => {
+  const { subscriptionBrain, transcript } = await import("../brain-subscription.mjs");
+  const runs = [];
+  const exec = async (bin, args, input, env) => {
+    runs.push({ args, input, env });
+    return { structured_output: { actions: [{ tool: "hold", input: { point: "F" } }, { tool: "radio", input: { to: ["Hammer"], body: "Wilco", end: "out" } }] } };
+  };
+  const brain = subscriptionBrain({ token: "sk-ant-oat01-x", exec });
+  const ctx = { agent: { role: "squad", tier: 1 }, system: "You are Viper 2.", tools: leaderTools, messages: [{ role: "user", content: "Hammer: hold Foxtrot" }] };
+  const res = await brain.think(ctx);
+  assert.deepEqual(res.content.map((b) => b.name), ["hold", "radio"]);
+  assert.equal(runs[0].env.CLAUDE_CODE_OAUTH_TOKEN, "sk-ant-oat01-x");
+  assert.equal(runs[0].env.CALLSIGN_ANTHROPIC_KEY, undefined);
+  assert.equal(runs[0].args[runs[0].args.indexOf("--model") + 1], "claude-haiku-5-5");
+  assert.equal(runs[0].args[runs[0].args.indexOf("--tools") + 1], "");
+
+  const ok = res.content.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: "{}" }));
+  ctx.messages.push({ role: "assistant", content: res.content }, { role: "user", content: ok });
+  assert.equal((await brain.think(ctx)).stop_reason, "end_turn");
+  assert.equal(runs.length, 1);
+
+  ok[0] = { ...ok[0], content: "no such point", is_error: true };
+  assert.equal((await brain.think(ctx)).stop_reason, "tool_use");
+  assert.equal(runs.length, 2);
+  assert.match(transcript(ctx.messages), /hold was refused: no such point/);
 });
