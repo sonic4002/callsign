@@ -11,7 +11,10 @@ const TAU = Math.PI * 2;
 
 // ---- generated sprites ----
 
-export const sprites = { units: {}, buildings: {}, terrain: {} };
+// `landmarks` and `props` hold pictures in the same form as `buildings`. `segments` holds
+// the pieces of things laid end to end (walls, fences, the bridge): see CREDITS.md in
+// assets/sprites for how a run is drawn. `variants` names the pictures of one kind of thing.
+export const sprites = { units: {}, buildings: {}, landmarks: {}, props: {}, terrain: {}, segments: {}, variants: {} };
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -33,7 +36,7 @@ export async function loadSprites(base = "/assets/sprites/") {
     return sprites;
   }
   const jobs = [];
-  for (const group of ["units", "buildings"]) {
+  for (const group of ["units", "buildings", "landmarks", "props"]) {
     for (const [id, entry] of Object.entries(manifest[group] ?? {})) {
       // A unit with a weapon that turns on its own has a second sheet for it; both must load.
       const images = [entry.image, entry.turret?.image].filter(Boolean).map((path) => loadImage(base + path));
@@ -45,6 +48,21 @@ export async function loadSprites(base = "/assets/sprites/") {
       );
     }
   }
+  // A segment is a small tree of pictures (x, y, and the same for each state); every node
+  // with an image gets it loaded in place. A piece that fails to load leaves the whole
+  // segment out, so the page falls back to its own drawing for all of it.
+  for (const [id, entry] of Object.entries(manifest.segments ?? {})) {
+    const tree = structuredClone(entry);
+    const parts = [];
+    const walk = (node) => {
+      if (!node || typeof node !== "object") return;
+      if (typeof node.image === "string") parts.push(loadImage(base + node.image).then((img) => (node.img = img)));
+      else Object.values(node).forEach(walk);
+    };
+    walk(tree);
+    jobs.push(Promise.all(parts).then((imgs) => imgs.every(Boolean) && (sprites.segments[id] = tree)));
+  }
+  sprites.variants = manifest.variants ?? {};
   for (const [id, path] of Object.entries(manifest.terrain ?? {})) {
     jobs.push(loadImage(base + path).then((img) => img && (sprites.terrain[id] = img)));
   }
@@ -503,7 +521,7 @@ export function drawBuilding(ctx, kind, color, time) {
   const entry = sprites.buildings[kind];
   if (entry) {
     shadow(ctx, 30, 13, 0.3);
-    drawSprite(ctx, entry, buildingHeight[kind] ?? 70, 0);
+    drawSprite(ctx, entry, buildingHeight[kind] ?? entry.height ?? 70, 0);
     if (kind.endsWith("_ruin")) return; // nobody flies a flag over a ruin
     // A generated building carries no team colour, so it gets a pennant beside it.
     line(ctx, "#d8dcd6", 1.6, -26, 4, -26, -30);
