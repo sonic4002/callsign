@@ -29,6 +29,11 @@ var (
 	ErrNotDamaged = errors.New("it is not damaged")
 )
 
+// OwnStructure resolves a place to a structure the side owns, for the room's tools.
+func (s *Sim) OwnStructure(side int, place string) (*Structure, error) {
+	return s.ownStructure(side, place)
+}
+
 // ownStructure resolves a place to a structure the side owns and that is not a ruin.
 func (s *Sim) ownStructure(side int, place string) (*Structure, error) {
 	pl, err := s.resolveFor(side, place)

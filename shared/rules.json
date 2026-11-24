@@ -643,6 +643,8 @@
     "ownPurchase": {
       "bought": { "en": "Bought {unit}, {squad} is deploying", "he": "נקנה {unit}, {squad} בדרך" },
       "built": { "en": "Building {unit}", "he": "מתחיל לבנות {unit}" },
+      "sold": { "en": "Sold the {unit}", "he": "נמכר: {unit}" },
+      "repairing": { "en": "Repairing the {unit}", "he": "מתקן את {unit}" },
       "upgraded": { "en": "Upgraded {squad} to {tier}", "he": "{squad} שודרג לדרגת {tier}" }
     },
     "signOff": {

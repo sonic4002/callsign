@@ -64,6 +64,10 @@ func (p *Player) raise(snap sim.Snapshot, role string, depth int) baseStep {
 			return baseStep{wait: true}
 		}
 	}
+	// Power first: what would leave the side short waits for another power structure.
+	if role != shared.RolePower && def.Power < 0 && p.spare(snap)+def.Power < 0 && p.powerCount(snap) < p.R.Match.PowerStructures {
+		return p.raise(snap, shared.RolePower, depth+1)
+	}
 	if snap.Gold < def.Cost {
 		return baseStep{wait: true}
 	}
@@ -91,10 +95,37 @@ func (p *Player) upkeep(snap sim.Snapshot, vehicles int) baseStep {
 			return p.raise(snap, role, 0)
 		}
 	}
+	// Short of power (a power structure fell): put one back before anything else is bought.
+	if snap.Power.Low && !p.rising(snap, shared.RolePower) && p.powerCount(snap) < p.R.Match.PowerStructures {
+		return p.raise(snap, shared.RolePower, 0)
+	}
 	if vehicles >= 2 && !p.stands(snap, shared.RoleDefence) && !p.rising(snap, shared.RoleDefence) {
 		if step := p.raise(snap, shared.RoleDefence, 0); step.build != nil {
 			return step
 		}
 	}
 	return baseStep{}
+}
+
+// spare is the power the side will have to spare once everything going up stands.
+func (p *Player) spare(snap sim.Snapshot) float64 {
+	spare := float64(snap.Power.Supply - snap.Power.Use)
+	f := p.R.Factions
+	for _, st := range snap.Structures {
+		if st.Side == p.Side && !st.Ruin && st.Building < 1 {
+			spare += f[st.Faction].Structures[st.Kind].Power
+		}
+	}
+	return spare
+}
+
+// powerCount is how many power structures the side has, standing or going up.
+func (p *Player) powerCount(snap sim.Snapshot) int {
+	n := 0
+	for _, st := range snap.Structures {
+		if st.Side == p.Side && !st.Ruin && st.Role == shared.RolePower {
+			n++
+		}
+	}
+	return n
 }
