@@ -571,6 +571,7 @@ export class Scene {
       if (!def) continue;
       if (st.role === "fence") things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: z, draw: () => drawFence(ctx, st, sideColor[st.side]) });
       else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, st, def, sideColor[st.side], time) });
+    }
     for (const g of rules.gushers ?? []) {
       things.push({
         depth: g.x + g.y,
