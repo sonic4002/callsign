@@ -3,10 +3,12 @@
 For every sprite in art/sprites.json that names a `keep` seed (the candidate that passed
 review), this cuts the background away, trims, scales to game size and writes
 
-    assets/sprites/{units,buildings,terrain}/<id>.png
-    assets/sprites/manifest.json     what the page loads; a unit with a back view gets
-                                     four facings in one row (SE, SW, NW, NE)
+    assets/sprites/{buildings,terrain}/<id>.png
+    assets/sprites/manifest.json     what the page loads
     assets/sprites/CREDITS.md        model, licence, seed and prompt of every sprite
+
+The units are not generated images: art/units.py renders them and owns the "units" part
+of the manifest, which is kept as it is here.
 
 Sprites without `keep` are left out of the manifest, and the page draws its own stand-in.
 
@@ -25,10 +27,19 @@ ROOT = HERE.parent
 RAW = ROOT / "assets" / "raw"
 OUT = ROOT / "assets" / "sprites"
 
-FOLDER = {"unit": "units", "building": "buildings", "terrain": "terrain"}
-ANCHOR = {"unit": [0.5, 0.85], "building": [0.5, 0.8]}
+FOLDER = {"building": "buildings", "terrain": "terrain"}
+ANCHOR = [0.5, 0.8]
 
-MODEL_NOTE = """Every sprite here was generated on this machine by `make art` and reviewed by eye.
+MODEL_NOTE = """## Units
+
+The unit sheets (`units/*.png`) are rendered on this machine by `make art-units` from
+original low-poly models built in code in `art/units.py`: each is posed by turning its
+joints, turned to eight headings under one light and rendered with Blender 4.2 (Cycles),
+https://www.blender.org. Blender is GPL software; the models and the pictures are ours.
+
+## Buildings and terrain
+
+Every sprite below was generated on this machine by `make art` and reviewed by eye.
 
 - Image model: FLUX.2 [klein] 4B, distilled (`flux-2-klein-4b.safetensors`), Apache-2.0,
   Black Forest Labs, https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
@@ -76,17 +87,6 @@ def make_tileable(image, size):
     return tile
 
 
-def facing_strip(front, back):
-    """Four facings in one row: south-east, south-west, north-west, north-east. The model
-    draws the unit from the front and from behind; the other two are their mirror images."""
-    w, h = max(front.width, back.width), max(front.height, back.height)
-    strip = Image.new("RGBA", (4 * w, h))
-    mirror = lambda im: im.transpose(Image.FLIP_LEFT_RIGHT)
-    for i, frame in enumerate([front, mirror(front), mirror(back), back]):
-        strip.paste(frame, (i * w + (w - frame.width) // 2, h - frame.height))  # centred, standing on the bottom edge
-    return strip, [w, h]
-
-
 def contact_sheet(entries, path):
     """One picture of the whole set: each sprite at game size and at 48 px, on mid grey."""
     cell_w, cell_h = 400, 330
@@ -113,10 +113,10 @@ def main():
     args = ap.parse_args()
 
     spec = json.loads((HERE / "sprites.json").read_text())
-    kept = [s for s in spec["sprites"] if "keep" in s and s["kind"] != "back"]
-    backs = {s["turn"]: s for s in spec["sprites"] if "keep" in s and s["kind"] == "back"}
+    kept = [s for s in spec["sprites"] if "keep" in s]
     session = None
-    manifest = {"units": {}, "buildings": {}, "terrain": {}}
+    old = json.loads((OUT / "manifest.json").read_text()) if (OUT / "manifest.json").exists() else {}
+    manifest = {"units": old.get("units", {}), "buildings": {}, "terrain": {}}
     credits = ["# Sprite credits", "", MODEL_NOTE, "| Sprite | Seed | Prompt |", "|---|---|---|"]
     sheet = []
 
@@ -126,9 +126,9 @@ def main():
             raise SystemExit(f"{raw} is missing: run `make art` to generate it")
         return Image.open(raw)
 
-    def credit(rel, sprite, note=""):
+    def credit(rel, sprite):
         prompt = spec["styles"][sprite["style"]].replace("{subject}", sprite["subject"]).replace("|", "/")
-        credits.append(f"| `{rel}`{note} | {sprite['keep']} | {prompt} |")
+        credits.append(f"| `{rel}` | {sprite['keep']} | {prompt} |")
 
     for sprite in kept:
         image = raw_image(sprite)
@@ -145,20 +145,9 @@ def main():
                 session = new_session("birefnet-general")
             cut = cut_out(image, session)
             result = scale_to_height(cut, sprite["height"])
-            if kind == "building":
-                manifest["buildings"][sprite["id"]] = {"image": rel, "size": [result.width, result.height], "anchor": ANCHOR[kind]}
-            elif sprite["id"] in backs:
-                # The back view is scaled by the same factor as the front, so the unit keeps its size when it turns.
-                back = cut_out(raw_image(backs[sprite["id"]]), session)
-                back = scale_to_height(back, max(1, round(back.height * sprite["height"] / cut.height)))
-                result, frame = facing_strip(result, back)
-                manifest["units"][sprite["id"]] = {"image": rel, "frame": frame, "facings": 4, "order": ["SE", "SW", "NW", "NE"], "anchor": ANCHOR[kind]}
-            else:
-                manifest["units"][sprite["id"]] = {"image": rel, "frame": [result.width, result.height], "facings": 1, "order": ["SE"], "anchor": ANCHOR[kind]}
+            manifest["buildings"][sprite["id"]] = {"image": rel, "size": [result.width, result.height], "anchor": ANCHOR}
         result.save(OUT / rel, optimize=True)
         credit(rel, sprite)
-        if sprite["id"] in backs:
-            credit(rel, backs[sprite["id"]], " (back view, redrawn from the front view)")
         sheet.append((sprite["id"], result))
         print(f"{rel}  {result.width}x{result.height}")
 
@@ -166,7 +155,7 @@ def main():
     (OUT / "CREDITS.md").write_text("\n".join(credits) + "\n")
     if args.sheet:
         contact_sheet(sheet, args.sheet)
-    print(f"{len(kept)} sprites written, {len(backs)} of them with a back view")
+    print(f"{len(kept)} sprites written")
 
 
 if __name__ == "__main__":

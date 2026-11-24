@@ -53,19 +53,6 @@ def workflow(prompt, seed, width, height):
     }
 
 
-def turn_workflow(prompt, seed, reference):
-    """The official klein image-edit graph: the same model redraws a reference image as the
-    prompt asks. Used to turn a kept sprite around so its other facings match it."""
-    flow = workflow(prompt, seed, 1024, 1024)
-    flow["image"] = {"class_type": "LoadImage", "inputs": {"image": reference}}
-    flow["scaled"] = {"class_type": "ImageScaleToTotalPixels", "inputs": {"image": ["image", 0], "upscale_method": "nearest-exact", "megapixels": 1.0, "resolution_steps": 1}}
-    flow["reference"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["scaled", 0], "vae": ["vae", 0]}}
-    flow["positive_ref"] = {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["positive", 0], "latent": ["reference", 0]}}
-    flow["negative_ref"] = {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["negative", 0], "latent": ["reference", 0]}}
-    flow["guider"]["inputs"].update(positive=["positive_ref", 0], negative=["negative_ref", 0])
-    return flow
-
-
 def call(path, body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(API + path, data=data, headers={"Content-Type": "application/json"})
@@ -117,7 +104,6 @@ def main():
     args = ap.parse_args()
 
     spec = json.loads((HERE / "sprites.json").read_text())
-    by_id = {s["id"]: s for s in spec["sprites"]}
     jobs = []
     for sprite in spec["sprites"]:
         if args.ids and sprite["id"] not in args.ids:
@@ -136,14 +122,7 @@ def main():
     try:
         for sprite, prompt, seed, out in jobs:
             began = time.time()
-            if "turn" in sprite:
-                # A turned view starts from the kept image of the sprite it belongs to.
-                source = by_id[sprite["turn"]]
-                reference = f"{source['id']}__{source['keep']}.png"
-                shutil.copy(RAW / reference, WORK / "input" / reference)
-                flow = turn_workflow(prompt, seed, reference)
-            else:
-                flow = workflow(prompt, seed, *sprite.get("size", [1024, 1024]))
+            flow = workflow(prompt, seed, *sprite.get("size", [1024, 1024]))
             shutil.move(render(flow), out)
             print(f"{out.name}  {time.time() - began:.1f}s", flush=True)
     finally:

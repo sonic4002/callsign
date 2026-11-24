@@ -2,6 +2,8 @@
 // page looks finished with no image files at all. When /assets/sprites/manifest.json
 // exists, anything it lists is drawn from its image instead, with no other change.
 //
+// The same holds one unit at a time for the animated unit sheets (see art/units.py).
+//
 // All drawings are made around the origin, standing on it, facing south-east (right and
 // toward the viewer). The caller translates, scales and flips.
 
@@ -33,7 +35,14 @@ export async function loadSprites(base = "/assets/sprites/") {
   const jobs = [];
   for (const group of ["units", "buildings"]) {
     for (const [id, entry] of Object.entries(manifest[group] ?? {})) {
-      jobs.push(loadImage(base + entry.image).then((img) => img && (sprites[group][id] = { ...entry, img })));
+      // A unit with a weapon that turns on its own has a second sheet for it; both must load.
+      const images = [entry.image, entry.turret?.image].filter(Boolean).map((path) => loadImage(base + path));
+      jobs.push(
+        Promise.all(images).then(([img, top]) => {
+          if (!img || (entry.turret && !top)) return;
+          sprites[group][id] = { ...entry, img, turret: entry.turret && { ...entry.turret, img: top } };
+        }),
+      );
     }
   }
   for (const [id, path] of Object.entries(manifest.terrain ?? {})) {
@@ -62,6 +71,108 @@ function drawSprite(ctx, entry, height, turn) {
   ctx.save();
   ctx.scale(flip, 1);
   ctx.drawImage(img, frame * fw, 0, fw, fh, -anchor[0] * fw * k, -anchor[1] * fh * k, fw * k, fh * k);
+  ctx.restore();
+}
+
+// ---- animated unit sheets ----
+//
+// A sheet has a row for each of eight map headings and a column for each frame; `anims`
+// names runs of columns. The models are rendered at `ppm` pixels a metre and drawn here
+// at METRE, so every unit is to one scale.
+
+const METRE = 15;
+
+// mapHeading turns a direction on screen into a heading on the map (0 = east, clockwise).
+const mapHeading = (turn) => Math.atan2(Math.sin(turn) - Math.cos(turn) / 2, Math.sin(turn) + Math.cos(turn) / 2);
+const rowOf = (entry, turn) => ((Math.round(mapHeading(turn) / (TAU / entry.facings)) % entry.facings) + entry.facings) % entry.facings;
+
+function drawFrame(ctx, entry, part, anim, index, row) {
+  const [start, count] = part.anims[anim] ?? part.anims.idle;
+  const [fw, fh] = part.frame;
+  const k = METRE / entry.ppm;
+  const col = start + Math.max(0, Math.min(count - 1, index));
+  ctx.drawImage(part.img, col * fw, row * fh, fw, fh, -part.anchor[0] * fw * k, -part.anchor[1] * fh * k, fw * k, fh * k);
+}
+
+// Where the soldiers of one fireteam stand around its centre.
+const spots = [[0, 0], [-8, -4], [8, 3], [-1, -9]];
+const spotsFor = (members) => spots.slice(0, Math.min(members, spots.length)).sort((a, b) => a[1] - b[1]);
+
+function animatedInfantry(ctx, entry, o) {
+  const down = o.action === "cover" || o.nerve === "pinned";
+  const engaged = o.sinceShot < 0.35 || (o.action === "fire" && !o.moving);
+  const file = spotsFor(o.members);
+  for (const [i, [ox, oy]] of file.entries()) {
+    let anim = down ? "cover" : "idle";
+    let index = 0;
+    let turn = o.turn;
+    if (engaged) {
+      // One soldier of the team fires each shot; the rest keep their aim.
+      const flash = o.sinceShot < 0.09 && (o.shots + i) % file.length === 0;
+      turn = o.aim ?? o.turn;
+      anim = down ? (flash ? "coverFire" : "cover") : "fire";
+      index = flash ? 1 : 0;
+    } else if (o.moving) {
+      anim = "walk";
+      index = Math.floor(o.time * (entry.fps?.walk ?? 10) + o.seed * 3 + i * 3) % entry.anims.walk[1];
+    }
+    ctx.save();
+    ctx.translate(ox, oy);
+    shadow(ctx, 5.5, 2.6);
+    drawFrame(ctx, entry, entry, anim, index, rowOf(entry, turn));
+    ctx.restore();
+  }
+}
+
+function wake(ctx, turn, moving) {
+  disc(ctx, "rgba(235,248,255,0.22)", 0, 2, 30, 9);
+  if (!moving) return;
+  const [dx, dy] = [Math.cos(turn), Math.sin(turn)];
+  for (const side of [-1, 1]) {
+    line(ctx, "rgba(235,248,255,0.5)", 1.6, -dx * 20 - dy * side * 5, -dy * 20 + dx * side * 5, -dx * 48 - dy * side * 13, -dy * 48 + dx * side * 13);
+  }
+}
+
+function animatedVehicle(ctx, entry, o) {
+  const naval = o.cls === "naval";
+  const row = rowOf(entry, o.turn);
+  if (naval) wake(ctx, o.turn, o.moving);
+  else shadow(ctx, 26, 11);
+  ctx.save();
+  // A boat rides the swell; an engine under way shakes its hull.
+  ctx.translate(0, naval ? Math.sin(o.time * 2 + o.seed) * 0.8 : o.moving ? Math.sin(o.time * 38 + o.seed) * 0.35 : 0);
+  drawFrame(ctx, entry, entry, "idle", 0, row);
+  const top = entry.turret;
+  // The weapon sits on its pivot along the hull, and keeps pointing at what it last shot at.
+  const heading = (row * TAU) / entry.facings;
+  const along = top.pivot * METRE * Math.SQRT1_2;
+  ctx.translate((Math.cos(heading) - Math.sin(heading)) * along, ((Math.cos(heading) + Math.sin(heading)) / 2) * along);
+  const frame = [0.07, 0.15, 0.25].findIndex((until) => o.sinceShot < until);
+  drawFrame(ctx, entry, top, frame < 0 ? "idle" : "fire", frame, rowOf(entry, o.sinceShot < 2.5 ? (o.aim ?? o.turn) : o.turn));
+  ctx.restore();
+}
+
+// hasAnimation reports whether a unit is drawn from an animated sheet.
+export const hasAnimation = (unit) => Boolean(sprites.units[unit]?.anims);
+
+// How long what is left of a unit stays on the field, in seconds.
+export const casualtySeconds = (unit, cls) => (!hasAnimation(unit) ? 0 : cls === "infantry" ? 7 : cls === "naval" ? 1.8 : 12);
+
+// drawCasualty draws a soldier falling, a burnt-out vehicle or a boat going down. `age`
+// is the time since it happened, in seconds.
+export function drawCasualty(ctx, { unit, cls, turn, age }) {
+  const entry = sprites.units[unit];
+  if (!entry?.anims) return;
+  const left = casualtySeconds(unit, cls) - age;
+  const row = rowOf(entry, turn);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, cls === "naval" ? left * 3 : left / 2));
+  if (cls === "infantry") drawFrame(ctx, entry, entry, "die", Math.floor(age * (entry.fps?.die ?? 9)), row);
+  else if (cls === "naval") drawFrame(ctx, entry, entry, "sink", Math.floor(age * 2.2), row);
+  else {
+    shadow(ctx, 26, 11);
+    drawFrame(ctx, entry, entry, "wreck", 0, row);
+  }
   ctx.restore();
 }
 
@@ -196,9 +307,12 @@ function boat(ctx, look, small) {
 
 const unitHeight = { infantry: 26, vehicle: 34, naval: 36 };
 
-// drawUnit draws one fireteam. `turn` is its direction of travel on screen.
-export function drawUnit(ctx, { unit, cls, faction, members, moving, firing, time, turn, seed }) {
+// drawUnit draws one fireteam. `turn` is its direction of travel on screen, `aim` the
+// direction of its last shot, `sinceShot` the seconds since then and `shots` their count.
+export function drawUnit(ctx, o) {
+  const { unit, cls, faction, members, moving, firing, time, turn, seed } = o;
   const entry = sprites.units[unit];
+  if (entry?.anims) return (cls === "infantry" ? animatedInfantry : animatedVehicle)(ctx, entry, o);
   if (entry) {
     shadow(ctx, cls === "infantry" ? 9 : 20);
     drawSprite(ctx, entry, unitHeight[cls] ?? 28, turn);
@@ -208,10 +322,7 @@ export function drawUnit(ctx, { unit, cls, faction, members, moving, firing, tim
   const flip = Math.cos(turn) < 0 ? -1 : 1;
   if (cls === "infantry") {
     // One figure per soldier, standing in a loose file.
-    const spots = [[0, 0], [-8, -4], [8, 3], [-1, -9]];
-    const n = Math.min(members, spots.length);
-    const order = spots.slice(0, n).sort((a, b) => a[1] - b[1]);
-    for (const [i, [ox, oy]] of order.entries()) {
+    for (const [i, [ox, oy]] of spotsFor(members).entries()) {
       ctx.save();
       ctx.translate(ox, oy);
       shadow(ctx, 5.5, 2.6);
