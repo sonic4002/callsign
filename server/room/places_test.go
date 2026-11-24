@@ -173,3 +173,47 @@ func TestLeadersAreToldAboutTheGroundAndCallsNameLandmarks(t *testing.T) {
 		t.Errorf("the south bridge is reported as %+v", span)
 	}
 }
+
+// A squad shoots a bridge only after the commander ordered that bridge destroyed in so
+// many words, and not long after; holding it or crossing it is no such order.
+func TestABridgeIsAttackedOnlyOnTheCommandersOrder(t *testing.T) {
+	rm := newRoom(t, Config{AutoStart: true})
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	viper := join(t, rm, 0, RoleSquad, 1)
+	attack := func() error {
+		_, err := rm.Tool(viper, ToolAttack, json.RawMessage(`{"place":"bridge-south","contact":0}`))
+		return err
+	}
+	if err := attack(); !errors.Is(err, ErrBridgeNotOrdered) || !strings.Contains(err.Error(), "ask Hammer") {
+		t.Fatalf("attacking a bridge nobody ordered destroyed: err = %v", err)
+	}
+	// Naming the bridge is not ordering it destroyed.
+	if _, err := rm.Say(hammer, "Viper 1, this is Hammer. Hold the south bridge. Over."); err != nil {
+		t.Fatal(err)
+	}
+	if err := attack(); !errors.Is(err, ErrBridgeNotOrdered) {
+		t.Fatalf("after an order to hold the bridge: err = %v", err)
+	}
+	if _, err := rm.Tool(viper, ToolHold, json.RawMessage(`{"place":"bridge-south"}`)); err != nil {
+		t.Fatalf("holding the bridge: %v", err)
+	}
+	// The order, in Hebrew; the other side's order is not ours.
+	enemy := join(t, rm, 1, RoleHammer, 0)
+	if _, err := rm.Say(enemy, "Viper 1, this is Hammer. Destroy the south bridge. Over."); err != nil {
+		t.Fatal(err)
+	}
+	if err := attack(); !errors.Is(err, ErrBridgeNotOrdered) {
+		t.Fatalf("after the enemy commander's order: err = %v", err)
+	}
+	if _, err := rm.Say(hammer, "צפע 1, כאן פטיש, השמידו את הגשר הדרומי, עבור."); err != nil {
+		t.Fatal(err)
+	}
+	if err := attack(); err != nil {
+		t.Fatalf("after the commander's order to destroy it: %v", err)
+	}
+	// The order does not stand for ever.
+	ticks(rm, bridgeOrderSeconds+5)
+	if err := attack(); !errors.Is(err, ErrBridgeNotOrdered) {
+		t.Fatalf("long after the order: err = %v", err)
+	}
+}
