@@ -17,7 +17,7 @@ const TAU = Math.PI * 2;
 // the pieces of things laid end to end (walls, fences, the bridge): see CREDITS.md in
 // assets/sprites for how a run is drawn. `variants` names the pictures of one kind of thing.
 // `portraits` are the roster pictures of the heroes, as addresses for an <img>.
-export const sprites = { units: {}, buildings: {}, landmarks: {}, props: {}, terrain: {}, segments: {}, variants: {}, portraits: {} };
+export const sprites = { units: {}, buildings: {}, landmarks: {}, props: {}, terrain: {}, segments: {}, variants: {}, portraits: {}, icons: {} };
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -72,6 +72,8 @@ export async function loadSprites(base = "/assets/sprites/") {
   }
   sprites.variants = manifest.variants ?? {};
   for (const [id, entry] of Object.entries(manifest.portraits ?? {})) sprites.portraits[id] = { ...entry, src: base + entry.image };
+  // A structure's small picture for its button in the build panel, as an address to show.
+  for (const [id, entry] of Object.entries(manifest.icons ?? {})) sprites.icons[id] = { ...entry, src: base + entry.image };
   for (const [id, path] of Object.entries(manifest.terrain ?? {})) {
     jobs.push(loadImage(base + path).then((img) => img && (sprites.terrain[id] = img)));
   }
@@ -734,22 +736,103 @@ export function emergence(entry, t, height = entry.height) {
 // shows it going up in stages, and `door` ("open" or "lit") lays the door patch over the
 // finished building. It returns false when there is no picture for `kind`, so the caller
 // can draw its own stand-in.
-export function drawStructurePicture(ctx, kind, { progress = 1, door = "closed", ruin = false } = {}) {
+//
+// A finished structure may also be given:
+//   powered  false when its side is on low power: the picture goes dark, whatever turns on
+//            it stands still, and a warning lamp blinks on it
+//   time     seconds, for the part that turns and for the lamp
+//   owner    a colour, for a building of no army that has a flagstaff (`flag` in the
+//            manifest): the flag of whoever holds it; none when nobody does
+export function drawStructurePicture(ctx, kind, { progress = 1, door = "closed", ruin = false, powered = true, time = 0, owner = null } = {}) {
   const base = sprites.buildings[kind];
   if (!base) return false;
   const height = base.height ?? 70;
   const stages = base.stages ?? [];
   const stage = stageOf(stages.length, progress);
-  const entry = ruin ? sprites.buildings[`${kind}_ruin`] : stage < stages.length ? sprites.buildings[stages[stage]] : base;
+  const done = !ruin && stage >= stages.length;
+  // A building whose top turns is painted once more without that top (`spin.body`), and the
+  // turning part is drawn over that; without the part's sheet the whole painting is used.
+  const body = (base.spin?.body && sprites.props[base.spin.prop]?.img && sprites.buildings[base.spin.body]) || base;
+  const entry = (ruin ? sprites.buildings[`${kind}_ruin`] : stage < stages.length ? sprites.buildings[stages[stage]] : body) ?? base;
+  const dark = done && !powered;
   shadow(ctx, 30, 13, 0.3);
-  drawSprite(ctx, entry ?? base, height, 0);
-  const patch = !ruin && stage >= stages.length && base.door?.frames?.[door];
+  drawSprite(ctx, dark ? dimmed(entry) : entry, height, 0);
+  const patch = done && base.door?.frames?.[door];
   if (patch?.img) {
+    const [x, y] = structureSpot(base, [patch.at[0] / base.size[0], patch.at[1] / base.size[1]], height);
     const k = height / base.size[1];
-    const [ax, ay] = base.anchor ?? [0.5, 0.8];
-    ctx.drawImage(patch.img, (patch.at[0] - ax * base.size[0]) * k, (patch.at[1] - ay * base.size[1]) * k, patch.size[0] * k, patch.size[1] * k);
+    ctx.drawImage(patch.img, x, y, patch.size[0] * k, patch.size[1] * k);
+  }
+  if (done && base.spin) drawSpin(ctx, base, height, powered ? time : 0, dark);
+  if (dark) drawLamp(ctx, base, height, time);
+  if (!ruin && owner && base.flag) {
+    const [x, y] = structureSpot(base, base.flag, height);
+    line(ctx, "#2b2f33", 1.4, x, y, x, y - 15);
+    pennant(ctx, x, y - 15, owner, time, 0.8);
   }
   return true;
+}
+
+// structureSpot turns a place given as fractions of a building's picture into pixels from
+// the point the building stands on, at the height it is drawn.
+export function structureSpot(base, [fx, fy], height = base.height ?? 70) {
+  const k = height / base.size[1];
+  const [ax, ay] = base.anchor ?? [0.5, 0.8];
+  return [(fx - ax) * base.size[0] * k, (fy - ay) * base.size[1] * k];
+}
+
+// spinFrame is which picture of a turning part to show: one turn every `period` seconds.
+export const spinFrame = (frames, period, time) => ((Math.floor((time / period) * frames) % frames) + frames) % frames;
+
+// drawSpin draws the part of a structure that turns (a radar's dish) over its picture:
+// `base.spin` names the prop sheet, where on the building its mount sits, how tall it is
+// drawn and how long one turn takes. At time 0 it stands still on its first picture.
+function drawSpin(ctx, base, height, time, dark) {
+  const { prop, at, height: tall, period = 6 } = base.spin;
+  const part = sprites.props[prop];
+  if (!part?.img) return;
+  const [fw, fh] = part.frame;
+  const k = (tall * (height / (base.height ?? height))) / fh;
+  const [x, y] = structureSpot(base, at, height);
+  const frame = spinFrame(part.frames, period, time);
+  const img = dark ? dimmed(part).img : part.img;
+  ctx.drawImage(img, frame * fw, 0, fw, fh, x - part.anchor[0] * fw * k, y - part.anchor[1] * fh * k, fw * k, fh * k);
+}
+
+// lampOn says whether a dark structure's warning lamp is lit at `time`: two short blinks,
+// then a pause, so a row of dark buildings does not look like a string of fairy lights.
+export const lampOn = (time) => {
+  const t = ((time % 1.6) + 1.6) % 1.6;
+  return t < 0.14 || (t > 0.3 && t < 0.44);
+};
+
+function drawLamp(ctx, base, height, time) {
+  const [x, y] = structureSpot(base, base.lamp ?? [0.5, 0.18], height);
+  disc(ctx, "#2a1c12", x, y, 2.2);
+  if (!lampOn(time)) return;
+  disc(ctx, "rgba(255,150,40,0.35)", x, y, 6);
+  disc(ctx, "#ffb347", x, y, 2);
+}
+
+// dimmed gives a sprite's entry with its picture darkened, as a structure looks with the
+// power down. The dark copy is made once and kept. Where there is no canvas to make it on
+// (a test), the entry comes back as it is.
+const darkened = new WeakMap();
+function dimmed(entry) {
+  const img = entry.img;
+  if (!img || typeof document === "undefined") return entry;
+  if (!darkened.has(img)) {
+    const copy = document.createElement("canvas");
+    copy.width = img.width;
+    copy.height = img.height;
+    const g = copy.getContext("2d");
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = "source-atop"; // only where the picture is, never its empty corners
+    g.fillStyle = "rgba(10,14,30,0.52)";
+    g.fillRect(0, 0, copy.width, copy.height);
+    darkened.set(img, copy);
+  }
+  return { ...entry, img: darkened.get(img) };
 }
 
 // drawSandbags draws a sandbag position facing `turn` (a direction on screen, as for a

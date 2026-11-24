@@ -1900,6 +1900,495 @@
       ],
       "subject": "the flat roof has fallen in, the walls are broken, cracked open and blackened with soot, and heaps of pale rubble and splintered wood lie inside the footprint",
       "keep": 21
+    },
+    {
+      "id": "aegis_powerPlant",
+      "kind": "building",
+      "style": "building",
+      "height": 176,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a compact power plant made of clean angular prefabricated modules in blue-grey and white, a low turbine hall with a row of tall cooling fins along its roof, two short wide exhaust stacks, a fenced transformer block with insulators at one corner and thick cable ducts along the wall",
+      "keep": 13,
+      "icon": true,
+      "lamp": [
+        0.885,
+        0.385
+      ]
+    },
+    {
+      "id": "aegis_powerPlant_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "aegis_powerPlant",
+      "height": 176,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has collapsed inward, the walls are broken, torn open and blackened with soot, and heaps of grey rubble, bent panels and twisted metal lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 23
+    },
+    {
+      "id": "aegis_powerPlant_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_powerPlant",
+      "height": 176,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_powerPlant_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_powerPlant",
+      "height": 176,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 41
+    },
+    {
+      "id": "aegis_powerPlant_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_powerPlant",
+      "height": 176,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "aegis_powerPlant_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_powerPlant",
+      "height": 176,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_generatorYard",
+      "kind": "building",
+      "style": "building",
+      "height": 156,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a rugged improvised militia generator yard, three big rusty diesel generators standing in a row under a sagging tarpaulin roof on scrap-metal posts, stacked fuel drums and jerrycans, thick black cables running to a crooked wooden pylon with a transformer box, and a corrugated metal windbreak on one side",
+      "keep": 13,
+      "icon": true,
+      "lamp": [
+        0.74,
+        0.2
+      ]
+    },
+    {
+      "id": "ashfall_generatorYard_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "ashfall_generatorYard",
+      "height": 156,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has caved in, the walls are cracked, broken open and scorched black, and heaps of rubble, bent corrugated sheets and charred timber lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 22
+    },
+    {
+      "id": "ashfall_generatorYard_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_generatorYard",
+      "height": 156,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 43
+    },
+    {
+      "id": "ashfall_generatorYard_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_generatorYard",
+      "height": 156,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_generatorYard_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_generatorYard",
+      "height": 156,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands, patched together from corrugated sheets and breeze blocks, and the rest is a bare frame of scrap posts and timber wrapped in wooden scaffolding, with building materials, tarpaulins and oil drums inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "ashfall_generatorYard_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_generatorYard",
+      "height": 156,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 42
+    },
+    {
+      "id": "aegis_radar",
+      "kind": "building",
+      "style": "building",
+      "height": 190,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a compact radar station made of clean angular prefabricated modules in blue-grey and white, a low square control block with a flat roof and a row of small antennas, and beside it on the roof a short sturdy lattice mast that ends in an empty round turntable mount with nothing fitted on top of it",
+      "keep": 11,
+      "icon": true,
+      "spin": {
+        "prop": "radar_dish",
+        "at": [
+          0.74,
+          0.065
+        ],
+        "height": 20,
+        "period": 6,
+        "body": "aegis_radar_bare"
+      },
+      "lamp": [
+        0.325,
+        0.165
+      ]
+    },
+    {
+      "id": "aegis_radar_bare",
+      "kind": "building",
+      "style": "door",
+      "from": "aegis_radar",
+      "height": 190,
+      "seeds": [
+        61,
+        62,
+        63,
+        64
+      ],
+      "subject": "the round dish on top of the lattice mast has been taken away, so the mast now ends in a small bare flat mounting plate with empty sky above it",
+      "keep": 61
+    },
+    {
+      "id": "aegis_radar_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "aegis_radar",
+      "height": 190,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has collapsed inward, the walls are broken, torn open and blackened with soot, and heaps of grey rubble, bent panels and twisted metal lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 23
+    },
+    {
+      "id": "aegis_radar_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_radar",
+      "height": 190,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
+      "keep": 42
+    },
+    {
+      "id": "aegis_radar_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_radar",
+      "height": 190,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
+      "keep": 41
+    },
+    {
+      "id": "aegis_radar_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "aegis_radar",
+      "height": 190,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "aegis_radar_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "aegis_radar",
+      "height": 190,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_listeningPost",
+      "kind": "building",
+      "style": "building",
+      "height": 176,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a rugged improvised militia listening post, a small two-storey breeze-block house with a flat roof crowded with scavenged aerials, wire antennas strung between poles, an old satellite bowl propped against the parapet, car batteries and cable reels, and one bare upright steel pole in the middle of the roof with nothing fitted on top of it",
+      "keep": 12,
+      "icon": true,
+      "spin": {
+        "prop": "antenna_loop",
+        "at": [
+          0.47,
+          0.075
+        ],
+        "height": 21,
+        "period": 9
+      },
+      "lamp": [
+        0.63,
+        0.3
+      ]
+    },
+    {
+      "id": "ashfall_listeningPost_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "ashfall_listeningPost",
+      "height": 176,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has caved in, the walls are cracked, broken open and scorched black, and heaps of rubble, bent corrugated sheets and charred timber lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 23
+    },
+    {
+      "id": "ashfall_listeningPost_stage1",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_listeningPost",
+      "height": 176,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
+      "keep": 41
+    },
+    {
+      "id": "ashfall_listeningPost_stage2",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_listeningPost",
+      "height": 176,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
+      "keep": 42
+    },
+    {
+      "id": "ashfall_listeningPost_stage3",
+      "kind": "building",
+      "style": "site",
+      "from": "ashfall_listeningPost",
+      "height": 176,
+      "seeds": [
+        31,
+        32,
+        33
+      ],
+      "subject": "only the lower half of the walls stands, patched together from corrugated sheets and breeze blocks, and the rest is a bare frame of scrap posts and timber wrapped in wooden scaffolding, with building materials, tarpaulins and oil drums inside the footprint and no roof yet",
+      "keep": 32
+    },
+    {
+      "id": "ashfall_listeningPost_stage4",
+      "kind": "building",
+      "style": "stage",
+      "from": "ashfall_listeningPost",
+      "height": 176,
+      "seeds": [
+        41,
+        42,
+        43
+      ],
+      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
+      "keep": 41
+    },
+    {
+      "id": "tech_goldworks",
+      "kind": "building",
+      "style": "building",
+      "height": 176,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "an old civilian assay office and mint from another era, a small solid two-storey stone building with a low domed roof, a heavy arched iron door, barred windows, a short brick chimney and an iron weighing scale and strongbox by the entrance, weathered pale stone and dark green trim, belonging to no army",
+      "keep": 11,
+      "icon": true,
+      "flag": [
+        0.5,
+        0.03
+      ]
+    },
+    {
+      "id": "tech_goldworks_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "tech_goldworks",
+      "height": 176,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has fallen in, the walls are cracked, broken open and blackened with soot, and heaps of rubble, broken stone and splintered timber lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 23
+    },
+    {
+      "id": "tech_clinic",
+      "kind": "building",
+      "style": "building",
+      "height": 156,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a small civilian field hospital, a low single-storey whitewashed clinic building with a flat roof and a wide canvas awning over the entrance, two stretchers and wooden benches under the awning, a water tank and a pale green roof, belonging to no army",
+      "keep": 14,
+      "icon": true,
+      "flag": [
+        0.88,
+        0.2
+      ]
+    },
+    {
+      "id": "tech_clinic_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "tech_clinic",
+      "height": 156,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has fallen in, the walls are cracked, broken open and blackened with soot, and heaps of rubble, broken stone and splintered timber lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 23
+    },
+    {
+      "id": "tech_garage",
+      "kind": "building",
+      "style": "building",
+      "height": 160,
+      "seeds": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "subject": "a small civilian roadside service garage, a single-storey brick workshop with a wide open roller door showing a vehicle lift and tool racks inside, a stack of tyres, an old hand-operated fuel pump and a small crane hoist on a concrete forecourt, faded ochre walls and a dark roof, belonging to no army",
+      "keep": 14,
+      "icon": true,
+      "flag": [
+        0.9,
+        0.19
+      ]
+    },
+    {
+      "id": "tech_garage_ruin",
+      "kind": "building",
+      "style": "ruin",
+      "from": "tech_garage",
+      "height": 160,
+      "seeds": [
+        21,
+        22,
+        23
+      ],
+      "subject": "the roof has fallen in, the walls are cracked, broken open and blackened with soot, and heaps of rubble, broken stone and splintered timber lie inside the footprint, with nothing rising above the broken walls",
+      "keep": 23
     }
   ]
 }
