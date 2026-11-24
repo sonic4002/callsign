@@ -107,8 +107,12 @@ function contacts(body, lang, rules) {
 function placeNames(body, lang, rules) {
   const points = rules.map.points.map((p) => p.callsign[lang]);
   const exact = (word) => points.find((p) => p.toLowerCase() === word.toLowerCase());
+  // A callsign named inside the message ("upgrade Viper 1", "שדרג את צפע 1") is a station,
+  // not a place, however much it sounds like one: צפע and זאב are the same to the ear.
+  const cs = rules.callsigns;
+  const stations = new Set([cs.player, cs.operator, ...Object.values(cs.classes)].map((name) => name[lang].toLowerCase()));
   const match = (word) => {
-    if (word.length < 3 || notPlaces.has(word.toLowerCase())) return null;
+    if (word.length < 3 || notPlaces.has(word.toLowerCase()) || stations.has(word.toLowerCase())) return null;
     const best = points.map((p) => [similarity(word, p, lang), p]).sort((a, b) => b[0] - a[0])[0];
     return best[0] >= 0.75 ? best[1] : null;
   };
