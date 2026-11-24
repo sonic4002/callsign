@@ -109,7 +109,9 @@ func checkInvariants(t *testing.T, s *sim.Sim) {
 		if !sq.Alive {
 			continue
 		}
-		if !sq.IsHauler() {
+		if from, taken := s.SeizedFrom(sq.ID); taken {
+			alive[from]++ // a squad a hero holds still counts for the side it will go back to
+		} else if !sq.IsHauler() {
 			alive[sq.Side]++ // haulers have their own cap
 		}
 		domain := rules.Factions[s.Sides[sq.Side].Faction].Units[sq.Unit].Domain
@@ -451,6 +453,9 @@ func TestEveryUnitSeesAsFarAsItCanBeShot(t *testing.T) {
 					continue // a hauler cannot answer anyway: it runs when it is shot at
 				}
 				for enemyID, e := range g.Units {
+					if e.Hero {
+						continue // a hero's shot gives it away like indirect fire does: see the hero tests
+					}
 					if e.MinRange == 0 && u.Sight < e.Range {
 						t.Errorf("%s %s sees %.0f but %s %s shoots %.0f", mine, id, u.Sight, theirs, enemyID, e.Range)
 					}

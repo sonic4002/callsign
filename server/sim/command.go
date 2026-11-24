@@ -49,6 +49,8 @@ type Event struct {
 	Owner     *int   `json:"owner,omitempty"`
 	Winner    *int   `json:"winner,omitempty"`
 	Reason    string `json:"reason,omitempty"`
+	// Was is the callsign a squad that changes hands had on the side that loses it.
+	Was *shared.Text `json:"was,omitempty"`
 }
 
 func (s *Sim) emit(e Event) { s.events = append(s.events, e) }
@@ -120,6 +122,12 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return nil, err
 	case CmdHaul:
 		return s.haulCommand(c)
+	case CmdFortify:
+		return s.fortifyOrder(c)
+	case CmdPlant:
+		return s.plantOrder(c)
+	case CmdSeize:
+		return s.seizeOrder(c)
 	}
 	return nil, ErrBadCommand
 }
@@ -234,7 +242,11 @@ func (s *Sim) visible(sq *Squad) bool {
 func (s *Sim) Population(side int) int {
 	n := 0
 	for _, sq := range s.Squads {
-		if sq.Side == side && sq.haul == nil && (sq.Alive || sq.Deploying()) {
+		owner := sq.Side
+		if from, taken := s.SeizedFrom(sq.ID); taken {
+			owner = from // a squad a hero holds for now still counts for the side it will go back to
+		}
+		if owner == side && sq.haul == nil && (sq.Alive || sq.Deploying()) {
 			n++
 		}
 	}
@@ -255,6 +267,9 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := s.heroAllowed(c.Side, &u); err != nil {
+		return nil, err
+	}
 	if u.Class == shared.HaulerClass {
 		if err := s.buyHauler(c, u); err != nil {
 			return nil, err
@@ -267,6 +282,7 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 		return nil, err
 	}
 	sq := s.raise(c.Side, c.Unit)
+	s.heroRaised(sq)
 	ticks := int(math.Round(u.DeploySeconds * float64(s.R.TickRate)))
 	if ticks <= 0 {
 		s.field(sq)

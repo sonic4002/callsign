@@ -131,6 +131,9 @@ func (s *Sim) resolveFor(side int, text string) (Place, error) {
 	if err != nil {
 		return pl, err
 	}
+	if pl.landmark > 0 && s.Landmarks[pl.landmark-1].Built && s.Sides[side].lands[pl.landmark-1].Kind == "" {
+		return Place{}, fmt.Errorf("%w: %q", ErrNoPlace, text) // a position this side has never seen
+	}
 	if st := pl.Structure; st != nil && st.Side != side && !st.seen[side].Known {
 		return Place{}, fmt.Errorf("%w: %q", ErrNoPlace, text)
 	}

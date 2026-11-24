@@ -40,7 +40,7 @@ func (p *Player) rising(snap sim.Snapshot, role string) bool {
 // canBuy reports whether the structure a unit needs stands.
 func (p *Player) canBuy(snap sim.Snapshot, unit string) bool {
 	u, ok := p.R.Factions[snap.Faction].Units[unit]
-	return ok && (u.Requires == "" || p.stands(snap, u.Requires))
+	return ok && (u.Requires == "" || p.stands(snap, u.Requires)) && (u.Also == "" || p.stands(snap, u.Also))
 }
 
 // raise asks for the structure with a role, or for what it needs first.

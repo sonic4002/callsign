@@ -91,6 +91,56 @@ type Unit struct {
 	// take it over. A unit with CaptureSeconds is an engineer.
 	RepairPerSecond float64 `json:"repairPerSecond,omitempty"`
 	CaptureSeconds  float64 `json:"captureSeconds,omitempty"`
+
+	// Callsign is the callsign class the unit answers to when it is not its Class: a
+	// hero is infantry and is called Ghost or Raven. Empty means the class.
+	Callsign string `json:"callsign,omitempty"`
+	// Hero marks the one exceptional soldier of an army: a squad of one, one alive at a
+	// time. StartTier is the brain tier it is fielded with. Also is a second structure
+	// role it needs beside Requires.
+	Hero      bool   `json:"hero,omitempty"`
+	StartTier int    `json:"startTier,omitempty"`
+	Also      string `json:"also,omitempty"`
+	// Stealth: an enemy sees the unit only from this close, or after it has fired.
+	Stealth float64 `json:"stealth,omitempty"`
+	// Demolition charges: how many it carries, what one does to a structure or a bridge,
+	// how long the fuse burns, and how long planting takes beside the target.
+	Charges      int     `json:"charges,omitempty"`
+	ChargeDamage float64 `json:"chargeDamage,omitempty"`
+	// ChargeVsHQ is the share of a charge's damage a headquarters takes.
+	ChargeVsHQ   float64 `json:"chargeVsHQ,omitempty"`
+	FuseSeconds  float64 `json:"fuseSeconds,omitempty"`
+	PlantSeconds float64 `json:"plantSeconds,omitempty"`
+	// Disguise: enemy fireteams do not fire on the unit from farther than this, until it fires.
+	Disguise float64 `json:"disguise,omitempty"`
+	// Seizing an enemy vehicle squad: how near the unit must come and stay, and how long it takes.
+	SeizeRadius  float64 `json:"seizeRadius,omitempty"`
+	SeizeSeconds float64 `json:"seizeSeconds,omitempty"`
+	// Dread is the stress per second its presence puts on enemy fireteams within DreadRadius.
+	Dread       float64 `json:"dread,omitempty"`
+	DreadRadius float64 `json:"dreadRadius,omitempty"`
+	// Crushes marks a heavy vehicle that kills infantry it drives through in the open.
+	Crushes bool `json:"crushes,omitempty"`
+}
+
+// CallClass is the callsign class a squad of this unit answers to.
+func (u *Unit) CallClass() string {
+	if u.Callsign != "" {
+		return u.Callsign
+	}
+	return u.Class
+}
+
+// Rank is a standing a squad earns by what it destroys: Kills is the worth of its kills in
+// multiples of its own cost. Accuracy multiplies its chance to hit, Nerve the stress it
+// takes, and HealPerSecond is the share of a member's health its teams regain out of combat.
+type Rank struct {
+	ID            string  `json:"id"`
+	Name          Text    `json:"name"`
+	Kills         float64 `json:"kills"`
+	Accuracy      float64 `json:"accuracy"`
+	Nerve         float64 `json:"nerve"`
+	HealPerSecond float64 `json:"healPerSecond"`
 }
 
 // Engineer reports whether squads of this unit can take over structures.
@@ -146,6 +196,9 @@ type LandmarkKind struct {
 	GarrisonCover float64 `json:"garrisonCover,omitempty"` // multiplier on hits taken inside, from any side
 	HP            float64 `json:"hp,omitempty"`            // of a building; at zero it falls
 	Size          float64 `json:"size,omitempty"`          // side of the ground it blocks, for buildings
+	// Arc is the width in degrees of the front a position built to face one way covers
+	// (sandbags); 0 for landmarks that cover by standing between shooter and target.
+	Arc float64 `json:"arc,omitempty"`
 }
 
 // Landmark is something on the map that belongs to no side.
@@ -221,6 +274,13 @@ type Rules struct {
 		BuildRadius     float64  `json:"buildRadius"`
 		DefenceCap      int      `json:"defenceCap"`
 		FenceRuns       int      `json:"fenceRuns"`
+		// Sandbags: how long a squad digs, and how many positions one squad may build.
+		FortifySeconds float64 `json:"fortifySeconds"`
+		SandbagLimit   int     `json:"sandbagLimit"`
+		// Crushing: how near a heavy vehicle's path must pass, and the least time between
+		// two men of one fireteam going under.
+		CrushRadius  float64 `json:"crushRadius"`
+		CrushSeconds float64 `json:"crushSeconds"`
 		// GarrisonSight is how close an enemy must be to see a fireteam inside a building.
 		GarrisonSight float64 `json:"garrisonSight"`
 		// GarrisonDamageShare is the share of the damage aimed at a garrison that the building takes too.
@@ -258,6 +318,7 @@ type Rules struct {
 	Map       Map             `json:"map"`
 	Rigs      map[string]Rig  `json:"rigs"`
 	Tiers     []Tier          `json:"tiers"`
+	Ranks     []Rank          `json:"ranks"` // earned standings, lowest first
 	Callsigns struct {
 		Player      Text            `json:"player"`
 		Operator    Text            `json:"operator"`
@@ -276,7 +337,9 @@ type Rules struct {
 		// ("take"), and how the net announces a purchase the operator made on its own.
 		Command     map[string]Words `json:"command"`
 		OwnPurchase map[string]Text  `json:"ownPurchase"`
-		Prowords    map[string]Words `json:"prowords"`
+		// HeroCue is what each side's net is told when a hero takes the field or falls.
+		HeroCue  map[string]Text  `json:"heroCue"`
+		Prowords map[string]Words `json:"prowords"`
 	} `json:"radio"`
 }
 
@@ -400,6 +463,12 @@ func (r *Rules) check() error {
 		for id, u := range f.Units {
 			if _, ok := r.Callsigns.Classes[u.Class]; !ok && u.Class != HaulerClass {
 				return fmt.Errorf("unit %s has unknown class %q", id, u.Class)
+			}
+			if _, ok := r.Callsigns.Classes[u.CallClass()]; !ok && u.Class != HaulerClass {
+				return fmt.Errorf("unit %s has unknown callsign %q", id, u.Callsign)
+			}
+			if u.Hero && (u.Teams != 1 || u.Members != 1) {
+				return fmt.Errorf("hero %s must be a squad of one", id)
 			}
 			if u.Class == HaulerClass && (u.Capacity <= 0 || u.LoadSeconds <= 0 || u.UnloadSeconds <= 0 || u.Teams != 1 || u.Members != 1) {
 				return fmt.Errorf("hauler %s needs a capacity, load and unload times, and one vehicle", id)

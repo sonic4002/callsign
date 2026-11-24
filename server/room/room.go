@@ -199,8 +199,13 @@ func (rm *Room) Tick() {
 		frame := map[string]any{"type": "event", "event": e}
 		if sq := rm.squadAny(e.Squad); sq != nil {
 			frame["callsign"] = rm.squadName(sq)
+			if e.Was != nil {
+				// A squad that just changed hands: the side losing it knew it by this name.
+				frame["callsign"] = Name{En: e.Was.En, He: e.Was.He, Squad: sq.ID}
+			}
 		}
 		rm.broadcast(e.Side, frame)
+		rm.heroNews(e)
 		if e.Kind == sim.EvSquadLost {
 			for c := range rm.clients {
 				if c.ID.Role == RoleSquad && c.ID.Side == e.Side && c.ID.Squad == e.Squad {
@@ -435,7 +440,7 @@ func (rm *Room) station(id Identity) (radio.Station, bool) {
 		return radio.Station{Kind: radio.Operator}, true
 	case RoleSquad:
 		if sq := rm.sim.Squad(id.Squad); sq != nil {
-			return radio.Station{Kind: radio.Squad, Class: sq.Class(), Num: sq.Num}, true
+			return radio.Station{Kind: radio.Squad, Class: sq.CallClass(), Num: sq.Num}, true
 		}
 	}
 	return radio.Station{}, false
@@ -444,7 +449,7 @@ func (rm *Room) station(id Identity) (radio.Station, bool) {
 // squadOf finds the living squad behind a callsign on one side.
 func (rm *Room) squadOf(side int, st radio.Station) *sim.Squad {
 	for _, sq := range rm.sim.Squads {
-		if sq.Alive && sq.Side == side && sq.Class() == st.Class && sq.Num == st.Num {
+		if sq.Alive && sq.Side == side && sq.CallClass() == st.Class && sq.Num == st.Num {
 			return sq
 		}
 	}
@@ -458,7 +463,7 @@ func (rm *Room) squadAny(id int) *sim.Squad {
 
 func (rm *Room) squadName(sq *sim.Squad) Name {
 	cs := rm.sim.Callsign(sq)
-	st := radio.Station{Kind: radio.Squad, Class: sq.Class(), Num: sq.Num}
+	st := radio.Station{Kind: radio.Squad, Class: sq.CallClass(), Num: sq.Num}
 	return Name{Key: st.Key(), En: cs.En, He: cs.He, Squad: sq.ID}
 }
 

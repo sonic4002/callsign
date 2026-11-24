@@ -748,9 +748,11 @@ func (s *Sim) unitFor(side int, unitID string) (shared.Unit, bool) {
 func (s *Sim) mayBuy(side int, unitID string) (shared.Unit, error) {
 	own := s.faction(side)
 	if u, ok := own.Units[unitID]; ok {
-		if u.Requires != "" && !s.Has(side, u.Requires) {
-			_, need := own.StructureOfRole(u.Requires)
-			return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))
+		for _, role := range []string{u.Requires, u.Also} {
+			if role != "" && !s.Has(side, role) {
+				_, need := own.StructureOfRole(role)
+				return u, fmt.Errorf("%w: build %s first", ErrNeedsStructure, a(need.Name.En))
+			}
 		}
 		return u, nil
 	}

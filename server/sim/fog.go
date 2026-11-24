@@ -176,6 +176,13 @@ func (s *Sim) observeMap(side int) {
 	for i := range s.Landmarks {
 		l, m := &s.Landmarks[i], &sd.lands[i]
 		m.Visible = s.InSight(side, l.X, l.Y)
+		if l.Built {
+			// A position built in the match is learned by seeing it, and its builder knows it.
+			if m.Visible || l.By == side {
+				m.Kind, m.HP = l.Kind, s.landmarkShare(l)
+			}
+			continue
+		}
 		if s.R.LandmarkKinds[l.Landmark.Kind].Garrison == 0 {
 			continue
 		}

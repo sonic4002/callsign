@@ -91,11 +91,11 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	}
 	sq, t, u := tr.sq, tr.t, tr.u
 	order := sq.Order.Kind
-	if order == OrderCapture {
-		order = OrderMove // engineers walk to their work and do not stop to fight
+	if order == OrderCapture || order == OrderPlant || order == OrderSeize {
+		order = OrderMove // engineers and heroes walk to their work and do not stop to fight
 	}
-	if order == OrderRepair {
-		order = OrderHold // engineers at a bridge fight like any squad holding ground
+	if order == OrderRepair || order == OrderFortify {
+		order = OrderHold // engineers at a bridge, and a squad digging in, fight like any squad holding ground
 	}
 	nerve := s.Nerve(t)
 
@@ -111,8 +111,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 			}
 			continue
 		}
-		if !o.t.Spotted {
-			continue
+		if !o.t.Spotted || s.passesFor(o, d) {
+			continue // unseen, or a disguised figure nobody has cause to shoot yet
 		}
 		if d <= 250 {
 			enemies++
@@ -143,6 +143,9 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	}
 	if wanted != nil {
 		target, targetD = wanted, wantedD
+	}
+	if target != nil && s.holdsFire(tr, targetD) {
+		target = nil // a disguised hero at work does not give itself away at long range
 	}
 	enemyHQ := s.R.HQPoint(1 - sq.Side)
 	// A squad sent at a structure shoots that structure, not the headquarters behind it.
