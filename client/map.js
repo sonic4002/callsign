@@ -2,6 +2,7 @@
 // gunfire and labels, sorted by depth. It draws only what the server sent this side.
 
 import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, house, isoBox, rock, sprites, tree } from "./art.js";
+import { advance, spreadOut } from "./motion.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
@@ -125,7 +126,7 @@ export class Scene {
           if (d < bd) [best, bd] = [v, d];
         }
         if (best) free.delete(best);
-        else best = { x: tm.x, y: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
+        else best = { x: tm.x, y: tm.y, px: tm.x, py: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
         if (tm.members < best.members) {
           this.lose(group, best, false);
           if (group.small) this.fall(group, best, best.members - tm.members);
@@ -162,7 +163,7 @@ export class Scene {
     const one = !group.small;
     for (let i = 0; i < (one ? 1 : count); i++) {
       const spread = () => (one ? 0 : (Math.random() - 0.5) * 14);
-      this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.x + spread(), y: v.y + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl });
+      this.effects.push({ kind: "casualty", unit: group.unit, cls: group.cls, x: v.px + spread(), y: v.py + spread(), turn: v.aim ?? v.turn, t0: performance.now() + i * 120, ttl });
     }
   }
 
@@ -170,16 +171,16 @@ export class Scene {
   // vehicle, a plume for a boat going under.
   lose(group, v, whole) {
     const now = performance.now();
-    if (group.small && group.air) return this.fx.pop(v.x, v.y, now); // a drone shot out of the air
-    if (group.small) return this.fx.dust(v.x, v.y, now, whole ? 1.6 : 1.1);
-    if (!whole) return this.fx.shell(v.x, v.y, now, 0.6);
+    if (group.small && group.air) return this.fx.pop(v.px, v.py, now); // a drone shot out of the air
+    if (group.small) return this.fx.dust(v.px, v.py, now, whole ? 1.6 : 1.1);
+    if (!whole) return this.fx.shell(v.px, v.py, now, 0.6);
     if (group.cls === "naval") {
-      this.fx.sinking(v.x, v.y, now);
-      this.sound("boomS", v.x, v.y);
-      this.sound("splash", v.x, v.y, 150);
+      this.fx.sinking(v.px, v.py, now);
+      this.sound("boomS", v.px, v.py);
+      this.sound("splash", v.px, v.py, 150);
     } else {
-      this.fx.wreck(v.x, v.y, now);
-      this.sound("boomM", v.x, v.y);
+      this.fx.wreck(v.px, v.py, now);
+      this.sound("boomM", v.px, v.py);
     }
   }
 
@@ -282,13 +283,13 @@ export class Scene {
       const t0 = now + i * w.gap;
       const x2 = target.x + miss();
       const y2 = target.y + miss();
-      this.effects.push({ kind: "tracer", x1: v.x, y1: v.y, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
+      this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
       const at = t0 + w.travel;
       if (w.impact === "shell") this.fx.shell(x2, y2, at, 1.25);
       else if (w.impact === "pop") this.fx.pop(x2, y2, at);
       else if (i % 2 === 0) this.fx.dust(x2, y2, at, 0.8);
     }
-    this.sound(w.sound, v.x, v.y);
+    this.sound(w.sound, v.px, v.py);
     if (w.impact === "shell") this.sound(this.fx.onWater(target.y) ? "splash" : "boomS", target.x, target.y, w.travel);
   }
 
@@ -456,20 +457,17 @@ export class Scene {
     const unitScale = Math.max(0.95 * crowd, Math.min(2.4, z * 1.9));
     const buildScale = Math.max(0.62 * crowd, Math.min(2.2, z * 1.55));
 
-    // Move what is on screen toward where the server says it is.
-    const ease = 1 - Math.exp(-dt * 9);
+    // Move what is on screen toward where the server says it is: it gathers speed, turns
+    // through the headings between, and eases to a halt (see motion.js).
     for (const group of this.groups.values()) {
+      const kind = group.air ? "air" : group.small ? "foot" : group.cls === "naval" ? "boat" : "wheels";
       for (const v of group.visuals) {
-        const dx = v.tx - v.x;
-        const dy = v.ty - v.y;
-        v.moving = Math.hypot(dx, dy) > 1.2;
-        if (v.moving) {
-          const [ix, iy] = toIso(dx, dy);
-          v.turn = Math.atan2(iy, ix);
-        }
-        v.x += dx * ease;
-        v.y += dy * ease;
+        const [ix, iy] = toIso(v.tx - v.x, v.ty - v.y);
+        advance(v, dt, kind, Math.atan2(iy, ix));
       }
+      // Men on foot are drawn far larger than life, so their teams are shown standing
+      // further apart than they are, or a squad would be one heap of soldiers.
+      spreadOut(group.visuals, kind === "foot" ? 1.75 : 1);
     }
     this.gunfire(now);
     this.smoulder(now);
@@ -516,7 +514,7 @@ export class Scene {
       }
       const wide = group.small ? 13 : 24;
       for (const v of group.visuals) {
-        const [sx, sy] = S(v.x, v.y);
+        const [sx, sy] = S(v.px, v.py);
         ctx.beginPath();
         ctx.ellipse(sx, sy, wide * unitScale, (wide / 2) * unitScale, 0, 0, TAU);
         ctx.fillStyle = `${color}38`;
@@ -553,11 +551,11 @@ export class Scene {
     for (const group of this.groups.values()) {
       for (const v of group.visuals) {
         things.push({
-          depth: v.x + v.y + (group.air ? 90 : 0), // what flies is drawn over what stands under it
-          x: v.x,
+          depth: v.px + v.py + (group.air ? 90 : 0), // what flies is drawn over what stands under it
+          x: v.px,
           y: v.y,
           scale: unitScale,
-          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0 }),
+          draw: () => drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, go: v.go, stride: v.stride, turnRate: v.turnRate }),
         });
       }
     }
@@ -699,7 +697,7 @@ export class Scene {
     for (const group of this.groups.values()) {
       if (!group.visuals.length) continue;
       const cx = group.visuals.reduce((a, v) => a + v.x, 0) / group.visuals.length;
-      const low = Math.max(...group.visuals.map((v) => cam.screen(v.x, v.y)[1]));
+      const low = Math.max(...group.visuals.map((v) => cam.screen(v.px, v.py)[1]));
       const [sx] = cam.screen(cx, group.visuals.reduce((a, v) => a + v.y, 0) / group.visuals.length);
       if (!group.own) {
         // An enemy in sight gets a name the player can say: "Viper 1 attack Target 3".
@@ -826,7 +824,7 @@ export class Scene {
     for (const group of this.groups.values()) {
       if (group.own && group.side !== side) continue;
       for (const v of group.visuals) {
-        const [vx, vy] = this.cam.screen(v.x, v.y);
+        const [vx, vy] = this.cam.screen(v.px, v.py);
         const d = Math.hypot(vx - sx, vy - 10 - sy);
         if (d < bd) [squad, contact, bd] = group.own ? [group.view, null, d] : [null, group.view, d];
       }
