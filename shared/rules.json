@@ -635,7 +635,7 @@
         "militia": {
           "name": { "en": "Militia cell", "he": "חוליית מיליציה" },
           "requires": "barracks",
-          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3,
+          "class": "infantry", "domain": "land", "cost": 100, "deploySeconds": 3.5,
           "teams": 4, "members": 3, "hp": 41, "armor": 0,
           "speed": 30, "range": 160, "sight": 265,
           "damage": 9, "cooldownTicks": 8, "accuracy": 0.46, "nerveResist": 0.8,
