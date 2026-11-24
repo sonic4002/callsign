@@ -3,7 +3,9 @@
 
 import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, house, isoBox, rock, sprites, tree } from "./art.js";
 import { Fog } from "./fog.js";
+import { Fx } from "./fx.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
+import { hearing, weaponOf } from "./sfx.js";
 
 export const sideColor = { [-1]: "#cfd3c8", 0: "#4da3ff", 1: "#ff6b4a" };
 const nerveColor = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
@@ -32,6 +34,10 @@ export class Scene {
     this.state = null;
     this.groups = new Map(); // squad id → what is drawn for it
     this.effects = [];
+    this.fx = new Fx(); // blasts, smoke, spray and scorch marks
+    this.sfx = null; // battle sounds; the page sets it once it has a volume to follow
+    this.hqSeen = null; // headquarters health as of the last state, to notice hits
+    this.hqHitAt = [-1e9, -1e9];
     this.selected = 0;
     this.last = performance.now();
     this.waves = [];
@@ -41,6 +47,8 @@ export class Scene {
     this.rules = rules;
     this.groups.clear();
     this.effects = [];
+    this.fx.reset(rules.map.waterY);
+    this.hqSeen = null;
     this.selected = 0;
     this.factionOf = {};
     this.unitOf = {};
@@ -108,14 +116,14 @@ export class Scene {
         if (best) free.delete(best);
         else best = { x: tm.x, y: tm.y, turn: g.side === 0 ? 0.4 : Math.PI - 0.4, seed: Math.random() * 10, nextShot: 0, members: tm.members };
         if (tm.members < best.members) {
-          this.puff(best.x, best.y, 0.5);
+          this.lose(group, best, false);
           if (group.cls === "infantry") this.fall(group, best, best.members - tm.members);
         }
         Object.assign(best, { tx: tm.x, ty: tm.y, members: tm.members, action: tm.action, nerve: tm.nerve });
         next.push(best);
       }
       for (const lost of free) {
-        this.puff(lost.x, lost.y, 1);
+        this.lose(group, lost, true);
         this.fall(group, lost, lost.members);
       }
       group.visuals = next;
@@ -127,12 +135,13 @@ export class Scene {
       const now = performance.now();
       for (const v of group.visuals) {
         if (!group.own && !(now - v.hitAt < 2500)) continue;
-        this.puff(v.x, v.y, 1);
+        this.lose(group, v, true);
         this.fall(group, v, v.members);
       }
       this.groups.delete(id);
     }
     if (this.selected && !state.squads.some((s) => s.id === this.selected)) this.selected = 0;
+    this.hqWatch(state);
   }
 
   // fall leaves what is left of `count` soldiers, or of a vehicle or boat, where it was.
@@ -146,8 +155,66 @@ export class Scene {
     }
   }
 
-  puff(x, y, size) {
-    this.effects.push({ kind: "puff", x, y, size, t0: performance.now(), ttl: 650 });
+  // lose shows a team taking a loss: dust for a soldier down, a burning wreck for a
+  // vehicle, a plume for a boat going under.
+  lose(group, v, whole) {
+    const now = performance.now();
+    if (group.cls === "infantry") return this.fx.dust(v.x, v.y, now, whole ? 1.6 : 1.1);
+    if (!whole) return this.fx.shell(v.x, v.y, now, 0.6);
+    if (group.cls === "naval") {
+      this.fx.sinking(v.x, v.y, now);
+      this.sound("boomS", v.x, v.y);
+      this.sound("splash", v.x, v.y, 150);
+    } else {
+      this.fx.wreck(v.x, v.y, now);
+      this.sound("boomM", v.x, v.y);
+    }
+  }
+
+  // hqWatch notices a headquarters losing health between two states, or falling.
+  hqWatch(state) {
+    const hq = state.hq ?? [];
+    const now = performance.now();
+    for (const p of this.rules.map.points) {
+      if (p.kind !== "hq") continue;
+      const was = this.hqSeen?.[p.owner];
+      const is = hq[p.owner];
+      if (was === undefined || is === undefined || is >= was) continue;
+      if (is <= 0) {
+        this.fx.collapse(p.x, p.y, now);
+        this.sound("boomL", p.x, p.y);
+      } else if (now - this.hqHitAt[p.owner] > 650) {
+        this.hqHitAt[p.owner] = now;
+        this.fx.strike(p.x, p.y, now, 0.8);
+        this.sound("boomS", p.x, p.y);
+      }
+    }
+    this.hqSeen = [...hq];
+  }
+
+  // sound plays a battle sound as heard from the middle of the view.
+  sound(kind, x, y, delay = 0) {
+    if (!this.sfx) return;
+    const [sx, sy] = this.cam.screen(x, y);
+    this.sfx.play(kind, hearing(this.cam, sx, sy, this.cam.zoom), delay);
+  }
+
+  // shoot shows and sounds one burst from a team's weapon at a target.
+  shoot(group, v, target, now) {
+    const w = weaponOf(group.unit, group.cls);
+    const miss = () => (Math.random() - 0.5) * 16;
+    for (let i = 0; i < w.rounds; i++) {
+      const t0 = now + i * w.gap;
+      const x2 = target.x + miss();
+      const y2 = target.y + miss();
+      this.effects.push({ kind: "tracer", x1: v.x, y1: v.y, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
+      const at = t0 + w.travel;
+      if (w.impact === "shell") this.fx.shell(x2, y2, at, 1.25);
+      else if (w.impact === "pop") this.fx.pop(x2, y2, at);
+      else if (i % 2 === 0) this.fx.dust(x2, y2, at, 0.8);
+    }
+    this.sound(w.sound, v.x, v.y);
+    if (w.impact === "shell") this.sound(this.fx.onWater(target.y) ? "splash" : "boomS", target.x, target.y, w.travel);
   }
 
   // ---- terrain ----
@@ -276,7 +343,21 @@ export class Scene {
 
   // ---- frame ----
 
+  // draw paints one frame, nudged a few pixels when a blast shakes the view.
   draw(now) {
+    const z = this.cam.zoom;
+    const [kx, ky] = this.fx.offset(now);
+    this.cam.cx -= kx / z;
+    this.cam.cy -= ky / z;
+    try {
+      this.paint(now);
+    } finally {
+      this.cam.cx += kx / z;
+      this.cam.cy += ky / z;
+    }
+  }
+
+  paint(now) {
     const { ctx, cam } = this;
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
@@ -332,6 +413,8 @@ export class Scene {
       }
     }
     this.gunfire(now);
+    this.fx.update(now, dt);
+    this.sfx?.refresh();
 
     // Ground markings: capture rings, order lines, team rings.
     const [rx, ry] = groundEllipse(rules.match.captureRadius);
@@ -398,6 +481,8 @@ export class Scene {
       }
     }
 
+    this.fx.drawGround(ctx, cam, unitScale, now);
+
     // Everything that stands up, far to near.
     const things = [];
     for (const p of rules.map.points) {
@@ -434,7 +519,7 @@ export class Scene {
     this.effects = this.effects.filter((e) => now - e.t0 < e.ttl);
     for (const e of this.effects) {
       const life = (now - e.t0) / e.ttl;
-      if (e.kind === "tracer") {
+      if (e.kind === "tracer" && life >= 0) {
         const [ax, ay] = S(e.x1, e.y1);
         const [bx, by] = S(e.x2, e.y2);
         const lift = 12 * unitScale;
@@ -452,21 +537,9 @@ export class Scene {
           ctx.arc(ax + Math.cos(e.turn) * 10 * unitScale, ay - lift + Math.sin(e.turn) * 5 * unitScale, (e.heavy ? 6 : 3.5) * unitScale, 0, TAU);
           ctx.fill();
         }
-      } else if (e.kind === "puff" && life >= 0) {
-        const [sx, sy] = S(e.x, e.y);
-        const r = (5 + 16 * life) * e.size * unitScale;
-        ctx.fillStyle = `rgba(${e.size >= 1 ? "60,54,48" : "150,140,120"},${0.55 * (1 - life)})`;
-        ctx.beginPath();
-        ctx.ellipse(sx, sy - 8 * unitScale - 14 * life * unitScale, r, r * 0.75, 0, 0, TAU);
-        ctx.fill();
-        if (e.size >= 1 && life < 0.3) {
-          ctx.fillStyle = `rgba(255,170,70,${0.9 - 3 * life})`;
-          ctx.beginPath();
-          ctx.arc(sx, sy - 8 * unitScale, 9 * unitScale * (1 - life), 0, TAU);
-          ctx.fill();
-        }
       }
     }
+    this.fx.draw(ctx, cam, unitScale, now);
 
     // Fog of war over everything on the ground; the labels stay readable above it.
     this.fog.render(state.fog, this.eyes());
@@ -480,6 +553,11 @@ export class Scene {
   eyes() {
     const { rules } = this;
     const eyes = rules.map.points.filter((p) => p.kind === "hq" && p.owner === this.state.side).map((p) => [p.x, p.y, rules.hq.sight]);
+    // A point we hold keeps watch over the ground around it.
+    for (const live of this.state.points) {
+      const p = rules.map.points.find((q) => q.id === live.id);
+      if (p.kind !== "hq" && live.owner === this.state.side) eyes.push([p.x, p.y, rules.match.pointSight]);
+    }
     for (const group of this.groups.values()) {
       if (group.own) for (const v of group.visuals) eyes.push([v.x, v.y, this.unitOf[group.unit].sight]);
     }
@@ -493,7 +571,6 @@ export class Scene {
     for (const group of all) {
       const stats = this.unitOf[group.unit];
       if (!stats) continue;
-      const heavy = group.cls !== "infantry";
       for (const v of group.visuals) {
         if (group.own && v.action !== "fire") continue;
         let target = null;
@@ -505,6 +582,11 @@ export class Scene {
             if (d < bd) [target, bd] = [o, d];
           }
         }
+        // With no enemy team in reach, a firing team is shooting at the headquarters.
+        if (!target && (group.own || now - this.hqHitAt[1 - group.side] < 1500)) {
+          const hq = this.rules.map.points.find((p) => p.kind === "hq" && p.owner === 1 - group.side);
+          if (hq && Math.hypot(hq.x - v.x, hq.y - v.y) < bd) target = { x: hq.x, y: hq.y };
+        }
         if (!target) continue;
         v.aim = Math.atan2(...toIso(target.x - v.x, target.y - v.y).reverse());
         // A hull keeps its heading when its weapon can turn without it.
@@ -515,9 +597,7 @@ export class Scene {
         target.hitAt = now;
         v.nextShot = now + (stats.cooldownTicks / this.rules.tickRate) * 1000 * (0.75 + Math.random() * 0.5);
         v.flashUntil = now + 110;
-        const miss = () => (Math.random() - 0.5) * 16;
-        this.effects.push({ kind: "tracer", x1: v.x, y1: v.y, x2: target.x + miss(), y2: target.y + miss(), turn: v.turn, heavy, flash: !hasAnimation(group.unit), t0: now, ttl: heavy ? 260 : 170 });
-        if (heavy) this.effects.push({ kind: "puff", x: target.x + miss(), y: target.y + miss(), size: 0.6, t0: now + 120, ttl: 500 });
+        this.shoot(group, v, target, now);
       }
     }
   }
