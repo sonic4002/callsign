@@ -14,8 +14,9 @@
 //   CALLSIGN_OPERATOR       "0" to play without Anvil
 //   CALLSIGN_OPERATOR_MODEL model id for Anvil (default: the top model)
 
-import { Agent } from "./agent.mjs";
-import { Link } from "./link.mjs";
+import { Host } from "./host.mjs";
+
+export { Host };
 
 export async function makeBrain(env = process.env) {
   const key = env.CALLSIGN_ANTHROPIC_KEY ?? "";
@@ -48,68 +49,6 @@ export async function makeBrain(env = process.env) {
 async function scripted() {
   const { scriptedBrain } = await import("./brain-scripted.mjs");
   return scriptedBrain();
-}
-
-// Host keeps one agent per station on a side in step with the match.
-export class Host {
-  constructor({ server, side = 0, brain, operator = true, log = console.log, standByMs }) {
-    Object.assign(this, { server, side, brain, operator, log, standByMs });
-    this.agents = new Map(); // squad id (0 for Anvil) → Agent
-  }
-
-  // start joins the match. `closed` resolves when the server drops the control connection.
-  async start() {
-    this.closed = new Promise((resolve) => (this.onClosed = resolve));
-    // The control connection only listens: which squads exist, and when the match restarts.
-    this.control = new Link(
-      `${this.server}?${new URLSearchParams({ side: this.side, role: "anvil", state: "0" })}`,
-      (frame) => this.#onFrame(frame),
-      () => {
-        this.stop();
-        this.onClosed();
-      },
-    );
-    await this.control.open();
-  }
-
-  // ready reports whether every agent that should exist has joined the net.
-  get ready() {
-    return this.agents.size > 0 && [...this.agents.values()].every((a) => a.me);
-  }
-
-  stop() {
-    for (const agent of this.agents.values()) agent.stop();
-    this.agents.clear();
-    this.control?.close();
-  }
-
-  #onFrame(frame) {
-    if (frame.type === "hello") {
-      for (const agent of this.agents.values()) agent.stop();
-      this.agents.clear();
-      this.log(`match ${frame.match}: side ${this.side} (${frame.faction}), brain: ${this.brain.name}`);
-      if (this.operator) this.#add("anvil", 0);
-      for (const sq of frame.state.squads) this.#add("squad", sq.id);
-    } else if (frame.type === "event" && frame.event.kind === "squad_spawned") {
-      this.#add("squad", frame.event.squad);
-    } else if (frame.type === "event" && frame.event.kind === "squad_lost") {
-      this.agents.get(frame.event.squad)?.stop();
-      this.agents.delete(frame.event.squad);
-    }
-  }
-
-  async #add(role, squad) {
-    if (this.agents.has(squad)) return;
-    const agent = new Agent({ server: this.server, side: this.side, role, squad, brain: this.brain, log: this.log, standByMs: this.standByMs });
-    this.agents.set(squad, agent);
-    try {
-      await agent.start();
-      this.log(`${agent.name} is on the net`);
-    } catch (err) {
-      this.agents.delete(squad);
-      this.log(`could not start the agent for ${role} ${squad || ""}: ${err.message}`);
-    }
-  }
 }
 
 if (import.meta.main) {

@@ -1,5 +1,8 @@
 // One agent: the operator (Anvil) or a squad leader. It sleeps until the net calls it or
 // something happens to its squad, then thinks once and acts through the game tools.
+//
+// This file and what it imports run unchanged in Node and in a Web Worker in the player's
+// browser: nothing here may use a Node-only module.
 
 import { Link } from "./link.mjs";
 import { leaderPrompt, operatorPrompt } from "./prompts.mjs";
@@ -10,8 +13,9 @@ const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack"]);
 const standBy = { en: "Stand by", he: "המתן" };
 
 export class Agent {
-  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15 }) {
-    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation });
+  // `join` is added to the address the agent joins with: its host's id, and later its room.
+  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, join = {} }) {
+    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, join });
     this.inbox = [];
     this.traffic = []; // the last few transmissions on the net, ours included
     this.history = [];
@@ -24,7 +28,7 @@ export class Agent {
   }
 
   async start() {
-    const query = new URLSearchParams({ side: this.side, role: this.role, state: "0" });
+    const query = new URLSearchParams({ ...this.join, side: this.side, role: this.role, state: "0" });
     if (this.squad) query.set("squad", this.squad);
     this.link = new Link(
       `${this.server}?${query}`,
@@ -180,7 +184,9 @@ export class Agent {
         this.history.push({ role: "user", content: results });
       }
     } catch (err) {
+      // The wake is skipped. The squad keeps its last order and the fireteams keep fighting.
       this.log(`${this.name}: thinking failed: ${err.message}`);
+      this.onTrouble?.(err);
     } finally {
       clearTimeout(timer);
     }

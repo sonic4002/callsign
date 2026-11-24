@@ -53,6 +53,7 @@ type frame struct {
 	OK       bool      `json:"ok"`
 	Error    string    `json:"error"`
 	Reason   string    `json:"reason"`
+	Active   bool      `json:"active"`
 }
 
 // drain returns everything queued for a client so far.
@@ -528,5 +529,83 @@ func TestSayStrictnessLevels(t *testing.T) {
 		case tc.to != "" && (err != nil || len(m.To) != 1 || m.To[0].Key != tc.to):
 			t.Errorf("level %d %q: got %+v %v, want it to reach %s", tc.level, tc.text, m.To, err, tc.to)
 		}
+	}
+}
+
+func TestOnlyOneHostRunsASidesAgents(t *testing.T) {
+	rm := newRoom(t, Config{})
+	hello := func(c *Client) (active, seen bool) {
+		for _, f := range drain(t, c) {
+			if f.Type == "hello" {
+				active, seen = f.Active, true
+			}
+		}
+		return
+	}
+	host := func(id string, rank int) *Client {
+		c, err := rm.Join(Identity{Side: 0, Role: RoleHost, Host: id, Rank: rank}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	seat := func(id string, role string, squad int) (*Client, error) {
+		return rm.Join(Identity{Side: 0, Role: role, Squad: squad, Host: id}, false)
+	}
+
+	node := host("node", RankServer)
+	if active, _ := hello(node); !active {
+		t.Fatal("the only host should be active")
+	}
+	anvil, err := seat("node", RoleAnvil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leader, _ := seat("node", RoleSquad, 1)
+
+	// The player's browser outranks it: the server-side agents are disconnected.
+	page := host("page", RankBrowser)
+	if active, _ := hello(page); !active {
+		t.Fatal("the browser host should take the side")
+	}
+	if active, seen := hello(node); !seen || active {
+		t.Fatalf("the server host should be told to stand by: seen=%v active=%v", seen, active)
+	}
+	if !anvil.closed || !leader.closed {
+		t.Fatal("the standing-by host's agents are still connected")
+	}
+	if _, err := seat("node", RoleSquad, 1); !errors.Is(err, ErrNotActiveHost) {
+		t.Fatalf("an agent of the standing-by host joined: %v", err)
+	}
+	mine, err := seat("page", RoleSquad, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A second browser of the same rank waits its turn, and the other side is untouched.
+	late := host("late", RankBrowser)
+	if active, _ := hello(late); active {
+		t.Fatal("a later host of the same rank took the side")
+	}
+	if _, err := rm.Join(Identity{Side: 1, Role: RoleAnvil, Host: "east"}, false); !errors.Is(err, ErrNotActiveHost) {
+		t.Fatalf("side 1 has no host, yet a hosted agent joined: %v", err)
+	}
+	if _, err := rm.Join(Identity{Side: 0, Role: RoleSquad, Squad: 2}, false); err != nil {
+		t.Fatalf("an agent that names no host is not managed: %v", err)
+	}
+
+	// The browser leaves: the first of the others takes over and is told so.
+	rm.Leave(page)
+	if !mine.closed {
+		t.Fatal("the browser's agent outlived its host")
+	}
+	if active, seen := hello(late); !seen || !active {
+		t.Fatalf("the next host of the highest rank should take over: seen=%v active=%v", seen, active)
+	}
+	if active, seen := hello(node); seen && active {
+		t.Fatal("the lower-ranked host was activated over a higher one")
+	}
+	rm.Leave(late)
+	if active, seen := hello(node); !seen || !active {
+		t.Fatalf("the server host should resume: seen=%v active=%v", seen, active)
 	}
 }

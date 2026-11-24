@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -29,6 +30,8 @@ func main() {
 	assets := flag.String("assets", "assets", "directory of generated art and audio, served read-only at /assets/")
 	speed := flag.Int("speed", 1, "run the clock this many times faster than real time")
 	tts := flag.String("tts", "", "address of the speech service (tts/server.py), passed on at /tts/; empty for none")
+	agents := flag.String("agents", "agents", "directory of the agent runtime, whose browser modules are served read-only at /agents/")
+	relay := flag.String("relay", "", "address of the model relay, passed on at /relay/; empty for none")
 	flag.Parse()
 
 	rules, err := shared.Load()
@@ -67,6 +70,16 @@ func main() {
 		}
 		mux.Handle("/tts/", http.StripPrefix("/tts", httputil.NewSingleHostReverseProxy(target)))
 	}
+	// The player's browser runs its own agents: the same modules the Node host runs.
+	mux.Handle("/agents/", agentModules(*agents))
+	if *relay != "" {
+		// Agents think through the model relay, and the page reaches it at one origin.
+		target, err := url.Parse(*relay)
+		if err != nil || target.Host == "" {
+			log.Fatalf("-relay must be a URL such as http://relay:8090, not %q", *relay)
+		}
+		mux.Handle("/relay/", httputil.NewSingleHostReverseProxy(target))
+	}
 	mux.Handle("/", http.FileServer(http.Dir(*client)))
 
 	// Cross-origin isolation lets the page's speech recogniser use WebAssembly threads.
@@ -88,4 +101,23 @@ func main() {
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+}
+
+// browserModules are the parts of the agent runtime that run in the browser. Nothing else
+// in that directory is served: not the Node-only brains, the tests or the package files.
+var browserModules = map[string]bool{
+	"agent.mjs": true, "link.mjs": true, "tools.mjs": true, "prompts.mjs": true, "host.mjs": true,
+	"brain-relay.mjs": true, "brain-scripted.mjs": true, "worker.mjs": true,
+}
+
+func agentModules(dir string) http.Handler {
+	files := http.StripPrefix("/agents/", http.FileServer(http.Dir(dir)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.Method != http.MethodGet && r.Method != http.MethodHead) || !browserModules[strings.TrimPrefix(r.URL.Path, "/agents/")] {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		files.ServeHTTP(w, r)
+	})
 }

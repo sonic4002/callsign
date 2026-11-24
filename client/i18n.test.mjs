@@ -10,7 +10,7 @@ const en = JSON.parse(read("i18n/en.json"));
 const he = JSON.parse(read("i18n/he.json"));
 const page = read("index.html");
 // Every script of the page, one after the other.
-const script = readdirSync(new URL(".", import.meta.url))
+const script = [...readdirSync(new URL(".", import.meta.url)), ...readdirSync(new URL("brains/", import.meta.url)).map((name) => `brains/${name}`)]
   .filter((name) => name.endsWith(".js"))
   .map(read)
   .join("\n");
@@ -26,6 +26,10 @@ const dynamic = {
   "voice.": ["asking", "loading", "listening", "working", "unsupported", "denied", "missing", "nothing", "failed"],
   "class.": classes,
   "side.": ["0", "1"],
+  "brains.": ["server", "relay", "demo", "standby"],
+  "agents.": ["relay", "demo", "server", "paused", "stopped", "skipped"],
+  "provider.": ["anthropic", "openrouter", "gemini", "openai"],
+  "trouble.": ["no_key", "bad_key", "rate_limited", "provider_error", "not_your_seat", "bad_request", "unreachable", "failed", "join"],
 };
 
 test("Hebrew and English have the same strings", () => {

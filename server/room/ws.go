@@ -22,7 +22,8 @@ type inbound struct {
 	Args   json.RawMessage `json:"args"`
 }
 
-// ServeWS is the WebSocket endpoint: /ws?side=0&role=hammer|anvil|squad|spectator&squad=<id>&state=0|1
+// ServeWS is the WebSocket endpoint: /ws?side=0&role=hammer|anvil|squad|spectator|host&squad=<id>&state=0|1
+// Agent hosts add host=<id> (and rank=<n> on their own connection); see host.go.
 //
 // Phase 0 has no accounts: a client is whoever it says it is. The role still limits what
 // that connection can do, and every action is checked by the simulation.
@@ -30,7 +31,8 @@ func (rm *Room) ServeWS(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	side, _ := strconv.Atoi(q.Get("side"))
 	squad, _ := strconv.Atoi(q.Get("squad"))
-	id := Identity{Side: side, Role: q.Get("role"), Squad: squad}
+	rank, _ := strconv.Atoi(q.Get("rank"))
+	id := Identity{Side: side, Role: q.Get("role"), Squad: squad, Host: q.Get("host"), Rank: rank}
 	if id.Role == "" {
 		id.Role = RoleHammer
 	}
