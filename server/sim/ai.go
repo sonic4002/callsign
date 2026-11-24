@@ -105,7 +105,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 		target, targetD = wanted, wantedD
 	}
 	enemyHQ := s.R.HQPoint(1 - sq.Side)
-	hq := target == nil && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
+	// A squad sent at a structure shoots that structure, not the headquarters behind it.
+	hq := target == nil && sq.Order.Structure == 0 && (order == OrderAttack || order == OrderHold) && u.Against("hq") > 0 &&
 		dist(t.X, t.Y, enemyHQ.X, enemyHQ.Y) <= u.Range
 	var structure *Structure
 	if target == nil && !hq {

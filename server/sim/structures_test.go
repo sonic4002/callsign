@@ -551,3 +551,29 @@ func TestAFenceRunsBetweenTwoPlaces(t *testing.T) {
 		}
 	}
 }
+
+// A squad ordered onto a structure beside the enemy headquarters shoots the structure.
+func TestAnOrderOnAStructureOutranksTheHeadquartersBesideIt(t *testing.T) {
+	s := newSim(t, 1)
+	target := own(s, 1, shared.RoleRefinery)
+	hq := rules.HQPoint(1)
+	tanks := buyFielded(t, s, 0, "tank")
+	for _, sq := range s.Squads {
+		if sq.Side == 1 {
+			place(sq, 1500, 60)
+		}
+	}
+	// Within reach of both the refinery and the headquarters.
+	place(tanks, hq.X-150, (hq.Y+target.Y)/2)
+	s.Step()
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdAttack, Squad: tanks.ID, Place: target.ID})
+	for i := 0; i < 3000 && own(s, 1, shared.RoleRefinery) != nil; i++ {
+		s.Step()
+	}
+	if own(s, 1, shared.RoleRefinery) != nil {
+		t.Fatal("the tanks never brought the refinery down")
+	}
+	if got := s.Snapshot(sim.Spectator).HQ[1]; got != 1 {
+		t.Fatalf("the headquarters was shot at while the order was on the refinery: health %.2f", got)
+	}
+}
