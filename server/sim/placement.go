@@ -128,13 +128,35 @@ func (s *Sim) baseReach(side int, def *shared.Structure, x, y float64) bool {
 	return false
 }
 
-// DockReach is how far from its headquarters a side may put a dockyard: far enough to
-// reach the nearest shore.
+// dockReach is how far from its headquarters a side may put a dockyard: far enough to
+// reach the nearest shore. It is read from the terrain alone, so the page can work it out
+// too: the land cell with water beside it nearest to a spot just in front of the
+// headquarters, the lowest row and column breaking a tie.
 func (s *Sim) dockReach(side int) float64 {
+	m := &s.R.Map
 	hq := s.R.HQPoint(side)
-	x, y := s.dockPosition(side)
-	return dist(hq.X, hq.Y, x, y) + 120
+	x, y := hq.X+s.inward(side)*60, hq.Y
+	bx, by, bd := x, y, math.MaxFloat64
+	for r := range m.Terrain {
+		for c := range m.Terrain[r] {
+			cx, cy := (float64(c)+0.5)*m.Cell, (float64(r)+0.5)*m.Cell
+			if m.TerrainAt(cx, cy) != 'L' {
+				continue
+			}
+			wet := false
+			for _, d := range [][2]float64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				wet = wet || m.TerrainAt(cx+d[0]*m.Cell, cy+d[1]*m.Cell) == 'W'
+			}
+			if d := dist(x, y, cx, cy); wet && d < bd {
+				bx, by, bd = cx, cy, d
+			}
+		}
+	}
+	return dist(hq.X, hq.Y, bx, by) + dockMargin
 }
+
+// dockMargin is added to the distance of the nearest shore: room to find a free spot on it.
+const dockMargin = 160.0
 
 // SiteFor chooses where a base structure goes when nobody said: the scripted enemy and
 // an operator who was only told what to build both use it. It takes the first place of

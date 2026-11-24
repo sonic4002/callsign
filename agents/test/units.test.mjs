@@ -17,7 +17,7 @@ const hammer = { key: "player", en: "Hammer", he: "פטיש" };
 test("the game tools: the six in the design, build and haul for the operator, capture and repair for engineers only", () => {
   const names = (tools) => tools.map((t) => t.name).sort();
   assert.deepEqual(names(leaderTools), ["attack", "hold", "move", "radio", "report"]);
-  assert.deepEqual(names(operatorTools), ["build", "buy", "command", "haul", "radio", "report"]);
+  assert.deepEqual(names(operatorTools), ["build", "buy", "cancel", "command", "haul", "radio", "rally", "report"]);
   const { units } = rules.factions.aegis;
   assert.deepEqual(names(leaderToolsFor(units.commandos)), names(leaderTools));
   assert.deepEqual(names(leaderToolsFor(units.engineers)), ["attack", "capture", "hold", "move", "radio", "repair", "report"]);

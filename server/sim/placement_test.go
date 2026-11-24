@@ -243,6 +243,22 @@ func TestEveryMapHasGroundForAFullBase(t *testing.T) {
 // are checked against one table, so they cannot drift apart: UPDATE_PLACEMENT=1 rewrites it.
 func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 	s := baseSim(t, 1)
+	// A point held away from the base, a gun beside it and a fence at home, so the table
+	// also covers ground that a held point opens and that small works block.
+	wealth(s, 0, 1500)
+	for i := range s.Points {
+		if s.Points[i].ID == "D" {
+			s.Points[i].Owner = 0
+		}
+	}
+	if _, err := s.Build(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "sentryGun", Place: "D"}); err != nil {
+		t.Fatal(err)
+	}
+	run(s, 30)
+	if _, err := s.Build(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "barrierWall", Place: "base:north"}); err != nil {
+		t.Fatal(err)
+	}
+	run(s, 30)
 	type row struct {
 		Kind string `json:"kind"`
 		Side int    `json:"side"`
@@ -269,10 +285,12 @@ func TestPlacementMatchesTheTableThePageIsCheckedAgainst(t *testing.T) {
 	}
 	type table struct {
 		Step       float64             `json:"step"`
+		Points     []sim.PointView     `json:"points"`
 		Structures []sim.StructureView `json:"structures"`
 		Rows       []row               `json:"rows"`
 	}
-	got := table{step, s.Snapshot(sim.Spectator).Structures, rows}
+	snap := s.Snapshot(sim.Spectator)
+	got := table{step, snap.Points, snap.Structures, rows}
 	const path = "../../client/testdata/placement-small.json"
 	if os.Getenv("UPDATE_PLACEMENT") != "" {
 		data, _ := json.MarshalIndent(got, "", " ")
