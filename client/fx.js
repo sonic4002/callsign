@@ -87,6 +87,7 @@ export class Fx {
     this.kick = 0; // pixels of screen shake still to play out
     this.kicks = []; // jolts waiting for their blast
     this.view = null; // { w, h, screen(x, y) } of the last frame, for culling and shake
+    this.smolders = new Map(); // id → when that fire next puts out smoke
   }
 
   reset(waterY = Infinity) {
@@ -96,6 +97,7 @@ export class Fx {
     this.emitters.clear();
     this.kick = 0;
     this.kicks = [];
+    this.smolders.clear();
   }
 
   onWater(y) {
@@ -239,14 +241,49 @@ export class Fx {
     this.blast(x + rand(-22, 22), y + rand(-22, 22), now, s, { h: rand(8, 34), scorch: false, shake: 2.2 });
   }
 
-  // collapse is a headquarters destroyed: blasts walking across it, then a long fire.
+  // collapse is a headquarters destroyed: one great blast that throws the building
+  // apart, a shock wave and a wall of dust across the ground, smaller blasts walking
+  // through what is left, then a long fire.
   collapse(x, y, now) {
-    this.blast(x, y, now, 3.2, { h: 14, pri: 4, shake: 3.4 });
-    for (let i = 0; i < 7; i++) {
-      this.blast(x + rand(-34, 34), y + rand(-34, 34), now + 180 + i * rand(190, 300), rand(1.1, 2.1), { h: rand(4, 36), pri: 3, shake: 2.6 });
+    this.blast(x, y, now, 3.6, { h: 16, pri: 4, shake: 3.3 });
+    this.blob("flash", x, y, { t0: now, ttl: 260, r0: 40, r1: 150, a: 0.9, add: true, h: 20, pri: 4 });
+    this.ring(x, y, { t0: now + 40, ttl: 900, r0: 14, r1: 150, a: 0.6 });
+    this.ring(x, y, { t0: now + 220, ttl: 1100, r0: 10, r1: 110, a: 0.35 });
+    // Pieces of the building, thrown high and far.
+    for (let i = 0; i < 34; i++) {
+      const dir = rand(0, TAU);
+      const sp = rand(30, 150);
+      this.speck(["#59636b", "#3c4348", "#8b97a0", "#6b5a45", "#2a2622"][i % 5], x + rand(-14, 14), y + rand(-14, 14), { t0: now + rand(0, 90), ttl: 2600, vx: Math.cos(dir) * sp, vy: Math.sin(dir) * sp, vh: rand(120, 330), g: 300, size: rand(2.2, 4.6), h: rand(6, 30), pri: 3 });
     }
-    this.column(x - 12, y + 6, now, 40, 2.1);
-    this.column(x + 14, y - 8, now + 900, 40, 1.7);
+    // Dust rolling out along the ground.
+    for (let i = 0; i < 14; i++) {
+      const dir = (i / 14) * TAU + rand(-0.2, 0.2);
+      const sp = rand(34, 70);
+      this.blob("dust", x, y, { t0: now + rand(120, 380), ttl: rand(1900, 2900), r0: 9, r1: rand(30, 44), a: 0.6, vx: Math.cos(dir) * sp, vy: Math.sin(dir) * sp, vh: rand(4, 12), drag: 1.3, h: 2, pri: 2 });
+    }
+    for (let i = 0; i < 9; i++) {
+      this.blast(x + rand(-38, 38), y + rand(-38, 38), now + 260 + i * rand(210, 330), rand(1.1, 2.2), { h: rand(4, 36), pri: 3, shake: 2.6 });
+    }
+    this.column(x - 12, y + 6, now + 300, 40, 2.1);
+    this.column(x + 14, y - 8, now + 1100, 40, 1.7);
+  }
+
+  // smolder is a building on fire for as long as it is called, once a frame: level 1 is a
+  // thread of smoke from the roof, 2 is flames and dark smoke, 3 is a ruin burning low.
+  // `id` names the fire, `roof` is how high above the ground it burns.
+  smolder(id, x, y, now, level, roof = 30) {
+    if (level <= 0 || now < (this.smolders.get(id) ?? 0)) return;
+    this.smolders.set(id, now + [0, 300, 170, 190][level]);
+    if (!this.onScreen(x, y)) return;
+    const big = level === 1 ? 0.75 : level === 2 ? 1.25 : 1.1;
+    const h = level === 3 ? roof * 0.3 : roof;
+    const spots = level === 1 ? [[6, -4]] : level === 2 ? [[6, -4], [-10, 6]] : [[-12, 6], [12, -6], [0, 12]];
+    const [ox, oy] = spots[Math.floor(Math.random() * spots.length)];
+    this.blob(level === 1 && Math.random() < 0.6 ? "smokeL" : "smokeD", x + ox + rand(-3, 3), y + oy + rand(-3, 3), { t0: now, ttl: rand(2400, 3600), r0: 4 * big, r1: rand(15, 23) * big, a: level === 1 ? 0.34 : 0.5, vx: 7, vy: -4, vh: rand(22, 36), drag: 0.25, h, pri: 0 });
+    if (level >= 2) {
+      this.blob("fire", x + ox + rand(-4, 4), y + oy + rand(-4, 4), { t0: now, ttl: rand(300, 480), r0: 4 * big, r1: 9 * big, a: 0.85, add: true, vh: rand(14, 28), h: h - 3, pri: 0 });
+      if (Math.random() < 0.25) this.speck("#ffd68a", x + ox, y + oy, { t0: now, ttl: 700, vx: rand(-14, 14), vy: rand(-14, 14), vh: rand(40, 90), g: 60, size: 1.1, add: true, h, pri: 0 });
+    }
   }
 
   // ---- frame ----

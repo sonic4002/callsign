@@ -3,6 +3,7 @@
 
 import { casualtySeconds, drawBuilding, drawCasualty, drawUnit, hasAnimation, house, isoBox, rock, sprites, tree } from "./art.js";
 import { Fog } from "./fog.js";
+import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
@@ -38,6 +39,10 @@ export class Scene {
     this.sfx = null; // battle sounds; the page sets it once it has a volume to follow
     this.hqSeen = null; // headquarters health as of the last state, to notice hits
     this.hqHitAt = [-1e9, -1e9];
+    this.finale = null; // the fall of a headquarters, while it plays
+    this.ruined = [false, false]; // which side's headquarters lies in ruins
+    this.sawLive = false; // this page has seen the match running, so its end is news
+    this.onFinale = null; // the page's hook: called when the result screen may come up
     this.selected = 0;
     this.last = performance.now();
     this.waves = [];
@@ -49,6 +54,9 @@ export class Scene {
     this.effects = [];
     this.fx.reset(rules.map.waterY);
     this.hqSeen = null;
+    this.finale = null;
+    this.ruined = [false, false];
+    this.sawLive = false;
     this.selected = 0;
     this.factionOf = {};
     this.unitOf = {};
@@ -181,8 +189,7 @@ export class Scene {
       const is = hq[p.owner];
       if (was === undefined || is === undefined || is >= was) continue;
       if (is <= 0) {
-        this.fx.collapse(p.x, p.y, now);
-        this.sound("boomL", p.x, p.y);
+        // The fall itself is the finale's to show; see fell().
       } else if (now - this.hqHitAt[p.owner] > 650) {
         this.hqHitAt[p.owner] = now;
         this.fx.strike(p.x, p.y, now, 0.8);
@@ -190,6 +197,70 @@ export class Scene {
       }
     }
     this.hqSeen = [...hq];
+    this.fell(state, now);
+  }
+
+  // fell starts the finale when a match ends with a headquarters destroyed. A page that
+  // joins after the end has nothing to watch and just shows the ruin.
+  fell(state, now) {
+    const owner = fallen(state);
+    if (!state.over) this.sawLive = true;
+    if (owner < 0 || this.finale || this.ruined[owner]) return;
+    if (!this.sawLive) {
+      this.ruined[owner] = true;
+      return;
+    }
+    const p = this.rules.map.points.find((q) => q.kind === "hq" && q.owner === owner);
+    const cam = this.cam;
+    const zoom = Math.max(cam.zoom, Math.max(cam.fitZoom, 0.36) * 1.9);
+    const [ix, iy] = toIso(p.x, p.y);
+    // The building ends up a little above the middle, clear of the result card.
+    const to = { cx: ix, cy: iy + (0.14 * cam.h) / zoom, zoom };
+    this.finale = new Finale({ owner, x: p.x, y: p.y, from: { cx: cam.cx, cy: cam.cy, zoom: cam.zoom }, to, t0: now, reduced: this.fx.reducedMotion() });
+  }
+
+  // finaleHolds says whether the result screen should still wait for the finale.
+  finaleHolds(now = performance.now()) {
+    return Boolean(this.finale?.holds(now));
+  }
+
+  // playFinale moves the view and sets off each step of the fall when its moment comes.
+  playFinale(now) {
+    const f = this.finale;
+    if (!f) return;
+    const view = f.camera(now);
+    if (view) {
+      this.cam.auto = false;
+      Object.assign(this.cam, view);
+    }
+    const centre = hearing(this.cam, this.cam.w / 2, this.cam.h / 2, this.cam.zoom); // we are looking right at it
+    for (const step of f.due(now)) {
+      if (step === "blast") {
+        this.fx.view = this.cam; // the view has only just arrived
+        this.fx.collapse(f.x, f.y, now);
+        this.sfx?.play("boomL", centre);
+        this.sfx?.play("boomM", centre, 420);
+      } else if (step === "ruin") {
+        this.ruined[f.owner] = true;
+      } else if (step === "aftershock") {
+        this.sfx?.play("boomM", centre);
+      } else if (step === "overlay") {
+        this.onFinale?.();
+      }
+    }
+  }
+
+  // smoulder shows how hurt each headquarters is: smoke, then fire, then a burning ruin.
+  // The enemy's is shown only while it is in sight; its health is as last seen.
+  smoulder(now) {
+    const { rules, state } = this;
+    for (const p of rules.map.points) {
+      if (p.kind !== "hq") continue;
+      const ruined = this.ruined[p.owner];
+      const seen = state.side !== 1 - p.owner || state.points.find((s) => s.id === p.id)?.visible;
+      if (!seen && !ruined) continue;
+      this.fx.smolder(`hq${p.owner}`, p.x, p.y, now, ruined ? 3 : Math.min(2, damageState(state.hq?.[p.owner])));
+    }
   }
 
   // sound plays a battle sound as heard from the middle of the view.
@@ -345,6 +416,7 @@ export class Scene {
 
   // draw paints one frame, nudged a few pixels when a blast shakes the view.
   draw(now) {
+    this.playFinale(now);
     const z = this.cam.zoom;
     const [kx, ky] = this.fx.offset(now);
     this.cam.cx -= kx / z;
@@ -413,6 +485,7 @@ export class Scene {
       }
     }
     this.gunfire(now);
+    this.smoulder(now);
     this.fx.update(now, dt);
     this.sfx?.refresh();
 
@@ -487,7 +560,7 @@ export class Scene {
     const things = [];
     for (const p of rules.map.points) {
       const live = state.points.find((s) => s.id === p.id);
-      const kind = p.kind === "hq" ? `hq_${this.hqFaction[p.owner] ?? (p.owner === 0 ? "aegis" : "ashfall")}` : p.kind;
+      const kind = p.kind === "hq" ? `hq_${this.hqFaction[p.owner] ?? (p.owner === 0 ? "aegis" : "ashfall")}${this.ruined[p.owner] ? "_ruin" : ""}` : p.kind;
       things.push({ depth: p.x + p.y, x: p.x, y: p.y, scale: buildScale, draw: () => drawBuilding(ctx, kind, sideColor[live.owner], time) });
     }
     for (const group of this.groups.values()) {

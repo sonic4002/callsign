@@ -80,6 +80,7 @@ const drawn = { roster: "", build: "" }; // what the sidebar lists show now
 
 const scene = new Scene($("map"), $("radar-map"), { lang: () => lang, showNerve: () => $("nerve").checked, side });
 const music = await new Music().load();
+scene.onFinale = () => renderOverlay();
 scene.sfx = new Sfx({ level: () => (music.muted ? 0 : music.volume) }); // guns and blasts follow the music's volume and mute
 const speech = new Speech({ volume: () => 0.6 + 0.4 * music.volume, duck: (on) => (music.duck(on), scene.sfx.duck(on)) });
 speech.bind($("speak"));
@@ -610,14 +611,17 @@ for (const button of document.querySelectorAll("#orders button")) {
 // The overlay is the start screen before the match and the result screen after it.
 function renderOverlay() {
   const over = Boolean(state?.over);
-  $("overlay").hidden = started && !over;
+  // A headquarters falling is watched first: the result waits, then fades in over the ruin.
+  const hold = over && scene.finaleHolds();
+  $("overlay").classList.toggle("after-finale", over && !hold && Boolean(scene.finale));
+  $("overlay").hidden = started && (!over || hold);
   $("overlay-title").textContent = over ? t(state.winner === -1 ? "over.draw" : state.winner === side ? "over.won" : "over.lost") : t("title");
   $("overlay-line").textContent = over ? t(`over.${state.reason}`) : t("tagline");
   const factionName = rules?.factions[faction]?.name[lang];
   $("overlay-side").textContent = t(`side.${side}`) + (factionName ? ` · ${factionName}` : "");
   $("start").textContent = over ? t("playAgain") : role === "spectator" ? t("watch") : t("start");
   $("start").hidden = over && !me; // a spectator cannot restart
-  music.setMode(!started || over ? "menu" : "battle");
+  music.setMode(!started || (over && !hold) ? "menu" : "battle");
 
   $("credits").hidden = !music.available;
   $("credits-list").replaceChildren(

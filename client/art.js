@@ -438,7 +438,27 @@ function flagPost(ctx, color, time) {
 }
 
 const buildingHeight = { hq_aegis: 96, hq_ashfall: 80, landRig: 84, seaRig: 80, point: 52 };
-const drawn = { hq_aegis: hqAegis, hq_ashfall: hqAshfall, landRig, seaRig, point: flagPost };
+buildingHeight.hq_aegis_ruin = buildingHeight.hq_aegis; // a ruin fills the frame of the building it was
+buildingHeight.hq_ashfall_ruin = buildingHeight.hq_ashfall;
+const drawn = { hq_aegis: hqAegis, hq_ashfall: hqAshfall, landRig, seaRig, point: flagPost, hq_aegis_ruin: (ctx) => rubble(ctx, "#59636b", "#8b97a0"), hq_ashfall_ruin: (ctx) => rubble(ctx, "#6b5a45", "#8a6a4a") };
+
+// rubble is a headquarters after it fell, for when there is no picture of the ruin: broken
+// wall stubs around a heap of scorched debris.
+function rubble(ctx, wall, light) {
+  shadow(ctx, 34, 15, 0.35);
+  isoBox(ctx, 0, 6, 56, 44, 3, "#2a2622", "#1d1a17", "#24201c");
+  for (const [x, y, w, d, h] of [[-20, -4, 10, 9, 15], [17, -2, 9, 11, 10], [-5, -10, 13, 7, 7], [3, 13, 16, 8, 5], [-17, 12, 8, 8, 8]]) {
+    isoBox(ctx, x, y, w, d, h, light, wall, "#33383c");
+  }
+  ctx.fillStyle = "#1b1815";
+  for (const [x, y, r] of [[-3, 3, 9], [9, 6, 6], [-11, 5, 5], [4, -2, 5]]) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * 0.55, 0, 0, TAU);
+    ctx.fill();
+  }
+  line(ctx, "#3c4348", 1.6, 10, -4, 24, -22);
+  line(ctx, "#3c4348", 1.4, -8, 2, -22, -10);
+}
 
 // drawBuilding draws what stands on a map point. `color` is the owner's colour.
 export function drawBuilding(ctx, kind, color, time) {
@@ -446,6 +466,7 @@ export function drawBuilding(ctx, kind, color, time) {
   if (entry) {
     shadow(ctx, 30, 13, 0.3);
     drawSprite(ctx, entry, buildingHeight[kind] ?? 70, 0);
+    if (kind.endsWith("_ruin")) return; // nobody flies a flag over a ruin
     // A generated building carries no team colour, so it gets a pennant beside it.
     line(ctx, "#d8dcd6", 1.6, -26, 4, -26, -30);
     pennant(ctx, -26, -30, color, time);

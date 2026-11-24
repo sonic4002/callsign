@@ -222,3 +222,8 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #build button.requested { animation: requested 1.1s ease-in-out infinite; }
 @keyframes requested { 50% { border-color: var(--brass); box-shadow: inset 0 0 0 1px #c9a44c88, inset 0 0 14px #c9a44c33; } }
 @media (prefers-reduced-motion: reduce) { #build button.requested { animation: none; border-color: var(--brass); } }
+
+/* The result screen after a headquarters has fallen comes up slowly over the burning ruin. */
+#overlay.after-finale { animation: overlay-in 1.6s ease-out; background: radial-gradient(ellipse at 50% 40%, #1b262c99, #05080ae6); }
+@keyframes overlay-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #overlay.after-finale { animation: none; } }
