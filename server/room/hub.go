@@ -51,7 +51,7 @@ const guessesPerMinute = 40
 // Hub holds every room on the server. Each room is its own match with its own seed,
 // clock and radio nets; nothing is shared between them but the rules.
 type Hub struct {
-	mu    sync.Mutex
+	mu sync.Mutex
 
 	guessFrom time.Time // start of the minute wrong join codes are being counted in
 	guesses   int
@@ -107,6 +107,13 @@ type Options struct {
 	Bot           string // how hard the scripted enemy presses, "" for the server's usual
 }
 
+// A lesson lasts as long as its learner needs, within what a match may; and only so many
+// run at once, since anyone can start one.
+const (
+	lessonSeconds = 1800
+	maxLessons    = 8
+)
+
 // BotLevels are the scripted enemies a player may choose in the lobby, easiest first.
 // The rush style stays a server flag: it is a test opponent, not a difficulty.
 var BotLevels = []string{bot.Easy, bot.Normal, bot.Standard}
@@ -141,7 +148,8 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.Side < -1 || o.Side > 1 {
 		return nil, 0, "", errors.New("side must be 0, 1 or -1 for either")
 	}
-	if o.Bot != "" && !botLevel(o.Bot) {
+	lesson := o.Bot == bot.Tutorial && o.Opponent == OpponentBot
+	if o.Bot != "" && !botLevel(o.Bot) && !lesson {
 		return nil, 0, "", errors.New("the scripted enemy is easy, normal or standard")
 	}
 	if o.Side == -1 {
@@ -155,11 +163,17 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if length == 0 {
 		length = h.cfg.LengthSeconds
 	}
+	if lesson {
+		length, o.Watch = lessonSeconds, false // nobody is hurried, and nobody watches
+	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
-		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey,
+		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson,
 	}
-	if o.Opponent == OpponentBot && h.cfg.Bot != "" {
+	if lesson {
+		cfg.Bots[1-o.Side] = bot.Tutorial // also on a server started without a scripted enemy
+	}
+	if o.Opponent == OpponentBot && h.cfg.Bot != "" && !lesson {
 		// A server started without a scripted enemy has none to choose a level of.
 		cfg.Bots[1-o.Side] = h.cfg.Bot
 		if o.Bot != "" {
@@ -168,7 +182,14 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	}
 
 	h.mu.Lock()
-	if len(h.rooms) >= h.cfg.MaxRooms {
+	lessons := 0
+	for _, e := range h.rooms {
+		if e.rm.cfg.Tutorial {
+			lessons++
+		}
+	}
+	// Lessons are open to anyone, so they get a share of the rooms and no more.
+	if len(h.rooms) >= h.cfg.MaxRooms || (lesson && lessons >= maxLessons) {
 		h.mu.Unlock()
 		return nil, 0, "", ErrFull
 	}
@@ -294,6 +315,9 @@ func (h *Hub) AgentWork() []AgentWork {
 	h.mu.Unlock()
 	work := []AgentWork{}
 	for code, rm := range rooms {
+		if rm.cfg.Tutorial {
+			continue // a lesson's squads think in the learner's browser, never here
+		}
 		if sides := rm.agentSides(agentGrace); len(sides) > 0 {
 			work = append(work, AgentWork{Room: code, Sides: sides})
 		}
@@ -355,7 +379,7 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"level":    h.usualBot(), // the one the lobby starts on
 		"length":   length,
 		"share":    strings.TrimRight(h.cfg.Share, "/"),
-		"open":     h.open != nil, // the open room of a server without an agent key
+		"open":     h.open != nil,       // the open room of a server without an agent key
 		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
 	})
 }
@@ -373,7 +397,9 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	// On a server that strangers can reach, only the host may start matches: each one
 	// runs agents on the host's machine.
-	if key := h.cfg.HostKey; key != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Callsign-Host")), []byte(key)) != 1 {
+	// A lesson is the exception: it runs no agents on this machine (see Config.Tutorial).
+	lesson := in.Bot == bot.Tutorial && in.Opponent == OpponentBot
+	if key := h.cfg.HostKey; key != "" && !lesson && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Callsign-Host")), []byte(key)) != 1 {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
