@@ -11,8 +11,9 @@ services:
     volumes:
       - .:/src:ro
       - callsign-gocache:/gocache
+    # CALLSIGN_BOT picks the scripted enemy: easy (default), normal, standard (relentless) or rush.
     # CALLSIGN_BOT= (set but empty) plays with no scripted enemy.
-    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-standard}", "-tts=http://tts:5002"]
+    command: ["go", "run", "./server/cmd/callsign", "-addr=:8080", "-seed=${CALLSIGN_SEED:-1}", "-bot=${CALLSIGN_BOT-easy}", "-tts=http://tts:5002"]
     ports:
       - "127.0.0.1:8080:8080" # this machine only: Phase 0 has no accounts
 

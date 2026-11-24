@@ -23,7 +23,7 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "address to listen on")
 	seed := flag.Uint64("seed", 1, "match seed; the same seed and orders replay the same match")
 	length := flag.Int("length", 0, "match length in seconds (0 = rules default)")
-	enemy := flag.String("bot", "standard", `scripted player for side 1: "standard", "rush", or "" for none`)
+	enemy := flag.String("bot", "easy", `scripted player for side 1: "easy", "normal", "standard" (relentless), "rush", or "" for none`)
 	west := flag.String("west", "aegis", "faction of side 0")
 	east := flag.String("east", "ashfall", "faction of side 1")
 	client := flag.String("client", "client", "directory of the debug page")

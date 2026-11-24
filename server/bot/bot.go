@@ -11,14 +11,27 @@ import (
 )
 
 const (
-	Standard = "standard" // take rigs and points, then press the enemy HQ
+	Standard = "standard" // take rigs and points, then press the enemy HQ; buys the moment it can
 	Rush     = "rush"     // one squad on the home rig, everything else at the enemy HQ
+	Normal   = "normal"   // Standard, but it buys at a human pace, fields fewer squads and attacks later
+	Easy     = "easy"     // slower and smaller again, and it leaves the enemy HQ alone for a long while
 )
+
+// pace is how hard a style presses: seconds between purchases, the most squads it fields,
+// and the second of the match before which it holds ground instead of going for the HQ.
+type pace struct{ buyEvery, squads, attackAfter int }
+
+var paces = map[string]pace{
+	Normal: {buyEvery: 14, squads: 8, attackAfter: 150},
+	Easy:   {buyEvery: 26, squads: 5, attackAfter: 300},
+}
 
 type Player struct {
 	Side  int
 	Style string
 	R     *shared.Rules
+
+	lastBuy int // tick of the last purchase, for the styles that pace themselves
 }
 
 // Act looks at what its side can see and returns the commands it wants this turn.
@@ -27,6 +40,12 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	var cmds []sim.Command
 	enemyHQ := p.R.HQPoint(1 - p.Side).ID
 	plan := p.infantryPlan()
+	slow, paced := paces[p.Style]
+	// Until its attack time a paced bot sends its spare squads to hold the middle of the map.
+	target, push := enemyHQ, sim.CmdAttack
+	if paced && snap.Tick < slow.attackAfter*p.R.TickRate {
+		target, push = p.nearest("point", 1), sim.CmdHold
+	}
 	infantry, naval, vehicles := 0, 0, 0
 	for _, sq := range snap.Squads {
 		want := sim.Command{Side: p.Side, Squad: sq.ID}
@@ -36,12 +55,12 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 			want.Kind, want.Point = sim.CmdHold, p.seaRig()
 		case "vehicle":
 			vehicles++
-			want.Kind, want.Point = sim.CmdAttack, enemyHQ
+			want.Kind, want.Point = push, target
 		default:
 			if infantry < len(plan) {
 				want.Kind, want.Point = sim.CmdHold, plan[infantry]
 			} else {
-				want.Kind, want.Point = sim.CmdAttack, enemyHQ
+				want.Kind, want.Point = push, target
 			}
 			infantry++
 		}
@@ -64,6 +83,9 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	if len(snap.Squads)+len(snap.Deploying) >= p.R.Match.PopulationCap {
 		return cmds
 	}
+	if paced && (len(snap.Squads)+len(snap.Deploying) >= slow.squads || (p.lastBuy > 0 && snap.Tick-p.lastBuy < slow.buyEvery*p.R.TickRate)) {
+		return cmds
+	}
 	buy := ""
 	switch {
 	case p.Style == Rush:
@@ -79,6 +101,7 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 	}
 	if id, u := p.unitOf(snap.Faction, buy); id != "" && snap.Gold >= u.Cost {
 		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
+		p.lastBuy = snap.Tick + 1
 	}
 	return cmds
 }

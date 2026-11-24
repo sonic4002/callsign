@@ -552,3 +552,22 @@ func TestDeploymentIsDeterministicAndHashed(t *testing.T) {
 		t.Fatalf("a new match starts with %d deployments", n)
 	}
 }
+
+// The enemy a new player meets has to be beatable. A relentless scripted Aegis stands in
+// for a competent player here: it must beat the paced styles clearly, and the easier the
+// style the more clearly.
+func TestPacedEnemiesAreBeatable(t *testing.T) {
+	const seeds = 12
+	wins := map[string]int{}
+	for _, style := range []string{bot.Easy, bot.Normal, bot.Standard} {
+		for seed := uint64(1); seed <= seeds; seed++ {
+			if s, _ := playMatch(t, seed, [2]string{bot.Standard, style}); s.Winner == 0 {
+				wins[style]++
+			}
+		}
+	}
+	t.Logf("relentless Aegis won, of %d: %v", seeds, wins)
+	if wins[bot.Easy] < seeds*9/10 || wins[bot.Normal] < seeds*3/4 || wins[bot.Easy] < wins[bot.Normal] {
+		t.Fatalf("paced enemies are not clearly beatable: %v of %d", wins, seeds)
+	}
+}
