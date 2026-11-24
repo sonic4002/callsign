@@ -1,5 +1,5 @@
 // End to end: the real game server, real WebSockets, the real agent loop. Only the model
-// is replaced, by the scripted brain or by a fake Anthropic client.
+// is replaced, by the rule brain or by a fake Anthropic client.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { Agent } from "../agent.mjs";
 import { claudeBrain } from "../brain-claude.mjs";
-import { scriptedBrain } from "../brain-scripted.mjs";
+import { ruleBrain } from "../brain-rule.mjs";
 import { Host } from "../main.mjs";
 
 const bin = process.env.CALLSIGN_BIN;
@@ -93,9 +93,9 @@ class Hammer {
 
 const squadIn = (frame, id) => frame.type === "state" && frame.state.squads.find((s) => s.id === id);
 
-test("Hammer's orders reach scripted squads over the net, in both languages", { skip }, async (t) => {
+test("Hammer's orders reach rule-brain squads over the net, in both languages", { skip }, async (t) => {
   const server = await startServer(t);
-  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  const host = new Host({ server, side: 0, brain: ruleBrain(), log: () => {} });
   await host.start();
   t.after(() => host.stop());
   await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);
@@ -107,14 +107,15 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
   const held = await hammer.next("Viper 2 holding Foxtrot", (f) => squadIn(f, 2)?.order.point === "F");
   assert.equal(squadIn(held, 2).order.kind, "hold");
   assert.equal(squadIn(held, 1).order.kind, "none", "Viper 1 was not addressed");
+  // It says where it is once: going inside the house at its post and arriving are one piece of news.
+  assert.match(await hammer.hears("Viper 2"), /^Hammer, this is Viper 2\. Inside the house [\w-]+ of Foxtrot\. Over\.$/);
   await hammer.next("Viper 2 arriving at Foxtrot", (f) => f.type === "event" && f.event.kind === "arrived" && f.event.squad === 2 && f.event.point === "F");
-  assert.equal(await hammer.hears("Viper 2"), "Hammer, this is Viper 2. In position at Foxtrot. Over.");
 
   // The same in Hebrew, to the other squad.
   hammer.say("צפע 1, כאן פטיש, תחזיקו את גימל, עבור.");
   assert.equal(await hammer.hears("Viper 1"), "פטיש, כאן צפע 1, רות, יבוצע, סוף.");
   await hammer.next("Viper 1 holding Golf", (f) => squadIn(f, 1)?.order.point === "G");
-  assert.equal(await hammer.hears("Viper 1"), "פטיש, כאן צפע 1, בעמדה בגימל, עבור.");
+  assert.equal(await hammer.hears("Viper 1"), "פטיש, כאן צפע 1, הגענו לגימל, בעמדה, עבור.");
 
   // An order the game refuses comes back as Negative with the game's reason.
   hammer.say("Viper 1, this is Hammer. Hold Sierra. Over.");
@@ -171,7 +172,7 @@ test("Hammer's orders reach scripted squads over the net, in both languages", { 
 
 test("haulers work on their own, go where the operator sends them, and can be escorted", { skip }, async (t) => {
   const server = await startServer(t, "refinery,barracks,works") // more haulers come out of the works;
-  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  const host = new Host({ server, side: 0, brain: ruleBrain(), log: () => {} });
   await host.start();
   t.after(() => host.stop());
   await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);
@@ -267,7 +268,7 @@ test("the agent loop feeds a model's tool calls to the game and the results back
 
 test("a squad goes to a place Hammer describes, takes cover there, and asks when the words are unclear", { skip }, async (t) => {
   const server = await startServer(t);
-  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  const host = new Host({ server, side: 0, brain: ruleBrain(), log: () => {} });
   await host.start();
   t.after(() => host.stop());
   await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);
@@ -294,13 +295,13 @@ test("a squad goes to a place Hammer describes, takes cover there, and asks when
   hammer.say("Viper 1, get into the house at Foxtrot");
   assert.equal(
     await hammer.hears("Viper 1"),
-    "Hammer, this is Viper 1. Say again, the house north of Foxtrot or the house west of Foxtrot or the house east of Foxtrot or the house south of Foxtrot. Over.",
+    "Hammer, this is Viper 1. Say again: the house north of Foxtrot or the house west of Foxtrot or the house east of Foxtrot or the house south of Foxtrot? Over.",
   );
   assert.equal(squadIn(hammer.frames.findLast((f) => f.type === "state"), 1).order.place, "N of D 150");
 });
 
 // The calls the page writes when a structure is placed, a unit cancelled and a rally
-// point set, said to scripted agents on a real server: the spot the ghost showed is where
+// point set, said to rule-brain agents on a real server: the spot the ghost showed is where
 // the structure stands, and the lines, the refund and the rally order are the server's.
 test("placing a structure, a production line, a cancel and a rally point, end to end", { skip }, async (t) => {
   const { canPlace, spotAt, spotWords, tint } = await import("../../client/placement.js");
@@ -312,7 +313,7 @@ test("placing a structure, a production line, a cancel and a rally point, end to
   rules.map = rules.maps.small;
 
   const server = await startServer(t);
-  const host = new Host({ server, side: 0, brain: scriptedBrain(), log: () => {} });
+  const host = new Host({ server, side: 0, brain: ruleBrain(), log: () => {} });
   await host.start();
   t.after(() => host.stop());
   await eventually("Anvil and two squad leaders on the net", () => host.agents.size === 3 && host.ready);

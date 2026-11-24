@@ -33,7 +33,7 @@ export function mountAgents({ t, system, server, side, seat, canAct }) {
     $("brains-note").textContent = wrong ? t(`trouble.${wrong}`) : "";
     $("brains-demo").checked = agents.demo;
     $("brains-usage").textContent = t("brains.count", { calls: usage.calls, input: usage.input.toLocaleString("en"), output: usage.output.toLocaleString("en") });
-    $("brains-open").classList.toggle("live", agents.status === "relay" || agents.status === "demo");
+    $("brains-open").classList.toggle("live", agents.status === "relay" || agents.status === "demo" || agents.status === "fast");
   }
 
   // The dialog has two panes: the live view of the agents, and the player's own key.

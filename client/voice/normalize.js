@@ -55,11 +55,42 @@ function distance(a, b) {
 
 const alike = (a, b) => (a.length || b.length ? 1 - distance(a, b) / Math.max(a.length, b.length) : 0);
 
+const plain = (s) => s.toLowerCase().replace(/[^a-zא-ת]/g, "");
+
 // similarity of two words: how they sound, with how they are spelled as a tie-break.
 export function similarity(a, b, lang) {
-  const plain = (s) => s.toLowerCase().replace(/[^a-zא-ת]/g, "");
   return 0.75 * alike(sound(a, lang), sound(b, lang)) + 0.25 * alike(plain(a), plain(b));
 }
+
+// spoken reduces a word to what is heard when it is read aloud, as far as spelling tells:
+// only letters that sound the same fall together (כ and ק, ט and ת; c and k, ph and f).
+// It is much finer than sound(), which also folds b with p and drops every vowel letter.
+export function spoken(word, lang) {
+  const w = plain(word);
+  if (lang === "he") {
+    const same = { ך: "כ", ק: "כ", ח: "כ", ת: "ט", ש: "ס", ץ: "צ", ף: "פ", ם: "מ", ן: "נ", ע: "א", ה: "א", ו: "", י: "" };
+    return [...w].map((ch) => same[ch] ?? ch).join("");
+  }
+  return w
+    .replace(/ph/g, "f")
+    .replace(/ck|[cq]/g, "k")
+    .replace(/x/g, "ks")
+    .replace(/z/g, "s")
+    .replace(/(?!^)[aeiou]/g, "")
+    .replace(/^[aeiou]+/, "a")
+    .replace(/(.)\1+/g, "$1");
+}
+
+// A good recogniser spells ordinary words right, so a word of its is taken for a map point
+// only when it reads aloud as that point's name and is spelled within a letter or two of it:
+// "קרמל" is כרמל and "Gulf" is Golf, but "עוד" is not דוד and "carry" is not Kilo.
+function sameName(word, name, lang) {
+  return spoken(word, lang) === spoken(name, lang) && distance(plain(word), plain(name)) <= (name.length >= 5 ? 2 : 1);
+}
+
+// The names of the Hebrew letters. A recogniser that hears a point named after a letter
+// ("אלף", "סמך") often writes the letter itself: "תקפו את א'".
+const letters = { א: "אלף", ב: "בית", ג: "גימל", ד: "דלת", ה: "הא", ו: "ואו", ז: "זין", ח: "חית", ט: "טית", י: "יוד", כ: "כף", ל: "למד", מ: "מם", נ: "נון", ס: "סמך", ע: "עין", פ: "פא", צ: "צדי", ק: "קוף", ר: "ריש", ש: "שין", ת: "תו" };
 
 const gap = "[\\s,.:;!?\\-–—]";
 const words = (s) => s.split(/[\s,.:;!?\-–—"']+/).filter(Boolean);
@@ -98,8 +129,8 @@ function addressee(text, lang, rules) {
 // places puts the map's own spelling on words that sound like a point's callsign. Text
 // the player typed (`typed`) is left as written: matching by sound is for what a
 // recogniser heard, and on typed words it only does harm ("זהב" is not "זאב").
-function places(body, lang, rules, typed = false) {
-  return contacts(typed ? body : placeNames(body, lang, rules), lang, rules);
+function places(body, lang, rules, { typed = false, careful = false } = {}) {
+  return contacts(typed ? body : placeNames(body, lang, rules, careful), lang, rules);
 }
 
 // contacts respells a named enemy squad: "target three" → "Target 3".
@@ -112,19 +143,31 @@ function contacts(body, lang, rules) {
   });
 }
 
-function placeNames(body, lang, rules) {
+// `careful` is for text from a recogniser that spells well (the game server's): a word is
+// respelled only when it is the point's name in another spelling (sameName), not whenever
+// it sounds roughly like it.
+function placeNames(body, lang, rules, careful = false) {
   const points = rules.map.points.map((p) => p.callsign[lang]);
+  if (lang === "he") {
+    body = body.replace(/(^|[\s,.:;])([בלמהו]?)([א-ת])['׳](?=$|[\s,.:;!?])/g, (all, lead, glue, letter) => (points.includes(letters[letter]) ? lead + glue + letters[letter] : all));
+  }
   const exact = (word) => points.find((p) => p.toLowerCase() === word.toLowerCase());
   // A station's own name is never a place, however alike they sound: "צפע" is not "זאב".
   // The same goes for the words of a unit's name ("Militia cell" is not Kilo).
   const cs = rules.callsigns;
   const units = Object.values(rules.factions).flatMap((f) => Object.values(f.units).map((u) => u.name));
+  // Nor are the words of procedure and of command: "Run the fight" is not "Lima the fight".
+  const radio = rules.radio;
+  const procedure = [radio.marker, radio.over, radio.out, ...Object.values(radio.prowords ?? {}), ...Object.values(radio.command ?? {})].flatMap((w) => w?.[lang] ?? []);
   const stations = new Set(
-    [cs.player, cs.operator, cs.allStations, cs.contact, ...Object.values(cs.classes), ...units].flatMap((name) => (name?.[lang] ?? "").toLowerCase().split(/\s+/)),
+    [...[cs.player, cs.operator, cs.allStations, cs.contact, ...Object.values(cs.classes), ...units].map((name) => name?.[lang] ?? ""), ...procedure].flatMap((name) =>
+      name.toLowerCase().split(/[\s,]+/),
+    ),
   );
   const known = (word) => notPlaces.has(word.toLowerCase()) || stations.has(word.toLowerCase());
   const match = (word) => {
     if (word.length < 3 || known(word)) return null;
+    if (careful) return points.find((p) => sameName(word, p, lang)) ?? null;
     const best = points.map((p) => [similarity(word, p, lang), p]).sort((a, b) => b[0] - a[0])[0];
     return best[0] >= 0.75 ? best[1] : null;
   };
@@ -154,7 +197,7 @@ function placeNames(body, lang, rules) {
   return parts.join("");
 }
 
-export function normalize(heard, { lang, rules }) {
+export function normalize(heard, { lang, rules, careful = false }) {
   const text = heard.replace(/\s+/g, " ").trim();
   const marker = rules.radio.marker[lang];
   const at = text.toLowerCase().search(new RegExp(`(^|${gap})${marker}(${gap}|$)`));
@@ -182,7 +225,7 @@ export function normalize(heard, { lang, rules }) {
       }
     }
   }
-  let body = places(rest.replace(/[\s,.:;!?]+$/, ""), lang, rules);
+  let body = places(rest.replace(/[\s,.:;!?]+$/, ""), lang, rules, { careful });
   if (lang === "he") return [`${to}, ${marker} ${me}`, body, end].filter(Boolean).join(", ") + (end ? "." : "");
   body = body.replace(/^by\b/i, "buy"); // the one homophone that opens an order
   body = body && body[0].toUpperCase() + body.slice(1);
@@ -192,7 +235,7 @@ export function normalize(heard, { lang, rules }) {
 // relaxed tidies a message that has no "this is": "צבע 1 תפוס את דוד" or "vapour two attack
 // gulf". Only a first word that sounds like a callsign and is followed by its number is
 // respelled; the operator's name must be close to exact. Map points in the rest are snapped.
-export function relaxed(heard, { lang, rules, typed = false }) {
+export function relaxed(heard, { lang, rules, typed = false, careful = false }) {
   const text = heard.replace(/\s+/g, " ").trim();
   const m = /^([^\s,.:;!?]+)(?:[\s\-#]+([^\s,.:;!?]+))?/.exec(text);
   if (!m) return text;
@@ -209,12 +252,13 @@ export function relaxed(heard, { lang, rules, typed = false }) {
     head = cs.operator[lang];
     taken = m[1].length;
   }
-  return head + places(text.slice(taken), lang, rules, typed);
+  return head + places(text.slice(taken), lang, rules, { typed, careful });
 }
 
 // tidy picks the right repair for a message: the full call when "this is" was said,
 // otherwise the relaxed form. A typed message (`typed`) only has a misspelled callsign at
-// its front put right; the rest is sent as the player wrote it.
+// its front put right; the rest is sent as the player wrote it. Text from a recogniser that
+// spells well (`careful`) has its map points respelled only when they are plainly meant.
 export function tidy(heard, opts) {
   if (opts.typed) return relaxed(heard, opts);
   const full = normalize(heard, opts);

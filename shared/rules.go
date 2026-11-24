@@ -383,6 +383,11 @@ type Rules struct {
 		// server/room/cues.go): the words in both languages, the least seconds between
 		// two of a kind, and the events raised elsewhere that call for it.
 		Cues map[string]Cue `json:"cues"`
+		// Brain is everything the rule brain says on the net (agents/brain-rule.mjs): each
+		// line in both languages, with as many wordings in one as in the other, so that
+		// squads do not all sound alike. {name} is filled in; {b_name}, {l_name} and
+		// {m_name} put the Hebrew letter in front of it.
+		Brain map[string]Words `json:"brain"`
 		// SpelledOut lists, per English point callsign, how it gets written in Hebrew
 		// letters by mistake ("דלתא" for Delta); the net puts the Hebrew callsign instead.
 		SpelledOut map[string][]string `json:"spelledOut"`
@@ -520,6 +525,11 @@ func (r *Rules) check() error {
 	for name, cue := range r.Radio.Cues {
 		if cue.Line.En == "" || cue.Line.He == "" || cue.Gap < 0 {
 			return fmt.Errorf("cue %s needs a line in both languages and a gap", name)
+		}
+	}
+	for name, w := range r.Radio.Brain {
+		if len(w.En) == 0 || len(w.En) != len(w.He) {
+			return fmt.Errorf("brain line %s needs the same number of wordings in both languages", name)
 		}
 	}
 	if len(r.Tiers) == 0 || r.Tiers[0].Tier != 1 {

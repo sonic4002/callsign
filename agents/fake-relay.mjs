@@ -1,6 +1,6 @@
 // A stand-in for the model relay, for tests and for running the browser agents with no
 // provider at all. It speaks the relay's contract (see brain-relay.mjs) and answers every
-// thought with the scripted brain, so nothing here costs anything or leaves the machine.
+// thought with the rule brain, so nothing here costs anything or leaves the machine.
 //
 //   node agents/fake-relay.mjs [port]        (default 8090; then start the game server
 //                                              with -relay=http://127.0.0.1:8090)
@@ -12,12 +12,12 @@
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 
-import { scriptedBrain } from "./brain-scripted.mjs";
+import { ruleBrain } from "./brain-rule.mjs";
 
 const providers = new Set(["anthropic", "openrouter", "gemini", "openai"]);
 const status = { bad_request: 400, not_your_seat: 401, bad_key: 401, no_key: 409, rate_limited: 429, provider_error: 502 };
 
-// ctxFrom rebuilds what the scripted brain reads from what an agent sends the relay: the
+// ctxFrom rebuilds what the rule brain reads from what an agent sends the relay: the
 // wake text of the last user message, and the status line inside it.
 function ctxFrom(body, rules, key) {
   const wakeText = body.messages.findLast((m) => typeof m.content === "string")?.content ?? "";
@@ -67,7 +67,7 @@ function ctxFrom(body, rules, key) {
 //   relay.keys                    player token → { provider, hint }
 //   relay.seats                   the X-Callsign-Seat header of every thought
 export function fakeRelay({ rules = JSON.parse(readFileSync(new URL("../shared/rules.json", import.meta.url), "utf8")), tokens = null } = {}) {
-  const brain = scriptedBrain();
+  const brain = ruleBrain();
   const sent = new Map(); // tool_use id → the block as the brain made it (with its fallback)
   const keys = new Map();
   const calls = [];
@@ -166,5 +166,5 @@ export function fakeRelay({ rules = JSON.parse(readFileSync(new URL("../shared/r
 if (import.meta.main) {
   const port = Number(process.argv[2] ?? process.env.CALLSIGN_RELAY_PORT ?? 8090);
   const base = await fakeRelay().up(port, process.env.CALLSIGN_RELAY_HOST ?? "127.0.0.1");
-  console.log(`fake relay: listening at ${base}. Every thought is answered by the scripted brain; no provider is called.`);
+  console.log(`fake relay: listening at ${base}. Every thought is answered by the rule brain; no provider is called.`);
 }

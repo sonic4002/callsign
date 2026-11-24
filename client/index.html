@@ -22,6 +22,8 @@
     <div id="map-wrap">
       <!-- The map never mirrors: the canvas is always drawn west on the left. -->
       <canvas id="map" dir="ltr"></canvas>
+      <!-- The mini map sits on the map itself, beside the zoom buttons. -->
+      <div id="radar-box" data-i18n-aria="radar"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
       <div id="zoom" dir="ltr">
         <button type="button" id="zoom-in" data-i18n-aria="zoomIn">+</button>
         <button type="button" id="zoom-out" data-i18n-aria="zoomOut">−</button>
@@ -126,11 +128,6 @@
       <div id="power" hidden><span class="icon"></span><span class="label" data-i18n="power"></span><bdi dir="ltr" class="figures"></bdi><i class="bar"><b></b></i><small class="state"></small></div>
     </section>
 
-    <section class="panel" data-sheet="more">
-      <h2 data-fold="radar"><span data-i18n="radar"></span></h2>
-      <div id="radar-box"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
-    </section>
-
     <section class="panel grow" data-sheet="squads">
       <h2><span data-i18n="roster"></span> <bdi dir="ltr" id="pop"></bdi></h2>
       <!-- Who has the initiative: the player, or Anvil. The button only transmits the call. -->
@@ -224,6 +221,14 @@
           <small id="lobby-speed-about"></small>
         </label>
         <label id="lobby-purse"><input type="checkbox" name="purse"> <span data-i18n="lobby.purse"></span></label>
+        <label id="lobby-anvil-row"><span data-i18n="lobby.anvil"></span>
+          <select name="anvil" id="lobby-anvil">
+            <option value="1" data-i18n="lobby.anvil.1"></option>
+            <option value="2" data-i18n="lobby.anvil.2"></option>
+            <option value="3" data-i18n="lobby.anvil.3" selected></option>
+          </select>
+        </label>
+        <label id="lobby-fast"><input type="checkbox" name="fast"> <span data-i18n="lobby.fast"></span></label>
         <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
       </details>
       <fieldset id="lobby-host" hidden>
@@ -299,6 +304,7 @@
         <dt data-i18n="help.q.digIn"></dt><dd data-i18n="help.a.digIn"></dd>
         <dt data-i18n="help.q.ranks"></dt><dd data-i18n="help.a.ranks"></dd>
         <dt data-i18n="help.q.speed"></dt><dd data-i18n="help.a.speed"></dd>
+        <dt data-i18n="help.q.voice"></dt><dd data-i18n="help.a.voice"></dd>
       </dl>
       <h2 data-i18n="strict"></h2>
       <ul>
