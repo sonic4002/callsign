@@ -795,7 +795,25 @@ function sitDown(got) {
 const makeMatch = (options) =>
   lobbyStep(async () => {
     const hostKey = $("lobby-host-key").value || localStorage.getItem("callsign.hostkey") || "";
-    const seat = await createRoom(options, hostKey);
+    if (offer?.locked && !hostKey) {
+      // Asked for before anything is sent: making a match here needs the host's password.
+      $("lobby-host").hidden = false;
+      $("lobby-host-key").focus();
+      throw Object.assign(new Error("host password needed"), { status: 403 });
+    }
+    let seat;
+    try {
+      seat = await createRoom(options, hostKey);
+    } catch (err) {
+      if (err.status === 403 && offer?.locked) {
+        // A wrong or outdated password: forget it and ask again.
+        localStorage.removeItem("callsign.hostkey");
+        $("lobby-host").hidden = false;
+        $("lobby-host-key").select();
+        $("lobby-host-key").focus();
+      }
+      throw err;
+    }
     if (hostKey) localStorage.setItem("callsign.hostkey", hostKey); // it worked: this browser is the host's
     sitDown(seat);
   });

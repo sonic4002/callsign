@@ -148,9 +148,11 @@
         <select name="length" id="lobby-length"></select>
       </label>
       <label id="lobby-watch"><input type="checkbox" name="watch"> <span data-i18n="lobby.watch"></span></label>
-      <label id="lobby-host" hidden><span data-i18n="lobby.hostKey"></span>
-        <input name="hostKey" id="lobby-host-key" type="password" dir="ltr" autocomplete="off">
-      </label>
+      <fieldset id="lobby-host" hidden>
+        <legend data-i18n="lobby.hostKey"></legend>
+        <p data-i18n="lobby.hostAbout"></p>
+        <input name="hostKey" id="lobby-host-key" type="password" dir="ltr" autocomplete="off" data-i18n-placeholder="lobby.hostKey">
+      </fieldset>
     </form>
     <section id="lobby-room" hidden>
       <p><span data-i18n="lobby.codeIs"></span> <strong id="lobby-code" dir="ltr"></strong></p>

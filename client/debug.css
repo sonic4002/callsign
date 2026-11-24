@@ -263,3 +263,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #overlay [hidden] { display: none !important; }
 #lobby-note code { white-space: nowrap; unicode-bidi: isolate; direction: ltr; color: var(--brass); }
 #overlay select { max-inline-size: 100%; min-inline-size: 0; text-overflow: ellipsis; }
+#lobby-host { border-color: var(--brass); }
+#lobby-host legend { color: var(--brass); }
+#lobby-host p { margin: 0 0 .5rem; font-size: .8rem; text-align: start; }
+#lobby-host input { inline-size: 100%; padding: .5rem .6rem; font: inherit; color: inherit; background: #10161a; border: 1px solid var(--brass); }
