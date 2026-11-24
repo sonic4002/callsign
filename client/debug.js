@@ -479,6 +479,22 @@ function sendBox(spoken = false) {
   draft("");
 }
 
+// order transmits a call the page wrote itself (a squad, a place and an action picked on
+// the map; an upgrade button) at once, without passing through the box. It is kept with
+// the sent calls, so Up brings it back to change and send again.
+function order(text) {
+  if (!transmit(text)) return;
+  if (sent.at(-1) !== text) sent.push(text);
+  recall = sent.length;
+  // The opening that picking the squad put in the box has been said: take it out again,
+  // unless the player has typed on from it.
+  if ($("text").value === opening) {
+    $("text").value = "";
+    syncInputDirection();
+  }
+}
+let opening = ""; // the start of a call that picking a squad wrote into the box
+
 $("send").addEventListener("submit", (ev) => {
   ev.preventDefault();
   sendBox();
@@ -696,7 +712,7 @@ function rosterRow(sq, canAct) {
     up.title = up.getAttribute("aria-label");
     up.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      draft(call("upgrade", { to: anvil(), squad: sq.callsign[lang] }));
+      order(call("upgrade", { to: anvil(), squad: sq.callsign[lang] }));
     });
     tier.append(up);
     if (asked) tier.append(el("small", "asked", t("upgradeAsked")));
@@ -735,7 +751,10 @@ function select(sq) {
   drawn.roster = "";
   renderSidebar();
   hideOrders();
-  if (me) draft(t("callPrefix", { to: sq.callsign[lang], from: me[lang] }));
+  if (me) {
+    opening = t("callPrefix", { to: sq.callsign[lang], from: me[lang] });
+    draft(opening);
+  }
   coach.update();
 }
 
@@ -787,14 +806,24 @@ function mapClick(ev) {
   if (hit.contact) {
     const name = scene.contactName(hit.contact, lang);
     const mine = state.squads.find((sq) => sq.id === scene.selected);
-    return draft(mine ? call("attack", { to: mine.callsign[lang], point: name }) : $("text").value + name);
+    if (!mine) return draft($("text").value + name);
+    // With a squad picked, an enemy offers one action: attack it.
+    return offerOrders(mine, name, { contact: name }, ["attack"], box, sx, sy);
   }
   if (!hit.point) return;
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (!squad) return draft($("text").value + hit.point.callsign[lang]);
+  offerOrders(squad, hit.point.callsign[lang], { point: hit.point.id }, ["hold", "move", "attack"], box, sx, sy);
+}
+
+// offerOrders opens the small menu of actions for a squad and a place. Pressing one
+// transmits the call at once.
+function offerOrders(squad, placeName, target, actions, box, sx, sy) {
   const menu = $("orders");
-  menu.dataset.point = hit.point.id;
-  $("orders-title").textContent = `${squad.callsign[lang]} → ${hit.point.callsign[lang]}`;
+  menu.dataset.point = target.point ?? "";
+  menu.dataset.contact = target.contact ?? "";
+  $("orders-title").textContent = `${squad.callsign[lang]} → ${placeName}`;
+  for (const button of menu.querySelectorAll("button")) button.hidden = !actions.includes(button.dataset.order);
   menu.style.left = `${Math.max(90, Math.min(box.width - 90, sx))}px`;
   menu.style.top = `${Math.min(box.height - 90, sy)}px`;
   menu.hidden = false;
@@ -808,8 +837,9 @@ for (const button of document.querySelectorAll("#orders button")) {
   button.addEventListener("click", () => {
     const squad = state.squads.find((sq) => sq.id === scene.selected);
     const point = rules.map.points.find((p) => p.id === $("orders").dataset.point);
+    const place = point?.callsign[lang] ?? $("orders").dataset.contact;
     hideOrders();
-    if (squad && point) draft(call(button.dataset.order, { to: squad.callsign[lang], point: point.callsign[lang] }));
+    if (squad && place) order(call(button.dataset.order, { to: squad.callsign[lang], point: place }));
   });
 }
 
