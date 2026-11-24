@@ -84,9 +84,6 @@ func TestAHeroIsAnnouncedOnBothNetsAndASeizedSquadChangesNets(t *testing.T) {
 	if _, err := rm.Tool(militia, ToolSeize, json.RawMessage(`{"contact":`+itoa(tank.ID)+`}`)); !errors.Is(err, sim.ErrNotHero) {
 		t.Fatalf("militia seizing: %v", err)
 	}
-	if _, err := rm.Say(hammer1, "Viper 1, this is Hammer. Blow up the west bridge. Over."); err != nil {
-		t.Fatal(err) // a bridge is hit only on the commander's order (bridges.go)
-	}
 	if _, err := rm.Tool(militia, ToolPlant, json.RawMessage(`{"place":"the west bridge"}`)); !errors.Is(err, sim.ErrNotHero) {
 		t.Fatalf("militia planting: %v", err)
 	}

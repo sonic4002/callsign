@@ -135,11 +135,6 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		default:
 			cmd.Place = place
 		}
-		if name == ToolAttack || name == ToolPlant {
-			if err := rm.mayHitBridge(side, cmd.Place); err != nil {
-				return nil, err
-			}
-		}
 	}
 	sq, err := rm.sim.Apply(cmd)
 	if err != nil {

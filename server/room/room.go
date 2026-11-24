@@ -123,9 +123,6 @@ type Room struct {
 
 	// The tick each kind of base cue was last said to each side; see cues.go.
 	cued [2]map[string]int
-	// bridgeDoomed is, for each side, the tick at which its commander last ordered a bridge
-	// destroyed in so many words, by bridge id (bridges.go). Squads shoot a bridge only then.
-	bridgeDoomed [2]map[string]int
 	// direct is set while the commander's own hand is at work (act.go): what it builds or
 	// buys needs nobody's leave and is not announced as the operator's doing.
 	direct bool
@@ -551,9 +548,6 @@ func (rm *Room) transmit(side int, from radio.Station, p radio.Parsed, text stri
 	m := Message{
 		Tick: rm.sim.Tick, From: rm.name(from, side), Lang: p.Lang, Text: text,
 		Body: p.Body, End: p.End, Prowords: p.Prowords, Points: p.Points, Landmarks: p.Landmarks,
-	}
-	if from.Kind == radio.Player {
-		rm.noteBridgeOrder(side, p.Body, p.Landmarks)
 	}
 	for _, st := range p.To {
 		if st.Kind == radio.Squad && rm.squadOf(side, st) == nil {
