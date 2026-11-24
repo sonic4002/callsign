@@ -6,7 +6,7 @@
 import { drawUnit, loadSprites } from "./art.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
-import { normalize } from "./voice/normalize.js";
+import { tidy } from "./voice/normalize.js";
 import { Voice } from "./voice/voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -176,9 +176,24 @@ function renderLog() {
 // transmit puts text on the net. It is the one place this page acts on the match.
 function transmit(text) {
   if (!text || !open()) return false;
-  ws.send(JSON.stringify({ type: "radio", text }));
+  ws.send(JSON.stringify({ type: "radio", text, strict }));
   return true;
 }
+
+// How closely the net holds the player to radio procedure: 1 relaxed, 2 standard, 3 strict.
+let strict = [1, 2, 3].find((n) => String(n) === localStorage.getItem("callsign.strict")) ?? 1;
+$("strict").value = String(strict);
+$("strict").addEventListener("change", (ev) => {
+  strict = Number(ev.target.value);
+  localStorage.setItem("callsign.strict", String(strict));
+});
+
+const speaks = (text) => (/[\u0590-\u05ff]/.test(text) ? "he" : "en");
+
+for (const id of ["help-open", "help-close"]) $(id).addEventListener("click", () => ($("help").hidden = id === "help-close"));
+$("help").addEventListener("click", (ev) => ev.target === $("help") && ($("help").hidden = true));
+addEventListener("keydown", (ev) => ev.key === "Escape" && ($("help").hidden = true));
+$("help").hidden = !query.has("help"); // ?help opens the page on the help window
 
 // draft puts a call in the box for the player to send or edit.
 function draft(text) {
@@ -192,13 +207,20 @@ const sent = [];
 let recall = 0; // index into `sent`; sent.length means the box holds a new call
 let unsent = "";
 
-$("send").addEventListener("submit", (ev) => {
-  ev.preventDefault();
-  const text = $("text").value.trim();
+// sendBox transmits what is in the box. At the relaxed level a roughly spelled callsign
+// or place is corrected first.
+function sendBox() {
+  let text = $("text").value.trim();
+  if (text && strict === 1 && rules) text = tidy(text, { lang: speaks(text), rules });
   if (!transmit(text)) return;
   if (sent.at(-1) !== text) sent.push(text);
   recall = sent.length;
   draft("");
+}
+
+$("send").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  sendBox();
 });
 
 $("text").addEventListener("keydown", (ev) => {
@@ -251,7 +273,10 @@ async function talkEnd() {
   if (!voice.held) return;
   const spoke = lang;
   const text = await voice.stop(spoke);
-  if (text && rules) draft(normalize(text, { lang: spoke, rules }));
+  if (!text || !rules) return;
+  // Spoken calls go out at once; the log shows what was sent, and Up brings it back to fix.
+  draft(tidy(text, { lang: spoke, rules }));
+  sendBox();
 }
 
 $("ptt").addEventListener("pointerdown", (ev) => {

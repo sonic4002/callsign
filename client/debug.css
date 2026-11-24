@@ -179,3 +179,22 @@ footer.panel { font-size: .78rem; color: var(--muted); }
   #radio { block-size: 12rem; }
   #sidebar { inline-size: auto; border-inline-start: 0; border-block-start: 2px solid var(--brass-dim); overflow: visible; }
 }
+
+/* ---- help ---- */
+#help { position: fixed; inset: 0; z-index: 11; display: grid; place-items: center; background: #05080ad9; }
+#help[hidden] { display: none; }
+#help .card {
+  inline-size: min(44rem, 94vw); max-block-size: 90vh; overflow: auto; padding: 1.4rem 1.8rem;
+  background: linear-gradient(#222b31, #151b1f); border: 1px solid var(--edge-hi); border-block-start: 3px solid var(--brass);
+}
+#help h1 { font-size: 1.3rem; letter-spacing: .12em; margin: 0; }
+#help h2 { margin: 1.1rem 0 .3rem; }
+#help p, #help li { color: var(--muted); font-size: .88rem; line-height: 1.5; margin: 0; }
+#help ul { margin: 0; padding-inline-start: 1.1rem; }
+#help .examples { list-style: none; padding: 0; display: grid; gap: .3rem; }
+#help .examples li { display: grid; grid-template-columns: 11rem 1fr; gap: .6rem; align-items: baseline; }
+#help code { color: var(--mine); font-size: .9rem; }
+#help strong { color: var(--brass); }
+#help .row { display: flex; justify-content: flex-end; margin-block-start: 1.2rem; }
+footer.panel select { margin-inline-start: .4rem; font: inherit; color: inherit; background: #10161a; border: 1px solid var(--edge-hi); }
+footer.panel label { display: block; margin-block-end: .3rem; }

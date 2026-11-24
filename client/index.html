@@ -43,6 +43,7 @@
     <header class="panel">
       <h1 data-i18n="title"></h1>
       <div id="controls">
+        <button type="button" id="help-open" data-i18n="help"></button>
         <button type="button" id="lang" data-i18n="language"></button>
         <button type="button" id="restart" data-i18n="restart"></button>
       </div>
@@ -87,6 +88,13 @@
 
     <footer class="panel">
       <label><input type="checkbox" id="nerve"> <span data-i18n="showNerve"></span></label>
+      <label><span data-i18n="strict"></span>
+        <select id="strict">
+          <option value="1" data-i18n="strict.1"></option>
+          <option value="2" data-i18n="strict.2"></option>
+          <option value="3" data-i18n="strict.3"></option>
+        </select>
+      </label>
       <p id="hint" data-i18n="hint"></p>
     </footer>
   </aside>
@@ -105,6 +113,33 @@
       <summary data-i18n="credits"></summary>
       <ul id="credits-list"></ul>
     </details>
+  </div>
+</div>
+<div id="help" hidden>
+  <div class="card">
+    <h1 data-i18n="help.title"></h1>
+    <h2 data-i18n="help.talk"></h2>
+    <p data-i18n="help.talk.body"></p>
+    <h2 data-i18n="help.orders"></h2>
+    <ul class="examples">
+      <li><span data-i18n="help.attack"></span><code dir="auto" data-i18n="help.attack.say"></code></li>
+      <li><span data-i18n="help.attackAny"></span><code dir="auto" data-i18n="help.attackAny.say"></code></li>
+      <li><span data-i18n="help.hold"></span><code dir="auto" data-i18n="help.hold.say"></code></li>
+      <li><span data-i18n="help.move"></span><code dir="auto" data-i18n="help.move.say"></code></li>
+      <li><span data-i18n="help.report"></span><code dir="auto" data-i18n="help.report.say"></code></li>
+      <li><span data-i18n="help.buy"></span><code dir="auto" data-i18n="help.buy.say"></code></li>
+      <li><span data-i18n="help.upgrade"></span><code dir="auto" data-i18n="help.upgrade.say"></code></li>
+      <li><span data-i18n="help.all"></span><code dir="auto" data-i18n="help.all.say"></code></li>
+    </ul>
+    <h2 data-i18n="strict"></h2>
+    <ul>
+      <li><strong data-i18n="strict.1"></strong> <span data-i18n="help.strict.1"></span></li>
+      <li><strong data-i18n="strict.2"></strong> <span data-i18n="help.strict.2"></span></li>
+      <li><strong data-i18n="strict.3"></strong> <span data-i18n="help.strict.3"></span></li>
+    </ul>
+    <h2 data-i18n="help.more"></h2>
+    <p data-i18n="help.more.body"></p>
+    <div class="row"><button type="button" class="primary" id="help-close" data-i18n="help.close"></button></div>
   </div>
 </div>
 <script type="module" src="debug.js"></script>

@@ -445,3 +445,34 @@ func TestOverWebSocket(t *testing.T) {
 		return f.Type == "event" && f.Event.Kind == sim.EvArrived && f.Event.Squad == 2 && f.Event.Point == "F"
 	})
 }
+
+func TestSayStrictnessLevels(t *testing.T) {
+	rm := newRoom(t, Config{})
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	cases := []struct {
+		text  string
+		level int
+		to    string // station key the message reaches, or "" when refused
+		want  string // part of the refusal
+	}{
+		{"צפע 1 תפוס את דוד", Relaxed, "infantry-1", ""},
+		{"Viper 1 attack", Relaxed, "infantry-1", ""},
+		{"What's happening at Kilo?", Relaxed, radio.Operator, ""},
+		{"Viper 1 attack Delta", 0, "infantry-1", ""}, // a frame with no level is relaxed
+		{"Viper 1 attack Delta", Standard, "", "start with the call"},
+		{"Viper 1, attack Delta", Standard, "", "start with the call"},
+		{"Viper 1, this is Hammer. Attack Delta", Standard, "infantry-1", ""},
+		{"Viper 1, this is Hammer. Attack Delta", Strict, "", "Over or Out"},
+		{"What's happening at Kilo?", Strict, "", "start with the call"},
+		{"צפע 1, כאן פטיש. תקוף את דוד. עבור.", Strict, "infantry-1", ""},
+	}
+	for _, tc := range cases {
+		m, err := rm.SayAt(hammer, tc.text, tc.level)
+		switch {
+		case tc.to == "" && (err == nil || !strings.Contains(err.Error(), tc.want)):
+			t.Errorf("level %d %q: err = %v, want %q", tc.level, tc.text, err, tc.want)
+		case tc.to != "" && (err != nil || len(m.To) != 1 || m.To[0].Key != tc.to):
+			t.Errorf("level %d %q: got %+v %v, want it to reach %s", tc.level, tc.text, m.To, err, tc.to)
+		}
+	}
+}

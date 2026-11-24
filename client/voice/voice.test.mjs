@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 import { Recognizer, isNoise, readWav, trimSilence } from "./engine.js";
 import { LogMel, parseMelFilters } from "./mel.js";
-import { normalize, similarity } from "./normalize.js";
+import { normalize, similarity, relaxed, tidy } from "./normalize.js";
 import { Tokenizer } from "./tokenizer.js";
 
 const read = (name) => readFileSync(new URL(name, import.meta.url));
@@ -130,4 +130,14 @@ test("the Hebrew model transcribes the test recording word for word", { skip }, 
   });
   const text = await r.transcribe(readWav(read("testdata/sample-he.wav")).samples);
   assert.equal(text, "אני הייתי, נגיד, אומר דבר כזה. קודם כל הייתי רוצה לתאר את החברה, זאת אומרת, מה החברה עושה, מה הטכנולוגיה, מה האתגרים שלך.");
+});
+
+test("relaxed: a callsign that only sounds right is respelled when its number follows", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  assert.equal(relaxed("צבע 1 תפוס את דוד", { lang: "he", rules }), "צפע 1 תפוס את דוד");
+  assert.equal(relaxed("צבע אחת תקוף", { lang: "he", rules }), "צפע 1 תקוף");
+  assert.equal(relaxed("vapour two attack gulf", { lang: "en", rules }), "Viper 2 attack Golf");
+  assert.equal(relaxed("what is happening at Kilo?", { lang: "en", rules }), "what is happening at Kilo?");
+  assert.equal(relaxed("buy a tank", { lang: "en", rules }), "buy a tank");
+  assert.equal(tidy("Viper 2, this is Hammer. Hold Foxtrot. Over.", { lang: "en", rules }), "Viper 2, this is Hammer. Hold Foxtrot. Over.");
 });

@@ -10,15 +10,16 @@ import (
 
 // inbound is a frame from a client.
 //
-//	{"type":"radio","text":"Viper 2, this is Hammer. Hold Foxtrot. Over."}
+//	{"type":"radio","text":"Viper 2, this is Hammer. Hold Foxtrot. Over.","strict":1}
 //	{"type":"tool","id":7,"name":"hold","args":{"point":"F"}}
 //	{"type":"restart"}
 type inbound struct {
-	Type string          `json:"type"`
-	Text string          `json:"text"`
-	ID   int             `json:"id"`
-	Name string          `json:"name"`
-	Args json.RawMessage `json:"args"`
+	Type   string          `json:"type"`
+	Text   string          `json:"text"`
+	Strict int             `json:"strict"` // radio frames: 1 relaxed (default), 2 standard, 3 strict
+	ID     int             `json:"id"`
+	Name   string          `json:"name"`
+	Args   json.RawMessage `json:"args"`
 }
 
 // ServeWS is the WebSocket endpoint: /ws?side=0&role=hammer|anvil|squad|spectator&squad=<id>&state=0|1
@@ -71,7 +72,7 @@ func (rm *Room) ServeWS(w http.ResponseWriter, r *http.Request) {
 func (rm *Room) handle(c *Client, in inbound) {
 	switch in.Type {
 	case "radio":
-		if _, err := rm.Say(c, in.Text); err != nil {
+		if _, err := rm.SayAt(c, in.Text, in.Strict); err != nil {
 			rm.reply(c, map[string]any{"type": "refused", "text": in.Text, "reason": err.Error()})
 		}
 	case "tool":

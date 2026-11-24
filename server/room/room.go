@@ -332,21 +332,47 @@ func (rm *Room) name(st radio.Station, side int) Name {
 	return n
 }
 
-// Say puts Hammer's typed transmission on the net. Routing is by callsign match only.
-// With no callsign at the front, the operator gets it.
-func (rm *Room) Say(c *Client, text string) (Message, error) {
+// How closely Hammer has to follow radio procedure. The player picks the level; agents
+// always transmit through the radio tool, which writes proper procedure itself.
+const (
+	Relaxed  = 1 // a callsign and the order are enough: "Viper 1 attack Delta"
+	Standard = 2 // the call is required: "Viper 1, this is Hammer. Attack Delta"
+	Strict   = 3 // the call and a closing Over or Out are required
+)
+
+var (
+	ErrNoCall   = errors.New(`start with the call: "<to>, this is <you>"`)
+	ErrNoEnding = errors.New("end the transmission with Over or Out")
+)
+
+// Say puts Hammer's transmission on the net at the relaxed level.
+func (rm *Room) Say(c *Client, text string) (Message, error) { return rm.SayAt(c, text, Relaxed) }
+
+// SayAt puts Hammer's transmission on the net, held to a strictness level. Routing is by
+// callsign match only. At the relaxed level a message with no callsign goes to the operator.
+func (rm *Room) SayAt(c *Client, text string, level int) (Message, error) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 	if c.ID.Role != RoleHammer {
 		return Message{}, errors.New("agents transmit with the radio tool")
 	}
-	p, err := rm.net.Parse(text)
+	parse := rm.net.Parse
+	if level <= Relaxed {
+		parse = rm.net.ParseRelaxed
+	}
+	p, err := parse(text)
 	if err != nil {
 		return Message{}, err
 	}
 	me := radio.Station{Kind: radio.Player}
 	if p.From != nil && *p.From != me {
 		return Message{}, fmt.Errorf("you are %s, not %s", rm.net.Name(me, p.Lang), rm.net.Name(*p.From, p.Lang))
+	}
+	if level >= Standard && (len(p.To) == 0 || p.From == nil) {
+		return Message{}, ErrNoCall
+	}
+	if level >= Strict && p.End == "" {
+		return Message{}, ErrNoEnding
 	}
 	if len(p.To) == 0 {
 		p.To = []radio.Station{{Kind: radio.Operator}}

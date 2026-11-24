@@ -38,8 +38,11 @@ function leaderPlan({ agent, wake, rules }) {
   if (call.prowords?.includes("radioCheck")) return [radio(back, say.fiveByFive[lang], "out")];
   const verb = verbOf(call.body);
   const point = call.points?.[0];
-  if (!verb || (!point && verb !== "hold")) return [radio(back, say.sayAgain[lang], "over")];
-  const input = verb === "attack" ? { point, contact: 0 } : { point: point ?? "here" };
+  if (!verb || (!point && verb === "move")) return [radio(back, say.sayAgain[lang], "over")];
+  // "Attack" with no target: the nearest enemy in sight, or else the enemy headquarters.
+  const contact = (!point && wake.status?.contacts?.[0]?.id) || 0;
+  const enemyHQ = rules.map.points.find((p) => p.kind === "hq" && p.owner !== agent.side)?.id;
+  const input = verb === "attack" ? { point: contact ? "" : point ?? enemyHQ, contact } : { point: point ?? "here" };
   return [
     { name: verb, input, orElse: (why) => radio(back, `${say.negative[lang]}, ${why}`, "over") },
     radio(back, say.wilco[lang], "out"),

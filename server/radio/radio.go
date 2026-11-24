@@ -167,7 +167,13 @@ func (n *Net) Resolve(name string) (Station, bool) {
 
 // Parse takes a transmission apart. Text with no call at the front is still a message:
 // it comes back with no addressee and the caller decides who gets it.
-func (n *Net) Parse(text string) (Parsed, error) {
+func (n *Net) Parse(text string) (Parsed, error) { return n.parse(text, false) }
+
+// ParseRelaxed is Parse for a player who drops the procedure: a callsign at the front
+// addresses the message even with nothing after it but the order ("Viper 1 attack Delta").
+func (n *Net) ParseRelaxed(text string) (Parsed, error) { return n.parse(text, true) }
+
+func (n *Net) parse(text string, relaxed bool) (Parsed, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return Parsed{}, ErrEmpty
@@ -217,7 +223,7 @@ func (n *Net) Parse(text string) (Parsed, error) {
 		}
 		p.From = &st
 		body = len(low) - len(rest)
-	case len(p.To) > 0 && skip(low[pos:], " \t") < skip(low[pos:], separators):
+	case len(p.To) > 0 && (relaxed || skip(low[pos:], " \t") < skip(low[pos:], separators)):
 		// "Viper 2, hold Foxtrot": a call without "this is" still counts.
 	default:
 		p.To, body = nil, 0

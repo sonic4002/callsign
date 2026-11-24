@@ -154,3 +154,33 @@ export function normalize(heard, { lang, rules }) {
   body = body && body[0].toUpperCase() + body.slice(1);
   return [`${to}, ${marker} ${me}`, body, end].filter(Boolean).join(". ") + (body || end ? "." : "");
 }
+
+// relaxed tidies a message that has no "this is": "צבע 1 תפוס את דוד" or "vapour two attack
+// gulf". Only a first word that sounds like a callsign and is followed by its number is
+// respelled; the operator's name must be close to exact. Map points in the rest are snapped.
+export function relaxed(heard, { lang, rules }) {
+  const text = heard.replace(/\s+/g, " ").trim();
+  const m = /^([^\s,.:;!?]+)(?:[\s\-#]+([^\s,.:;!?]+))?/.exec(text);
+  if (!m) return text;
+  const cs = rules.callsigns;
+  const close = (word, name) => similarity(word, name, lang);
+  let head = "";
+  let taken = 0;
+  const number = m[2] ? numberOf(m[2], lang) : 0;
+  const best = Object.values(cs.classes).map((c) => [close(m[1], c[lang]), c[lang]]).sort((a, b) => b[0] - a[0])[0];
+  if (number && best[0] >= 0.6) {
+    head = `${best[1]} ${number}`;
+    taken = m[0].length;
+  } else if (close(m[1], cs.operator[lang]) >= 0.8) {
+    head = cs.operator[lang];
+    taken = m[1].length;
+  }
+  return head + places(text.slice(taken), lang, rules);
+}
+
+// tidy picks the right repair for a message: the full call when "this is" was said,
+// otherwise the relaxed form.
+export function tidy(heard, opts) {
+  const full = normalize(heard, opts);
+  return full !== heard.replace(/\s+/g, " ").trim() ? full : relaxed(heard, opts);
+}
