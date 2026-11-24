@@ -64,9 +64,8 @@ func (s *Sim) crush(live []*teamRef) {
 					sgn = -1
 				}
 				pace := o.u.Speed * s.dt * 1.4
-				nx, ny := f.X-uy*sgn*pace, f.Y+ux*sgn*pace
-				if s.Walkable(nx, ny) {
-					f.X, f.Y = nx, ny
+				// A step onto another body is no step; a friend in the way is shoved along (bodies.go).
+				if s.dodge(o, -uy*sgn*pace, ux*sgn*pace) {
 					dx, dy = f.X-t.X, f.Y-t.Y
 					d = math.Hypot(dx, dy)
 				}

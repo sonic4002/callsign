@@ -77,6 +77,7 @@ func (s *Sim) trackObjects() {
 //	                +0.20 order is hold, no target  -0.10 under fire
 //	                +0.40 order is hold and the point is still far
 //	                -0.20 shaken (-0.30 more under fire)   -0.70 pinned
+//	                -0.60 an enemy body blocks the way and there is something to shoot
 //	cover     0.20  +0.25 under fire   +0.20 shaken   +0.60 pinned
 //	fall back 0.10  +0.45 shaken and outnumbered
 //	                +0.60 an enemy inside the weapon's minimum range and nothing to shoot
@@ -192,7 +193,7 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if order != OrderNone {
 		destX, destY = sq.Order.X, sq.Order.Y
 		if sq.Order.Contact == 0 {
-			ox, oy := formation(tr.slot, u.Teams, sq.Side)
+			ox, oy := s.formation(u, tr.slot, sq.Side)
 			destX, destY = destX+ox, destY+oy
 		}
 		// Take the cover the post offers, or the landmark the order named.
@@ -216,6 +217,12 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 		} else {
 			destX, destY = t.X, t.Y // inside, and meant to be
 		}
+	}
+	// Bodies take room: the team stands on its slot when it is free, and on the nearest
+	// free spot when another body has it (bodies.go). Chasing a contact, or going in at a
+	// door, it has no spot to keep.
+	if order != OrderNone && sq.Order.Contact == 0 && enter == 0 && t.In == "" {
+		destX, destY = s.post(tr, destX, destY)
 	}
 	quiet := int(s.R.Nerve.QuietSeconds * float64(s.R.TickRate))
 	underFire := s.Tick-t.lastShot <= quiet
@@ -266,7 +273,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if needMove {
 		v := 0.5 + b(order == OrderMove, 0.4) + b(order == OrderAttack, 0.1) +
 			b(order == OrderHold && !canFire, 0.2) + b(enRoute, 0.4) - b(underFire, 0.1) -
-			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7) + b(onTask && !pinned, 0.7)
+			b(shaken, 0.2) - b(shaken && underFire, 0.3) - b(pinned, 0.7) + b(onTask && !pinned, 0.7) -
+			b(s.Tick < t.held && canFire, 0.6) // an enemy body is in the way: shoot before pushing on
 		if v > score {
 			best, score = plan{act: ActAdvance, x: destX, y: destY}, v
 		}

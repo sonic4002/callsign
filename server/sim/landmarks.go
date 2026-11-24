@@ -150,18 +150,21 @@ func (s *Sim) coverSpot(tr *teamRef, slotX, slotY float64) (x, y float64, landma
 	if inside {
 		return l.X, l.Y, best
 	}
-	// Outside: close in around the landmark, well inside its cover.
-	ox, oy := formation(tr.slot, u.Teams, sq.Side)
+	// Outside: close in around the landmark, well inside its cover, shoulder to shoulder
+	// (bodies.go: the teams of a squad no longer stand on one spot).
+	ox, oy, spread := s.huddle(u, tr.slot, sq.Side)
 	r := s.kindOf(l).CoverRadius
 	if s.kindOf(l).Size > 0 {
-		// Beside a building, on the side nearer the post.
+		// Beside a building, on the side nearer the post, and no farther out than keeps
+		// the whole squad inside the cover.
+		at := math.Min(r*0.8, r-spread-1)
 		dx, dy := sq.Order.X-l.X, sq.Order.Y-l.Y
 		if d := math.Hypot(dx, dy); d > 1 {
-			return l.X + dx/d*r*0.8 + ox*0.3, l.Y + dy/d*r*0.8 + oy*0.3, best
+			return l.X + dx/d*at + ox, l.Y + dy/d*at + oy, best
 		}
-		return l.X + r*0.8, l.Y + oy*0.3, best
+		return l.X + at, l.Y + oy, best
 	}
-	return l.X + ox*0.35, l.Y + oy*0.35, best
+	return l.X + ox, l.Y + oy, best
 }
 
 // failing reports whether a building is close enough to falling that troops should get out.
@@ -215,8 +218,12 @@ func (s *Sim) enterBuildings(live []*teamRef) {
 		}
 		_, before := s.garrison(l.ID)
 		t.In, t.path = l.ID, nil
+		// Inside, a team takes no room on the ground.
+		s.bodies.drop(tr, &tr.cell)
+		s.spots.drop(tr, &tr.spot)
+		t.claimed = false
 		l.gSide, l.gTeams = tr.sq.Side, l.gTeams+1
-		ox, oy := formation(tr.slot, tr.u.Teams, tr.sq.Side)
+		ox, oy := s.formation(tr.u, tr.slot, tr.sq.Side)
 		t.X, t.Y = l.X+ox*0.25, l.Y+oy*0.25
 		if before == 0 {
 			s.emit(Event{Side: tr.sq.Side, Kind: EvGarrisoned, Squad: tr.sq.ID, Place: l.ID, Point: s.nearestPoint(l.X, l.Y)})
@@ -243,6 +250,9 @@ func (s *Sim) leave(tr *teamRef) {
 	}
 	r := s.R.LandmarkKinds[l.Landmark.Kind].Size/2 + NavCell
 	t.X, t.Y = s.nav.snapXY(navGround, l.X+dx/d*r, l.Y+dy/d*r)
+	// Back on the ground it takes room again: beside whoever stands at the door.
+	t.X, t.Y = s.room(tr.sq, t, t.X, t.Y)
+	s.bodies.put(tr, &tr.cell, t.X, t.Y)
 }
 
 // coverAgainst is the multiplier on a shot's chance to hit a fireteam, from the cover it

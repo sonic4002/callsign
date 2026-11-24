@@ -557,12 +557,14 @@ func TestATankRunsDownInfantryInTheOpenAndNotBehindSandbags(t *testing.T) {
 			l := digIn(t, s, militia)
 			// The men stand in the position, off its middle, where the tank will pass them.
 			for i := range militia.Teams {
-				militia.Teams[i].X, militia.Teams[i].Y = l.X, l.Y+24
+				militia.Teams[i].X, militia.Teams[i].Y = l.X-25.5, l.Y+20
 			}
 		}
+		// Bodies take room now, so the four teams stand in a row along the tank's line
+		// (inside the position when there is one) and not on one spot as they used to.
 		mx, my := militia.Teams[0].X, militia.Teams[0].Y
 		for i := range militia.Teams {
-			militia.Teams[i].X, militia.Teams[i].Y = mx, my
+			militia.Teams[i].X, militia.Teams[i].Y = mx+17*float64(i), my
 			militia.Teams[i].Stress = 1 // pinned: they cannot step aside
 			militia.Teams[i].Cooldown = 100000
 		}

@@ -349,6 +349,15 @@ func (s *Sim) Hash() uint64 {
 			put(uint64(t.Cooldown))
 			put(uint64(int64(t.lastFire)))
 			h.Write([]byte(t.In))
+			// What the team's body is doing among the others (bodies.go).
+			f(t.claimX)
+			f(t.claimY)
+			put(uint64(t.jam))
+			put(uint64(t.stuck))
+			put(uint64(int64(t.lean)))
+			put(uint64(t.yield))
+			put(uint64(t.detour))
+			put(uint64(t.held))
 		}
 	}
 	s.hashStructures(put, f)

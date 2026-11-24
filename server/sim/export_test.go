@@ -13,3 +13,27 @@ func (s *Sim) ShotAt(sq *Squad) {
 		sq.Teams[i].lastShot = s.Tick
 	}
 }
+
+// Overlap is the deepest that two bodies on the map overlap right now (0 when none do)
+// and the squads they belong to: a seam for the tests of bodies. Teams inside a building
+// take no room, and a crushing vehicle may be over enemy infantry.
+func (s *Sim) Overlap() (depth float64, a, b *Squad) {
+	live := s.liveTeams()
+	for i, x := range live {
+		if x.t.In != "" {
+			continue
+		}
+		for _, y := range live[i+1:] {
+			if y.t.In != "" {
+				continue
+			}
+			if d := touch(x, y) - dist(x.t.X, x.t.Y, y.t.X, y.t.Y); d > depth {
+				depth, a, b = d, x.sq, y.sq
+			}
+		}
+	}
+	return depth, a, b
+}
+
+// Body is the radius of the room one team of a squad takes up.
+func (s *Sim) Body(sq *Squad) float64 { return s.R.BodyOf(sq.unit) }
