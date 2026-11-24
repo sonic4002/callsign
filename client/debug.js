@@ -784,7 +784,9 @@ function renderDeploying(deploying) {
     const queue = deploying.filter((d) => d.unit === button.dataset.unit);
     const first = queue[0];
     button.classList.toggle("deploying", Boolean(first));
-    const asked = inLine(button.dataset.unit);
+    // A locked unit is never "asked for": a purchase whose unit is not known yet marks
+    // every card as waiting, and that must not light up what cannot be bought.
+    const asked = button.classList.contains("locked") ? 0 : inLine(button.dataset.unit);
     button.classList.toggle("requested", !first && asked > 0);
     button.querySelector(".fill").style.blockSize = first ? `${progress(first) * 100}%` : "0";
     button.querySelector(".left").textContent = first ? t("seconds", { seconds: secondsLeft(first) }) : "";
