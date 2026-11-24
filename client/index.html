@@ -178,6 +178,10 @@
       <label><span data-i18n="lobby.length"></span>
         <select name="length" id="lobby-length"></select>
       </label>
+      <label id="lobby-gold-row"><span data-i18n="lobby.startGold"></span>
+        <select id="lobby-gold"></select>
+        <input id="lobby-gold-other" type="number" inputmode="numeric" dir="ltr" hidden data-i18n-aria="lobby.startGold">
+      </label>
       <label id="lobby-speed-row"><span data-i18n="lobby.speed"></span>
         <select name="speed" id="lobby-speed">
           <option value="relaxed" data-i18n="lobby.speed.relaxed"></option>
@@ -201,6 +205,7 @@
         <button type="button" id="lobby-copy" data-i18n="lobby.copy"></button>
       </p>
       <p id="lobby-pace"></p>
+      <p id="lobby-gold-shown"></p>
       <ul id="lobby-seats"></ul>
       <p id="lobby-status"></p>
       <p id="lobby-note"></p>

@@ -107,7 +107,17 @@ type Options struct {
 	Bot           string // how hard the scripted enemy presses, "" for the server's usual
 	Speed         string // how fast the match's clock runs, "" for normal (see Speeds)
 	Purse         bool   // the operators may buy on their own from the start
+	StartGold     int    // gold each side starts with, 0 for the rules default
 }
+
+// The least and the most gold a match may be started with.
+const (
+	MinStartGold = 100
+	MaxStartGold = 20000
+)
+
+// StartGolds are the amounts the lobby offers; a player may also type one.
+var StartGolds = []int{300, 1000, 2500, 5000}
 
 // Speed is a pace a match can be played at. It changes only how much real time one tick
 // of the simulation takes: the same seed and the same commands at the same ticks give the
@@ -186,6 +196,9 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.Bot != "" && !botLevel(o.Bot) && !lesson {
 		return nil, 0, "", errors.New("the scripted enemy is easy, normal or standard")
 	}
+	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
+		return nil, 0, "", errors.New("starting gold is " + strconv.Itoa(MinStartGold) + " to " + strconv.Itoa(MaxStartGold))
+	}
 	if o.Speed == "" {
 		o.Speed = SpeedNormal
 	}
@@ -208,7 +221,7 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true,
-		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
+		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse, StartGold: o.StartGold,
 	}
 	if lesson {
 		cfg.Bots[1-o.Side] = bot.Tutorial // also on a server started without a scripted enemy
@@ -413,28 +426,32 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		length = h.r.Match.LengthSeconds
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"factions": h.cfg.Factions, // side 0, side 1
-		"bot":      h.cfg.Bot != "",
-		"levels":   BotLevels,    // the scripted enemies on offer, easiest first
-		"level":    h.usualBot(), // the one the lobby starts on
-		"length":   length,
-		"speeds":   Speeds,      // the paces on offer, slowest first
-		"speed":    SpeedNormal, // the one the lobby starts on
-		"share":    strings.TrimRight(h.cfg.Share, "/"),
-		"open":     h.open != nil,       // the open room of a server without an agent key
-		"locked":   h.cfg.HostKey != "", // making a match needs the host's password
+		"factions":   h.cfg.Factions, // side 0, side 1
+		"bot":        h.cfg.Bot != "",
+		"levels":     BotLevels,    // the scripted enemies on offer, easiest first
+		"level":      h.usualBot(), // the one the lobby starts on
+		"length":     length,
+		"startGolds": StartGolds, // the starting gold on offer; any amount within the limits is taken
+		"startGold":  h.r.Match.StartGold,
+		"goldLimits": []int{MinStartGold, MaxStartGold},
+		"speeds":     Speeds,      // the paces on offer, slowest first
+		"speed":      SpeedNormal, // the one the lobby starts on
+		"share":      strings.TrimRight(h.cfg.Share, "/"),
+		"open":       h.open != nil,       // the open room of a server without an agent key
+		"locked":     h.cfg.HostKey != "", // making a match needs the host's password
 	})
 }
 
 func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Opponent string `json:"opponent"`
-		Side     *int   `json:"side"`
-		Length   int    `json:"length"`
-		Watch    bool   `json:"watch"`
-		Bot      string `json:"bot"`
-		Speed    string `json:"speed"`
-		Purse    bool   `json:"purse"`
+		Opponent  string `json:"opponent"`
+		Side      *int   `json:"side"`
+		Length    int    `json:"length"`
+		Watch     bool   `json:"watch"`
+		Bot       string `json:"bot"`
+		Speed     string `json:"speed"`
+		Purse     bool   `json:"purse"`
+		StartGold int    `json:"startGold"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -447,7 +464,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, StartGold: in.StartGold}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

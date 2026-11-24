@@ -356,5 +356,8 @@
   "monitor.why.stopped": "its host stopped it",
   "monitor.why.failed": "something went wrong",
   "monitor.sec": "s",
-  "monitor.min": "min"
+  "monitor.min": "min",
+  "lobby.startGold": "Starting gold",
+  "lobby.goldOther": "Other amount",
+  "lobby.goldIs": "Starting gold: {gold}"
 }

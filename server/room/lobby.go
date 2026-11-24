@@ -50,18 +50,19 @@ type SeatView struct {
 
 // LobbyView is the state of a room around the match: who sits where and whether it runs.
 type LobbyView struct {
-	Room     string      `json:"room"`
-	Opponent string      `json:"opponent"`
-	Length   int         `json:"length"` // seconds
-	Watch    bool        `json:"watch"`
-	Level    string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
-	Speed    string      `json:"speed"`           // the pace: "relaxed", "normal" or "fast"
-	Pace     float64     `json:"pace"`            // match seconds per real second at that pace
-	Purse    bool        `json:"purse"`           // the operators may buy on their own from the start
-	Phase    string      `json:"phase"`           // "lobby", "playing" or "over"
-	Match    int         `json:"match"`
-	Seats    [2]SeatView `json:"seats"`
-	Tutorial bool        `json:"tutorial,omitempty"` // the first lesson (see Config.Tutorial)
+	Room      string      `json:"room"`
+	Opponent  string      `json:"opponent"`
+	Length    int         `json:"length"` // seconds
+	Watch     bool        `json:"watch"`
+	Level     string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
+	Speed     string      `json:"speed"`           // the pace: "relaxed", "normal" or "fast"
+	Pace      float64     `json:"pace"`            // match seconds per real second at that pace
+	Purse     bool        `json:"purse"`           // the operators may buy on their own from the start
+	StartGold int         `json:"startGold"`       // gold each side starts with
+	Phase     string      `json:"phase"`           // "lobby", "playing" or "over"
+	Match     int         `json:"match"`
+	Seats     [2]SeatView `json:"seats"`
+	Tutorial  bool        `json:"tutorial,omitempty"` // the first lesson (see Config.Tutorial)
 }
 
 // ErrNoLesson refuses a lesson frame outside a lesson.
@@ -85,7 +86,10 @@ func (rm *Room) Release(c *Client) error {
 func (rm *Room) lobby() LobbyView {
 	v := LobbyView{
 		Room: rm.cfg.Code, Opponent: rm.cfg.Opponent, Watch: rm.cfg.Watch, Match: rm.match,
-		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby", Tutorial: rm.cfg.Tutorial, Speed: SpeedNormal, Pace: 1, Purse: rm.cfg.Purse,
+		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby", Tutorial: rm.cfg.Tutorial, Speed: SpeedNormal, Pace: 1, Purse: rm.cfg.Purse, StartGold: rm.cfg.StartGold,
+	}
+	if v.StartGold == 0 {
+		v.StartGold = rm.r.Match.StartGold
 	}
 	if f, ok := speedFactor(rm.cfg.Speed); ok {
 		v.Speed, v.Pace = rm.cfg.Speed, f

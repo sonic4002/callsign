@@ -877,6 +877,8 @@ function renderSeats(view) {
   // Both players see the pace before they press Ready.
   const pace = view.speed ?? "normal";
   $("lobby-pace").textContent = t("lobby.pace", { name: t(`lobby.speed.${pace}`) });
+  $("lobby-gold-shown").hidden = !view.startGold;
+  $("lobby-gold-shown").textContent = t("lobby.goldIs", { gold: view.startGold ?? "" });
   $("lobby-link").value = shareLink(room, offer?.share);
   $("lobby-copy").textContent = t("lobby.copy");
   $("lobby-seats").replaceChildren(
@@ -989,7 +991,7 @@ $("start").addEventListener("click", () => {
     const friend = chosen("opponent") === "friend";
     localStorage.setItem("callsign.level", chosen("bot"));
     localStorage.setItem("callsign.speed", chosen("speed"));
-    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"), speed: chosen("speed"), purse: chosen("purse") === "on" });
+    return makeMatch({ opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"), speed: chosen("speed"), purse: chosen("purse") === "on", startGold: startGold() });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
   if (found && freeSeat(found.lobby)) return takeFreeSeat();
@@ -1083,6 +1085,41 @@ requestAnimationFrame(frame);
 
 // What the lobby can offer, and the match lengths to choose from.
 offer = await serverInfo().catch(() => null);
+// Starting gold: the server's amounts, or one the player types, kept for next time.
+const golds = offer?.startGolds ?? [];
+const [goldMin, goldMax] = offer?.goldLimits ?? [100, 20000];
+$("lobby-gold-row").hidden = golds.length === 0; // an older server has one amount only
+for (const amount of golds) {
+  const option = el("option");
+  option.value = String(amount);
+  option.textContent = amount.toLocaleString("en-US");
+  $("lobby-gold").append(option);
+}
+{
+  const other = el("option");
+  other.value = "other";
+  other.dataset.i18n = "lobby.goldOther";
+  other.textContent = t("lobby.goldOther");
+  $("lobby-gold").append(other);
+  const kept = Number(localStorage.getItem("callsign.startGold")) || offer?.startGold || golds[0];
+  $("lobby-gold").value = golds.includes(kept) ? String(kept) : "other";
+  $("lobby-gold-other").value = String(kept);
+  $("lobby-gold-other").min = String(goldMin);
+  $("lobby-gold-other").max = String(goldMax);
+  $("lobby-gold-other").step = "50";
+  const show = () => ($("lobby-gold-other").hidden = $("lobby-gold").value !== "other");
+  $("lobby-gold").addEventListener("change", show);
+  show();
+}
+// startGold is the amount chosen, held inside what the server takes.
+function startGold() {
+  const picked = $("lobby-gold").value === "other" ? Number($("lobby-gold-other").value) : Number($("lobby-gold").value);
+  if (!Number.isFinite(picked) || picked <= 0) return 0; // the server's usual amount
+  const gold = Math.round(Math.min(goldMax, Math.max(goldMin, picked)));
+  localStorage.setItem("callsign.startGold", String(gold));
+  return gold;
+}
+
 // Only the host makes matches on a locked server; a browser that has done so once is remembered.
 $("lobby-host").hidden = !offer?.locked || Boolean(localStorage.getItem("callsign.hostkey"));
 const usual = offer?.length ?? baseRules?.match.lengthSeconds ?? 600;

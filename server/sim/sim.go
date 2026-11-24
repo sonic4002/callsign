@@ -41,6 +41,7 @@ type Config struct {
 	Seed          uint64
 	Factions      [2]string
 	LengthSeconds int // 0 uses the rules default
+	StartGold     int // gold each side starts with; 0 uses the rules default
 }
 
 type Side struct {
@@ -144,6 +145,10 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		length = r.Match.LengthSeconds
 	}
 	s.lengthTicks = length * r.TickRate
+	gold := cfg.StartGold
+	if gold <= 0 {
+		gold = r.Match.StartGold
+	}
 	for i := range r.Map.Points {
 		p := &r.Map.Points[i]
 		s.Points = append(s.Points, PointState{Point: p, Owner: p.Owner, CapSide: NoSide})
@@ -156,7 +161,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		s.Sides[side] = Side{
 			ID:       side,
 			Faction:  cfg.Factions[side],
-			goldUnit: int64(r.Match.StartGold) * int64(r.TickRate),
+			goldUnit: int64(gold) * int64(r.TickRate),
 			HQHP:     r.HQ.HP,
 			nextNum:  map[string]int{},
 			hqAlarm:  never,

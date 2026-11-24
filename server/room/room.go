@@ -42,13 +42,14 @@ type Config struct {
 	// A room made in the lobby (see lobby.go). Code is what players type to find it.
 	// With Seats on, a Hammer needs the token of a seat and the match starts when every
 	// human seat is ready; off, anyone may command a side and the first Hammer starts it.
-	Code     string
-	Seats    bool
-	Opponent string // "bot" or "friend", for the lobby to show
-	Watch    bool   // spectators, who see both sides, are let in
-	Speed    string // the pace the room is played at, for the lobby to show; "" is normal
-	Purse    bool   // the operators may buy on their own from the first second (a lobby option)
-	AgentKey string // what an agent must show to join when it holds no seat token; "" lets any agent in
+	Code      string
+	Seats     bool
+	Opponent  string // "bot" or "friend", for the lobby to show
+	Watch     bool   // spectators, who see both sides, are let in
+	Speed     string // the pace the room is played at, for the lobby to show; "" is normal
+	Purse     bool   // the operators may buy on their own from the first second (a lobby option)
+	StartGold int    // gold each side starts with (a lobby option); 0 is the rules default
+	AgentKey  string // what an agent must show to join when it holds no seat token; "" lets any agent in
 
 	// Tutorial marks the first lesson's room. Its learner's squads are run by the
 	// learner's own browser with the scripted brain, never by this machine's agents, so a
@@ -126,6 +127,7 @@ func New(r *shared.Rules, cfg Config) (*Room, error) {
 func (rm *Room) reset() error {
 	s, err := sim.New(rm.r, sim.Config{
 		Seed: rm.cfg.Seed + uint64(rm.match), Factions: rm.cfg.Factions, LengthSeconds: rm.cfg.LengthSeconds,
+		StartGold: rm.cfg.StartGold,
 	})
 	if err != nil {
 		return err

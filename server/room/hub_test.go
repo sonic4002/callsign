@@ -838,3 +838,33 @@ func TestHostKeyGuardsMakingAMatchAndWrongCodesAreSlowed(t *testing.T) {
 		t.Fatalf("a right code was refused while guesses are slowed: %d", res.StatusCode)
 	}
 }
+
+func TestTheLobbySetsTheStartingGold(t *testing.T) {
+	h := newHub(t, HubConfig{AgentKey: "agents"})
+	rm, _, _, err := h.Create(Options{Opponent: OpponentBot, StartGold: 2500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rm.Lobby().StartGold; got != 2500 {
+		t.Fatalf("the lobby shows %d starting gold, want 2500", got)
+	}
+	rm.View(func(s *sim.Sim) {
+		for side := 0; side < 2; side++ {
+			if gold := s.Snapshot(side).Gold; gold != 2500 {
+				t.Fatalf("side %d starts with %d gold, want 2500", side, gold)
+			}
+		}
+	})
+	usual, _, _, err := h.Create(Options{Opponent: OpponentBot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := usual.Lobby().StartGold; got != rules.Match.StartGold {
+		t.Fatalf("with nothing chosen the lobby shows %d, want the rules' %d", got, rules.Match.StartGold)
+	}
+	for _, bad := range []int{50, 20001, -5} {
+		if _, _, _, err := h.Create(Options{Opponent: OpponentBot, StartGold: bad}); err == nil {
+			t.Errorf("starting gold %d was accepted", bad)
+		}
+	}
+}

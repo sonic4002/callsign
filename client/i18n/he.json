@@ -356,5 +356,8 @@
   "monitor.why.stopped": "המארח שלו עצר אותו",
   "monitor.why.failed": "משהו השתבש",
   "monitor.sec": "שנ׳",
-  "monitor.min": "דק׳"
+  "monitor.min": "דק׳",
+  "lobby.startGold": "זהב התחלתי",
+  "lobby.goldOther": "סכום אחר",
+  "lobby.goldIs": "זהב התחלתי: {gold}"
 }
