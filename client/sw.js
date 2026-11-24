@@ -9,7 +9,7 @@
 // Never kept: the game connection, the speech service, the relay, speech-model weights and
 // their runtime (the voice code stores those itself, on the player's first use of the mic).
 
-const CACHE = "callsign-5";
+const CACHE = "callsign-6";
 const NEVER = [/^\/ws\b/, /^\/tts\//, /^\/relay\//, /^\/mcp\b/, /^\/assets\/models\//, /^\/assets\/voice-cache\//, /^\/vendor\//];
 const PICTURES = [/^\/assets\/sprites\//, /^\/assets\/audio\//];
 const kept = (url) => url.origin === self.location.origin && !NEVER.some((re) => re.test(url.pathname));

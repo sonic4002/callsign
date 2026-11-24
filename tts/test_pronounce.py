@@ -53,7 +53,7 @@ class Pronounce(unittest.TestCase):
         names += [k["word"]["he"] for k in RULES["landmarkKinds"].values() if k["word"]["he"] != "בית"]
         names += [c["he"] for c in RULES["callsigns"]["classes"].values()]
         names += [RULES["callsigns"]["player"]["he"], RULES["callsigns"]["operator"]["he"]]
-        self.assertEqual([n for n in names if n not in TABLE["he"]], [])
+        self.assertEqual([w for n in names for w in n.split() if w not in TABLE["he"]], [])
 
 
 if __name__ == "__main__":

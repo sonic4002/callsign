@@ -2,6 +2,9 @@
   "comment": "How the radio's own words are said. The Hebrew reader guesses vowels from context and gets some names wrong (Alef as 'elef', Samech as 'semach'), so each word here is pinned to one reading, written in the phonetic alphabet the voice model takes. 'last' applies only to the final word of a message; 'before' only when that word follows.",
   "he": {
     "אלף": { "ipa": "ʔˈalef" },
+    "סוללת": { "ipa": "solelˈat" },
+    "נון": { "ipa": "nˈun" },
+    "מם": { "ipa": "mˈem" },
     "בועז": { "ipa": "bˈoʔaz" },
     "גימל": { "ipa": "ɡˈimel" },
     "דוד": { "ipa": "davˈid" },
@@ -36,6 +39,7 @@
     "התבצרו": { "ipa": "hitbatsʁˈu" },
     "שקי": { "ipa": "sakˈej" },
     "חול": { "ipa": "χˈol" },
+    "הרוסים": { "ipa": "haʁusˈim" },
     "מטען": { "ipa": "mitʔˈan" },
     "פטיש": { "ipa": "patˈiʃ" },
     "סדן": { "ipa": "sadˈan" },

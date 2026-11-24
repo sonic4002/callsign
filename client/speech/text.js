@@ -10,7 +10,7 @@ const heNumbers = ["", "אחת", "שתיים", "שלוש", "ארבע", "חמש",
 // The device's own voice, used when the speech service has no recording in time, guesses
 // Hebrew vowels and gets the radio's words wrong ("suf" for סוף). Written with their
 // vowel points it reads them right.
-const pointedWords = { סוף: "סוֹף", עבור: "עֲבוֹר", רות: "רוּת", צפע: "צֶפַע", קרנף: "קַרְנַף", סדן: "סַדָּן", פטיש: "פַּטִּישׁ", סמל: "סַמָּל", המתן: "הַמְתֵּן" };
+const pointedWords = { סוף: "סוֹף", עבור: "עֲבוֹר", רות: "רוּת", צפע: "צֶפַע", קרנף: "קַרְנַף", סדן: "סַדָּן", פטיש: "פַּטִּישׁ", סמל: "סַמָּל", המתן: "הַמְתֵּן", סוללת: "סוֹלְלַת", נון: "נוּן", מם: "מֵם" };
 export function pointed(text) {
   return text.replace(/[\u05d0-\u05ea]+/g, (word) => pointedWords[word] ?? word);
 }
@@ -18,6 +18,8 @@ export function pointed(text) {
 export function speakable(message, rules) {
   const lang = message.lang === "he" ? "he" : "en";
   let text = String(message.text ?? "")
+    // The anti-aircraft abbreviation is said by its letters: "nun-mem".
+    .replace(/נ["״”]מ/g, "נון מם")
     // Letters, digits and plain punctuation only: no markup, emoji or control characters.
     .replace(/[^\p{L}\p{N}\p{M}\s.,;:!?'"()%$\/+-]/gu, " ")
     .replace(/\s+/g, " ")

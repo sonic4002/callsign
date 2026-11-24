@@ -27,7 +27,7 @@ from scipy.signal import resample_poly
 from pronounce import fix
 
 # Bump when the model, the pronunciation table or the settings below change, so old audio is not reused.
-VERSION = "2"
+VERSION = "3"
 RATE = 22050  # the radio effect in the page cuts everything above 3.4 kHz anyway
 SPEED = 1.08  # radio talk is clipped
 MAX_CHARS = 400
