@@ -8,7 +8,7 @@ import { advance, spreadOut } from "./motion.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
-import { drawField, drawFountain, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
+import { drawField, drawFountain, fieldSeen, fieldShare, ghosts, gusherAt, haulerGroups, loadBar, pickGusher, unloaded } from "./gold.js";
 import { Camera, groundEllipse, toIso } from "./iso.js";
 import { hearing, weaponOf } from "./sfx.js";
 import { coverPercent, drawBridge, drawMiniMap, drawScenery, isWater, landmarkFallbacks, paintGround, placeAt, scenery } from "./terrain.js";
@@ -635,8 +635,14 @@ export class Scene {
       if (e.kind !== "casualty" || now < e.t0) continue;
       things.push({ depth: e.x + e.y - 1, x: e.x, y: e.y, scale: unitScale, draw: () => drawCasualty(ctx, { unit: e.unit, cls: e.cls, turn: e.turn, age: (now - e.t0) / 1000 }) });
     }
+    // Smoke and fire stand among the troops and buildings, not over all of them.
+    for (const { depth, p } of this.fx.standing(cam, unitScale, now)) things.push({ depth, raw: true, draw: () => this.fx.drawOne(ctx, p, unitScale, now) });
     things.sort((a, b) => a.depth - b.depth);
     for (const th of things) {
+      if (th.raw) {
+        th.draw(); // already in screen space
+        continue;
+      }
       const [sx, sy] = S(th.x, th.y);
       ctx.save();
       ctx.translate(sx, sy);
@@ -669,7 +675,6 @@ export class Scene {
         }
       }
     }
-    this.fx.draw(ctx, cam, unitScale, now);
 
     // Fog of war over everything on the ground; the labels stay readable above it.
     this.fog.render(state.fog, this.eyes());
@@ -775,6 +780,7 @@ export class Scene {
     // Each gold field says how full it is, as last seen. The isolate marks keep the
     // percentage reading left to right in a Hebrew page.
     for (const g of rules.map.gushers ?? []) {
+      if (!fieldSeen(state, g.id)) continue; // how full a field nobody has looked at is, nobody knows
       const [sx, sy] = cam.screen(g.x, g.y);
       this.plate(`◆ ⁦${Math.round(fieldShare(state, g.id) * 100)}%⁩`, sx, sy + 30 * buildScale, { size: 11, color: "#f0c95a", border: "rgba(0,0,0,0)", bold: true, alpha: 0.6 });
     }
@@ -872,7 +878,12 @@ export class Scene {
       const [sx, sy] = cam.screen(st.x, st.y);
       const top = sy - (st.role === "defence" ? 44 : 66) * buildScale;
       const enemy = st.side !== state.side;
-      if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88` });
+      if (st.role === "tech") {
+        // A tech building says what it is, in its holder's colour, and what holding it gives.
+        const hold = sideColor[st.side] ?? sideColor[-1];
+        this.plate(def.name[lang], sx, top - 4, { size: 11, color: hold, border: `${hold}88` });
+        if (cam.zoom >= 0.3) this.plate(def.about[lang], sx, top - 19, { size: 9.5, color: "#ecdca6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.6 });
+      } else if (enemy) this.plate(def.name[lang], sx, top - 4, { size: 11, color: sideColor[st.side], border: `${sideColor[st.side]}88` });
       else if (cam.zoom >= 0.3 && st.role !== "defence") this.plate(def.name[lang], sx, top - 4, { size: 10, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.5 });
       const rising = st.building < 1;
       if (!rising && st.hp >= 1) continue;

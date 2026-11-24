@@ -9,7 +9,11 @@ export function unitDef(rules, id) {
 }
 
 // structureDef is the rules entry of a structure in a snapshot.
-export const structureDef = (rules, st) => rules.factions[st.faction]?.structures[st.kind] ?? null;
+// A tech building belongs to no faction: its entry is in rules.techBuildings.
+export const structureDef = (rules, st) => rules.factions[st.faction]?.structures[st.kind] ?? rules.techBuildings?.[st.kind] ?? null;
+
+// techSite is the map's entry for a tech building in a snapshot (its name on this map).
+export const techSite = (rules, st) => (st.site ? (rules.map.techBuildings ?? []).find((t) => t.id === st.site) ?? null : null);
 
 // ofRole is a faction's structure for a role: the first by id, as the server picks it.
 export function ofRole(rules, faction, role) {

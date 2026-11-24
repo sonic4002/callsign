@@ -112,7 +112,8 @@ body.no-server #no-server {
     padding-block: 4px; padding-inline: max(.6rem, var(--safe-s)) max(.6rem, var(--safe-e));
   }
   html:not([data-sheet="radio"]) #log { justify-content: flex-end; gap: 0; }
-  html:not([data-sheet="radio"]) #log li:not(:nth-last-child(-n+4)) { display: none; }
+  /* The page marks which four: radio to the player comes before system lines (cues.js). */
+  html:not([data-sheet="radio"]) #log li:not(.strip) { display: none; }
   html:not([data-sheet="radio"]) #log li { block-size: 22px; line-height: 22px; flex: none; }
   html:not([data-sheet="radio"]) #log .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
   html:not([data-sheet="radio"]) #log .who { min-inline-size: 0; }
@@ -213,7 +214,7 @@ body.no-server #no-server {
 @media (max-height: 500px) and (orientation: landscape) {
   :root { --strip: 38px; --send: 46px; --tick: 52px; --tabs: 0px; --rail: 76px; }
   /* Sideways there is little height: two lines of the log, not four. */
-  html:not([data-sheet="radio"]) #log li:not(:nth-last-child(-n+2)) { display: none; }
+  html:not([data-sheet="radio"]) #log li:not(.strip2) { display: none; }
 
   #map-wrap {
     inset-inline: 0 calc(var(--rail) + var(--safe-e));

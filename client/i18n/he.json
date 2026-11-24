@@ -444,5 +444,14 @@
   "reconnected": "החיבור למשחק חזר.",
   "loading": "טוען…",
   "voiceReady": "מודל הדיבור מוכן: אפשר לדבר מיד כשהקרב מתחיל.",
-  "act.capture": "השתלט"
+  "act.capture": "השתלט",
+  "cueVoice": "השמעת הודעות הבסיס בקול",
+  "event.structure_captured_tech": "ההנדסה שלנו השתלטה על {structure} ליד {point}.",
+  "event.structure_seen_taken": "האויב השתלט על {structure} ליד {point}.",
+  "eventMany.squad_spawned": "{count} כיתות מוכנות במפקדה.",
+  "eventMany.squad_lost": "{count} כיתות הושמדו.",
+  "eventMany.enemy_destroyed": "{count} כיתות אויב הושמדו.",
+  "eventMany.structure_built": "{count} × {structure} עומדים.",
+  "call.captureTech": "{to}, כאן {from}, השתלטו על {structure}, עבור.",
+  "call.attackStructureTech": "{to}, כאן {from}, תקפו את {structure}, עבור."
 }

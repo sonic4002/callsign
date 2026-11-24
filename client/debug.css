@@ -80,6 +80,13 @@ button.primary:hover:not(:disabled) { background: #f4c552; }
 #log .squad .who { color: var(--mine); }
 #log .system { color: #6f8d83; font-style: italic; }
 #log .warn { color: var(--warn); }
+/* Radio traffic carries a rule down its side; what the page itself notes is smaller and set in. */
+#log li.radio { border-inline-start: 2px solid #2f6d5b; padding-inline-start: .45rem; }
+#log li.system { font-size: .82rem; padding-inline-start: calc(.45rem + 2px); }
+/* A base cue: the operator's voice, but a fixed line the game wrote. */
+#log li.cue { border-inline-start-color: #c9a44c; }
+#log li.cue .text { color: #ecdca6; }
+#log .cue-mark { inline-size: .95em; block-size: .95em; flex: none; align-self: center; color: #e9c46a; }
 #send { display: flex; gap: .5rem; padding-block-start: .5rem; }
 #text {
   flex: 1; min-inline-size: 0; font: inherit; color: var(--text); background: #0a100f;

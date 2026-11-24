@@ -444,5 +444,14 @@
   "reconnected": "Connected to the game again.",
   "loading": "Loading…",
   "voiceReady": "Speech model ready: you can talk as soon as the match starts.",
-  "act.capture": "Take over"
+  "act.capture": "Take over",
+  "cueVoice": "Speak base cues aloud",
+  "event.structure_captured_tech": "Our engineers took {structure} near {point}.",
+  "event.structure_seen_taken": "The enemy took {structure} near {point}.",
+  "eventMany.squad_spawned": "{count} squads are ready at headquarters.",
+  "eventMany.squad_lost": "{count} squads were destroyed.",
+  "eventMany.enemy_destroyed": "{count} enemy squads were destroyed.",
+  "eventMany.structure_built": "{count} × {structure} now stand.",
+  "call.captureTech": "{to}, this is {from}. Take over {structure}. Over.",
+  "call.attackStructureTech": "{to}, this is {from}. Attack {structure}. Over."
 }

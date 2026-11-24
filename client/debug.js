@@ -8,7 +8,8 @@ import { mountAgents } from "./brains/settings.js";
 import { drawUnit, loadSprites } from "./art.js";
 import { wantedStructure } from "/agents/bases.mjs";
 import { drawIcon } from "./bases-art.js";
-import { structureCards, structureDef, structureRows, unitDef, unitLock } from "./bases.js";
+import { structureCards, structureDef, structureRows, techSite, unitDef, unitLock } from "./bases.js";
+import { cueMark, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
@@ -307,7 +308,8 @@ function onFrame(frame) {
       if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) upgrading.clear();
       // The sign-off ends the match: whatever radio was still waiting is dropped for it.
       if (frame.message.final) speech.silence();
-      speech.say(frame.message, { rules, faction });
+      // A base cue is always written; whether it is also spoken is the player's choice.
+      if (spoken(frame.message)) speech.say(frame.message, { rules, faction });
       break;
     case "refused":
       buyAnswered();
@@ -349,27 +351,35 @@ function system(key, vars = {}, tone = "") {
 function renderLog() {
   const log = $("log");
   const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  // Repeats are folded into one line ("3 squads are ready"), and a phone's strip shows
+  // the few lines that matter most: radio to the player before system lines.
+  const lines = foldLog(entries);
+  const strip = new Set(stripPick(lines, "player", 4));
+  const strip2 = new Set(stripPick(lines, "player", 2));
   log.replaceChildren(
-    ...entries.map((e) => {
+    ...lines.map(({ entry: e, count }, i) => {
       const li = el("li");
       const time = el("time");
       const text = el("span", "text");
+      const shown = `${strip.has(i) ? " strip" : ""}${strip2.has(i) ? " strip2" : ""}`;
       if (e.kind === "radio") {
         const m = e.message;
         time.textContent = clock(m.tick);
-        li.className = m.from.squad ? "squad" : m.from.key;
+        li.className = `radio ${m.from.squad ? "squad" : m.from.key}${m.cue ? " cue" : ""}${shown}`;
         text.textContent = m.text; // always as transmitted, in the language it was sent in
-        li.append(time, el("span", "who", m.from[lang]), text);
+        li.append(time, el("span", "who", m.from[lang]), ...(m.cue ? [cueMark()] : []), text);
         return li;
       }
-      li.className = `system ${e.tone ?? ""}`;
+      li.className = `system ${e.tone ?? ""}${shown}`;
+      const times = (line) => (count > 1 ? `${line} \u2066×${count}\u2069` : line);
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        text.textContent = t(`event.${ev.kind}`, { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "" });
+        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", count };
+        text.textContent = count > 1 && `eventMany.${ev.kind}` in strings.en ? t(`eventMany.${ev.kind}`, vars) : times(t(`event.${ev.kind}`, vars));
       } else {
         time.textContent = clock(e.tick);
-        text.textContent = t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" });
+        text.textContent = times(t(e.key, { ...e.vars, from: me?.[lang] ?? "", faction: rules?.factions[e.vars.faction]?.name[lang] ?? "" }));
       }
       li.append(time, text);
       return li;
@@ -377,6 +387,10 @@ function renderLog() {
   );
   if (pinned) log.scrollTop = log.scrollHeight;
 }
+
+// Base cues are spoken unless the player turned that off; they are written either way.
+$("cue-voice").checked = cueVoice.on;
+$("cue-voice").addEventListener("change", (ev) => (cueVoice.on = ev.target.checked));
 
 // transmit puts text on the net. It is the one place this page acts on the match.
 function transmit(text) {
@@ -638,9 +652,10 @@ addEventListener("blur", talkEnd);
 $("restart").addEventListener("click", () => open() && ws.send(JSON.stringify({ type: "restart" })));
 
 // Calls the sidebar and the map write. `to` and `from` are callsigns in the page language.
-const structureName = (st) => structureDef(rules, st)?.name[lang] ?? st.kind;
+// A tech building is called by its own name on the map ("the clinic east of Delta").
+const structureName = (st) => techSite(rules, st)?.name[lang] ?? structureDef(rules, st)?.name[lang] ?? st.kind;
 // Any faction's structure by its rules id: events name a structure by its kind alone.
-const kindName = (kind) => Object.values(rules?.factions ?? {}).map((f) => f.structures?.[kind]).find(Boolean)?.name[lang] ?? kind;
+const kindName = (kind) => (Object.values(rules?.factions ?? {}).map((f) => f.structures?.[kind]).find(Boolean) ?? rules?.techBuildings?.[kind])?.name[lang] ?? kind;
 const call = (kind, vars) => t(`call.${kind}`, { from: me[lang], ...vars });
 const anvil = () => rules.callsigns.operator[lang];
 
@@ -844,6 +859,8 @@ function buildButton(id, unit, enabled, lock) {
 
 // structureEvent picks the log line for a structure event: whose it was decides the words.
 function structureEvent(ev, mySide) {
+  // A tech building was nobody's or somebody's: the line does not call it "the enemy's".
+  if (ev.kind === "structure_captured" && rules.techBuildings?.[ev.unit]) return ev.owner === mySide ? "structure_captured_tech" : ev.reason === "seen" ? "structure_seen_taken" : "structure_taken";
   if (ev.kind === "structure_lost" && ev.owner !== mySide) return "structure_lost_theirs";
   if (ev.kind === "structure_captured" && ev.owner !== mySide) return "structure_taken";
   return ev.kind;
@@ -1040,7 +1057,8 @@ function mapClick(ev) {
     if (st.side === side || !mine) return draft($("text").value + structureName(st));
     // Engineers may take it over; anyone may attack it. The action pressed is sent at once.
     const actions = unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"];
-    const say = (action) => call(action === "capture" ? "capture" : "attackStructure", { to: mine.callsign[lang], structure: structureName(st) });
+    const tech = st.role === "tech"; // not "the enemy's": it may be nobody's
+    const say = (action) => call(`${action === "capture" ? "capture" : "attackStructure"}${tech ? "Tech" : ""}`, { to: mine.callsign[lang], structure: structureName(st) });
     return offerOrders(mine, structureName(st), actions, say, box, sx, sy);
   }
   const squad = state.squads.find((sq) => sq.id === scene.selected);
