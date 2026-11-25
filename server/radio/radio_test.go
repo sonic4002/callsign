@@ -246,3 +246,25 @@ func TestCallsignsAndPointsDoNotCollide(t *testing.T) {
 		}
 	}
 }
+
+func TestBareAck(t *testing.T) {
+	for body, want := range map[string]bool{
+		"Roger":                     true,
+		"roger.":                    true,
+		"Wilco":                     true,
+		"Roger, wilco":              true,
+		"רות":                       true,
+		"רות, יבוצע":                true,
+		"רות יבוצע!":                true,
+		"Wilco, moving to Golf":     false,
+		"Roger, hold where you are": false,
+		"רות, נעים לפסל":            false,
+		"Negative":                  false,
+		"Stand by":                  false,
+		"":                          false,
+	} {
+		if got := net.BareAck(body); got != want {
+			t.Errorf("BareAck(%q) = %v, want %v", body, got, want)
+		}
+	}
+}

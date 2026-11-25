@@ -955,15 +955,21 @@
       "lost": { "en": "We have been defeated", "he": "הובסנו" },
       "draw": { "en": "The fight is over. Neither side won", "he": "הקרב הסתיים. אין מנצח" }
     },
+    "traffic": {
+      "reportWindow": 45,
+      "eventSeconds": 20,
+      "answerSeconds": 30,
+      "levels": { "order": 1, "answer": 1, "ask": 1, "cue": 1, "loss": 1, "contact": 2, "objective": 2, "notice": 2, "status": 3, "ack": 3 }
+    },
     "cues": {
       "structureReady": { "gap": 1, "line": { "en": "Construction complete: {structure}", "he": "הבנייה הושלמה: {structure}" } },
       "newOptions": { "gap": 1, "line": { "en": "Construction complete: {structure}. New options available", "he": "הבנייה הושלמה: {structure}. נפתחו אפשרויות חדשות" } },
       "unitReady": { "gap": 2, "line": { "en": "{squad} in the field", "he": "{squad} בשטח" } },
       "noGold": { "gap": 8, "line": { "en": "Not enough gold", "he": "אין מספיק זהב" } },
       "lowPower": { "gap": 20, "events": ["low_power"], "line": { "en": "Low power", "he": "מחסור בחשמל" } },
-      "powerRestored": { "gap": 5, "events": ["power_restored"], "line": { "en": "Power restored", "he": "החשמל חזר" } },
+      "powerRestored": { "gap": 5, "level": 2, "events": ["power_restored"], "line": { "en": "Power restored", "he": "החשמל חזר" } },
       "baseUnderAttack": { "gap": 30, "line": { "en": "Our base is under attack", "he": "הבסיס שלנו מותקף" } },
-      "haulerUnderAttack": { "gap": 20, "line": { "en": "{unit} under attack near {point}", "he": "מתקיפים את {unit} ליד {point}" } },
+      "haulerUnderAttack": { "gap": 20, "level": 2, "line": { "en": "{unit} under attack near {point}", "he": "מתקיפים את {unit} ליד {point}" } },
       "haulerLost": { "gap": 2, "line": { "en": "We lost {unit} near {point}", "he": "איבדנו את {unit} ליד {point}" } },
       "structureLost": { "gap": 2, "line": { "en": "We lost {structure}", "he": "איבדנו את {structure}" } },
       "structureTaken": { "gap": 2, "line": { "en": "{structure} is ours", "he": "{structure} בידינו" } },
@@ -974,7 +980,7 @@
       "heroReady": { "gap": 1, "line": { "en": "{hero} is in the field", "he": "{hero} בשטח" } },
       "heroFallen": { "gap": 1, "line": { "en": "{hero} is down", "he": "{hero} נפל" } },
       "enemyHero": { "gap": 1, "line": { "en": "Warning: enemy hero in the field: {hero}", "he": "אזהרה: גיבור אויב בשטח: {hero}" } },
-      "enemyHeroFallen": { "gap": 1, "line": { "en": "The enemy's {hero} is down", "he": "{hero} של האויב נפל" } }
+      "enemyHeroFallen": { "gap": 1, "level": 2, "line": { "en": "The enemy's {hero} is down", "he": "{hero} של האויב נפל" } }
     },
     "brain": {
       "wilco": { "en": ["Wilco"], "he": ["רות, יבוצע"] },
@@ -1050,6 +1056,7 @@
       "opMassing": { "en": ["Massing at {place} before the attack"], "he": ["מרכז כוחות {b_place} לפני ההתקפה"] },
       "opAttacking": { "en": ["Attacking {place} with {count} squads"], "he": ["תוקפים את {place} עם {count} כיתות"] },
       "opGuarding": { "en": ["{squad} is going to guard the haulers at {place}"], "he": ["{squad} יוצאת לאבטח את המשאיות {b_place}"] },
+      "opContact": { "en": ["{squad} in contact near {place}"], "he": ["{squad} במגע ליד {place}"] },
       "opDefending": { "en": ["Pulling back to defend the base: {squad}"], "he": ["חוזרים להגן על הבסיס: {squad}"] }
     },
     "spelledOut": {

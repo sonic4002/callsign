@@ -352,6 +352,33 @@ func (n *Net) prowords(low string) []string {
 	return sortedKeys(found)
 }
 
+// BareAck reports whether a body is an acknowledgement and nothing else: Roger or Wilco
+// in either language, with no word beside them. "Wilco, moving to Golf" is not one.
+func (n *Net) BareAck(body string) bool {
+	work := []byte(lower(body))
+	found := false
+	for _, w := range n.pro {
+		if w.key != "roger" && w.key != "wilco" {
+			continue
+		}
+		for from := 0; ; {
+			i := strings.Index(string(work[from:]), w.text)
+			if i < 0 {
+				break
+			}
+			i += from
+			from = i + len(w.text)
+			if boundaryBefore(string(work[:i])) && boundary(string(work[from:])) {
+				found = true
+				for j := i; j < from; j++ {
+					work[j] = ' '
+				}
+			}
+		}
+	}
+	return found && strings.Trim(string(work), separators+"!") == ""
+}
+
 // hebrewPrefixes are the one-letter words Hebrew glues to the front of a noun
 // (in, to, from, the, and, as, that), so "בפסל" still names Foxtrot.
 const hebrewPrefixes = "בלמהוכש"

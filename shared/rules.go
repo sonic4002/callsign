@@ -383,6 +383,18 @@ type Rules struct {
 		// server/room/cues.go): the words in both languages, the least seconds between
 		// two of a kind, and the events raised elsewhere that call for it.
 		Cues map[string]Cue `json:"cues"`
+		// Traffic is how the net keeps itself quiet (server/room/traffic.go): for how many
+		// seconds a second squad's report of the same thing is dropped, for how long after
+		// its event a squad's line counts as the report of it, for how long after Hammer's
+		// call a station's line counts as the answer, and the least "radio traffic" level
+		// of the commander's page (1 quiet, 2 normal, 3 full) at which each kind of line
+		// is shown and spoken.
+		Traffic struct {
+			ReportWindow  float64        `json:"reportWindow"`
+			EventSeconds  float64        `json:"eventSeconds"`
+			AnswerSeconds float64        `json:"answerSeconds"`
+			Levels        map[string]int `json:"levels"`
+		} `json:"traffic"`
 		// Brain is everything the rule brain says on the net (agents/brain-rule.mjs): each
 		// line in both languages, with as many wordings in one as in the other, so that
 		// squads do not all sound alike. {name} is filled in; {b_name}, {l_name} and
@@ -489,10 +501,14 @@ func JSONFor(id string) ([]byte, error) {
 
 // Cue is one fixed line of the operator's. {structure}, {squad}, {unit} and {point} in a
 // line are filled in with names in the language it is said in.
+// TrafficKinds are the kinds a transmission can be, each with a level in radio.traffic.
+var TrafficKinds = []string{"order", "answer", "ask", "cue", "loss", "contact", "objective", "notice", "status", "ack"}
+
 type Cue struct {
 	Line   Text     `json:"line"`
 	Gap    float64  `json:"gap"`              // seconds before the same cue may be said again
 	Events []string `json:"events,omitempty"` // event kinds, by name, that call for it
+	Level  int      `json:"level,omitempty"`  // the least radio traffic level that shows it; 0 is 1, always
 }
 
 // BodyOf is the radius of the room one team of a unit takes up on the map.
@@ -525,6 +541,20 @@ func (r *Rules) check() error {
 	for name, cue := range r.Radio.Cues {
 		if cue.Line.En == "" || cue.Line.He == "" || cue.Gap < 0 {
 			return fmt.Errorf("cue %s needs a line in both languages and a gap", name)
+		}
+	}
+	tr := r.Radio.Traffic
+	if tr.ReportWindow <= 0 || tr.EventSeconds <= 0 || tr.AnswerSeconds <= 0 {
+		return fmt.Errorf("radio.traffic needs a report window, event seconds and answer seconds")
+	}
+	for _, kind := range TrafficKinds {
+		if l := tr.Levels[kind]; l < 1 || l > 3 {
+			return fmt.Errorf("radio.traffic.levels needs a level from 1 to 3 for %q", kind)
+		}
+	}
+	for name, cue := range r.Radio.Cues {
+		if cue.Level < 0 || cue.Level > 3 {
+			return fmt.Errorf("cue %s has a level outside 1 to 3", name)
 		}
 	}
 	for name, w := range r.Radio.Brain {

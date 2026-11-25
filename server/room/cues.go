@@ -211,6 +211,7 @@ func (rm *Room) cue(side int, key string, vars map[string]string) {
 	m := Message{
 		Seq: rm.seq, Tick: rm.sim.Tick, From: rm.name(from, side), To: []Name{rm.name(to, side)},
 		Lang: lang, Text: text, Body: body, End: radio.Out, Cue: key,
+		Kind: KindCue, Net: NetCommand, Level: rm.cueLevel(key),
 	}
 	rm.logs[side] = append(rm.logs[side], m)
 	rm.broadcast(side, map[string]any{"type": "radio", "message": m})

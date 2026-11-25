@@ -211,5 +211,5 @@ func (rm *Room) tellHammer(side int, lang, body string) {
 		return
 	}
 	p.To = []radio.Station{to}
-	rm.transmit(side, from, p, text) //nolint:errcheck // the purchase stands either way
+	rm.transmit(side, from, p, text, KindNotice) //nolint:errcheck // the purchase stands either way
 }

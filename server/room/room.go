@@ -91,6 +91,11 @@ type Message struct {
 	// Cue names the base cue this is (see cues.go): a fixed line the server wrote in the
 	// operator's name, not something the operator's agent thought of.
 	Cue string `json:"cue,omitempty"`
+	// Kind, Net and Level say what the line is, which net it belongs on and the least
+	// radio traffic level of the commander's page that shows and speaks it (traffic.go).
+	Kind  string `json:"kind"`
+	Net   string `json:"net"`
+	Level int    `json:"level"`
 }
 
 // Client is one connection. Out carries the JSON frames to write to it; it is closed
@@ -132,6 +137,9 @@ type Room struct {
 	// buys needs nobody's leave and is not announced as the operator's doing.
 	direct bool
 
+	// What each side's net remembers in order to stay quiet; see traffic.go.
+	traffic [2]traffic
+
 	// What each side's agents last said about themselves; see telemetry.go.
 	tele [2]map[int]*agentReport
 }
@@ -169,6 +177,7 @@ func (rm *Room) reset() error {
 		rm.lang[side] = map[string]string{}
 		rm.cmd[side] = command{asked: -1, buy: rm.cfg.Purse}
 		rm.cued[side] = map[string]int{}
+		rm.traffic[side] = newTraffic()
 		rm.bots[side] = nil
 		if style := rm.cfg.Bots[side]; style != "" {
 			rm.bots[side] = &bot.Player{Side: side, Style: style, R: rm.r}
@@ -212,6 +221,9 @@ func (rm *Room) Tick() {
 	}
 	for _, e := range rm.sim.Step() {
 		frame := map[string]any{"type": "event", "event": e}
+		if rm.heardEvent(e) {
+			frame["known"] = true // another squad has this to report: this one's leader need not
+		}
 		if sq := rm.squadAny(e.Squad); sq != nil {
 			frame["callsign"] = rm.squadName(sq)
 			if e.Was != nil {
@@ -266,6 +278,7 @@ func (rm *Room) signOff() {
 		m := Message{
 			Seq: rm.seq, Tick: rm.sim.Tick, From: rm.name(from, side), To: []Name{rm.name(to, side)},
 			Lang: lang, Text: text, Body: body, End: radio.Out, Final: true,
+			Kind: KindCue, Net: NetCommand, Level: 1,
 		}
 		rm.logs[side] = append(rm.logs[side], m)
 		rm.broadcast(side, map[string]any{"type": "radio", "message": m})
@@ -538,15 +551,22 @@ func (rm *Room) SayAt(c *Client, text string, level int) (Message, error) {
 		p.To = []radio.Station{{Kind: radio.Operator}}
 	}
 	rm.lang[c.ID.Side][me.Key()] = p.Lang // the net follows the commander's language
-	m, err := rm.transmit(c.ID.Side, me, p, text)
+	m, err := rm.transmit(c.ID.Side, me, p, text, "")
 	if err == nil {
 		rm.heardHammer(c.ID.Side, p)
 	}
 	return m, err
 }
 
-// transmit checks the addressees, logs the message and sends it to the whole side.
-func (rm *Room) transmit(side int, from radio.Station, p radio.Parsed, text string) (Message, error) {
+// ErrDropped is returned for a transmission the net did not carry because it had nothing
+// new to say (traffic.go). It is not a failure of the sender's.
+type ErrDropped string
+
+func (e ErrDropped) Error() string { return string(e) }
+
+// transmit checks the addressees, logs the message and sends it to the whole side. `tag`
+// is the kind an agent gave the line, "" for none.
+func (rm *Room) transmit(side int, from radio.Station, p radio.Parsed, text string, tag string) (Message, error) {
 	if rm.sim.Over {
 		return Message{}, sim.ErrOver
 	}
@@ -564,6 +584,12 @@ func (rm *Room) transmit(side int, from radio.Station, p radio.Parsed, text stri
 		m.To = append(m.To, rm.name(st, side))
 		rm.lang[side][st.Key()] = p.Lang
 	}
+	where := rm.classify(side, from, p, tag)
+	if where.dropped != "" {
+		return Message{}, ErrDropped(where.dropped)
+	}
+	m.Kind, m.Net, m.Level = where.kind, where.net, where.level
+	rm.noteCall(side, from, p.To)
 	rm.seq++
 	m.Seq = rm.seq
 	rm.logs[side] = append(rm.logs[side], m)

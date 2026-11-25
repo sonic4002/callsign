@@ -52,6 +52,7 @@ type toolArgs struct {
 	Body    string `json:"body"`
 	End     string `json:"end"`
 	Lang    string `json:"lang"`
+	Kind    string `json:"kind"` // radio: what the line is (contact, objective, loss, status, ack), "" to let the net tell
 	Mode    string `json:"mode"` // command: "orders" or "fight", empty to read it
 	MayBuy  *bool  `json:"buy"`  // command: whether the operator may spend on its own
 	// Place is where an order or a structure goes: a point, a landmark, a bridge or a
@@ -185,7 +186,16 @@ func (rm *Room) toolRadio(c *Client, a toolArgs) (any, error) {
 		return nil, err
 	}
 	p.To = to
-	m, err := rm.transmit(side, from, p, text)
+	tag := a.Kind
+	if !tagged[tag] {
+		tag = "" // only the kinds an agent may give; the rest are the net's to tell
+	}
+	m, err := rm.transmit(side, from, p, text, tag)
+	var dropped ErrDropped
+	if errors.As(err, &dropped) {
+		// Nothing went out and nothing is wrong: the net already has this.
+		return map[string]any{"sent": "", "dropped": string(dropped)}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
