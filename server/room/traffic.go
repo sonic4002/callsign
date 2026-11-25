@@ -34,7 +34,7 @@ const (
 	KindLoss      = "loss"      // a squad that can hardly fight on
 	KindContact   = "contact"   // the enemy met
 	KindObjective = "objective" // a place reached
-	KindNotice    = "notice"    // what the operator did on its own
+	KindNotice    = "notice"    // what the operator bought or built on its own; its cue says when it is ready
 	KindStatus    = "status"    // routine
 	KindAck       = "ack"       // Roger or Wilco and nothing else
 )
@@ -196,7 +196,7 @@ func (rm *Room) classify(side int, from radio.Station, p radio.Parsed, tag strin
 	case from.Kind == radio.Operator && toHammer && p.End == radio.Over:
 		kind = KindAsk
 	}
-	if answers && toHammer && kind == KindStatus {
+	if answers && toHammer && kind == KindStatus && !fresh {
 		kind = KindAnswer // a routine line right after Hammer's call is the reply to it
 	}
 	if !toHammer {

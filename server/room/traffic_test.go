@@ -193,7 +193,7 @@ func TestEveryLineHasAKindANetAndALevel(t *testing.T) {
 	sent(t, rm, anvil, `{"to":"Hammer","body":"Gold is piling up, shall I buy armour?","end":"over"}`)
 	check("the operator's question", KindAsk, NetCommand, 1)
 	rm.tellHammer(0, "en", "Bought Rifle Squad, Viper 9 is deploying")
-	check("a purchase of the operator's own", KindNotice, NetCommand, 2)
+	check("a purchase of the operator's own", KindNotice, NetCommand, 3)
 	sent(t, rm, anvil, `{"to":"`+nameA+`","body":"Hold Golf","end":"over"}`)
 	check("the operator's task for a squad", KindStatus, NetSquad, 3)
 	sent(t, rm, la, `{"to":"Anvil","body":"Wilco","end":"out"}`)

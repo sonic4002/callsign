@@ -959,7 +959,7 @@
       "reportWindow": 45,
       "eventSeconds": 20,
       "answerSeconds": 30,
-      "levels": { "order": 1, "answer": 1, "ask": 1, "cue": 1, "loss": 1, "contact": 2, "objective": 2, "notice": 2, "status": 3, "ack": 3 }
+      "levels": { "order": 1, "answer": 1, "ask": 1, "cue": 1, "loss": 1, "contact": 2, "objective": 2, "notice": 3, "status": 3, "ack": 3 }
     },
     "cues": {
       "structureReady": { "gap": 1, "line": { "en": "Construction complete: {structure}", "he": "הבנייה הושלמה: {structure}" } },
