@@ -28,9 +28,9 @@ export const traffic = {
 // The page's own lines about events, by the least level that shows them. What is not
 // listed needs the player and is shown always: a squad or a point lost or taken, what
 // was sold or cancelled, the base or a hauler under attack. That something was started
-// (a squad on its way, a structure going up) is said at the full level only: the build
-// panel shows it, the operator's cue says when it is ready, and an operator that buys on
-// its own would otherwise fill the net with it.
+// or bought (a squad on its way, a structure going up, a leader upgraded) is said at the
+// full level only: the build panel and the squad list show it, the operator's cue says
+// when it is ready, and an operator that buys on its own would otherwise fill the net.
 const eventLevels = {
   enemy_destroyed: NORMAL,
   structure_lost_theirs: NORMAL,
@@ -41,7 +41,7 @@ const eventLevels = {
   charge_planted: NORMAL,
   charge_blew: NORMAL,
   promoted: NORMAL,
-  upgraded: NORMAL,
+  upgraded: FULL,
   deploying: FULL,
   structure_started: FULL,
   garrisoned: FULL,

@@ -45,6 +45,7 @@ test("the page's own lines: what needs the player always, the rest by level", ()
   assert.equal(onCommandNet(event("garrisoned"), FULL), true);
   assert.equal(onCommandNet(event("deploying"), NORMAL), false, "a squad on its way is in the build panel; its cue says when it is ready");
   assert.equal(onCommandNet(event("deploying"), FULL), true);
+  assert.equal(onCommandNet(event("upgraded"), NORMAL), false);
   assert.ok(onCommandNet({ kind: "system", key: "matchStarted" }, QUIET));
   assert.ok(onCommandNet({ kind: "radio", message: {} }, QUIET), "a message with no level is shown");
 });
