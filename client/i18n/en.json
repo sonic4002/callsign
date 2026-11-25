@@ -284,7 +284,7 @@
   "command.ordersBuy": "Anvil: on your orders, buying on its own",
   "command.grant": "Let Anvil buy",
   "command.revoke": "Stop Anvil buying",
-  "command.nowBuys": "Anvil may now buy on its own. It tells you what it bought.",
+  "command.nowBuys": "Anvil may now buy on its own. It tells you when each thing is ready.",
   "command.nowAsks": "Anvil now buys only when you order it.",
   "call.grant": "{to}, this is {from}. You may buy as you see fit. Over.",
   "call.revoke": "{to}, this is {from}. Do not buy on your own. Over.",

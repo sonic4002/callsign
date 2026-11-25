@@ -38,11 +38,13 @@ test("only what the command net shows is spoken", () => {
 
 test("the page's own lines: what needs the player always, the rest by level", () => {
   const event = (kind) => ({ kind: "event", event: { kind } });
-  for (const kind of ["squad_lost", "captured", "point_lost", "structure_built", "deploying", "hq_under_attack"]) assert.ok(onCommandNet(event(kind), QUIET), kind);
+  for (const kind of ["squad_lost", "captured", "point_lost", "structure_built", "deploy_cancelled", "hq_under_attack"]) assert.ok(onCommandNet(event(kind), QUIET), kind);
   assert.equal(onCommandNet(event("enemy_destroyed"), QUIET), false);
   assert.equal(onCommandNet(event("enemy_destroyed"), NORMAL), true);
   assert.equal(onCommandNet(event("garrisoned"), NORMAL), false);
   assert.equal(onCommandNet(event("garrisoned"), FULL), true);
+  assert.equal(onCommandNet(event("deploying"), NORMAL), false, "a squad on its way is in the build panel; its cue says when it is ready");
+  assert.equal(onCommandNet(event("deploying"), FULL), true);
   assert.ok(onCommandNet({ kind: "system", key: "matchStarted" }, QUIET));
   assert.ok(onCommandNet({ kind: "radio", message: {} }, QUIET), "a message with no level is shown");
 });
