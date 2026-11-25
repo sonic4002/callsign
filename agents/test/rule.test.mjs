@@ -338,6 +338,11 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
   ]);
   // A structure shot at away from the headquarters: the squads go to it, not home.
   assert.deepEqual((await on(far, { kind: "structure_attacked", point: "B", structure: "s2", unit: "refinery" }))[0], ["radio", { to: ["Viper 1", "Viper 2"], body: "Hold Bravo", end: "over" }]);
+  // A squad Hammer ordered by name is left alone: three at the forward point, one of them
+  // Hammer's, are two to spare, and an idle one of Hammer's is given no task.
+  assert.deepEqual(await on(held({ squads: [...posts, ...atHotel], hammerOrdered: ["Viper 5"] }), { kind: "quiet" }), []);
+  assert.deepEqual(await on(middle([]), { kind: "quiet" }), [["radio", { to: ["Viper 3"], body: "Hold Foxtrot", end: "over" }]]);
+  assert.deepEqual(await on({ ...middle([]), hammerOrdered: ["Viper 3"] }, { kind: "quiet" }), []);
   // With two squads to spare it holds what it has and attacks nothing.
   assert.deepEqual(await on(held({ squads: [...posts, ...atHotel.slice(0, 2)] }), { kind: "quiet" }), []);
 });

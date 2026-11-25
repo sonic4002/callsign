@@ -207,11 +207,14 @@ func (rm *Room) toolReport(c *Client) (any, error) {
 	if c.ID.Role == RoleAnvil {
 		// The operator also reads who has the initiative, and whether a purchase now
 		// would count as ordered by Hammer.
+		// And which squads Hammer ordered by name: those are Hammer's until the operator is
+		// handed the fight again, and the operator plans around them (traffic.go).
 		return struct {
 			sim.Snapshot
 			Command CommandView `json:"command"`
 			Ordered bool        `json:"purchaseOrdered"`
-		}{snap, rm.cmd[c.ID.Side].view(), rm.ordered(c.ID.Side)}, nil
+			Hammers []string    `json:"hammerOrdered"`
+		}{snap, rm.cmd[c.ID.Side].view(), rm.ordered(c.ID.Side), rm.hammersSquads(c.ID.Side)}, nil
 	}
 	type friend struct {
 		Callsign string        `json:"callsign"`

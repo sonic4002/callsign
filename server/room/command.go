@@ -95,6 +95,8 @@ func (rm *Room) heardHammer(side int, p radio.Parsed) {
 	case says("give"):
 		// Handing over the fight brings the purse with it, unless Hammer keeps it back.
 		fight, buy = true, c.buy || !c.fight
+		// And every squad with it: the ones Hammer ordered by name are the operator's again.
+		rm.traffic[side].hammers = map[int]bool{}
 	}
 	// "You may buy" and "do not buy" stand on their own, with or without the fight.
 	if says("grant") && !says("take") {

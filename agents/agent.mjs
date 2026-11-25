@@ -361,6 +361,8 @@ export function compactStatus(status, side) {
     // Who has the initiative, and whether Hammer has just asked for a purchase.
     command: status.command,
     purchaseOrdered: status.purchaseOrdered,
+    // Squads Hammer ordered by name: Hammer's until the operator is handed the fight again.
+    ...(status.hammerOrdered?.length ? { hammerOrdered: status.hammerOrdered } : {}),
     gold: status.gold,
     ...(status.taken ? { taken: status.taken } : {}),
     goldPerMinute: status.income,

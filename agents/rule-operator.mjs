@@ -252,9 +252,12 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
   };
   const once = (what, secs) => toldOnce(mem, s, what, secs);
   const unitOf = (sq) => rules.factions[s.faction ?? ""]?.units[sq.unit] ?? unitAnywhere(rules, sq.unit) ?? {};
+  // A squad Hammer ordered by name is Hammer's: the operator plans around it and gives it
+  // no task of its own, until Hammer hands over the fight afresh.
+  const hammers = new Set(s.hammerOrdered ?? []);
   const fighter = (sq) => {
     const u = unitOf(sq);
-    return !u.captureSeconds && !u.hero && u.class !== "hauler";
+    return !u.captureSeconds && !u.hero && u.class !== "hauler" && !hammers.has(sq.callsign.en);
   };
   const hq = rules.map.points.find((p) => p.kind === "hq" && p.owner === side);
   const enemyHQ = rules.map.points.find((p) => p.kind === "hq" && p.owner !== side);
@@ -305,7 +308,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
   const ours = (p) => (!hq || !enemyHQ || dist(p, hq) <= dist(p, enemyHQ) + 1) && !(s.contacts ?? []).some((c) => c.class !== "hauler" && dist(c, p) <= 260);
   const free = (id) => owner(id) !== side && owner(id) !== 1 - side;
   const taken = new Set(s.squads.map((q) => q.order?.point).filter(Boolean)); // one squad per point
-  const idle = s.squads.filter((q) => q.order?.kind === "none" && !fresh(q) && !busy.has(q.callsign.en));
+  const idle = s.squads.filter((q) => q.order?.kind === "none" && !fresh(q) && !busy.has(q.callsign.en) && !hammers.has(q.callsign.en));
   const waiting = [];
   for (const sq of idle) {
     if (moves.length >= 3) break;

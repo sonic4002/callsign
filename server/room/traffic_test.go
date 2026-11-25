@@ -137,6 +137,28 @@ func TestASquadHammerOrderedIsNeverSilenced(t *testing.T) {
 		t.Fatalf("its contact report is %s/%s/%d, want contact on the command net at level 1", m.Kind, m.Net, m.Level)
 	}
 
+	// The operator is told which squads are Hammer's, so that it plans around them.
+	report, err := rm.Tool(anvil, ToolReport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen struct {
+		Hammers []string `json:"hammerOrdered"`
+	}
+	if b, _ := json.Marshal(report); json.Unmarshal(b, &seen) != nil || len(seen.Hammers) != 1 || seen.Hammers[0] != nameB {
+		t.Fatalf("the operator's status names %v as Hammer's squads, want [%s]", seen.Hammers, nameB)
+	}
+	// Handing the operator the fight hands the squads back with it.
+	if _, err := rm.Say(hammer, "Anvil, this is Hammer. Run the fight. Over."); err != nil {
+		t.Fatal(err)
+	}
+	if left := rm.hammersSquads(0); len(left) != 0 {
+		t.Fatalf("after the fight was handed over, %v are still Hammer's", left)
+	}
+	if _, err := rm.Say(hammer, nameB+", this is Hammer. Hold Golf. Over."); err != nil {
+		t.Fatal(err)
+	}
+
 	// The operator tasking it by name takes it back: it is one of the group again.
 	sent(t, rm, anvil, `{"to":"`+nameB+`","body":"Hold Foxtrot","end":"over"}`)
 	meets(rm, a, sim.Event{Kind: sim.EvContact, Contact: 60})

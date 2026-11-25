@@ -21,8 +21,9 @@ import (
 //   - A bare "Roger" from the operator to a squad is not transmitted: a report needs no
 //     acknowledgement, and the squad's leader would be woken to read it.
 //
-// A squad that Hammer ordered by name is Hammer's until the operator tasks it again: it
-// is never silenced, and whatever it tells Hammer is shown at every level.
+// A squad that Hammer ordered by name is Hammer's until the operator tasks it by name or
+// Hammer hands the operator the fight afresh: it is never silenced, whatever it tells
+// Hammer is shown at every level, and the operator is told which squads those are.
 const (
 	NetCommand = "command" // to or from Hammer, or to all stations
 	NetSquad   = "squad"   // squads and the operator among themselves
@@ -239,6 +240,18 @@ func (rm *Room) noteCall(side int, from radio.Station, to []radio.Station) {
 			}
 		}
 	}
+}
+
+// hammersSquads lists, by English callsign and in id order, the living squads Hammer
+// ordered by name.
+func (rm *Room) hammersSquads(side int) []string {
+	out := []string{}
+	for _, sq := range rm.sim.Squads {
+		if sq.Alive && sq.Side == side && rm.traffic[side].hammers[sq.ID] {
+			out = append(out, rm.squadName(sq).En)
+		}
+	}
+	return out
 }
 
 // cueLevel is the least radio traffic level that shows a base cue.

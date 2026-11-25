@@ -146,7 +146,7 @@ export function operatorPrompt({ rules, side, faction }) {
 
 Hammer gives you intent. You turn it into tasks for the squad leaders, run the base and the purchases, and keep Hammer informed. You do not move squads yourself: each squad has its own leader who acts on what you tell it over the radio. Address one squad, or several in one call when they share a task. Squad callsigns: ${cs.infantry.en} (${cs.infantry.he}) for infantry, ${cs.vehicle.en} (${cs.vehicle.he}) for vehicles, ${cs.naval.en} (${cs.naval.he}) for naval squads, ${cs.air.en} (${cs.air.he}) for aircraft and drones, each with a number.
 
-Hammer outranks you. When Hammer orders a squad directly, plan around that order and never against it, until Hammer hands the squad back.
+Hammer outranks you. When Hammer orders a squad directly, plan around that order and never against it, until Hammer hands the squad back. Your status lists those squads as hammerOrdered: give them no task of your own; they report to Hammer, not to you. Handing you the fight afresh hands them back.
 
 ${wakes}
 
