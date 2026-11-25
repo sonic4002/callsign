@@ -20,8 +20,8 @@ export class Agent {
   // `join` is added to the address the agent joins with: its host's id, and { room, key } or
   // { room, token } for a server that holds rooms.
   // `where` says where this agent runs, for its commander's view: "server" or "browser".
-  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, quietMs = 30_000, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
-    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, quietMs, join });
+  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, quietMs = 30_000, gatherMs = 1500, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
+    Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, quietMs, gatherMs, join });
     // What this agent tells its own commander about itself; see telemetry.mjs.
     this.tele = new Telemetry({ role, squad, brain: brain?.name ?? "", where, limit: wakesPerConversation, send: (report) => this.link.send({ type: "telemetry", telemetry: report }) });
     this.inbox = [];
@@ -77,6 +77,7 @@ export class Agent {
     if (!this.stopped) this.tele.stopped(why);
     this.stopped = true;
     clearInterval(this.quiet);
+    clearTimeout(this.gathering);
     this.link?.close();
   }
 
@@ -140,9 +141,18 @@ export class Agent {
       if (m.from.key === "player") this.netLang = m.lang; // the net follows the commander's language
       if (m.from.key === this.me.key) return;
       if (m.cue) return; // a base cue is the server's fixed line to the commander: it wakes nobody
-      if (callsFor(m, this.me)) this.#enqueue({ kind: "radio", msg: m });
-      // The operator runs the fight, so every other transmission on the net wakes it too.
-      else if (this.role === "anvil") this.#enqueue({ kind: "heard", msg: m });
+      const mine = callsFor(m, this.me);
+      if (this.role !== "anvil") {
+        if (mine) this.#enqueue({ kind: "radio", msg: m });
+        return;
+      }
+      // The operator runs the fight, so the net's traffic wakes it too, but only Hammer's
+      // call is a call with a wake of its own. What squads report, to it or to anyone, is
+      // read together in one wake; a bare Roger or Wilco (the net marks them) needs no
+      // thought at all and stays in the traffic the next wake shows.
+      if (m.kind === "ack") return;
+      if (mine && m.from.key === "player") this.#enqueue({ kind: "radio", msg: m });
+      else this.#enqueue({ kind: "heard", msg: m, ...(mine ? { forMe: true } : {}) });
       return;
     }
     if (frame.type === "direct") {
@@ -165,12 +175,33 @@ export class Agent {
       const wanted = this.role === "squad" ? leaderEvents.has(e.kind) && e.squad === this.squad : operatorEvents.has(e.kind);
       // An event about a landmark or a bridge carries its name, for whoever reads the wake.
       const named = e.place && [...(this.rules.map.landmarks ?? []), ...(this.rules.map.bridges ?? [])].find((p) => p.id === e.place);
-      if (wanted) this.#enqueue({ kind: "event", event: e, callsign: frame.callsign, place: named ? `${named.name.en} (${e.place})` : e.place });
+      if (!wanted) return;
+      // Another squad met the same enemy first and has it to report (the net marks the
+      // event `known`). The fireteams fight on their own, so a leader whose thought costs
+      // a model call is not woken for it; one that thinks for free still acts, in silence.
+      if (frame.known && e.kind === "contact" && this.#costly()) return;
+      this.#enqueue({ kind: "event", event: e, callsign: frame.callsign, place: named ? `${named.name.en} (${e.place})` : e.place, ...(frame.known ? { known: true } : {}) });
     }
+  }
+
+  // Whether a thought of this station's is a call to a model.
+  #costly() {
+    return Boolean(this.brain?.slowFor?.({ role: this.role, tier: this.tier }) ?? this.brain?.slow);
   }
 
   #enqueue(item) {
     this.inbox.push(item);
+    // An operator that pays for its thoughts lets a burst of traffic land before it reads
+    // it: eight squads reporting in two seconds are one wake, not eight. A call is never
+    // kept waiting.
+    if (item.kind !== "radio" && this.role === "anvil" && this.gatherMs > 0 && this.#costly()) {
+      this.gathering ??= setTimeout(() => {
+        this.gathering = null;
+        this.#pump();
+      }, this.gatherMs);
+      this.gathering?.unref?.();
+      return;
+    }
     this.#pump();
   }
 
@@ -362,12 +393,16 @@ function describe(item) {
   }
   if (item.kind === "heard") {
     const m = item.msg;
-    return `Heard on the net, ${m.from.en} to ${m.to.map((t) => t.en).join(", ")}: "${m.text}"`;
+    return item.forMe ? `Report to you from ${m.from.en}: "${m.text}"` : `Heard on the net, ${m.from.en} to ${m.to.map((t) => t.en).join(", ")}: "${m.text}"`;
   }
   const e = item.event;
   const who = item.callsign?.en ?? "A squad";
   const heroic = describeHeroEvent(e, who);
   if (heroic) return heroic;
+  return eventLine(item, e, who) + (item.known ? " Another squad has already reported this on the net: act if you need to, and do not report it again." : "");
+}
+
+function eventLine(item, e, who) {
   switch (e.kind) {
     case "quiet":
       return "Nothing has woken you for a while and you hold the initiative: your status shows a squad without orders or gold you could spend. Act if it helps; otherwise do nothing.";

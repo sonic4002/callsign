@@ -13,7 +13,9 @@
 import { intents, nearestCover, understandLeader } from "./rule-grammar.mjs";
 import { phrase, placeName, pointName, targetName } from "./rule-phrases.mjs";
 
-export const radio = (to, body, end) => ({ name: "radio", input: { to, body, end } });
+// `kind` says what a line is (tools.mjs); a squad's own reports need none, because the
+// net knows which event woke the squad.
+export const radio = (to, body, end, kind) => ({ name: "radio", input: { to, body, end, ...(kind ? { kind } : {}) } });
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const bearings = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]; // y grows south
@@ -142,7 +144,8 @@ const spotAt = (p, b, metres) => ({ x: p.x + offsets[b][0] * metres, y: p.y + of
 // leaderEvent is what a leader does when something happens to its squad and nobody called.
 export function leaderEvent(ctx, mem) {
   const { agent, wake, rules } = ctx;
-  const e = wake.items.find((i) => i.kind === "event")?.event;
+  const woke = wake.items.find((i) => i.kind === "event");
+  const e = woke?.event;
   if (!e) return [];
   const lang = agent.lang === "he" ? "he" : "en";
   const to = [agent.commander ?? "Hammer"];
@@ -171,8 +174,10 @@ export function leaderEvent(ctx, mem) {
   if (arrival) mem.there = true;
   // An enemy squad the net has just heard named is not reported again, by this squad or another.
   const named = e.kind === "contact" && e.contact ? [targetName(rules, e.contact, "en"), targetName(rules, e.contact, "he")] : [];
-  const known = (wake.traffic ?? []).some((said) => named.some((n) => new RegExp(`${n}(?!\\d)`).test(said)));
-  const tell = (body) => ((twice || known) && body === undefined ? [] : [radio(to, body ?? line(), "over")]);
+  // The net itself marks an event another squad met first (`known`): that squad reports it.
+  const known = Boolean(woke.known) || (wake.traffic ?? []).some((said) => named.some((n) => new RegExp(`${n}(?!\\d)`).test(said)));
+  // What the net marked is another squad's to say, whatever this one does about it (the net would drop it anyway).
+  const tell = (body) => (woke.known || ((twice || known) && body === undefined) ? [] : [radio(to, body ?? line(), "over")]);
   if (level < 2 || !you) return tell();
 
   const teams = (you.teams ?? []).filter((t) => t.members === undefined || t.members > 0);

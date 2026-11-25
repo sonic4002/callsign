@@ -19,6 +19,9 @@ const place = (what) => ({
   description: `${what} One of: a map point by id or any of its names ("F", "Foxtrot", "פסל", "the town"); a landmark or bridge by its id from the map list ("F-house-1", "bridge-south") or by its name ("the grove north of Foxtrot"); or a spot off a point, as "<bearing> of <point> [<metres>]" ("north of Foxtrot", "NE of D 150").`,
 });
 
+// The kinds a station may give its own transmission; the server knows the rest itself.
+export const kinds = ["contact", "objective", "loss", "status", "ack"];
+
 const radio = tool(
   "radio",
   'Transmit on the command net. The net writes the call ("<to>, this is <you>") and the closing word itself, so the body is only the message.',
@@ -30,6 +33,12 @@ const radio = tool(
     },
     body: { type: "string", description: 'The message alone, one short sentence, for example "Wilco" or "Contact, two vehicles north of Golf".' },
     end: { type: "string", enum: ["over", "out"], description: '"over" when you expect a reply, "out" when you do not.' },
+    kind: {
+      type: "string",
+      enum: kinds,
+      description:
+        'What the transmission is, so the net can keep quiet what Hammer need not hear: "contact" for the enemy met or a fight begun, "objective" for a place reached or taken or a fight ended, "loss" for a squad that can hardly fight on, "ack" for a bare Roger or Wilco, "status" for everything else (answers, questions, routine).',
+    },
   },
 );
 

@@ -239,6 +239,28 @@ test("a squad does not report an enemy the net has just heard named", async () =
   assert.deepEqual((await run(ruleBrain(), { agent: leader("en", 2), wake: { ...event(contact), traffic: ["Hammer, this is Viper 2. Contact, Target 3 near Golf. Over."] } }))[0], ["attack", { place: "", contact: 3 }]);
 });
 
+test("a squad does not report what the net says another squad met first, and still acts on it", async () => {
+  const known = (e, level) => run(ruleBrain(), { agent: leader("en", level), wake: { items: [{ kind: "event", event: e, known: true }], call: null, status: status() } });
+  assert.deepEqual(await known({ kind: "contact", point: "G", contact: 3 }, 1), []);
+  assert.deepEqual(await known({ kind: "arrived", point: "G" }, 1), []);
+  assert.deepEqual(await known({ kind: "contact", point: "G", contact: 3 }, 2), [["attack", { place: "", contact: 3 }]], "it goes for the enemy, and says nothing");
+});
+
+test("the operator tells Hammer of a fight once, by its place, and passes on no squad's report word for word", async () => {
+  const brain = ruleBrain();
+  const report = (who, body, extra = {}) => ({ kind: "heard", forMe: true, msg: { from: { key: `infantry-${who}`, en: `Viper ${who}`, he: `צפע ${who}`, squad: who }, to: [{ key: "operator", en: "Anvil", he: "סדן" }], lang: "en", body, end: "over", kind: "contact", points: ["G"], prowords: [], landmarks: [], ...extra } });
+  const on = (items, timeLeft, lang = "en") => run(brain, { agent: { ...anvil(1), lang }, wake: { items, call: null, status: base("orders", false, { timeLeft }) } });
+  // Two squads report the same fight in one wake: one line to Hammer, marked as a contact.
+  assert.deepEqual(await on([report(1, "Contact, Target 3 near Golf"), report(2, "Contact, Target 4 near Golf")], 500), [["radio", { to: ["Hammer"], body: "Viper 1 in contact near Golf", end: "out", kind: "contact" }]]);
+  // The same fight a little later is not told again; another place is; and after a while the first is news again.
+  assert.deepEqual(await on([report(2, "Eyes on Target 5 near Golf")], 480), []);
+  assert.deepEqual(await on([report(2, "Contact near Foxtrot", { points: ["F"] })], 470, "he"), [["radio", { to: ["Hammer"], body: "צפע 2 במגע ליד פסל", end: "out", kind: "contact" }]]);
+  assert.deepEqual((await on([report(2, "Contact near Golf")], 400)).length, 1);
+  // What is not a contact, and what was not said to the operator, is not passed on.
+  assert.deepEqual(await on([report(1, "In position at Golf", { kind: "objective" })], 300), []);
+  assert.deepEqual(await on([{ ...report(1, "Contact near Kilo", { points: ["K"] }), forMe: false }], 300), []);
+});
+
 test("the operator's three levels: orders only, the economy with the purse, the fight when handed it", async () => {
   const heard = (level, st) => run(ruleBrain(), { agent: anvil(level), wake: { items: [{ kind: "heard", msg: call("Wilco", { from: viper1, end: "out" }) }], call: null, status: st } });
   // Level 1 never acts on its own, whatever it holds, and says so when handed more.
@@ -277,13 +299,13 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
   const st = held({ squads: [squad(1, { order: { kind: "hold", point: "D" } }), squad(2, { x: 500, y: 300, order: { kind: "hold", point: "G" } })], haulers: [{ id: 1001, side: 0, field: "B" }] });
   assert.deepEqual(await on(st, { kind: "hauler_attacked", hauler: 1001, point: "B", field: "B" }), [
     ["radio", { to: ["Viper 2"], body: "Hold Bravo", end: "over" }],
-    ["radio", { to: ["Hammer"], body: "Viper 2 is going to guard the haulers at Bravo", end: "out" }],
+    ["radio", { to: ["Hammer"], body: "Viper 2 is going to guard the haulers at Bravo", end: "out", kind: "contact" }],
   ]);
   // The headquarters under attack: the two nearest come home.
   const far = held({ squads: [squad(1, { x: 800, y: 500, order: { kind: "hold", point: "F" } }), squad(2, { x: 450, y: 690, order: { kind: "hold", point: "D" } }), squad(3, { x: 1150, y: 690, order: { kind: "hold", point: "H" } })] });
   assert.deepEqual(await on(far, { kind: "hq_under_attack" }), [
     ["radio", { to: ["Viper 2", "Viper 1"], body: "Hold Alpha", end: "over" }],
-    ["radio", { to: ["Hammer"], body: "Pulling back to defend the base: Viper 2 and Viper 1", end: "out" }],
+    ["radio", { to: ["Hammer"], body: "Pulling back to defend the base: Viper 2 and Viper 1", end: "out", kind: "contact" }],
   ]);
   // Every point ours, one squad on each, and three more without work: those three gather at the
   // point nearest the enemy, then go in together. The squads on the points stay.
@@ -291,12 +313,12 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
   const gather = await on(held({ squads: [...posts, squad(4), squad(5), squad(6)] }), { kind: "quiet" });
   assert.deepEqual(gather, [
     ["radio", { to: ["Viper 4", "Viper 5", "Viper 6"], body: "Hold Hotel", end: "over" }],
-    ["radio", { to: ["Hammer"], body: "Massing at Hotel before the attack", end: "out" }],
+    ["radio", { to: ["Hammer"], body: "Massing at Hotel before the attack", end: "out", kind: "status" }],
   ]);
   const atHotel = [4, 5, 6].map((n) => squad(n, { x: 1150 + 10 * n, y: 690, order: { kind: "hold", point: "H" } }));
   assert.deepEqual(await on(held({ squads: [...posts, ...atHotel] }), { kind: "quiet" }), [
     ["radio", { to: ["Viper 4", "Viper 5", "Viper 6"], body: "Attack Zulu", end: "over" }],
-    ["radio", { to: ["Hammer"], body: "Attacking Zulu with 3 squads", end: "out" }],
+    ["radio", { to: ["Hammer"], body: "Attacking Zulu with 3 squads", end: "out", kind: "contact" }],
   ]);
   // A free point in the middle is taken by one squad, unless an enemy squad is seen by it.
   const middle = (contacts) => base("fight", false, { squads: [squad(1, { order: { kind: "hold", point: "B" } }), squad(2, { order: { kind: "hold", point: "D" } }), squad(3)], points: [{ id: "A", owner: 0 }, { id: "B", owner: 0 }, { id: "D", owner: 0 }, { id: "F", owner: -1 }, { id: "G", owner: 0 }, { id: "H", owner: 1 }, { id: "K", owner: 1 }, { id: "S", owner: -1 }, { id: "Z", owner: 1 }], contacts });
@@ -312,7 +334,7 @@ test("the level-3 operator guards its haulers, comes home to a base under attack
   assert.deepEqual(await on(kiloLost([...posts, squad(4)], -1), { kind: "quiet" }), [["radio", { to: ["Viper 4"], body: "Hold Hotel", end: "over" }]], "and does not walk alone to a free point by the enemy's base");
   assert.deepEqual(await on(kiloLost([...posts, ...atHotel]), { kind: "quiet" }), [
     ["radio", { to: ["Viper 4", "Viper 5", "Viper 6"], body: "Hold Kilo", end: "over" }],
-    ["radio", { to: ["Hammer"], body: "Attacking Kilo with 3 squads", end: "out" }],
+    ["radio", { to: ["Hammer"], body: "Attacking Kilo with 3 squads", end: "out", kind: "contact" }],
   ]);
   // A structure shot at away from the headquarters: the squads go to it, not home.
   assert.deepEqual((await on(far, { kind: "structure_attacked", point: "B", structure: "s2", unit: "refinery" }))[0], ["radio", { to: ["Viper 1", "Viper 2"], body: "Hold Bravo", end: "over" }]);

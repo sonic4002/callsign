@@ -206,6 +206,53 @@ test("haulers work on their own, go where the operator sends them, and can be es
   await hammer.next("both haulers choosing for themselves", (f) => haulers(f).length === 2 && haulers(f).every((h) => !h.assigned));
 });
 
+test("the operator is not woken by a bare acknowledgement, reads squads' reports as traffic, and its own bare Roger is not sent", { skip }, async (t) => {
+  const server = await startServer(t);
+  const wakes = [];
+  // A brain that only notes what woke it; `said` is what it transmits on its next thought.
+  let said = null;
+  const brain = {
+    name: "noting",
+    slow: false,
+    think: async ({ wake, messages }) => {
+      const first = typeof messages.at(-1).content === "string"; // the first turn of a wake
+      if (first) wakes.push(wake.items.map((i) => [i.kind, i.msg?.kind ?? i.event?.kind, Boolean(i.forMe)]));
+      if (!first || !said) return { content: [{ type: "text", text: "" }], stop_reason: "end_turn" };
+      const input = said;
+      said = null;
+      return { content: [{ type: "tool_use", id: "t1", name: "radio", input }], stop_reason: "tool_use" };
+    },
+  };
+  const logged = [];
+  const anvil = new Agent({ server, side: 0, role: "anvil", brain, log: (line) => logged.push(line), quietMs: 0 });
+  await anvil.start();
+  t.after(() => anvil.stop());
+  const hammer = await Hammer.join(t, server);
+  // A squad leader with no brain of its own: this test speaks for it.
+  const viper = new WebSocket(`${server}?side=0&role=squad&squad=1&state=0`);
+  t.after(() => viper.close());
+  await new Promise((resolve) => viper.addEventListener("open", resolve, { once: true }));
+  const radio = (args) => viper.send(JSON.stringify({ type: "tool", id: 1, name: "radio", args }));
+
+  radio({ to: ["Anvil"], body: "Wilco", end: "out" });
+  const ack = (await hammer.next("the squad's Wilco", (f) => f.type === "radio" && f.message.from.en === "Viper 1")).message;
+  assert.deepEqual([ack.kind, ack.net, ack.level], ["ack", "squad", 3]);
+  radio({ to: ["Anvil"], body: "Two vehicles north of Golf", end: "over", kind: "contact" });
+  const report = (await hammer.next("the squad's report", (f) => f.type === "radio" && f.message.kind === "contact")).message;
+  assert.deepEqual([report.net, report.level], ["squad", 3]);
+  await eventually("the operator reading the report", () => wakes.length === 1);
+  assert.deepEqual(wakes[0], [["heard", "contact", true]], "the Wilco woke nobody; the report is traffic addressed to the operator, not a call");
+
+  // The operator's bare Roger to the squad is not carried by the net.
+  said = { to: ["Viper 1"], body: "Roger", end: "out", kind: "ack" };
+  radio({ to: ["Anvil"], body: "Pinned north of Golf", end: "over", kind: "status" });
+  await eventually("the operator's answer being refused by the net", () => logged.some((line) => line.includes("radio")));
+  hammer.say("Anvil, this is Hammer. Radio check. Over.");
+  await hammer.next("Hammer's own call", (f) => f.type === "radio" && f.message.from.key === "player");
+  assert.ok(!hammer.radioLog().some((text) => /this is Anvil\. Roger/.test(text)), "no bare Roger from the operator on the net");
+  await eventually("Hammer's call waking the operator as a call", () => wakes.some((w) => w.some(([kind]) => kind === "radio")));
+});
+
 test("the agent loop feeds a model's tool calls to the game and the results back", { skip }, async (t) => {
   const server = await startServer(t);
   const requests = [];

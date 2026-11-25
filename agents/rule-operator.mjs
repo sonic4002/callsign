@@ -213,6 +213,30 @@ function ownMoves({ wake, rules, agent }, mem) {
   return [...moves, ...fightMoves({ wake, rules, agent }, mem, lang)];
 }
 
+// toldOnce reports whether Hammer has not been told `what` within the last `secs` seconds
+// of the match, and notes that it is being told now: the same thing is not said twice.
+function toldOnce(mem, s, what, secs) {
+  const now = typeof s?.timeLeft === "number" ? s.timeLeft : 0;
+  const at = mem.told.get(what);
+  if (typeof s?.timeLeft === "number" && at !== undefined && at - now >= 0 && at - now < secs) return false;
+  mem.told.set(what, now);
+  return true;
+}
+
+// summary is what the operator passes on to Hammer of what its squads report to it. The
+// squads' own lines stay on the squad net; Hammer hears of a fight once, when it starts,
+// by the place it is at, and not once from every squad in it.
+function summary({ wake, rules, agent }, mem) {
+  const s = wake.status;
+  const lang = agent.lang === "he" ? "he" : "en";
+  const said = wake.items.find((i) => i.kind === "heard" && i.forMe && i.msg.kind === "contact" && i.msg.from.squad);
+  if (!said || !s) return [];
+  const sq = (s.squads ?? []).find((q) => q.callsign.en === said.msg.from.en);
+  const place = said.msg.points?.[0] ?? sq?.near ?? "";
+  if (!place || !toldOnce(mem, s, `contact:${place}`, 90)) return [];
+  return [radio([rules.callsigns.player.en], phrase(rules, lang, "opContact", { squad: said.msg.from[lang] ?? said.msg.from.en, place: pointName(rules, place, lang) }), "out", "contact")];
+}
+
 // fightMoves is the level-3 operator running the fight Hammer handed it. At most three
 // calls a wake, so the net stays readable.
 function fightMoves({ wake, rules, agent }, mem, lang) {
@@ -226,13 +250,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     const at = mem.tasked.get(sq.callsign.en);
     return typeof s.timeLeft === "number" && at !== undefined && at - now >= 0 && at - now < secs;
   };
-  // The same thing is not told to Hammer twice within a while.
-  const once = (what, secs) => {
-    const at = mem.told.get(what);
-    if (typeof s.timeLeft === "number" && at !== undefined && at - now >= 0 && at - now < secs) return false;
-    mem.told.set(what, now);
-    return true;
-  };
+  const once = (what, secs) => toldOnce(mem, s, what, secs);
   const unitOf = (sq) => rules.factions[s.faction ?? ""]?.units[sq.unit] ?? unitAnywhere(rules, sq.unit) ?? {};
   const fighter = (sq) => {
     const u = unitOf(sq);
@@ -264,7 +282,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     if (back.length && home < 2) {
       task(back, say("opHold", { place: name(where.id) }));
       back.forEach((sq) => busy.add(sq.callsign.en));
-      if (once("defending", 60)) moves.push(radio([boss], say("opDefending", { squad: back.map((sq) => sq.callsign[lang] ?? sq.callsign.en).join(say("and")) }), "out"));
+      if (once("defending", 60)) moves.push(radio([boss], say("opDefending", { squad: back.map((sq) => sq.callsign[lang] ?? sq.callsign.en).join(say("and")) }), "out", "contact"));
     }
   }
   // A hauler under attack: the nearest free squad guards its field.
@@ -277,7 +295,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     if (guard) {
       task([guard], say("opHold", { place: name(field) }));
       busy.add(guard.callsign.en);
-      if (once(`guard:${field}`, 60)) moves.push(radio([boss], say("opGuarding", { squad: guard.callsign[lang] ?? guard.callsign.en, place: name(field) }), "out"));
+      if (once(`guard:${field}`, 60)) moves.push(radio([boss], say("opGuarding", { squad: guard.callsign[lang] ?? guard.callsign.en, place: name(field) }), "out", "contact"));
     }
   }
   // Points nobody holds on our half of the map: every squad without orders goes to the
@@ -325,10 +343,10 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
         // A point is taken and held; the headquarters is attacked.
         const goal = prize ?? enemyHQ;
         task(there, say(prize ? "opHold" : "opAttack", { place: name(goal.id) }));
-        if (once(`attacking:${goal.id}`, 45)) moves.push(radio([boss], say("opAttacking", { place: name(goal.id), count: there.length }), "out"));
+        if (once(`attacking:${goal.id}`, 45)) moves.push(radio([boss], say("opAttacking", { place: name(goal.id), count: there.length }), "out", "contact"));
       } else if (coming.length) {
         task(coming, say("opHold", { place: name(forward.id) }));
-        if (once("massing", 90)) moves.push(radio([boss], say("opMassing", { place: name(forward.id) }), "out"));
+        if (once("massing", 90)) moves.push(radio([boss], say("opMassing", { place: name(forward.id) }), "out", "status"));
       }
     } else if (waiting.length) {
       // Fewer than three: the ones without work stand at the forward point.
@@ -468,7 +486,7 @@ export function operatorPlan(ctx, mem) {
   const level = operatorLevel(agent);
   // A hauler in trouble, like the rest of the base's news, is told to the commander by the
   // server's own base cues (server/room/cues.go); the operator does not say it again.
-  if (!call || call.from.key !== "player") return ownMoves(ctx, mem); // otherwise Anvil answers to Hammer only
+  if (!call || call.from.key !== "player") return [...summary(ctx, mem), ...ownMoves(ctx, mem)]; // otherwise Anvil answers to Hammer only
   const lang = call.lang === "he" ? "he" : "en";
   const back = [call.from.en];
   const text = call.body.toLowerCase();
