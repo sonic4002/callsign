@@ -64,29 +64,41 @@ button.primary:hover:not(:disabled) { background: #f4c552; }
 
 /* ---- radio console ---- */
 #radio { block-size: 13.5rem; display: flex; flex-direction: column; border-inline: 0; border-block-end: 0; }
-#log {
+:is(#log, #squad-log) {
   flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: .45rem .6rem;
   display: flex; flex-direction: column; gap: .2rem;
   background: #0a100f repeating-linear-gradient(#0000 0 2px, #ffffff05 2px 3px);
   border: 1px solid #22302c; color: var(--phosphor);
   font-size: .88rem; font-variant-numeric: tabular-nums; letter-spacing: .01em;
 }
-#log li { display: flex; gap: .6rem; align-items: baseline; }
-#log time { color: #4f6f64; font-size: .75rem; flex: none; }
-#log .who { flex: none; font-weight: 700; min-inline-size: 4.6rem; }
-#log .text { unicode-bidi: plaintext; text-align: start; overflow-wrap: anywhere; }
-#log .player .who { color: #ffffff; }
-#log .operator .who { color: #d2b1ff; }
-#log .squad .who { color: var(--mine); }
-#log .system { color: #6f8d83; font-style: italic; }
-#log .warn { color: var(--warn); }
+:is(#log, #squad-log) li { display: flex; gap: .6rem; align-items: baseline; }
+:is(#log, #squad-log) time { color: #4f6f64; font-size: .75rem; flex: none; }
+:is(#log, #squad-log) .who { flex: none; font-weight: 700; min-inline-size: 4.6rem; }
+:is(#log, #squad-log) .text { unicode-bidi: plaintext; text-align: start; overflow-wrap: anywhere; }
+:is(#log, #squad-log) .player .who { color: #ffffff; }
+:is(#log, #squad-log) .operator .who { color: #d2b1ff; }
+:is(#log, #squad-log) .squad .who { color: var(--mine); }
+:is(#log, #squad-log) .system { color: #6f8d83; font-style: italic; }
+:is(#log, #squad-log) .warn { color: var(--warn); }
 /* Radio traffic carries a rule down its side; what the page itself notes is smaller and set in. */
-#log li.radio { border-inline-start: 2px solid #2f6d5b; padding-inline-start: .45rem; }
-#log li.system { font-size: .82rem; padding-inline-start: calc(.45rem + 2px); }
+:is(#log, #squad-log) li.radio { border-inline-start: 2px solid #2f6d5b; padding-inline-start: .45rem; }
+:is(#log, #squad-log) li.system { font-size: .82rem; padding-inline-start: calc(.45rem + 2px); }
 /* A base cue: the operator's voice, but a fixed line the game wrote. */
-#log li.cue { border-inline-start-color: #c9a44c; }
-#log li.cue .text { color: #ecdca6; }
-#log .cue-mark { inline-size: .95em; block-size: .95em; flex: none; align-self: center; color: #e9c46a; }
+:is(#log, #squad-log) li.cue { border-inline-start-color: #c9a44c; }
+:is(#log, #squad-log) li.cue .text { color: #ecdca6; }
+:is(#log, #squad-log) .cue-mark { inline-size: .95em; block-size: .95em; flex: none; align-self: center; color: #e9c46a; }
+/* The net's two tabs: the command net, and beside it the squad net, which opens only when asked for. */
+#net-tabs { display: flex; gap: .2rem; margin-block-end: .35rem; }
+#net-tabs button {
+  padding: .1rem .7rem .2rem; clip-path: none; background: none; border: 0; border-block-end: 2px solid transparent;
+  font-size: .7rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+#net-tabs button:hover { background: none; color: var(--text); }
+#net-tabs button[aria-selected="true"] { color: var(--brass); border-block-end-color: var(--brass); }
+#radio[data-net="squad"] #log, #squad-log[hidden] { display: none; }
+/* Read, never heard: the squad net is set a shade back from the command net. */
+#squad-log { color: #8fb3a6; }
+#squad-log li.radio { border-inline-start-color: #2a4a40; }
 #send { display: flex; gap: .5rem; padding-block-start: .5rem; }
 #text {
   flex: 1; min-inline-size: 0; font: inherit; color: var(--text); background: #0a100f;
@@ -496,6 +508,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 #settings h1 { font-size: 1.3rem; letter-spacing: .12em; margin: 0; }
 #settings h2 { margin: 1.1rem 0 .4rem; }
 #settings label { display: flex; align-items: center; gap: .5rem; min-block-size: 2.2rem; font-size: .9rem; }
+#settings .fine { margin: .1rem 0 0; font-size: .78rem; line-height: 1.35; color: var(--muted); }
 #settings select { font: inherit; color: inherit; background: #10161a; border: 1px solid var(--edge-hi); padding: .25rem .4rem; }
 #settings #volume { flex: 1; }
 #settings .row { display: flex; justify-content: flex-end; margin-block-start: 1.2rem; }

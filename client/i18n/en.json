@@ -593,5 +593,14 @@
   "run.nesw": "north-east to south-west",
   "run.nwse": "north-west to south-east",
   "help.q.turn": "Can I turn a wall before I place it?",
-  "help.a.turn": "Yes. While a wall or fence follows your pointer, press R or roll the wheel (on a phone, the Turn button beside Build here): the run turns through north to south, east to west and the two diagonals. Each segment shows green or red, and the whole run must fit."
+  "help.a.turn": "Yes. While a wall or fence follows your pointer, press R or roll the wheel (on a phone, the Turn button beside Build here): the run turns through north to south, east to west and the two diagonals. Each segment shows green or red, and the whole run must fit.",
+  "squadNet": "Squad net",
+  "squadNet.empty": "What your squads and Anvil say to each other is written here. It is never spoken aloud.",
+  "traffic": "Radio traffic",
+  "traffic.1": "1 · Quiet",
+  "traffic.2": "2 · Normal",
+  "traffic.3": "3 · Full",
+  "traffic.about": "Quiet: only what needs you, and the answers to your own orders. Normal: also one line for each new contact and each objective reached. Full: everything. A squad you ordered yourself always reports to you.",
+  "help.q.nets": "Why are there two nets, and how do I hear less?",
+  "help.a.nets": "The command net carries what is said to you and by you: your orders and their answers, Anvil's news of the base and of a fight, and the game's own lines. What squads and Anvil say among themselves is on the squad net, the tab beside it: it is written, never spoken. Squads that move together report an enemy or an arrival once, not once each, and Anvil sums a fight up for you instead of passing every report on. In Settings (⚙), Radio traffic sets how much reaches the command net and your ears: Quiet (base under attack, a squad or a point lost or taken, something ready, answers to your orders), Normal (also each new contact and each objective reached) or Full (everything, the squad net too). A squad you ordered yourself by radio keeps answering you and reporting contact at every level."
 }

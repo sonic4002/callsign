@@ -10,6 +10,7 @@ import { wantedStructure } from "/agents/bases.mjs";
 import { drawIcon } from "./bases-art.js";
 import { ofRole, structureCards, structureDef, techSite, unitDef, unitLock } from "./bases.js";
 import { cueMark, cued, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
+import { heard, onCommandNet, onSquadNet, traffic } from "./nets.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
 import { Music } from "./music.js";
@@ -353,8 +354,10 @@ function onFrame(frame) {
       if (frame.message.from.key === "operator" && frame.message.prowords?.some((w) => w === "negative" || w === "sayAgain")) upgrading.clear();
       // The sign-off ends the match: whatever radio was still waiting is dropped for it.
       if (frame.message.final) speech.silence();
-      // A base cue is always written; whether it is also spoken is the player's choice.
-      if (spoken(frame.message)) speech.say(frame.message, { rules, faction });
+      // Only what the command net shows at the chosen radio traffic is spoken; the squad
+      // net is read, never heard. A base cue is always written; whether it is also spoken
+      // is the player's choice.
+      if (heard(frame.message) && spoken(frame.message)) speech.say(frame.message, { rules, faction });
       break;
     case "acted":
       acted(frame);
@@ -405,14 +408,24 @@ function system(key, vars = {}, tone = "") {
 
 // ---- radio console ----
 
+// Two nets (nets.js). The command net is what is said to and by the commander, as much of
+// it as the radio traffic setting lets through, with the page's own lines; the squad net
+// is what the squads and the operator say among themselves, drawn only while its tab is open.
 function renderLog() {
-  const log = $("log");
-  const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const level = traffic.level;
   // Repeats are folded into one line ("3 squads are ready"), and a phone's strip shows
   // the few lines that matter most: radio to the player before system lines.
-  const lines = foldLog(entries);
-  const strip = new Set(stripPick(lines, "player", 4));
-  const strip2 = new Set(stripPick(lines, "player", 2));
+  drawLog($("log"), foldLog(entries.filter((e) => onCommandNet(e, level))), true);
+  if ($("radio").dataset.net !== "squad") return;
+  const squad = entries.filter(onSquadNet).map((entry) => ({ entry, count: 1 }));
+  drawLog($("squad-log"), squad, false);
+  if (squad.length === 0) $("squad-log").append(el("li", "system empty", t("squadNet.empty")));
+}
+
+function drawLog(log, lines, withStrip) {
+  const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const strip = new Set(withStrip ? stripPick(lines, "player", 4) : []);
+  const strip2 = new Set(withStrip ? stripPick(lines, "player", 2) : []);
   log.replaceChildren(
     ...lines.map(({ entry: e, count }, i) => {
       const li = el("li");
@@ -444,6 +457,26 @@ function renderLog() {
   );
   if (pinned) log.scrollTop = log.scrollHeight;
 }
+
+// The net's two tabs. The command net is the one a match opens on, every time.
+function showNet(name) {
+  $("radio").dataset.net = name;
+  for (const tab of $("net-tabs").children) tab.setAttribute("aria-selected", String(tab.dataset.net === name));
+  $("squad-log").hidden = name !== "squad";
+  renderLog();
+  const log = name === "squad" ? $("squad-log") : $("log");
+  log.scrollTop = log.scrollHeight;
+}
+for (const tab of $("net-tabs").children) tab.addEventListener("click", () => showNet(tab.dataset.net));
+showNet("command");
+
+// How much radio traffic the commander is shown and hears: 1 quiet, 2 normal, 3 full.
+$("traffic").value = String(traffic.level);
+$("traffic").addEventListener("change", (ev) => {
+  traffic.level = Number(ev.target.value);
+  speech.silence(); // what was waiting to be spoken was chosen by the old level
+  renderLog();
+});
 
 // Base cues are spoken unless the player turned that off; they are written either way.
 $("cue-voice").checked = cueVoice.on;

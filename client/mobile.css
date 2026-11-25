@@ -23,6 +23,8 @@ body.no-server #no-server {
     --send: 54px; /* the radio box */
     --tabs: 64px; /* the bar of sheets, with the talk button */
     --tick: 96px; /* the last four lines of the radio log */
+    --nets: 40px; /* the two tabs over the open radio sheet */
+    --sheet: min(52dvh, calc(100dvh - var(--strip) - var(--send) - var(--tabs) - var(--safe-t) - var(--safe-b)));
     --rail: 0px; /* the bar's width when it stands on the edge (landscape) */
     --kb: 0px; /* height of the on-screen keyboard, set by mobile.js */
     --safe-t: env(safe-area-inset-top, 0px);
@@ -38,11 +40,21 @@ body.no-server #no-server {
     overflow: hidden; overscroll-behavior: none; touch-action: manipulation;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
   }
-  input, #log .text { -webkit-user-select: text; user-select: text; }
+  input, :is(#log, #squad-log) .text { -webkit-user-select: text; user-select: text; }
 
   /* The desk's boxes dissolve; each part below is placed on the screen by itself. */
   main, #stage, #radio { display: contents; }
-  #radio > h2 { display: none; }
+  /* The two nets' tabs belong to the open radio sheet; the strip is always the command net. */
+  #net-tabs { display: none; }
+  html[data-sheet="radio"] #net-tabs {
+    display: flex; position: fixed; z-index: 5; inset-inline: 0; margin: 0; gap: 0;
+    inset-block-end: calc(var(--send) + var(--tabs) + var(--safe-b) + var(--sheet) - var(--nets));
+    block-size: var(--nets); padding-inline: max(.4rem, var(--safe-s)) max(.4rem, var(--safe-e));
+    background: var(--panel); border-block-start: 2px solid var(--brass-dim);
+  }
+  html[data-sheet="radio"] #net-tabs button { flex: 1; font-size: .8rem; }
+  html:not([data-sheet="radio"]) #squad-log { display: none; }
+  html:not([data-sheet="radio"]) #radio[data-net="squad"] #log { display: flex; }
 
   #map-wrap {
     position: fixed; inset-inline: 0;
@@ -106,7 +118,7 @@ body.no-server #no-server {
   #ptt.live { background: var(--warn); transform: translateX(-50%) scale(1.14); box-shadow: 0 0 0 6px #f0a04a55, 0 2px 10px #000b; }
 
   /* ---- radio log: its last four lines always, the whole of it as a sheet ---- */
-  #log {
+  :is(#log, #squad-log) {
     position: fixed; z-index: 4; inset-inline: 0; inset-block-end: calc(var(--send) + var(--tabs) + var(--safe-b));
     block-size: var(--tick); flex: none; overflow: hidden; border-inline: 0; font-size: .86rem;
     padding-block: 4px; padding-inline: max(.6rem, var(--safe-s)) max(.6rem, var(--safe-e));
@@ -117,9 +129,9 @@ body.no-server #no-server {
   html:not([data-sheet="radio"]) #log li { block-size: 22px; line-height: 22px; flex: none; }
   html:not([data-sheet="radio"]) #log .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
   html:not([data-sheet="radio"]) #log .who { min-inline-size: 0; }
-  html[data-sheet="radio"] #log {
-    z-index: 5; overflow-y: auto; border-block-start: 2px solid var(--brass-dim); gap: .35rem;
-    block-size: min(52dvh, calc(100dvh - var(--strip) - var(--send) - var(--tabs) - var(--safe-t) - var(--safe-b)));
+  html[data-sheet="radio"] :is(#log, #squad-log) {
+    z-index: 5; overflow-y: auto; gap: .35rem;
+    block-size: calc(var(--sheet) - var(--nets));
   }
   #voice-status {
     position: fixed; z-index: 8; inset-inline: .5rem; inset-block-end: calc(var(--send) + var(--tabs) + var(--tick) + var(--safe-b) + 6px);
@@ -201,7 +213,8 @@ body.no-server #no-server {
 
   /* The on-screen keyboard is up: the radio box rides on top of it. */
   html.typing #send { inset-block-end: var(--kb); }
-  html.typing #log { inset-block-end: calc(var(--kb) + var(--send)); }
+  html.typing :is(#log, #squad-log) { inset-block-end: calc(var(--kb) + var(--send)); }
+  html.typing #net-tabs { display: none; }
   html.typing #voice-status { display: none; }
 }
 
@@ -241,16 +254,20 @@ body.no-server #no-server {
     inset-inline: 0 calc(var(--rail) + var(--safe-e)); inset-block-end: 0;
     block-size: calc(var(--send) + var(--safe-b)); padding-block-end: calc(4px + var(--safe-b));
   }
-  #log { inset-inline: 0 calc(var(--rail) + var(--safe-e)); inset-block-end: calc(var(--send) + var(--safe-b)); }
+  :is(#log, #squad-log) { inset-inline: 0 calc(var(--rail) + var(--safe-e)); inset-block-end: calc(var(--send) + var(--safe-b)); }
   #voice-status { inset-inline: .5rem calc(var(--rail) + var(--safe-e) + .5rem); inset-block-end: calc(var(--send) + var(--tick) + var(--safe-b) + 6px); }
 
-  html[data-sheet="radio"] #log, #sidebar {
+  html[data-sheet="radio"] :is(#log, #squad-log), #sidebar {
     inset-block: calc(var(--strip) + var(--safe-t)) calc(var(--send) + var(--safe-b));
     inset-inline: auto calc(var(--rail) + var(--safe-e));
     inline-size: min(25rem, 58vw); block-size: auto; max-block-size: none;
     border-block-start: 0; border-inline-start: 2px solid var(--brass-dim); padding-inline: 3px;
   }
-  html[data-sheet="radio"] #log { padding-inline: .6rem; }
+  html[data-sheet="radio"] :is(#log, #squad-log) { padding-inline: .6rem; inset-block-start: calc(var(--strip) + var(--safe-t) + var(--nets)); }
+  html[data-sheet="radio"] #net-tabs {
+    inset-block: calc(var(--strip) + var(--safe-t)) auto; inset-inline: auto calc(var(--rail) + var(--safe-e));
+    inline-size: min(25rem, 58vw); border-block-start: 0; border-inline-start: 2px solid var(--brass-dim);
+  }
 }
 
 /* ---- a large touch screen (an unfolded phone, a small tablet): the phone layout, with the

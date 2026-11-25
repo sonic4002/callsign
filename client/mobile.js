@@ -20,7 +20,7 @@ function show(name) {
   for (const tab of $("dock").children) tab.setAttribute("aria-pressed", String(tab.dataset.open === next));
   // The radar and the log measure themselves; they were hidden until now.
   if (next === "more") dispatchEvent(new Event("resize"));
-  if (next === "radio") $("log").scrollTop = $("log").scrollHeight;
+  if (next === "radio") for (const id of ["log", "squad-log"]) $(id).scrollTop = $(id).scrollHeight;
 }
 
 for (const tab of $("dock").children) tab.addEventListener("click", () => show(tab.dataset.open));

@@ -83,8 +83,14 @@
       </div>
     </div>
     <section id="radio" class="panel">
-      <h2 data-i18n="radioLog"></h2>
+      <!-- Two nets: what is said to and by the commander, and what the squads and the
+           operator say among themselves (read, never spoken). The command net is open. -->
+      <div class="tabs" id="net-tabs" role="tablist">
+        <button type="button" role="tab" data-net="command" data-i18n="radioLog"></button>
+        <button type="button" role="tab" data-net="squad" data-i18n="squadNet"></button>
+      </div>
       <ol id="log" aria-live="polite"></ol>
+      <ol id="squad-log" hidden></ol>
       <form id="send">
         <input id="text" type="text" dir="auto" autocomplete="off" spellcheck="false" data-i18n-placeholder="placeholder">
         <button type="button" id="ptt" data-i18n-aria="voiceButton">🎤</button>
@@ -299,6 +305,7 @@
         <dt data-i18n="help.q.units"></dt><dd data-i18n="help.a.units"></dd>
         <dt data-i18n="help.q.auto"></dt><dd data-i18n="help.a.auto"></dd>
         <dt data-i18n="help.q.cues"></dt><dd data-i18n="help.a.cues"></dd>
+        <dt data-i18n="help.q.nets"></dt><dd data-i18n="help.a.nets"></dd>
         <dt data-i18n="help.q.upgrade"></dt><dd data-i18n="help.a.upgrade"></dd>
         <dt data-i18n="help.q.heroes"></dt><dd data-i18n="help.a.heroes"></dd>
         <dt data-i18n="help.q.digIn"></dt><dd data-i18n="help.a.digIn"></dd>
@@ -376,6 +383,14 @@
     <label class="check"><input type="checkbox" id="voices"> <span data-i18n="settings.voices"></span></label>
     <label class="check"><input type="checkbox" id="cue-voice" checked> <span data-i18n="cueVoice"></span></label>
     <h2 data-i18n="settings.radio"></h2>
+    <label><span data-i18n="traffic"></span>
+      <select id="traffic">
+        <option value="1" data-i18n="traffic.1"></option>
+        <option value="2" data-i18n="traffic.2"></option>
+        <option value="3" data-i18n="traffic.3"></option>
+      </select>
+    </label>
+    <p class="fine" data-i18n="traffic.about"></p>
     <label><span data-i18n="strict"></span>
       <select id="strict">
         <option value="1" data-i18n="strict.1"></option>
