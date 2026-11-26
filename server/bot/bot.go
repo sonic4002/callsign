@@ -371,7 +371,8 @@ func (p *Player) unitOf(faction, class string) (string, shared.Unit) {
 func (p *Player) specialist(faction string, line map[string]string) string {
 	units := p.R.Factions[faction].Units
 	for _, id := range sortedIDs(units) {
-		if u := units[id]; line[u.Class] != id && !u.Engineer() && u.Class != shared.HaulerClass && !u.Hero {
+		// A strike aircraft is no specialist of the scripted player's: it has no plan for sorties.
+		if u := units[id]; line[u.Class] != id && !u.Engineer() && u.Class != shared.HaulerClass && !u.Hero && !u.Strike() {
 			return id
 		}
 	}

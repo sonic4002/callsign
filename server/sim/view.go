@@ -87,6 +87,8 @@ type SquadView struct {
 	// many it has built of the Limit it may.
 	Dig float64 `json:"dig,omitempty"`
 	Dug int     `json:"dug,omitempty"`
+	// Sortie is set for a strike aircraft: where it is in its sortie and what it carries.
+	Sortie *SortieView `json:"sortie,omitempty"`
 }
 
 // ContactView is an enemy squad as the other side sees it: only the teams in sight.
@@ -96,12 +98,14 @@ type ContactView struct {
 	Unit  string `json:"unit"`
 	Class string `json:"class"`
 	// Hero marks an enemy hero; Disguised one that still passes for a bystander.
-	Hero      bool       `json:"hero,omitempty"`
-	Disguised bool       `json:"disguised,omitempty"`
-	X         float64    `json:"x"`
-	Y         float64    `json:"y"`
-	Near      string     `json:"near"`
-	Teams     []TeamView `json:"teams"`
+	Hero      bool `json:"hero,omitempty"`
+	Disguised bool `json:"disguised,omitempty"`
+	// Parked marks strike aircraft standing at their airbase, not flying.
+	Parked bool       `json:"parked,omitempty"`
+	X      float64    `json:"x"`
+	Y      float64    `json:"y"`
+	Near   string     `json:"near"`
+	Teams  []TeamView `json:"teams"`
 }
 
 // DeployView is a bought squad that has not reached the field yet.
@@ -156,6 +160,7 @@ type Snapshot struct {
 	Fields       []FieldView     `json:"fields"`  // every gold field; out of sight, as last seen
 	Haulers      []HaulerView    `json:"haulers"` // own haulers, then enemy ones as last seen
 	Charges      []ChargeView    `json:"charges"` // demolition charges burning down: own, and enemy ones in sight
+	Blasts       []BlastView     `json:"blasts"`  // bombs that have just gone off: own, and enemy ones in sight
 	// Taken counts this side's squads an enemy hero holds for now. They are not in Squads,
 	// and they still count toward the cap, because they come back.
 	Taken  int    `json:"taken,omitempty"`
@@ -241,6 +246,7 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	}
 	s.snapHaul(&snap, side)
 	s.snapCharges(&snap, side)
+	s.snapBlasts(&snap, side)
 	return snap
 }
 
@@ -255,6 +261,9 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 		Contacts: append([]int{}, sq.Contacts...),
 	}
 	s.viewExtras(sq, &v)
+	if sq.sortie != nil {
+		v.Sortie = s.sortieView(sq)
+	}
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 {
 			tv := TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, Nerve: s.Nerve(t), Action: t.Action, In: t.In}
@@ -269,6 +278,7 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 
 func (s *Sim) contactView(sq *Squad) ContactView {
 	v := ContactView{ID: sq.ID, Side: sq.Side, Unit: sq.Unit, Class: sq.unit.Class, Hero: sq.unit.Hero, Disguised: s.disguised(sq)}
+	v.Parked = sq.sortie != nil && sq.sortie.grounded()
 	var x, y float64
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 && t.Spotted {
@@ -365,6 +375,7 @@ func (s *Sim) Hash() uint64 {
 	s.hashPower(put, f)
 	s.hashHaul(put, f)
 	s.hashHeroes(put, f)
+	s.hashSorties(put)
 	return h.Sum64()
 }
 

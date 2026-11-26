@@ -131,7 +131,20 @@ type Unit struct {
 	Body float64 `json:"body,omitempty"`
 	// Crushes marks a heavy vehicle that kills infantry it drives through in the open.
 	Crushes bool `json:"crushes,omitempty"`
+	// A strike aircraft (server/sim/sortie.go): Bombs is what each plane carries on a
+	// sortie, 0 for every other unit. Damage is what one bomb does at the middle of its
+	// blast, BlastRadius how far the blast reaches, and RearmSeconds how long the squad
+	// stands at its airbase after a strike before it can fly again.
+	// Evade is the share of the shots fired at it in flight that its speed makes miss.
+	Bombs        int     `json:"bombs,omitempty"`
+	BlastRadius  float64 `json:"blastRadius,omitempty"`
+	RearmSeconds float64 `json:"rearmSeconds,omitempty"`
+	Evade        float64 `json:"evade,omitempty"`
 }
+
+// Strike reports whether squads of this unit are strike aircraft: they fly sorties from
+// an airbase and hold no ground.
+func (u *Unit) Strike() bool { return u.Bombs > 0 }
 
 // CallClass is the callsign class a squad of this unit answers to.
 func (u *Unit) CallClass() string {
@@ -592,6 +605,9 @@ func (r *Rules) check() error {
 			}
 			if u.DeploySeconds < 0 {
 				return fmt.Errorf("unit %s has a negative deploy time", id)
+			}
+			if u.Bombs < 0 || (u.Strike() && (u.Domain != "air" || u.Requires == "" || !u.NoCapture || u.BlastRadius <= 0 || u.RearmSeconds <= 0 || u.Against("air") != 0)) || u.Evade < 0 || u.Evade >= 1 {
+				return fmt.Errorf("strike aircraft %s must fly, come from a structure, hold no ground, hit nothing in the air, and have a blast radius and a rearm time", id)
 			}
 			if u.MinRange < 0 || u.MinRange >= u.Range || u.Pierce < 0 || u.Pierce > 1 {
 				return fmt.Errorf("unit %s has a bad minRange or pierce", id)

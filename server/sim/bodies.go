@@ -159,8 +159,8 @@ func (s *Sim) buildBodies(live []*teamRef) {
 	s.spots.reset(s)
 	s.live = live
 	for _, tr := range live {
-		if tr.t.In != "" {
-			continue
+		if tr.t.In != "" || tr.sq.sortie != nil {
+			continue // a strike aircraft is in nobody's way: it passes over, and parks on its own pad
 		}
 		s.bodies.put(tr, &tr.cell, tr.t.X, tr.t.Y)
 		if s.claims(tr.t) {

@@ -146,8 +146,8 @@ func (s *Sim) deploy() {
 // it was the last one given out, so that the next squad of its class takes it.
 func (s *Sim) unraise(sq *Squad) {
 	sd := &s.Sides[sq.Side]
-	if sd.nextNum[sq.unit.Class] == sq.Num {
-		sd.nextNum[sq.unit.Class]--
+	if sd.nextNum[sq.unit.CallClass()] == sq.Num {
+		sd.nextNum[sq.unit.CallClass()]--
 	}
 }
 
@@ -246,6 +246,10 @@ func (s *Sim) comeOut(sq *Squad) bool {
 	sq.Alive, sq.DeployTicks = true, 0
 	if sq.haul != nil {
 		return true // a hauler goes to work by itself
+	}
+	if sq.sortie != nil {
+		s.park(sq, st) // a strike aircraft stands at its airbase, armed, until it is given a target
+		return true
 	}
 	// A chosen rally place is an order like any other, so the squad holds there and its
 	// leader reports in. When the unit cannot get there it gathers beside the structure.

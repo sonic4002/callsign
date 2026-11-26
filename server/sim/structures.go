@@ -929,7 +929,7 @@ func (s *Sim) defencesFire(live []*teamRef) {
 			continue
 		}
 		st.Cooldown = st.def.CooldownTicks
-		chance := st.def.Accuracy
+		chance := st.def.Accuracy * s.evades(target)
 		if target.plan.act == ActCover {
 			chance *= 0.5
 		}

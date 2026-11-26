@@ -140,6 +140,7 @@ type Team struct {
 	// Where the team stood a tick ago, and when a vehicle last ran one of its men down (crush.go).
 	prevX, prevY float64
 	crushTick    int
+	dropped      bool // a plane that has let its bombs go on this sortie (sortie.go)
 
 	// The team's body among the others (bodies.go).
 	dx, dy     float64 // the step it has made this tick
@@ -195,6 +196,8 @@ type Squad struct {
 	dig   int        // ticks spent digging the position it was told to build
 	told  int        // tick its side was last told a vehicle is running its men down
 	hero  *heroState // set for a hero (hero.go)
+	// sortie is set for a strike aircraft, which flies from an airbase and back (sortie.go).
+	sortie *sortie
 
 	unit        *shared.Unit
 	haul        *haul // set for a gold hauler, which works on its own and has no leader
@@ -230,9 +233,11 @@ type Sim struct {
 	// taken over for now (hero.go).
 	Charges []Charge
 	seized  []seizure
-	Over    bool
-	Winner  int
-	Reason  string
+	// Blasts are the bombs that have just gone off (sortie.go).
+	Blasts []Blast
+	Over   bool
+	Winner int
+	Reason string
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
@@ -403,6 +408,9 @@ func (s *Sim) raise(side int, unitID string) *Squad {
 	if u.Class == shared.HaulerClass {
 		sq.haul = &haul{State: HaulOut, alarm: never}
 	}
+	if u.Strike() {
+		sq.sortie = &sortie{State: SortieParked, Bombs: u.Bombs}
+	}
 	s.Squads = append(s.Squads, sq)
 	return sq
 }
@@ -446,6 +454,9 @@ func (s *Sim) field(sq *Squad) {
 	}
 	s.emit(Event{Side: side, Kind: EvSquadSpawned, Squad: sq.ID})
 	s.heroFielded(sq)
+	if sq.sortie != nil {
+		s.park(sq, s.airbaseFor(sq)) // an aircraft that came from no structure takes the nearest airbase
+	}
 }
 
 // gathered reports whether a squad that came out of its structure has taken its place
@@ -572,6 +583,7 @@ func (s *Sim) Step() []Event {
 	s.trackStructures()
 	s.trackObjects()
 	s.heroOrders()
+	s.sorties()
 	for _, tr := range live {
 		tr.plan = s.decide(tr, live)
 	}
@@ -592,6 +604,7 @@ func (s *Sim) Step() []Event {
 	}
 	s.defencesFire(live)
 	s.heroes(live)
+	s.strikes(live)
 	s.resolveSandbags()
 	s.resolveDamage(live)
 	s.resolveStructures()
@@ -652,6 +665,10 @@ func (s *Sim) spot(live []*teamRef) {
 
 func (s *Sim) move(tr *teamRef) {
 	t, p := tr.t, tr.plan
+	if tr.sq.sortie != nil {
+		s.fly(tr) // over everything, and through nothing (sortie.go)
+		return
+	}
 	t.Action = p.act
 	if (p.act != ActAdvance && p.act != ActFallBack) || t.In != "" {
 		t.hx, t.hy = 0, 0
@@ -746,7 +763,7 @@ func (s *Sim) fire(tr *teamRef) {
 	if tgt.plan.act == ActCover {
 		chance *= 0.5
 	}
-	chance *= s.coverAgainst(tgt, t.X, t.Y)
+	chance *= s.coverAgainst(tgt, t.X, t.Y) * s.evades(tgt)
 	s.hitSandbags(tr, tgt)
 	if tgt.t.In != "" {
 		// Rounds fired at a garrison hit its walls too.
@@ -923,6 +940,9 @@ func (s *Sim) squadEvents(live []*teamRef) {
 			sq.Order = Order{Kind: OrderNone} // out of the door and in its place: awaiting orders
 		}
 		pinned, arrived, alive := false, sq.Order.Kind != OrderNone && !sq.Order.arrived && !sq.Order.rally, 0
+		if sq.sortie != nil {
+			arrived = false // a strike aircraft reports its strike and its return itself (sortie.go)
+		}
 		cx, cy := sq.Center()
 		for i := range sq.Teams {
 			t := &sq.Teams[i]
