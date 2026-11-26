@@ -19,6 +19,7 @@
 //
 // It runs unchanged in Node and in a Web Worker: it needs only fetch.
 
+import { isStrike } from "./aircraft.mjs";
 import { compactStructures } from "./bases.mjs";
 import { call as ask } from "./brain-relay.mjs";
 import { memories, stepper } from "./brain-rule.mjs";
@@ -39,29 +40,31 @@ export function optionsFor({ agent, wake, rules }) {
   const out = new Map();
   const add = (intent, about) => out.size < 62 && !out.has(intent.label) && out.set(intent.label, { intent, about });
   const reach = (p) => unit.domain === "air" || (unit.domain === "sea") === (p.kind === "seaRig");
+  const strike = isStrike(unit); // flies sorties: it bombs a place or looks at it, and holds none
   for (const p of rules.map.points.filter(reach)) {
     const name = `${p.callsign.en} / ${p.callsign.he} (${p.name.en}, ${p.name.he})`;
-    add(intents.move(p.id), `go to ${name} without stopping to fight on the way`);
-    add(intents.hold(p.id), `go to ${name} and hold, defend, take or capture it`);
-    add(intents.attack(p.id), `attack ${name}: assault it and destroy the enemy there`);
+    add(intents.move(p.id), strike ? `fly over ${name} to look at it, and come home` : `go to ${name} without stopping to fight on the way`);
+    if (!strike) add(intents.hold(p.id), `go to ${name} and hold, defend, take or capture it`);
+    add(intents.attack(p.id), strike ? `strike ${name}: bomb the enemy there` : `attack ${name}: assault it and destroy the enemy there`);
   }
-  for (const c of (status.contacts ?? []).slice(0, 8)) {
+  for (const c of (status.contacts ?? []).filter((c) => !strike || c.class !== "air").slice(0, 8)) {
     add(intents.attackContact(c.id), `attack the enemy ${c.unit} squad ${rules.callsigns.contact.en} ${c.id} / ${rules.callsigns.contact.he} ${c.id}, in sight near ${c.near}`);
   }
   const marks = [...(rules.map.landmarks ?? []), ...(rules.map.bridges ?? [])];
   for (const id of (call?.landmarks ?? []).slice(0, 4)) {
     const l = marks.find((m) => m.id === id);
-    if (l) add(intents.hold(id, `hold:lm:${id}`), `go to ${l.name.en} / ${l.name.he} and take cover or position there`);
+    if (l && strike) add(intents.attack(id, `attack:lm:${id}`), `strike ${l.name.en} / ${l.name.he}: bomb it`);
+    else if (l) add(intents.hold(id, `hold:lm:${id}`), `go to ${l.name.en} / ${l.name.he} and take cover or position there`);
   }
   for (const s of compactStructures(status, agent.side).filter((st) => st.whose !== "yours").slice(0, 4)) {
     add(intents.attack(s.id), `attack the enemy structure ${s.name} (${s.id}) near ${s.near}`);
     if (unit.captureSeconds > 0) add(intents.capture(s.id), `take over the structure ${s.name} (${s.id}) near ${s.near} with your engineers`);
   }
   const hq = rules.map.points.find((p) => p.kind === "hq" && p.owner === agent.side);
-  if (hq && reach(hq)) add(intents.move(hq.id, "fallBack", { back: true }), "fall back: retreat, withdraw, pull out, get out of there, return to your own headquarters");
+  if (hq && reach(hq)) add(intents.move(hq.id, "fallBack", { back: true }), strike ? "return to base: break off, abort, come home, land" : "fall back: retreat, withdraw, pull out, get out of there, return to your own headquarters");
   const cover = nearestCover(status, rules, { within: 400 });
-  add(cover ? intents.hold(cover.id, "cover", { shelter: cover.id }) : intents.hold("here", "cover"), "take cover: get down, hide, find shelter close to where you are now");
-  add(intents.hold("here", "hold:here"), "stop and stay where you are now, and defend this spot");
+  if (!strike) add(cover ? intents.hold(cover.id, "cover", { shelter: cover.id }) : intents.hold("here", "cover"), "take cover: get down, hide, find shelter close to where you are now");
+  if (!strike) add(intents.hold("here", "hold:here"), "stop and stay where you are now, and defend this spot");
   if (canDig(unit)) add(intents.fortify(), "dig in: build a sandbag position where you stand");
   add(intents.report(), "report: say where you are, your strength and what you see; a question about your status or situation");
   return out;

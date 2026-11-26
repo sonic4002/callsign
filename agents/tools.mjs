@@ -76,8 +76,25 @@ export const seizeTool = tool("seize", "Take over an enemy vehicle squad in sigh
   contact: { type: "integer", description: "The enemy vehicle squad's contact id from your status." },
 });
 
+// A strike aircraft squad's orders are the same three tools with other meanings
+// (server/sim/sortie.go): it flies sorties and stands nowhere but at its airbase.
+export const strikeTools = [
+  radio,
+  report,
+  tool("move", "Fly over a place and straight home again with nothing dropped, to see what is there.", {
+    place: place("Where to fly over."),
+  }),
+  tool("hold", 'Break off and return to your airbase. Aircraft hold no ground: any place but "here" is refused.', {
+    place: { type: "string", description: 'Always "here".' },
+  }),
+  tool("attack", "Fly a strike: straight to the target, all bombs in one pass, then home to rearm. Give a place, or a contact id for an enemy squad in sight (never an aircraft). Fill one and leave the other empty. A structure, a bridge, a building, an enemy squad that stays in sight and the enemy headquarters are flown at again until they are gone; open ground gets one pass.", {
+    place: { type: "string", description: 'What to bomb, in any form a place takes, or an enemy structure by its id from your status ("s7") or its name ("the enemy works"), or "" when attacking a contact.' },
+    contact: { type: "integer", description: "Enemy squad id from your status, or 0 when attacking a place." },
+  }),
+];
+
 // leaderToolsFor is the tool list of the leader of a squad of that unit.
-export const leaderToolsFor = (unit) => [
+export const leaderToolsFor = (unit) => unit?.bombs > 0 ? strikeTools : [
   ...leaderTools,
   ...(unit?.captureSeconds > 0 ? [captureTool] : []),
   ...(unit?.repairPerSecond > 0 || unit?.captureSeconds > 0 ? [repairTool] : []),

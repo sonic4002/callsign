@@ -10,6 +10,7 @@
 // Every choice is a function of the wake and of what this leader did before: nothing is
 // drawn at random.
 
+import { isStrike, strikeAck, strikeDoing, strikeEventLines, strikeIntent } from "./aircraft.mjs";
 import { intents, nearestCover, understandLeader } from "./rule-grammar.mjs";
 import { phrase, placeName, pointName, targetName } from "./rule-phrases.mjs";
 
@@ -69,7 +70,7 @@ function reportLine(say, status, rules, lang) {
   if (!you) return say("sayAgain");
   const o = you.order ?? { kind: "none" };
   const where = o.place || o.point;
-  const doing = o.kind === "none" || !o.kind ? say("doing.none") : ["move", "hold", "attack"].includes(o.kind) && (where || o.contact) ? say(`doing.${o.kind}`, o.contact ? { place: targetName(rules, o.contact, lang) } : { place: where }) : say("doing.other");
+  const doing = strikeDoing(you, say) ?? (o.kind === "none" || !o.kind ? say("doing.none") : ["move", "hold", "attack"].includes(o.kind) && (where || o.contact) ? say(`doing.${o.kind}`, o.contact ? { place: targetName(rules, o.contact, lang) } : { place: where }) : say("doing.other"));
   const seen = (you.contacts ?? []).length ? say("seen.some", { count: you.contacts.length, target: you.contacts[0] }) : say("seen.none");
   const nerves = (you.teams ?? []).map((t) => t.nerve);
   const nerve = nerves.includes("pinned") ? say("nerve.pinned") : nerves.includes("shaken") ? say("nerve.shaken") : "";
@@ -90,6 +91,8 @@ export function carryOut(intent, ctx, mem) {
   const level = levelOf(agent);
   const unit = agent.unit ?? {};
   const you = status?.you;
+  // A strike squad flies sorties: what it cannot do is refused here, in the net's language.
+  if (isStrike(unit)) intent = strikeIntent(intent, { rules, agent, status, make: intents });
 
   if (intent.kind === "none") return [];
   if (intent.kind === "report") return [radio(back, reportLine(say, status, rules, lang), "over")];
@@ -103,6 +106,7 @@ export function carryOut(intent, ctx, mem) {
   Object.assign(mem, { order: intent, fellBack: false, next: null, there: false });
   const negative = (why) => [radio(back, say("negative", { reason: why }), "over")];
   const act = (step, ack = say("wilco"), orElse = negative) => [{ ...step, orElse }, radio(back, ack, "out")];
+  if (isStrike(unit)) return act(intent.tool, strikeAck(intent, say, status));
 
   if (intent.kind === "attack") {
     const target = intent.contact ? (status?.contacts ?? []).find((c) => c.id === intent.contact) : null;
@@ -166,6 +170,7 @@ export function leaderEvent(ctx, mem) {
     fortified: () => say("fortified", { place: pointName(rules, e.point, lang) }),
     charge_planted: () => say("planted", { place: pointName(rules, e.point, lang), count: e.count }),
     crushed: () => say("crushed", { place: pointName(rules, e.point, lang) }),
+    ...strikeEventLines(e, say, where, status),
   }[e.kind];
   if (!line) return [];
   // Going inside a building and arriving are one piece of news: whichever comes second is not said.
@@ -178,6 +183,9 @@ export function leaderEvent(ctx, mem) {
   const known = Boolean(woke.known) || (wake.traffic ?? []).some((said) => named.some((n) => new RegExp(`${n}(?!\\d)`).test(said)));
   // What the net marked is another squad's to say, whatever this one does about it (the net would drop it anyway).
   const tell = (body) => (woke.known || ((twice || known) && body === undefined) ? [] : [radio(to, body ?? line(), "over")]);
+  // A strike squad that is armed again says so only when nobody has heard from it since
+  // its strike; its other news is said as it is.
+  if (e.kind === "rearmed" && you?.order?.kind === "attack") return [];
   if (level < 2 || !you) return tell();
 
   const teams = (you.teams ?? []).filter((t) => t.members === undefined || t.members > 0);

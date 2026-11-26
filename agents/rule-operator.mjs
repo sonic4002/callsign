@@ -15,6 +15,7 @@
 // The room enforces the purse and the fight (server/room/command.go); a refusal is passed
 // on to Hammer in the words the game gave. Nothing is drawn at random.
 
+import { isStrike, strikeTasks, strikeUnit, strikeWords } from "./aircraft.mjs";
 import { buildVerb, compactStructures, namedStructure, placeOf, wantedStructure } from "./bases.mjs";
 import { heroUnit, unitAnywhere } from "./heroes.mjs";
 import { mendVerb, sellVerb, sparePower } from "./power.mjs";
@@ -55,8 +56,10 @@ function unitIn(text, units, anyClass) {
   const score = ([, u]) => words(u).filter((w) => low.includes(w)).length;
   const named = entries.filter((e) => score(e) > 0).sort((a, b) => score(b) - score(a))[0];
   if (named) return named[0];
+  // "A plane", "a bomber", "מטוס": the side's strike aircraft, whatever it is called.
+  if (strikeWords.test(low) && strikeUnit(units)) return strikeUnit(units)[0];
   const cls = classWords.find(([, re]) => re.test(low))?.[0] ?? (anyClass ? "infantry" : null);
-  return cls ? entries.filter(([, u]) => u.class === cls && !u.hero && !u.captureSeconds).sort((a, b) => a[1].cost - b[1].cost)[0]?.[0] : undefined;
+  return cls ? entries.filter(([, u]) => u.class === cls && !u.hero && !u.captureSeconds && !isStrike(u)).sort((a, b) => a[1].cost - b[1].cost)[0]?.[0] : undefined;
 }
 export const wantedUnit = (text, units) => unitIn(text, units, true);
 
@@ -189,6 +192,11 @@ function ownMoves({ wake, rules, agent }, mem) {
     // Eight squads as a rule; with gold piling up, as many as the game allows but two.
     const room = Math.min(rules.match.populationCap, s.gold >= 1500 ? Math.max(8, rules.match.populationCap - 2) : 8);
     const hurt = base.filter((st) => !st.building && !st.repairing && st.health < 0.66).sort((a, b) => a.health - b.health)[0];
+    // One squad of strike aircraft, once its airbase stands, the ground squads are in
+    // hand and there is gold for it beside the next squad: for what they cannot reach.
+    const strike = strikeUnit(Object.fromEntries(units));
+    const flying = [...s.squads, ...(s.deploying ?? [])].some((q) => isStrike(units.find(([id]) => id === q.unit)?.[1]));
+    const wantStrike = strike && !flying && stands(strike[1].requires) && count("infantry") >= 4 && count("vehicle") >= 2 && fielded < room && s.gold >= strike[1].cost + (pick?.[1].cost ?? 0);
     if (short) raise("power");
     else if (["power", "refinery", "barracks"].includes(next)) raise(next);
     else if (!stands("refinery")) raise("refinery");
@@ -198,6 +206,7 @@ function ownMoves({ wake, rules, agent }, mem) {
     } else if (more && haulers === 0) raise(hauler[1].requires);
     else if (next && !rising && s.gold >= cost(next) + spare) raise(next);
     else if (hurt && s.gold >= 2 * spare) moves.push({ name: "repair", input: { place: hurt.id } });
+    else if (wantStrike) moves.push({ name: "buy", input: { unit: strike[0], upgrade: "" } });
     else if (pick && fielded < room) {
       if (pick[1].requires && !stands(pick[1].requires)) raise(pick[1].requires);
       else if (s.gold >= pick[1].cost) moves.push({ name: "buy", input: { unit: pick[0], upgrade: "" } });
@@ -257,7 +266,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
   const hammers = new Set(s.hammerOrdered ?? []);
   const fighter = (sq) => {
     const u = unitOf(sq);
-    return !u.captureSeconds && !u.hero && u.class !== "hauler" && !hammers.has(sq.callsign.en);
+    return !u.captureSeconds && !u.hero && u.class !== "hauler" && !isStrike(u) && !hammers.has(sq.callsign.en);
   };
   const hq = rules.map.points.find((p) => p.kind === "hq" && p.owner === side);
   const enemyHQ = rules.map.points.find((p) => p.kind === "hq" && p.owner !== side);
@@ -313,7 +322,7 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
   for (const sq of idle) {
     if (moves.length >= 3) break;
     const u = unitOf(sq);
-    if (u.hero || u.captureSeconds) continue; // heroes and engineers wait for a task of their own
+    if (u.hero || u.captureSeconds || isStrike(u)) continue; // heroes, engineers and strike aircraft wait for a task of their own
     const goal = rules.map.points
       .filter((p) => p.kind !== "hq" && !taken.has(p.id) && (u.domain === "sea" ? p.kind === "seaRig" && owner(p.id) !== side : free(p.id) && ours(p) && (u.domain === "air" || p.kind !== "seaRig") && !u.noCapture))
       .sort((a, b) => dist(a, sq) - dist(b, sq))[0];
@@ -356,6 +365,16 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
       const out = waiting.filter((sq) => dist(sq, forward) > 230 && !fresh(sq, 20));
       if (out.length) task(out, say("opHold", { place: name(forward.id) }));
     }
+  }
+  // Strike aircraft standing armed are sent at what the ground squads cannot reach: an
+  // enemy squad near the base, else a defence or a power structure the side has seen.
+  const planes = s.squads.filter((sq) => isStrike(unitOf(sq)) && !hammers.has(sq.callsign.en) && !fresh(sq, 20));
+  const known = compactStructures(s, side);
+  for (const t of strikeTasks({ status: s, rules, side, squads: planes, structures: known, dist })) {
+    if (moves.length >= 3) break;
+    const def = t.structure && Object.values(rules.factions).flatMap((f) => Object.values(f.structures)).find((d) => d.name.en === t.structure.name);
+    const place = t.contact ? `${rules.callsigns.contact[lang]} ${t.contact}` : `${def?.name[lang] ?? t.structure.name} ${t.structure.id}`;
+    task([t.squad], say("opAttack", { place }));
   }
   return moves;
 }

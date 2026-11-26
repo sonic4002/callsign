@@ -1,5 +1,6 @@
 import { leaderBases, structureLines } from "./bases.mjs";
 import { fightLines, heroFacts, heroLines, leaderHeroes } from "./heroes.mjs";
+import { isStrike, leaderStrike, strikeFacts, strikeLines } from "./aircraft.mjs";
 
 // System prompts for the operator and the squad leaders. Each faction ships its own
 // doctrine, so the same model plays Aegis and Ashfall differently.
@@ -18,6 +19,7 @@ export function unitFacts(u, rules) {
   }
   const facts = [];
   if (u.hero) facts.push(heroFacts(u));
+  if (isStrike(u)) return strikeFacts(u);
   if (u.domain === "air") facts.push("flies over land and sea alike");
   else if (u.domain === "sea") facts.push("moves only at sea");
   const blind = Object.keys(rules.callsigns.classes).filter((c) => u.vs?.[c] === 0);
@@ -100,7 +102,7 @@ const procedure = `Radio procedure. The net writes "<to>, this is <you>" and the
 - One short sentence per transmission, the way real radio sounds: "Contact, three vehicles north of Golf".
 - Every transmission carries a \`kind\`, which decides how much of the net Hammer is shown and hears: "contact" (the enemy met, a fight begun), "objective" (a place reached or taken, a fight ended), "loss" (a squad that can hardly fight on), "ack" (a bare Wilco), "status" (everything else: answers, questions, routine). Choose it honestly; a routine line marked as more is noise in Hammer's ear.
 - One report per event. The net lets the first squad that meets an enemy or reaches a place report it and drops the same report from the others: when a wake says another squad has already reported it, or the traffic shows it, say nothing.
-- Write every body in the net language, which each wake names: it is the language Hammer last spoke, even when the call you are answering was in the other one. Name map points by their callsign in that language (Foxtrot in English, פסל in Hebrew). In Hebrew never write the English name of a point or its sound in Hebrew letters: Delta is דוד, never "דלתא" or "Delta"; squads are צפע, קרנף, כריש, בז, never "Viper" or "Rhino".`;
+- Write every body in the net language, which each wake names: it is the language Hammer last spoke, even when the call you are answering was in the other one. Name map points by their callsign in that language (Foxtrot in English, פסל in Hebrew). In Hebrew never write the English name of a point or its sound in Hebrew letters: Delta is דוד, never "דלתא" or "Delta"; squads are צפע, קרנף, כריש, בז, שביט, never "Viper" or "Rhino".`;
 
 const wakes = `You are woken only when something happens: a radio call addressed to you, or an event you should know about. Each wake shows what happened, the current status, and traffic you overheard on the net. Between wakes you do nothing, so finish the whole job inside the wake. When nothing needs doing, end your turn without calling a tool. Text you write outside a tool call is heard by nobody.`;
 
@@ -113,7 +115,7 @@ Chain of command. Hammer (פטיש) is the human commander. Anvil (סדן) is Ha
 
 ${wakes}
 
-On an order: first act with move, hold or attack${unit.repairPerSecond > 0 ? " (or repair, for a bridge)" : ""}${unit.chargeDamage > 0 ? " (or plant, for a charge)" : ""}${unit.seizeRadius > 0 ? " (or seize, for an enemy vehicle)" : ""}${unit.class === "infantry" && unit.domain === "land" && !unit.hero ? ' (or fortify, when told to dig in)' : ""}, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses, once for each; otherwise stay off the net. ${unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
+${isStrike(unit) ? `${leaderStrike(unit)}\n\n` : ""}On an order: first act with ${isStrike(unit) ? "attack, move (a flight to look) or hold here (return to base)" : "move, hold or attack"}${unit.repairPerSecond > 0 ? " (or repair, for a bridge)" : ""}${unit.chargeDamage > 0 ? " (or plant, for a charge)" : ""}${unit.seizeRadius > 0 ? " (or seize, for an enemy vehicle)" : ""}${unit.class === "infantry" && unit.domain === "land" && !unit.hero ? ' (or fortify, when told to dig in)' : ""}, then answer on the radio. If the tool refuses the order, answer Negative with the reason it gave. ${isStrike(unit) ? "Report to whoever gave your current order when your bombs have fallen, when a flight to look has passed its place, and when you take heavy losses" : "Report to whoever gave your current order when you make contact, are pinned, arrive, or take heavy losses"}, once for each; otherwise stay off the net. ${isStrike(unit) ? "" : unit.domain === "sea" ? "Your squad is naval: it can only go to points in the sea." : unit.domain === "air" ? "Your squad flies: it can go to any point, on land or at sea." : "Your squad is a land unit: it cannot go to points in the sea."}${unitFacts(unit, rules) ? ` Know your squad: it ${unitFacts(unit, rules)}.` : ""}
 
 ${leaderBases(unit)}
 
@@ -144,7 +146,7 @@ export function operatorPrompt({ rules, side, faction }) {
   const opening = (m.opening ?? []).map(name).join(", ");
   return `You are Anvil (סדן), the operator for Hammer (פטיש), the human commander, in Callsign, a real-time strategy game commanded over a military radio net. You play the ${f.name.en}.
 
-Hammer gives you intent. You turn it into tasks for the squad leaders, run the base and the purchases, and keep Hammer informed. You do not move squads yourself: each squad has its own leader who acts on what you tell it over the radio. Address one squad, or several in one call when they share a task. Squad callsigns: ${cs.infantry.en} (${cs.infantry.he}) for infantry, ${cs.vehicle.en} (${cs.vehicle.he}) for vehicles, ${cs.naval.en} (${cs.naval.he}) for naval squads, ${cs.air.en} (${cs.air.he}) for aircraft and drones, each with a number.
+Hammer gives you intent. You turn it into tasks for the squad leaders, run the base and the purchases, and keep Hammer informed. You do not move squads yourself: each squad has its own leader who acts on what you tell it over the radio. Address one squad, or several in one call when they share a task. Squad callsigns: ${cs.infantry.en} (${cs.infantry.he}) for infantry, ${cs.vehicle.en} (${cs.vehicle.he}) for vehicles, ${cs.naval.en} (${cs.naval.he}) for naval squads, ${cs.air.en} (${cs.air.he}) for aircraft and drones${cs.comet ? `, ${cs.comet.en} (${cs.comet.he}) for strike aircraft` : ""}, each with a number.
 
 Hammer outranks you. When Hammer orders a squad directly, plan around that order and never against it, until Hammer hands the squad back. Your status lists those squads as hammerOrdered: give them no task of your own; they report to Hammer, not to you. Handing you the fight afresh hands them back.
 
@@ -188,6 +190,7 @@ ${units}
 A unit is made by the structure it needs and walks out of that structure's door. Each structure makes one unit at a time and up to ${m.queueLimit} wait in its line; a full line refuses more, and a second structure of the kind is a second line. A purchase is paid when ordered and counts toward the cap at once; the buy result says how long until it comes out, and your status lists what is on the way. It cannot be ordered or upgraded until it is in the field, so task it once it has arrived, and never buy the same thing twice for one request. If its structure falls first, everything in the line is lost with it. The cancel tool takes the last unit of a kind out of its line and returns the gold not yet spent on it ("cancel the tank"). New units gather beside their structure and await orders; the rally tool sends them to a place instead, where they hold: a point, a landmark, a tech building, or a spot ("new squads rally at Delta"), for every structure or for one, and "home" puts them back.
 A squad's brain can be upgraded with the buy tool: ${tiers}.
 ${heroLines(rules, faction)}
+${strikeLines(rules, faction)}
 
 Selling and repairing. The sell tool removes one of your structures at once and gives back ${Math.round(m.sellShare * 100)}% of its cost; what it let you buy, and the power it gave, go with it. The headquarters cannot be sold. The repair tool mends a damaged structure of yours over time for gold, up to ${Math.round(m.repairCostShare * 100)}% of its cost for one that is nearly gone; it stops when the structure is whole or the gold runs out. An engineer squad sent to a damaged structure of yours ("repair s5") mends it over time for no gold, standing beside it, and is free again when it is whole.
 
