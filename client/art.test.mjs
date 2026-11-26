@@ -206,6 +206,14 @@ test("manifest: heroes, sandbags and the moving frames are all there", () => {
     assert.equal(u[key].turret.anims.fire[1], 3);
   }
   for (const anim of ["move", "bankLeft", "bankRight"]) assert.equal(u.helicopter.anims[anim][1], 3);
+  // The two aeroplanes: one sheet each, no turret, sixteen headings, lifted by the page.
+  for (const key of ["strikeJet", "propBomber"]) {
+    assert.equal(u[key].facings, 16, `${key} turns through sixteen headings`);
+    assert.ok(u[key].altitude > u.helicopter.altitude, `${key} flies above the helicopter`);
+    assert.equal(u[key].turret, undefined);
+    for (const anim of ["idle", "wreck", "move", "bankLeft", "bankRight"]) assert.ok(u[key].anims[anim][1] >= 1, `${key} has ${anim}`);
+    assert.ok(has(u[key].image));
+  }
   const bags = manifest.landmarks.sandbags;
   assert.deepEqual(bags.states, ["whole", "damaged", "flat"]);
   assert.equal(bags.facings, 8);

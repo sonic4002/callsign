@@ -13,6 +13,7 @@ export const movers = {
   wheels: { turn: 3.2, cruise: 30 },
   boat: { turn: 2.2, cruise: 34 },
   air: { turn: 2.6, cruise: 40 },
+  jet: { turn: 5.5, cruise: 110 }, // a strike aircraft: it never hangs in the air, and turns for home in a moment
 };
 
 const TAU = Math.PI * 2;

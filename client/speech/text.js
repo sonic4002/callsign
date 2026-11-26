@@ -10,7 +10,7 @@ const heNumbers = ["", "אחת", "שתיים", "שלוש", "ארבע", "חמש",
 // The device's own voice, used when the speech service has no recording in time, guesses
 // Hebrew vowels and gets the radio's words wrong ("suf" for סוף). Written with their
 // vowel points it reads them right.
-const pointedWords = { סוף: "סוֹף", עבור: "עֲבוֹר", רות: "רוּת", צפע: "צֶפַע", קרנף: "קַרְנַף", סדן: "סַדָּן", פטיש: "פַּטִּישׁ", סמל: "סַמָּל", המתן: "הַמְתֵּן", סוללת: "סוֹלְלַת", נון: "נוּן", מם: "מֵם" };
+const pointedWords = { סוף: "סוֹף", עבור: "עֲבוֹר", רות: "רוּת", צפע: "צֶפַע", קרנף: "קַרְנַף", שביט: "שָׁבִיט", סדן: "סַדָּן", פטיש: "פַּטִּישׁ", סמל: "סַמָּל", המתן: "הַמְתֵּן", סוללת: "סוֹלְלַת", נון: "נוּן", מם: "מֵם" };
 export function pointed(text) {
   return text.replace(/[\u05d0-\u05ea]+/g, (word) => pointedWords[word] ?? word);
 }

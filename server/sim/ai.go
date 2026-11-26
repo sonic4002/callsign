@@ -90,6 +90,9 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	if tr.sq.haul != nil {
 		return s.haulPlan(tr, live) // haulers run on their own AI
 	}
+	if tr.sq.sortie != nil {
+		return s.sortiePlan(tr) // a strike aircraft flies its sortie and nothing else
+	}
 	sq, t, u := tr.sq, tr.t, tr.u
 	order := sq.Order.Kind
 	// A hero sent to plant a charge or to seize a vehicle keeps going under fire: being

@@ -45,6 +45,8 @@ code in `art/props.py`, with the same Blender set-up as the units. In the manife
 - `portraits.<name>` is a square roster picture of a hero.
 - Units: a sheet's `facings` is 8 or 16 and `order` names its rows; `anims` names runs of
   columns. Vehicles and boats have `move`; the helicopter `move`, `bankLeft`, `bankRight`;
+  the two aeroplanes (`strikeJet`, `propBomber`: sixteen headings, no turret sheet) `idle`
+  standing on their wheels, and `move`, `bankLeft`, `bankRight` and `wreck` like it;
   soldiers `walk` (twelve frames) and `stop`; the heroes (`hero: true`) their own poses.
 
 ## Sandbags

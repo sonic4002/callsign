@@ -33,7 +33,7 @@ const dynamic = {
     "squad_seized", "squad_taken", "squad_returned", "squad_released"],
   "radar.": ["none", "rising", "dark"],
   "over.": ["won", "lost", "draw", "hq_destroyed", "timer", "timer_hq", "timer_force"],
-  "order.": ["none", "move", "hold", "attack", "repair", "fortify", "plant", "seize"],
+  "order.": ["none", "move", "hold", "attack", "repair", "fortify", "plant", "seize", "return"],
   "call.": ["hold", "move", "attack", "cover", "upgrade", "give", "take", "grant", "revoke", "attackStructure", "capture", "haul", "captureTech", "attackStructureTech", "mend", "fortify", "plant", "plantStructure", "seize"],
   "eventMany.": ["squad_spawned", "squad_lost", "enemy_destroyed", "structure_built"],
   "placer.why.": ["far", "ground", "shore", "room", "edge"],

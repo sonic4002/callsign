@@ -20,11 +20,11 @@ func (s *Sim) ShotAt(sq *Squad) {
 func (s *Sim) Overlap() (depth float64, a, b *Squad) {
 	live := s.liveTeams()
 	for i, x := range live {
-		if x.t.In != "" {
-			continue
+		if x.t.In != "" || x.sq.sortie != nil {
+			continue // a strike aircraft takes no room: it flies over everything (sortie.go)
 		}
 		for _, y := range live[i+1:] {
-			if y.t.In != "" {
+			if y.t.In != "" || y.sq.sortie != nil {
 				continue
 			}
 			if d := touch(x, y) - dist(x.t.X, x.t.Y, y.t.X, y.t.Y); d > depth {

@@ -11,8 +11,9 @@ import { leaderToolsFor, normalize, operatorTools } from "./tools.mjs";
 import { compactStructures } from "./bases.mjs";
 import { eventLine as powerEventLine } from "./power.mjs";
 import { describeHeroEvent, heroLeaderEvents, heroOperatorEvents, unitAnywhere } from "./heroes.mjs";
+import { describeStrikeEvent, strikeLeaderEvents } from "./aircraft.mjs";
 
-const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned", ...heroLeaderEvents]);
+const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned", ...heroLeaderEvents, ...strikeLeaderEvents]);
 const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell", "low_power", "power_restored", "structure_repaired", "repair_stopped", ...heroOperatorEvents]);
 const standBy = { en: "Stand by", he: "המתן" };
 
@@ -412,7 +413,7 @@ function describe(item) {
   }
   const e = item.event;
   const who = item.callsign?.en ?? "A squad";
-  const heroic = describeHeroEvent(e, who);
+  const heroic = describeHeroEvent(e, who) ?? describeStrikeEvent(e, who);
   if (heroic) return heroic;
   return eventLine(item, e, who) + (item.known ? " Another squad has already reported this on the net: act if you need to, and do not report it again." : "");
 }

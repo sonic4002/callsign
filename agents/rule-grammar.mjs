@@ -25,9 +25,9 @@ import { compactStructures, namedStructure } from "./bases.mjs";
 
 export const leaderWords = {
   attack: {
-    en: ["attack", "assault", "destroy", "hit", "engage", "strike", "kill", "eliminate", "storm", "raid", "shoot", "take out", "wipe out", "clear out", "clear", "fire on", "open fire", "go after", "hunt", "take down", "knock out", "finish off", "smash", "bring down",
+    en: ["attack", "assault", "destroy", "hit", "engage", "strike", "kill", "eliminate", "storm", "raid", "shoot", "take out", "wipe out", "clear out", "clear", "fire on", "open fire", "go after", "hunt", "take down", "knock out", "finish off", "smash", "bring down", "bomb", "bombs", "bombard",
       "a tack", "attach", "attic", "a track", "attacked", "attacks", "attacking", "at tack", "a tech"],
-    he: ["תקוף", "תקפו", "תקפי", "תקיפ", "תתקפ", "תתקוף", "התקפ", "התקיפ", "לתקוף", "השמד", "השמיד", "תשמיד", "להשמיד", "חסל", "לחסל", "תחסל", "נטרל", "הסתער", "תסתער", "להסתער", "=פגע", "תפגע", "=ירו", "תירו", "אש על", "תוריד", "הורד את", "הורידו את", "פתח באש", "פתחו באש", "הפיל", "הפל את", "הרוס", "הרסו", "תהרס",
+    he: ["תקוף", "תקפו", "תקפי", "תקיפ", "תתקפ", "תתקוף", "התקפ", "התקיפ", "לתקוף", "השמד", "השמיד", "תשמיד", "להשמיד", "חסל", "לחסל", "תחסל", "נטרל", "הסתער", "תסתער", "להסתער", "הפצץ", "הפציצ", "תפציץ", "תפציצ", "להפציץ", "=פגע", "תפגע", "=ירו", "תירו", "אש על", "תוריד", "הורד את", "הורידו את", "פתח באש", "פתחו באש", "הפיל", "הפל את", "הרוס", "הרסו", "תהרס",
       "תכוף", "תקופ", "טקוף", "תאקוף"],
   },
   move: {

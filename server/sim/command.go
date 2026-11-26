@@ -151,6 +151,9 @@ func (s *Sim) order(c Command) (*Squad, error) {
 	if sq == nil || sq.Side != c.Side || sq.haul != nil {
 		return nil, ErrNoSquad
 	}
+	if sq.sortie != nil {
+		return s.sortieOrder(c, sq)
+	}
 	o := Order{Kind: c.Kind, Tick: s.Tick}
 	place := c.Place
 	if place == "" {

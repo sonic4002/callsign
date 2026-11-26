@@ -28,6 +28,7 @@ import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
 import { hintCalls, hintPhrases } from "./voice/hints.js";
 import { Voice } from "./voice/voice.js";
+import { sortieText } from "./aircraft.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -863,7 +864,7 @@ function renderSidebar() {
   // The lists are rebuilt only when what they show changes, so buttons stay clickable.
   // Progress bars are then moved in place on every frame.
   const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
-  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order, sq.rank, sq.hero?.charges, sq.hero?.seized, Math.round((sq.dig ?? 0) * 10)]), deploying.map((d) => [d.id, d.line ?? 0]), live(upgrading), live(promoted)]);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order, sq.rank, sq.hero?.charges, sq.hero?.seized, Math.round((sq.dig ?? 0) * 10), sq.sortie?.state, Math.round((sq.sortie?.rearm ?? 0) * 10)]), deploying.map((d) => [d.id, d.line ?? 0]), live(upgrading), live(promoted)]);
   if (rosterKey !== drawn.roster) {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
@@ -977,6 +978,9 @@ $("command-switch").addEventListener("click", () => transmit(call(command.mode =
 $("command-purse").addEventListener("click", () => transmit(call(command.buy ? "revoke" : "grant", { to: anvil() })));
 
 function orderText(sq) {
+  // A strike aircraft: where it is in its sortie (aircraft.js).
+  const sortie = sortieText(sq, t, () => (sq.order.place ? placeName(sq.order.place) : sq.order.point ? pointName(sq.order.point) : t("order.here")));
+  if (sortie) return sortie;
   if (sq.order.kind === "fortify") return t("order.fortify", { percent: Math.round((digProgress(sq) ?? 0) * 100) });
   if (sq.order.kind === "plant") return t("order.plant");
   if (sq.order.kind === "seize") return t("order.seize");
@@ -1037,7 +1041,7 @@ function buildButton(id, unit, enabled, lock) {
   const g = icon.getContext("2d");
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.translate(36, unit.class === "infantry" ? 38 : 36);
-  g.scale(1.25, 1.25);
+  g.scale(unit.bombs ? 0.56 : 1.25, unit.bombs ? 0.56 : 1.25); // a plane's wings are wider than the card
   drawUnit(g, { unit: id, cls: unit.class, faction, members: Math.min(unit.members, 3), moving: false, firing: false, time: 0, turn: 0.4, seed: 0, grounded: true });
   const count = el("span", "count");
   count.hidden = true;

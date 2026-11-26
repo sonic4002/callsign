@@ -677,7 +677,8 @@
       "air": { "en": "Hawk", "he": "בז" },
       "naval": { "en": "Shark", "he": "כריש" },
       "ghost": { "en": "Ghost", "he": "רפאים" },
-      "raven": { "en": "Raven", "he": "עורב" }
+      "raven": { "en": "Raven", "he": "עורב" },
+      "comet": { "en": "Comet", "he": "שביט" }
     }
   },
   "techBuildings": {
@@ -726,7 +727,7 @@
         "dockyard": { "name": { "en": "Dockyard", "he": "המספנה" }, "role": "dockyard", "capturable": true,
           "cost": 220, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": ["barracks"], "unlocks": ["patrolBoat"], "footprint": 44, "sight": 180, "power": -15 },
         "airbase": { "name": { "en": "Airbase", "he": "בסיס האוויר" }, "role": "airbase", "capturable": true,
-          "cost": 300, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["radar"], "unlocks": ["helicopter"], "footprint": 54, "sight": 180, "power": -20 },
+          "cost": 300, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["radar"], "unlocks": ["helicopter", "strikeJet"], "footprint": 54, "sight": 180, "power": -20 },
         "sentryGun": { "name": { "en": "Sentry Gun", "he": "תותח זקיף" }, "role": "defence",
           "cost": 150, "buildSeconds": 6, "hp": 420, "armor": 0.5, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 310, "power": -10,
           "range": 290, "damage": 20, "cooldownTicks": 6, "accuracy": 0.65, "vs": { "air": 0.3 } },
@@ -784,6 +785,16 @@
           "damage": 30, "cooldownTicks": 8, "accuracy": 0.65, "nerveResist": 0.5,
           "vs": { "structure": 0.8, "fence": 0.8 }
         },
+        "strikeJet": {
+          "name": { "en": "Strike jet", "he": "מטוס תקיפה" },
+          "requires": "airbase", "callsign": "comet",
+          "class": "air", "domain": "air", "cost": 500, "deploySeconds": 10,
+          "teams": 2, "members": 1, "hp": 150, "armor": 0.2,
+          "speed": 160, "range": 60, "sight": 300,
+          "damage": 100, "cooldownTicks": 10, "accuracy": 1, "nerveResist": 0,
+          "bombs": 2, "blastRadius": 60, "rearmSeconds": 14, "evade": 0.75, "noCapture": true,
+          "vs": { "air": 0, "infantry": 0.5, "hq": 0.3, "structure": 2, "fence": 2 }
+        },
         "rocketLauncher": {
           "name": { "en": "Precision rocket launcher", "he": "משגר רקטות מדויק" },
           "requires": "works", "siege": true,
@@ -832,7 +843,7 @@
         "boatShed": { "name": { "en": "Boat Shed", "he": "סככת הסירות" }, "role": "dockyard", "capturable": true,
           "cost": 250, "buildSeconds": 10, "hp": 760, "armor": 0.2, "requires": ["barracks"], "unlocks": ["speedboat"], "footprint": 44, "sight": 180, "power": -15 },
         "launchYard": { "name": { "en": "Launch Yard", "he": "חצר השיגור" }, "role": "airbase", "capturable": true,
-          "cost": 400, "buildSeconds": 14, "hp": 700, "armor": 0.2, "requires": ["radar"], "unlocks": ["fpvSwarm"], "footprint": 50, "sight": 180, "power": -20 },
+          "cost": 400, "buildSeconds": 14, "hp": 700, "armor": 0.2, "requires": ["radar"], "unlocks": ["fpvSwarm", "propBomber"], "footprint": 50, "sight": 180, "power": -20 },
         "gunNest": { "name": { "en": "Gun Nest", "he": "קן מקלעים" }, "role": "defence",
           "cost": 120, "buildSeconds": 5, "hp": 330, "armor": 0.35, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 300, "power": -10,
           "range": 280, "damage": 13, "cooldownTicks": 4, "accuracy": 0.55, "vs": { "air": 0.5 } },
@@ -890,6 +901,16 @@
           "damage": 25, "cooldownTicks": 14, "accuracy": 0.6, "nerveResist": 0.2,
           "noCapture": true,
           "vs": { "air": 0.5, "hq": 0.2, "structure": 0.7, "fence": 0.5 }
+        },
+        "propBomber": {
+          "name": { "en": "Prop bomber", "he": "מפציץ מדחף" },
+          "requires": "airbase", "callsign": "comet",
+          "class": "air", "domain": "air", "cost": 450, "deploySeconds": 8,
+          "teams": 3, "members": 1, "hp": 130, "armor": 0.05,
+          "speed": 120, "range": 55, "sight": 300,
+          "damage": 135, "cooldownTicks": 10, "accuracy": 1, "nerveResist": 0,
+          "bombs": 1, "blastRadius": 55, "rearmSeconds": 10, "evade": 0.75, "noCapture": true,
+          "vs": { "air": 0, "infantry": 0.5, "hq": 0.3, "structure": 2, "fence": 2 }
         },
         "rpgTeam": {
           "name": { "en": "Rocket team", "he": "חוליית טילי כתף" },
@@ -1013,6 +1034,7 @@
       "why.onlyEngineersMend": { "en": ["only engineers mend structures"], "he": ["רק מהנדסים מתקנים מבנים"] },
       "why.onlyEngineersCapture": { "en": ["only engineers take over structures"], "he": ["רק מהנדסים משתלטים על מבנים"] },
       "why.noVehicle": { "en": ["no enemy vehicle in sight"], "he": ["אין רכב אויב בטווח ראייה"] },
+      "why.noLoiter": { "en": ["aircraft cannot hold ground; give me a target or send me back to base"], "he": ["מטוסים לא מחזיקים שטח; תן מטרה או שלח אותי לבסיס"] },
       "why.noDig": { "en": ["this squad cannot dig in"], "he": ["הכיתה הזאת לא מתבצרת"] },
       "why.cannotHurt": { "en": ["our weapons cannot hurt {target}"], "he": ["הנשק שלנו לא פוגע ב{target}"] },
       "why.noSquad": { "en": ["no squad can reach that point"], "he": ["אין כיתה שיכולה להגיע לשם"] },
@@ -1040,6 +1062,16 @@
       "ackFlank": { "en": ["Wilco, going in from the {side}"], "he": ["רות, יבוצע, נכנסים מ{side}"] },
       "ackRange": { "en": ["Wilco, engaging from {count} metres"], "he": ["רות, יבוצע, תוקפים מטווח {count} מטר"] },
       "ackTarget": { "en": ["Wilco, engaging {target}"], "he": ["רות, יבוצע, תוקפים את {target}"] },
+      "ackStrike": { "en": ["Wilco, rolling in on {place}"], "he": ["רות, יבוצע, יוצאים לתקיפה על {place}"] },
+      "ackStrikeLater": { "en": ["Wilco, striking {place} as soon as we are rearmed"], "he": ["רות, יבוצע, תוקפים את {place} מיד בתום החימוש"] },
+      "ackOverfly": { "en": ["Wilco, flying over {place} for a look"], "he": ["רות, יבוצע, טסים מעל {place} לתצפית"] },
+      "ackReturn": { "en": ["Wilco, returning to base"], "he": ["רות, יבוצע, חוזרים לבסיס"] },
+      "struck": { "en": ["Bombs away on {place}, returning to base", "Strike on {place} complete, heading home to rearm"], "he": ["פצצות שוחררו על {place}, חוזרים לבסיס", "התקיפה על {place} בוצעה, חוזרים לבסיס להתחמש"] },
+      "overhead": { "en": ["Over {place}, {seen}, returning to base"], "he": ["מעל {place}, {seen}, חוזרים לבסיס"] },
+      "rearmed": { "en": ["Rearmed at base, ready for a target"], "he": ["חומשנו בבסיס, מוכנים למטרה"] },
+      "doing.parked": { "en": ["at base, armed"], "he": ["בבסיס, חמושים"] },
+      "doing.rearming": { "en": ["rearming at base"], "he": ["מתחמשים בבסיס"] },
+      "doing.return": { "en": ["returning to base"], "he": ["חוזרים לבסיס"] },
       "fallingBack": { "en": ["Falling back to {place}", "We are shaken, pulling back to {place}"], "he": ["נסוגים {l_place}", "אנחנו מעורערים, נסוגים {l_place}"] },
       "requestSupport": { "en": ["Outnumbered near {place}, request support", "Request support near {place}, {count} enemy squads"], "he": ["אנחנו בנחיתות ליד {place}, מבקש סיוע", "מבקש סיוע ליד {place}, {count} כיתות אויב"] },
       "engaging": { "en": ["Engaging {target} near {place}"], "he": ["תוקפים את {target} ליד {place}"] },

@@ -1035,6 +1035,121 @@
           3
         ]
       }
+    },
+    "strikeJet": {
+      "facings": 16,
+      "order": [
+        "E",
+        "ESE",
+        "SE",
+        "SSE",
+        "S",
+        "SSW",
+        "SW",
+        "WSW",
+        "W",
+        "WNW",
+        "NW",
+        "NNW",
+        "N",
+        "NNE",
+        "NE",
+        "ENE"
+      ],
+      "heading": "map",
+      "ppm": 40,
+      "altitude": 7.0,
+      "image": "units/strikeJet.png",
+      "frame": [
+        358,
+        285
+      ],
+      "anchor": [
+        0.5,
+        0.6469
+      ],
+      "anims": {
+        "idle": [
+          0,
+          1
+        ],
+        "wreck": [
+          1,
+          1
+        ],
+        "move": [
+          2,
+          1
+        ],
+        "bankLeft": [
+          3,
+          1
+        ],
+        "bankRight": [
+          4,
+          1
+        ]
+      }
+    },
+    "propBomber": {
+      "facings": 16,
+      "order": [
+        "E",
+        "ESE",
+        "SE",
+        "SSE",
+        "S",
+        "SSW",
+        "SW",
+        "WSW",
+        "W",
+        "WNW",
+        "NW",
+        "NNW",
+        "N",
+        "NNE",
+        "NE",
+        "ENE"
+      ],
+      "heading": "map",
+      "ppm": 40,
+      "altitude": 6.0,
+      "fps": {
+        "move": 14,
+        "bankLeft": 14,
+        "bankRight": 14
+      },
+      "image": "units/propBomber.png",
+      "frame": [
+        378,
+        326
+      ],
+      "anchor": [
+        0.5,
+        0.606
+      ],
+      "anims": {
+        "idle": [
+          0,
+          1
+        ],
+        "wreck": [
+          1,
+          1
+        ],
+        "move": [
+          2,
+          2
+        ],
+        "bankLeft": [
+          4,
+          2
+        ],
+        "bankRight": [
+          6,
+          2
+        ]
+      }
     }
   },
   "buildings": {

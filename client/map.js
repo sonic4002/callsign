@@ -91,6 +91,7 @@ export class Scene {
     this.tinted = null; // the ground that ghost may stand on, kept until the base changes
     this.sites = new Map(); // structure id → when its building site next throws dust and rings
     this.doors = new Map(); // structure id → until when its door stands open behind a unit
+    this.blasts = new Set(); // the bombs already shown (bombs)
     this.last = performance.now();
     this.waves = [];
   }
@@ -190,7 +191,9 @@ export class Scene {
       // `small` is a squad of many small figures (soldiers, drones) and not one big machine;
       // `air` is anything that flies.
       const stats = this.unitOf[g.unit];
-      Object.assign(group, { id: g.id, side: g.side, unit: g.unit, cls: g.class, faction, own: g.own, view: g, small: (stats?.members ?? 1) > 1, air: stats?.domain === "air", hauler: g.hauler ?? null });
+      Object.assign(group, { id: g.id, side: g.side, unit: g.unit, cls: g.class, faction, own: g.own, view: g, small: (stats?.members ?? 1) > 1, air: stats?.domain === "air", hauler: g.hauler ?? null,
+        // A strike aircraft flies sorties; `parked` while it stands at its airbase.
+        strike: (stats?.bombs ?? 0) > 0, parked: g.sortie ? g.sortie.state === "parked" || g.sortie.state === "rearming" : Boolean(g.parked) });
       // Teams arrive as a list of the living, so each is matched to the nearest one
       // already on screen instead of by its place in the list.
       const free = new Set(group.visuals);
@@ -231,7 +234,28 @@ export class Scene {
       this.groups.delete(id);
     }
     if (this.selected && !state.squads.some((s) => s.id === this.selected)) this.selected = 0;
+    this.bombs(state);
     this.hqWatch(state);
+  }
+
+  // bombs shows and sounds the bombs that have just gone off (state.blasts): each falls
+  // from its plane for a moment, then bursts, one after another like a stick of bombs.
+  bombs(state) {
+    const now = performance.now();
+    const live = new Set();
+    let n = 0;
+    for (const b of state.blasts ?? []) {
+      const key = `${b.x}:${b.y}:${state.tick - b.age}`;
+      live.add(key);
+      if (this.blasts.has(key)) continue;
+      this.blasts.add(key);
+      if (b.age > 6) continue; // gone off before this page was looking
+      const fall = 320 + 110 * n++;
+      this.effects.push({ kind: "bomb", x: b.x, y: b.y, t0: now, ttl: fall });
+      this.fx.blast(b.x, b.y, now + fall, 1.7, { shake: 3.2 });
+      this.sound(this.fx.onWater(b.x, b.y) ? "splash" : "boomM", b.x, b.y, fall);
+    }
+    for (const key of this.blasts) if (!live.has(key)) this.blasts.delete(key);
   }
 
   // makerOf is the standing structure of a unit's own side that it appeared beside, if any.
@@ -719,10 +743,12 @@ export class Scene {
     // Move what is on screen toward where the server says it is: it gathers speed, turns
     // through the headings between, and eases to a halt (see motion.js).
     for (const group of this.groups.values()) {
-      const kind = group.air ? "air" : group.small ? "foot" : group.cls === "naval" ? "boat" : "wheels";
+      const kind = group.strike ? "jet" : group.air ? "air" : group.small ? "foot" : group.cls === "naval" ? "boat" : "wheels";
       for (const v of group.visuals) {
         const [ix, iy] = toIso(v.tx - v.x, v.ty - v.y);
         advance(v, dt, kind, Math.atan2(iy, ix));
+        // A strike aircraft climbs off its pad when it leaves and comes down onto it again.
+        if (group.strike) v.alt = Math.max(0, Math.min(1, (v.alt ?? (group.parked ? 0 : 1)) + (group.parked ? -dt : dt) / 1.1));
       }
       // Men on foot are drawn far larger than life, so their teams are shown standing
       // further apart than they are, or a squad would be one heap of soldiers.
@@ -892,7 +918,7 @@ export class Scene {
               ctx.globalAlpha = Math.min(1, age * 2.5);
               ctx.scale(0.55 + 0.45 * age, 0.55 + 0.45 * age);
             }
-            drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate, pose: heroPose(rules, group.view, { moving: v.moving, firing: now - (v.shotAt ?? -1e9) < 1500 }) });
+            drawUnit(ctx, { unit: group.unit, cls: group.cls, faction: group.faction, members: v.members, moving: v.moving, firing: now < v.flashUntil, time, turn: v.turn, seed: v.seed, action: v.action, nerve: v.nerve, aim: v.aim, sinceShot: (now - (v.shotAt ?? -1e9)) / 1000, shots: v.shots ?? 0, load: group.hauler?.load ?? 0, haul: group.hauler?.state, go: v.go, stride: v.stride, turnRate: v.turnRate, alt: v.alt, pose: heroPose(rules, group.view, { moving: v.moving, firing: now - (v.shotAt ?? -1e9) < 1500 }) });
           },
         });
       }
@@ -959,6 +985,15 @@ export class Scene {
           ctx.fill();
         }
         ctx.lineCap = "butt";
+      }
+      if (e.kind === "bomb" && life >= 0 && life < 1) {
+        // A bomb on its way down: a dark speck that falls faster as it goes.
+        const [bx, by] = S(e.x, e.y);
+        const up = 90 * unitScale * (1 - life * life);
+        ctx.fillStyle = "#161a1e";
+        ctx.beginPath();
+        ctx.ellipse(bx, by - up, 1.8 * unitScale, 3.4 * unitScale, 0, 0, TAU);
+        ctx.fill();
       }
       if (e.kind === "tracer" && life >= 0) {
         const [ax, ay] = S(e.x1, e.y1);
@@ -1088,7 +1123,7 @@ export class Scene {
     const all = [...this.groups.values()];
     for (const group of all) {
       const stats = this.unitOf[group.unit];
-      if (!stats) continue;
+      if (!stats || group.strike) continue; // a strike aircraft has no gun: its bombs are shown as they fall (bombs)
       for (const v of group.visuals) {
         if (group.own && v.action !== "fire") continue;
         let target = null;
@@ -1491,7 +1526,19 @@ export class Scene {
     this.fog.drawRadar(g, k);
     for (const group of this.groups.values()) {
       g.fillStyle = group.id === this.selected ? "#ffffff" : sideColor[group.side];
-      for (const v of group.visuals) g.fillRect(v.x * k - 1.5 * this.dpr, v.y * k - 1.5 * this.dpr, 3 * this.dpr, 3 * this.dpr);
+      for (const v of group.visuals) {
+        if (!group.strike) {
+          g.fillRect(v.x * k - 1.5 * this.dpr, v.y * k - 1.5 * this.dpr, 3 * this.dpr, 3 * this.dpr);
+          continue;
+        }
+        // A strike aircraft is a small arrowhead, so a fast blip is read for what it is.
+        const r = 3 * this.dpr;
+        g.beginPath();
+        g.moveTo(v.x * k, v.y * k - r);
+        g.lineTo(v.x * k + r, v.y * k + r);
+        g.lineTo(v.x * k - r, v.y * k + r);
+        g.fill();
+      }
     }
     // What the main view is looking at.
     const corners = [[0, 0], [cam.w, 0], [cam.w, cam.h], [0, cam.h]].map(([sx, sy]) => cam.world(sx, sy));

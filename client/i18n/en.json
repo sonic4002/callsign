@@ -263,7 +263,7 @@
   "help.q.speed": "Can a match run slower or faster?",
   "help.a.speed": "Yes. The speed is chosen on the start screen when you make a match, together with its length and how hard the scripted enemy presses.",
   "help.q.units": "What can I build and buy?",
-  "help.a.units": "Structures first: a power structure, a refinery (it brings a hauler), a barracks for infantry and engineers, a works for vehicles and more haulers, a radar, an airbase for aircraft, a dockyard for boats, and guns, anti-air and walls or fences to defend. Then units. Aegis: commandos, combat engineers, main battle tank, precision rocket launcher, attack helicopter, patrol boat, and the Sentinel. Ashfall: militia, rocket team, sappers, technical, drone swarm, speedboat, and the Oracle. A unit's button says which structure it still needs. Losing a structure takes away what it unlocked until you rebuild it. Engineers take over enemy structures.",
+  "help.a.units": "Structures first: a power structure, a refinery (it brings a hauler), a barracks for infantry and engineers, a works for vehicles and more haulers, a radar, an airbase for aircraft, a dockyard for boats, and guns, anti-air and walls or fences to defend. Then units. Aegis: commandos, combat engineers, main battle tank, precision rocket launcher, attack helicopter, strike jet, patrol boat, and the Sentinel. Ashfall: militia, rocket team, sappers, technical, drone swarm, prop bomber, speedboat, and the Oracle. A unit's button says which structure it still needs. Losing a structure takes away what it unlocked until you rebuild it. Engineers take over enemy structures.",
   "upgradeAsked": "requested",
   "command.orders": "Anvil: on your orders",
   "command.fight": "Anvil: running the fight",
@@ -604,5 +604,13 @@
   "traffic.about": "Quiet: only what needs you, and the answers to your own orders. Normal: also one line for each new contact and each objective reached. Full: everything. A squad you ordered yourself always reports to you.",
   "help.q.nets": "Why are there two nets, and how do I hear less?",
   "help.a.nets": "The command net carries what is said to you and by you: your orders and their answers, Anvil's news of the base and of a fight, and the game's own lines. What squads and Anvil say among themselves is on the squad net, the tab beside it: it is written, never spoken. Squads that move together report an enemy or an arrival once, not once each, and Anvil sums a fight up for you instead of passing every report on. In Settings (⚙), Radio traffic sets how much reaches the command net and your ears: Quiet (base under attack, a squad or a point lost or taken, something ready, answers to your orders), Normal (also each new contact and each objective reached) or Full (everything, the squad net too). A squad you ordered yourself by radio keeps answering you and reporting contact at every level.",
-  "unit.noGold": "not enough gold"
+  "unit.noGold": "not enough gold",
+  "order.return": "Returning to base",
+  "order.parked": "At base, armed",
+  "order.rearming": "Rearming {percent}%",
+  "order.overfly": "Flying over {point}",
+  "help.strike": "Send a strike aircraft at a target",
+  "help.strike.say": "Comet 1, attack Zulu",
+  "help.q.planes": "How do strike aircraft work?",
+  "help.a.planes": "The airbase also makes a strike aircraft: the Strike jet for Aegis, the Prop bomber for Ashfall, callsign Comet. It stands at the airbase and holds no ground. Give it a target (“Comet 1, attack Zulu”, an enemy structure, a bridge, “Target 3”): it flies straight there over everything, drops all its bombs in one pass, flies home and rearms before it can go again. A structure, a bridge, a building, the enemy headquarters or an enemy squad that stays in sight is flown at again until it is gone; open ground gets one pass. “Comet 1, move to Delta” is a flight over the place and back, to look: you cannot order a strike on a structure your side has never seen. “Comet 1, return to base” calls it off. It cannot hold, capture or hit aircraft. Anti-air defences and most infantry shoot at it on the way, so strike what cannot shoot up, or take out the anti-air first. If your last airbase falls, the planes standing on it are lost with it."
 }

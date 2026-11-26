@@ -744,6 +744,151 @@ class Helicopter(Vehicle):
             self.turret.location = (self.pivot - 0.3, 0.5, -0.4)
 
 
+class Plane(Vehicle):
+    """A fixed-wing strike aircraft: one sheet, no weapon that turns. It is rendered
+    standing on its wheels (`idle`, parked on the pad); under way the page lifts it and
+    lays its shadow on the ground. Everything hangs from `air`, a joint on the line of
+    the fuselage, so a bank rolls the aircraft about itself."""
+
+    facings = FACINGS16  # it flies straight at whatever it is sent to, from any side
+    axis = 1.5  # the height of the fuselage's centre line when it stands on its wheels
+    spins = 1  # frames of the propeller turning, 1 for a jet
+    size = 0.8  # the model is built a little large and drawn at this: a parked one must not hide its airbase
+
+    def __init__(self, look):
+        self.look = look
+        self.root = joint(None, name="root")
+        self.body = joint(self.root, name="body")
+        self.body.scale = (self.size,) * 3
+        self.air = joint(self.body, (0, 0, self.axis), name="air")
+        self.hull = joint(self.air, (0, 0, -self.axis), name="hull")
+        self.gear = joint(self.hull, name="gear")
+        self.wings = {}
+        self.prop = None
+        self.build(look)
+        turning = list(range(self.spins))
+        self.sheets = {"": [("idle", [0]), ("wreck", [0]), ("move", turning), ("bankLeft", turning), ("bankRight", turning)]}
+
+    def wing(self, side, outline, z0, z1, colour):
+        """One wing on its own joint at the root, so that a wreck can break it."""
+        root = joint(self.hull, (0, 0.4 * side, z0), name="wing")
+        prism_z(root, [(x, (y - 0.4) * side) for x, y in outline], 0, z1 - z0, colour)
+        self.wings[side] = root
+        return root
+
+    def bomb(self, parent, loc, length, radius, colour, nose):
+        x, y, z = loc
+        cyl(parent, radius, length, loc, colour, axis="X", sides=8)
+        cyl(parent, radius, radius * 2.2, (x + length / 2 + radius * 1.1, y, z), nose, axis="X", sides=8, top=0.03)
+        box(parent, (0.26, radius * 3, 0.04), (x - length / 2 - 0.05, y, z), nose)
+        box(parent, (0.26, 0.04, radius * 3), (x - length / 2 - 0.05, y, z), nose)
+
+    def pose(self, anim, t, sheet):
+        show(self.root, True)
+        show(self.gear, anim == "idle" or self.fixed_gear)
+        char(self.root, anim == "wreck")
+        self.body.location = (0, 0, 0)
+        self.air.rotation_euler = (0, 0, 0)
+        for root in self.wings.values():
+            root.rotation_euler = (0, 0, 0)
+        if self.prop:
+            self.prop.rotation_euler = (t * math.pi / 3 if anim != "idle" else 0.3, 0, 0)
+        if anim == "move":
+            self.air.rotation_euler = (0, 0.03, 0)
+        if anim in ("bankLeft", "bankRight"):
+            # Leaning into the turn: the left wing drops in a turn to the left.
+            self.air.rotation_euler = (0.5 * (-1 if anim == "bankLeft" else 1), 0.03, 0)
+        if anim == "wreck":
+            # Down on its belly, over on one wing, the other broken at the root.
+            show(self.gear, False)
+            self.body.location = (0, 0.2, -self.belly * self.size)
+            self.air.rotation_euler = (0.22, 0.06, 0)
+            self.wings[1].rotation_euler = (-0.5, 0.1, -0.35)
+            if self.prop:
+                self.prop.rotation_euler = (0.9, 0, 0)
+
+
+class StrikeJet(Plane):
+    """A compact ground-attack jet: swept wings, two canted fins, side intakes, a bomb
+    under each wing."""
+
+    cell, centre = 10.2, 1.05
+    manifest = {"altitude": 7.0}
+    fixed_gear = False
+    belly = 0.85
+
+    def build(self, c):
+        b, pale, glass = self.hull, "#d9e2e8", "#1f2a33"
+        prism_y(b, [(4.9, 1.38), (3.3, 1.8), (1.7, 2.0), (-3.5, 1.95), (-4.2, 1.75), (-4.2, 1.15), (-3.3, 0.95), (2.4, 0.95), (3.9, 1.1)], 1.05, c["hull"])
+        prism_y(b, [(3.25, 1.8), (2.4, 2.38), (1.1, 2.42), (0.3, 2.0)], 0.7, glass)  # canopy
+        box(b, (0.08, 0.74, 0.44), (1.75, 0, 2.2), c["hull2"])  # canopy frame
+        box(b, (3.4, 0.5, 0.2), (-1.5, 0, 2.02), c["hull2"])  # spine
+        box(b, (0.5, 0.3, 0.08), (-0.4, 0, 2.14), c["trim"], glow=0.6)  # lamp on the spine
+        for side in (1, -1):
+            box(b, (3.0, 0.55, 0.78), (0.1, 0.78 * side, 1.42), c["hull2"])  # intake trunk
+            box(b, (0.06, 0.45, 0.62), (1.62, 0.78 * side, 1.42), "#14181b")  # its mouth
+            box(b, (1.4, 0.57, 0.3), (-0.2, 0.78 * side, 1.7), pale)  # pale panel over the trunk
+            self.wing(side, [(1.3, 0.4), (-1.5, 4.7), (-2.5, 4.7), (-2.3, 0.4)], 1.34, 1.48, c["hull"])
+            prism_z(self.wings[side], [(-1.0, 3.2 * side), (-1.6, 4.3 * side), (-2.5, 4.3 * side), (-2.42, 3.2 * side)], 0.14, 0.16, pale)
+            prism_z(b, [(-3.0, 0.5 * side), (-4.3, 2.3 * side), (-4.9, 2.3 * side), (-4.5, 0.5 * side)], 1.5, 1.6, c["hull2"])  # tailplane
+            fin = joint(b, (0, 0.5 * side, 1.9))
+            fin.rotation_euler = (-0.3 * side, 0, 0)  # canted outward
+            prism_y(fin, [(-2.7, 0), (-3.8, 1.5), (-4.5, 1.5), (-4.25, 0)], 0.1, c["hull"])
+            prism_y(fin, [(-3.62, 1.25), (-3.8, 1.5), (-4.5, 1.5), (-4.46, 1.25)], 0.12, pale)  # fin cap
+            cyl(b, 0.33, 0.5, (-4.3, 0.3 * side, 1.5), "#14181b", axis="X", sides=8, top=0.26)  # exhaust
+            box(self.wings[side], (0.7, 0.08, 0.2), (-0.6, 1.9 * side, -0.1), c["low"])  # pylon
+            self.bomb(self.wings[side], (-0.5, 1.9 * side, -0.36), 1.5, 0.17, c["low"], c["deck"])
+            # Main wheels, under the intake trunks.
+            box(self.gear, (0.08, 0.08, 0.7), (-0.9, 0.95 * side, 0.6), c["low"])
+            cyl(self.gear, 0.26, 0.16, (-0.9, 0.95 * side, 0.26), "#17191b", axis="Y", sides=10)
+        box(self.gear, (0.08, 0.08, 0.75), (2.7, 0, 0.58), c["low"])  # nose wheel
+        cyl(self.gear, 0.2, 0.14, (2.7, 0, 0.2), "#17191b", axis="Y", sides=10)
+
+
+class PropBomber(Plane):
+    """An old low-wing single-engine aeroplane patched up to carry bombs: a round rust
+    cowl, a three-bladed propeller, wheels that do not fold, panels of three colours."""
+
+    cell, centre = 10.7, 1.2
+    manifest = {"altitude": 6.0, "fps": {"move": 14, "bankLeft": 14, "bankRight": 14}}
+    fixed_gear = True
+    belly = 0.75
+    axis = 1.6
+    spins = 2
+
+    def build(self, c):
+        b, glass = self.hull, "#1f2a33"
+        prism_y(b, [(2.9, 1.05), (2.9, 2.15), (1.0, 2.28), (-1.0, 2.12), (-4.4, 1.8), (-4.6, 1.5), (-1.0, 1.05), (1.8, 0.95)], 1.0, c["hull"])
+        cyl(b, 0.64, 0.9, (3.2, 0, 1.6), c["rust"], axis="X", sides=10)  # cowl
+        cyl(b, 0.5, 0.06, (3.67, 0, 1.6), "#14181b", axis="X", sides=10)  # its open front
+        for side in (1, -1):
+            box(b, (0.7, 0.08, 0.1), (2.5, 0.52 * side, 1.25), "#14181b")  # exhaust stack
+        prism_y(b, [(1.2, 2.26), (0.75, 2.75), (-0.6, 2.75), (-1.25, 2.14)], 0.7, glass)  # canopy
+        box(b, (0.08, 0.74, 0.5), (0.1, 0, 2.5), c["hull2"])
+        box(b, (0.45, 1.03, 0.55), (-2.3, 0, 1.68), c["head"])  # ochre band round the tail
+        box(b, (1.1, 1.03, 0.4), (1.9, 0, 1.9), c["armour"])  # an olive panel from another machine
+        prism_y(b, [(-3.4, 1.85), (-4.2, 3.05), (-4.75, 3.05), (-4.7, 1.6)], 0.1, c["rust"])  # fin
+        self.prop = joint(b, (3.78, 0, 1.6))
+        cyl(self.prop, 0.2, 0.5, (0.2, 0, 0), c["low"], axis="X", sides=8, top=0.03)  # spinner
+        for k in range(3):
+            blade = joint(self.prop)
+            blade.rotation_euler = (k * 2 * math.pi / 3, 0, 0)
+            box(blade, (0.05, 0.2, 1.35), (0, 0, 0.7), c["wood"])
+        for side in (1, -1):
+            self.wing(side, [(1.35, 0.4), (0.9, 5.3), (-0.45, 5.3), (-0.95, 0.4)], 1.1, 1.26, c["hull2"])
+            patch = c["rust"] if side == 1 else c["armour"]
+            prism_z(self.wings[side], [(1.0, 2.3 * side), (0.85, 3.5 * side), (-0.6, 3.5 * side), (-0.7, 2.3 * side)], 0.16, 0.18, patch)
+            prism_z(self.wings[side], [(0.9, 4.7 * side), (0.9, 5.3 * side), (-0.45, 5.3 * side), (-0.5, 4.7 * side)], 0.16, 0.18, c["head"])  # tip
+            prism_z(b, [(-3.5, 0.3 * side), (-3.8, 2.0 * side), (-4.6, 2.0 * side), (-4.6, 0.3 * side)], 1.72, 1.8, c["hull2"])  # tailplane
+            box(self.wings[side], (0.5, 0.08, 0.16), (0.2, 2.2 * side, -0.08), c["low"])  # bomb rack
+            self.bomb(self.wings[side], (0.2, 2.2 * side, -0.34), 1.2, 0.2, c["armour"], c["rust"])
+            # Wheels that stay down, each under a faired leg.
+            box(self.gear, (0.3, 0.12, 0.8), (1.3, 1.3 * side, 0.7), c["hull"])
+            cyl(self.gear, 0.32, 0.18, (1.3, 1.3 * side, 0.32), "#17191b", axis="Y", sides=10)
+        cyl(self.gear, 0.14, 0.1, (-4.2, 0, 1.2), "#17191b", axis="Y", sides=8)  # tail wheel
+        box(self.gear, (0.06, 0.06, 0.3), (-4.2, 0, 1.38), c["low"])
+
+
 class Drone:
     """One small attack drone of a swarm: four arms, four rotors, a charge slung under it.
     Rendered at ground level; the page lifts it to its height and lays the shadow."""
@@ -1136,6 +1281,8 @@ UNITS = {
     "helicopter": lambda: Helicopter(AEGIS),
     "rocketLauncher": lambda: RocketLauncher(AEGIS),
     "fpvSwarm": lambda: Drone(ASHFALL),
+    "strikeJet": lambda: StrikeJet(AEGIS),
+    "propBomber": lambda: PropBomber(ASHFALL),
     "rpgTeam": lambda: Soldier(ASHFALL, militia=True, rocket=True),
     "aegis_hauler": lambda: Hauler(AEGIS, improvised=False),
     "ashfall_hauler": lambda: Hauler(ASHFALL, improvised=True),
