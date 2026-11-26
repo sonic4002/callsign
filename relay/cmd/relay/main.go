@@ -69,6 +69,13 @@ func main() {
 			allowed = append(allowed, strings.TrimRight(o, "/"))
 		}
 	}
+	// The game's own key is used only on the owner's own machine. A public server holds
+	// none of the owner's keys, so one set there by mistake is never spent by visitors.
+	jevKey := strings.TrimSpace(os.Getenv("CALLSIGN_JEV_KEY"))
+	if jevKey != "" && os.Getenv("CALLSIGN_PRIVATE") != "1" {
+		log.Print("relay: CALLSIGN_JEV_KEY is set but this is not marked a private machine (CALLSIGN_PRIVATE=1): the key is not used")
+		jevKey = ""
+	}
 	r, err := relay.New(relay.Config{
 		Game:      &relay.HTTPGame{URL: *game, Secret: os.Getenv("CALLSIGN_AGENT_KEY")},
 		Keys:      keys,
@@ -78,7 +85,7 @@ func main() {
 		Providers: provider.All(nil),
 		Origins:   allowed,
 		Decide: relay.Decide{
-			Provider: provider.NewTypeSafe(nil), Key: strings.TrimSpace(os.Getenv("CALLSIGN_JEV_KEY")), Model: *jevModel,
+			Provider: provider.NewTypeSafe(nil), Key: jevKey, Model: *jevModel,
 			Seat:      relay.Limits{Concurrent: 4, PerMinute: *jevSeatPerMinute, Burst: max(5, *jevSeatPerMinute/3), KeyChanges: 1, Idle: 10 * time.Minute},
 			PerMinute: *jevPerMinute, Burst: max(10, *jevPerMinute/10), DailyUSD: *jevDaily,
 			SpendFile: filepath.Join(*data, "jev-spend.json"),
@@ -106,10 +113,10 @@ func main() {
 		srv.Shutdown(shut)
 	}()
 	log.Printf("relay: listening on %s, tiers from %s, keys in %s", *addr, *game, *data)
-	if os.Getenv("CALLSIGN_JEV_KEY") != "" {
+	if jevKey != "" {
 		log.Printf("relay: the fast brain is on: at most %.2f USD a day, %d decisions a minute in all and %d for one player", *jevDaily, *jevPerMinute, *jevSeatPerMinute)
 	} else {
-		log.Print("relay: no CALLSIGN_JEV_KEY, so the fast brain is off and squads without a key use the rule brain")
+		log.Print("relay: no usable CALLSIGN_JEV_KEY, so the fast brain is off and squads without a key use the rule brain")
 	}
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)

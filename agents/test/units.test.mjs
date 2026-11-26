@@ -210,13 +210,16 @@ test("claude brain: model and effort by tier, fallback where the model has one, 
 test("makeBrain: the rule brain without a usable key, and never a downgrade when Claude was asked for by name", async () => {
   assert.equal((await makeBrain({})).name, "rule");
   assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "" })).name, "rule");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "claude" })).name, "claude");
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "claude", CALLSIGN_PRIVATE: "1" })).name, "claude");
+  // A server that is not marked private never spends a key of its owner's.
+  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "claude" })).name, "rule");
+  assert.equal((await makeBrain({ CALLSIGN_CLAUDE_TOKEN: "sk-ant-oat-test" })).name, "rule");
   // A subscription token is not an API key: it selects the Claude Code brain.
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_BRAIN: "subscription" })).name, "subscription");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_CLAUDE_BIN: "/no/such/claude" })).name, "rule");
-  assert.equal((await makeBrain({ CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "scripted" })).name, "rule");
-  await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "claude" }), /needs CALLSIGN_ANTHROPIC_KEY/);
-  await assert.rejects(makeBrain({ CALLSIGN_BRAIN: "gpt" }), /unknown CALLSIGN_BRAIN/);
+  assert.equal((await makeBrain({ CALLSIGN_PRIVATE: "1", CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_BRAIN: "subscription" })).name, "subscription");
+  assert.equal((await makeBrain({ CALLSIGN_PRIVATE: "1", CALLSIGN_ANTHROPIC_KEY: "sk-ant-oat01-x", CALLSIGN_CLAUDE_BIN: "/no/such/claude" })).name, "rule");
+  assert.equal((await makeBrain({ CALLSIGN_PRIVATE: "1", CALLSIGN_ANTHROPIC_KEY: "sk-test", CALLSIGN_BRAIN: "scripted" })).name, "rule");
+  await assert.rejects(makeBrain({ CALLSIGN_PRIVATE: "1", CALLSIGN_BRAIN: "claude" }), /needs CALLSIGN_ANTHROPIC_KEY/);
+  await assert.rejects(makeBrain({ CALLSIGN_PRIVATE: "1", CALLSIGN_BRAIN: "gpt" }), /unknown CALLSIGN_BRAIN/);
 });
 
 test("subscription brain: actions become tool calls, and it thinks again only on a refusal or a report", async () => {

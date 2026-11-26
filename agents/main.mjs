@@ -7,6 +7,9 @@
 //   CALLSIGN_ANTHROPIC_KEY  Anthropic API key. Without it the rule brain is used: no AI at all.
 //   CALLSIGN_CLAUDE_TOKEN   Claude subscription token from `claude setup-token`, for testing.
 //                           A token put in CALLSIGN_ANTHROPIC_KEY is recognised too.
+//   CALLSIGN_PRIVATE        "1" on the owner's own machine. Without it a key or token of the owner's is
+//                           refused and the rule brain plays: a public server holds none of the
+//                           owner's keys, so a key set there by mistake cannot be spent by visitors.
 //   CALLSIGN_BRAIN          "rule", "claude" or "subscription" (default: "rule" unless a key or token is set)
 //   CALLSIGN_ANVIL_LEVEL    1, 2 or 3: the rule-brain operator's initiative when the match sets none (default 3)
 //   CALLSIGN_CLAUDE_BIN     Claude Code executable for the subscription brain (default: claude)
@@ -25,7 +28,11 @@ export async function makeBrain(env = process.env) {
   const key = env.CALLSIGN_ANTHROPIC_KEY ?? "";
   // A token from `claude setup-token` (sk-ant-oat...) is a Claude subscription, not an API key.
   const token = env.CALLSIGN_CLAUDE_TOKEN || (key.startsWith("sk-ant-oat") ? key : "");
-  const kind = env.CALLSIGN_BRAIN || (token ? "subscription" : key ? "claude" : "rule");
+  let kind = env.CALLSIGN_BRAIN || (token ? "subscription" : key ? "claude" : "rule");
+  if (kind !== "rule" && kind !== "scripted" && env.CALLSIGN_PRIVATE !== "1") {
+    console.log("A Claude key or token of the server's own is set, but this is not marked a private machine (CALLSIGN_PRIVATE=1): it is not used, and the rule brain plays.");
+    kind = "rule";
+  }
   if (kind === "rule" || kind === "scripted") return rule(env); // "scripted" is the rule brain's old name
   let brain;
   if (kind === "claude") {
