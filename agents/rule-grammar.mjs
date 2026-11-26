@@ -34,7 +34,7 @@ export const leaderWords = {
     en: ["move", "go", "advance", "head", "proceed", "push", "get to", "get over to", "drive", "fly", "sail", "march", "run", "relocate", "reposition", "make your way", "roll", "cross",
       "moo", "moved", "movie", "moves", "moving", "mauve", "moove"],
     he: ["=נוע", "נועו", "תנוע", "לנוע", "=זוז", "זוזו", "תזוז", "לזוז", "התקדמ", "תתקדמ", "התקדם", "להתקדם", "=לך", "=לכו", "תלכו", "=סע", "=סעו", "תיסע", "תסעו", "=טוס", "טוסו", "=שוט", "שוטו", "=רוץ", "רוצו", "תגיע", "הגיעו", "להגיע", "=עלו", "=עלה", "=רדו ל", "=חצו", "=חצה", "תחצו",
-      "=נו", "נוא", "=נועה"],
+      "=נו", "נוא", "=נועה", "=נעו"],
   },
   hold: {
     en: ["hold", "defend", "secure", "guard", "keep", "protect", "occupy", "take", "capture", "stay at", "stay on", "sit on", "set up at", "watch",

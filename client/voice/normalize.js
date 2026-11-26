@@ -225,6 +225,8 @@ export function normalize(heard, { lang, rules, careful = false }) {
       }
     }
   }
+  // A recogniser sometimes writes the closing word twice ("כרמל עבור, עבור"): it was said once.
+  for (let again; end && (again = /[^\s,.:;!?]+(?=[\s,.:;!?]*$)/.exec(rest)) && again[0].toLowerCase() === end.toLowerCase(); ) rest = rest.slice(0, again.index);
   let body = places(rest.replace(/[\s,.:;!?]+$/, ""), lang, rules, { careful });
   if (lang === "he") return [`${to}, ${marker} ${me}`, body, end].filter(Boolean).join(", ") + (end ? "." : "");
   body = body.replace(/^by\b/i, "buy"); // the one homophone that opens an order
@@ -237,7 +239,8 @@ export function normalize(heard, { lang, rules, careful = false }) {
 // respelled; the operator's name must be close to exact. Map points in the rest are snapped.
 export function relaxed(heard, { lang, rules, typed = false, careful = false }) {
   const text = heard.replace(/\s+/g, " ").trim();
-  const m = /^([^\s,.:;!?]+)(?:[\s\-#]+([^\s,.:;!?]+))?/.exec(text);
+  // The number may be set off by commas, as a recogniser writes "Viper, too, hold Delta".
+  const m = /^([^\s,.:;!?]+)(?:(?:[\s\-#]+|,\s*(?=[^\s,.:;!?]+,))([^\s,.:;!?]+))?/.exec(text);
   if (!m) return text;
   const cs = rules.callsigns;
   const close = (word, name) => similarity(word, name, lang);

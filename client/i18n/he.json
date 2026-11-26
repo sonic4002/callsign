@@ -70,6 +70,7 @@
   "voice.asking": "ממתין למיקרופון…",
   "voice.loading": "טוען את מודל הדיבור: {percent}%",
   "voice.listening": "מקשיב. שחררו לסיום.",
+  "voice.hearing": "מקשיב: {text}",
   "voice.working": "מתמלל…",
   "voice.unsupported": "הדפדפן הזה לא יכול להקליט מהמיקרופון כאן.",
   "voice.denied": "המיקרופון חסום. אשרו אותו לדף הזה בהגדרות האתר בדפדפן.",

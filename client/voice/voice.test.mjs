@@ -36,6 +36,7 @@ const heard = {
     ["ריש אחת כאן פטישה חזק בשמח עבור", "כריש 1, כאן פטיש, חזק בסמך, עבור."],
     ["צפע אחת וקרנף אחת כאן פטיש נועו לכרמל סוף", "צפע 1 וקרנף 1, כאן פטיש, נועו לכרמל, סוף."],
     ["סדן, כאן פטיש, קנה טנק, עבור.", "סדן, כאן פטיש, קנה טנק, עבור."],
+    ["קרנף אחד כאן פטיש תקפו את כרמל עבור עבור", "קרנף 1, כאן פטיש, תקפו את כרמל, עבור."],
   ],
 };
 
@@ -104,18 +105,23 @@ test("models.json names every file with its size and checksum", () => {
   for (const f of [...manifest.runtime.files, ...Object.values(manifest.models).flatMap((m) => Object.values(m.files))]) {
     assert.ok(f.path && f.bytes > 0 && /^[0-9a-f]{64}$/.test(f.sha256), JSON.stringify(f));
   }
-  assert.deepEqual(Object.keys(manifest.models).sort(), ["en", "he"]);
+  assert.deepEqual(Object.keys(manifest.models).sort(), ["en", "he", "he-whisper"]);
+  // The model used when the first is not on the server exists, and is not fetched by default.
+  assert.equal(manifest.models.he.fallback, "he-whisper");
+  assert.equal(manifest.models["he-whisper"].optional, true);
 });
 
-// The real thing: the Hebrew model on a 12 s recording, through the same runtime the
-// page uses (single thread here). Opt-in because it needs 180 MB of weights.
+// The real thing: the older Hebrew model (kept as the fallback, `make voice-models ALL=1`)
+// on a 12 s recording, through the same runtime the page uses (single thread here).
+// Opt-in because it needs 165 MB of weights. The model the page uses first has its own
+// such test in transducer.test.mjs.
 const root = new URL("../../", import.meta.url);
-const spec = manifest.models.he;
+const spec = manifest.models["he-whisper"];
 const weights = Object.values(spec.files).map((f) => new URL(`assets/models/${spec.dir}/${f.path}`, root));
 const runtime = new URL("client/vendor/ort/", root);
-const skip = !process.env.CALLSIGN_VOICE_MODELS ? "set CALLSIGN_VOICE_MODELS=1 (make voice-test)" : !weights.every(existsSync) || !existsSync(new URL("ort.wasm.min.mjs", runtime)) ? "weights are not here: make voice-models" : false;
+const skip = !process.env.CALLSIGN_VOICE_MODELS ? "set CALLSIGN_VOICE_MODELS=1 (make voice-test)" : !weights.every(existsSync) || !existsSync(new URL("ort.wasm.min.mjs", runtime)) ? "weights are not here: make voice-models ALL=1" : false;
 
-test("the Hebrew model transcribes the test recording word for word", { skip }, async () => {
+test("the older Hebrew model transcribes the test recording word for word", { skip }, async () => {
   const ort = await import(new URL("ort.wasm.min.mjs", runtime));
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.wasmBinary = readFileSync(new URL("ort-wasm-simd-threaded.wasm", runtime));
@@ -139,6 +145,8 @@ test("relaxed: a callsign that only sounds right is respelled when its number fo
   assert.equal(relaxed("צבע 1 תפוס את דוד", { lang: "he", rules }), "צפע 1 תפוס את דוד");
   assert.equal(relaxed("צבע אחת תקוף", { lang: "he", rules }), "צפע 1 תקוף");
   assert.equal(relaxed("vapour two attack gulf", { lang: "en", rules }), "Viper 2 attack Golf");
+  assert.equal(relaxed("Viper, too, hold Delta.", { lang: "en", rules }), "Viper 2, hold Delta.");
+  assert.equal(relaxed("Anvil, to the bridge", { lang: "en", rules }), "Anvil, to the bridge"); // not a number: nothing sets it off
   assert.equal(relaxed("what is happening at Kilo?", { lang: "en", rules }), "what is happening at Kilo?");
   assert.equal(relaxed("buy a tank", { lang: "en", rules }), "buy a tank");
   assert.equal(tidy("Viper 2, this is Hammer. Hold Foxtrot. Over.", { lang: "en", rules }), "Viper 2, this is Hammer. Hold Foxtrot. Over.");

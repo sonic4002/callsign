@@ -479,7 +479,7 @@ flowchart LR
       <tr><td>Model access</td><td>Relay in Go: player's key, model chosen by tier</td><td>Full tier control; you pay for no AI.</td></tr>
       <tr><td>Open league</td><td>MCP server over the game tools</td><td>Any agent can join, including Swarm.</td></tr>
       <tr><td>Data</td><td>Postgres + Redis</td><td>Accounts and ladders; Redis for live match state.</td></tr>
-      <tr><td>Voice in</td><td>Web Speech API, Ozen in the browser</td><td>Free, runs on the player's device.</td></tr>
+      <tr><td>Voice in</td><td>Web Speech API, a small streaming model in the browser</td><td>Free, runs on the player's device.</td></tr>
       <tr><td>Voice out</td><td>Pre-recorded radio phrases (LightBlue / voxtream2-he + Phonikud)</td><td>Made once on your machine, served as files.</td></tr>
       <tr><td>Languages</td><td>i18n JSON, RTL layout</td><td>Hebrew and English from the first build.</td></tr>
       <tr><td>Art</td><td>FLUX.2 / Z-Image via ComfyUI</td><td>Generated on your GPU, reviewed by Claude.</td></tr>
@@ -571,7 +571,7 @@ flowchart LR
     <tbody>
       <tr><td><strong>Typing</strong></td><td>Chat box switches to right-to-left when you type Hebrew.</td><td>Plain browser input</td></tr>
       <tr><td><strong>Mic, fast path</strong></td><td>Phone's built-in recognition, he-IL or en-US.</td><td>Web Speech API</td></tr>
-      <tr><td><strong>Mic, on-device</strong></td><td>Small Hebrew model that runs in the browser, for browsers without built-in Hebrew recognition.</td><td>Ozen-v1, 61M parameters</td></tr>
+      <tr><td><strong>Mic, on-device</strong></td><td>Small Hebrew model that runs in the browser, for browsers without built-in Hebrew recognition.</td><td>Zipformer2 streaming, 66M parameters (was Ozen-v1; measured in stt/eval/RESULTS.md)</td></tr>
       <tr><td><strong>Understanding</strong></td><td>Operator LLM reads Hebrew natively; a resolver maps place aliases.</td><td>Claude, Gemini or GPT</td></tr>
       <tr><td><strong>Radio voices</strong></td><td>Radio talk follows fixed procedure, so almost every line is built from pre-recorded phrases with callsigns, places and numbers stitched in. Costs nothing per match.</td><td>Phrases recorded once with LightBlue or voxtream2-he</td></tr>
       <tr><td><strong>Free-form answers</strong></td><td>Rare long operator replies use the device's built-in voice.</td><td>Browser speech synthesis</td></tr>

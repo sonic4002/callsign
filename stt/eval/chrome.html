@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Callsign: the page's speech worker under measurement</title>
+<!-- Driven by chrome.mjs. It talks to client/voice/worker.js exactly as client/voice/voice.js does. -->
+<script type="module">
+import { readWav } from "/voice/engine.js";
+
+// ?main runs the worker's code on the page's own thread instead: Chrome's CPU throttling
+// slows only that thread, so this is how a slow phone is imitated. The code is the same;
+// it then hears and answers through the window's own message events.
+let worker;
+if (new URLSearchParams(location.search).has("main")) {
+  await import("/voice/worker.js");
+  worker = { postMessage: (m) => window.postMessage(m, location.origin), addEventListener: (kind, fn) => window.addEventListener(kind, fn) };
+} else worker = new Worker("/voice/worker.js", { type: "module" });
+const loading = new Map(); // lang → { resolve, reject }
+const waiting = new Map(); // id → { resolve, reject }
+let nextId = 1;
+worker.addEventListener("message", ({ data }) => {
+  if (data.type === "ready") loading.get(data.lang)?.resolve(data);
+  else if (data.type === "result") waiting.get(data.id)?.resolve(data);
+  else if (data.type === "partial") waiting.get(data.id)?.partial(data.text);
+  else if (data.type === "missing" || data.type === "error") {
+    const err = new Error(data.message ?? data.type);
+    (data.id ? waiting.get(data.id) : loading.get(data.lang))?.reject(err);
+  }
+});
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+window.isolated = () => self.crossOriginIsolated;
+
+// load resolves with { ms, threads, model } once the language's model is running.
+window.load = (lang) =>
+  new Promise((resolve, reject) => {
+    loading.set(lang, { resolve, reject });
+    worker.postMessage({ type: "load", lang });
+  });
+
+// say plays one recording to the worker and resolves with { text, ms, partials }: ms is
+// the wait from the end of the recording (the button let go) to the text. `live` sends it
+// in pieces as it is made; `paced` sends those pieces at the speed of speech.
+window.say = async (file, lang, { openers = [], phrases = [], live = false, paced = false } = {}) => {
+  const { samples } = readWav(new Uint8Array(await (await fetch(file)).arrayBuffer()));
+  const id = nextId++;
+  const partials = [];
+  const answer = new Promise((resolve, reject) => waiting.set(id, { resolve, reject, partial: (text) => partials.push(text) }));
+  let t0;
+  if (live) {
+    worker.postMessage({ type: "begin", id, lang, phrases });
+    const step = 1600; // a tenth of a second
+    for (let at = 0; at < samples.length; at += step) {
+      worker.postMessage({ type: "audio", id, samples: samples.slice(at, at + step) });
+      if (paced) await sleep(100);
+    }
+    t0 = performance.now();
+    worker.postMessage({ type: "end", id, openers });
+  } else {
+    t0 = performance.now();
+    worker.postMessage({ type: "transcribe", id, lang, audio: samples, openers, phrases });
+  }
+  try {
+    const { text } = await answer;
+    return { text, ms: Math.round(performance.now() - t0), seconds: samples.length / 16000, partials: partials.length };
+  } finally {
+    waiting.delete(id);
+  }
+};
+</script>

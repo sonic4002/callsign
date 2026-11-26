@@ -7,9 +7,12 @@
 //     broke the page on a slow phone); the kept copy only when the network is gone;
 //   sprites and music: the kept copy first, refreshed behind the player's back.
 // Never kept: the game connection, the speech service, the relay, speech-model weights and
-// their runtime (the voice code stores those itself, on the player's first use of the mic).
+// their runtime (the voice code stores those itself, on the player's first use of the mic,
+// in caches of its own named callsign-voice-…; those are left alone here, so that a new
+// version of the page does not make a phone download 70 MB of speech model again).
 
-const CACHE = "callsign-8";
+const CACHE = "callsign-9";
+const VOICE = /^callsign-voice-/; // the speech worker's own caches (client/voice/worker.js)
 const NEVER = [/^\/ws\b/, /^\/tts\//, /^\/relay\//, /^\/mcp\b/, /^\/assets\/models\//, /^\/assets\/voice-cache\//, /^\/vendor\//];
 const PICTURES = [/^\/assets\/sprites\//, /^\/assets\/audio\//];
 const kept = (url) => url.origin === self.location.origin && !NEVER.some((re) => re.test(url.pathname));
@@ -28,7 +31,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
+      .then((names) => Promise.all(names.filter((name) => name !== CACHE && !VOICE.test(name)).map((name) => caches.delete(name))))
       .then(() => self.clients.claim()),
   );
 });

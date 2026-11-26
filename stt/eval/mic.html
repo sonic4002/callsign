@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Callsign: the page's push-to-talk under test</title>
+<!-- Driven by chrome.mjs --mic. It holds the talk button of client/voice/voice.js for as long
+     as a recording lasts, with Chrome playing that recording as the microphone. -->
+<script type="module">
+import { Voice } from "/voice/voice.js";
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+// talk resolves with { text, ms, states, partials, live }: ms is the wait from letting go
+// to the text; live says whether the recording was handed over while it was being made.
+window.talk = async (lang, seconds, { openers = [], phrases = [] } = {}) => {
+  const states = [];
+  const partials = [];
+  const voice = new Voice({
+    onState: (state, detail) => {
+      if (states.at(-1) !== state) states.push(state);
+      if (state === "listening" && detail?.text) partials.push(detail.text);
+    },
+  });
+  await voice.start(lang, { phrases });
+  const live = Boolean(voice.recorder?.id);
+  await sleep(seconds * 1000);
+  const t0 = performance.now();
+  const text = await voice.stop(lang, openers, "");
+  return { text, ms: Math.round(performance.now() - t0), states, partials, live };
+};
+</script>

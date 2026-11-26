@@ -1,6 +1,8 @@
-// make voice-models: downloads the speech runtime and the two recognisers named in
+// make voice-models: downloads the speech runtime and the recognisers named in
 // models.json, each from a pinned version, and checks every file against its SHA-256.
 // Files already in place and correct are left alone. Run from the repository root.
+// A model marked "optional" (the older Hebrew one, used only where the first is not on
+// the server) is fetched only with --all.
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -23,7 +25,9 @@ async function get(url, file, want) {
 
 const rt = manifest.runtime;
 for (const f of rt.files) await get(rt.source + f.path, join(rt.dir, f.path), f);
+const all = process.argv.includes("--all");
 for (const m of Object.values(manifest.models)) {
+  if (m.optional && !all) continue;
   for (const f of Object.values(m.files)) {
     await get(`https://huggingface.co/${m.name}/resolve/${m.revision}/${f.path}`, join("assets/models", m.dir, f.path), f);
   }

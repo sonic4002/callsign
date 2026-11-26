@@ -1,6 +1,6 @@
 // Scores the transcripts in assets/stt-eval/results against what was said.
 //
-//   node stt/eval/score.mjs [--misses <result name>] [--tidy-harm <result name>]
+//   node stt/eval/score.mjs [--misses <result name>] [--lost <result name>] [--tidy-harm <result name>]
 //
 // For each result, language and kind of recording, as heard and again after the page's
 // own tidying (client/voice/normalize.js):
@@ -8,10 +8,16 @@
 //   callsigns  recordings in which every callsign said, with its number, was written
 //   points     recordings in which every map point said was written (of those that name one)
 //   exact      recordings written word for word
+//   order      (tidied only) recordings in which the order would be understood: every
+//              callsign with its number, every map point, and what to do. What to do is
+//              read the way the rule brain reads it (agents/rule-grammar.mjs: the same
+//              order words found); a call with no such word (a purchase, a proword, a
+//              question) must have every word of its body, in order.
 // Digits and number words count as the same word; case and punctuation are ignored.
 
 import { readFileSync, readdirSync } from "node:fs";
 
+import { leaderWords, scan, tidy as plainBody } from "../../agents/rule-grammar.mjs";
 import { tidy } from "../../client/voice/normalize.js";
 
 const root = new URL("../../", import.meta.url);
@@ -65,8 +71,29 @@ function names(ws, lang) {
 
 const within = (want, got) => want.every((n) => got.includes(n));
 
+// The order words in a call, as the rule brain finds them.
+const orders = (text, lang) => scan(plainBody(text), lang, leaderWords, rules).found.filter((f) => !f.negated).map((f) => f.cls).sort().join(" ");
+// The words of a call that are not its frame: no callsigns, numbers, "this is" or closing word.
+function body(ws, lang) {
+  const cs = rules.callsigns;
+  const frame = new Set([cs.player, cs.operator, cs.allStations, ...Object.values(cs.classes), rules.radio.marker, rules.radio.over, rules.radio.out].flatMap((n) => n[lang].toLowerCase().split(" ")));
+  return ws.filter((w) => !frame.has(w) && !(lang === "he" && frame.has(w.slice(1))) && !/^\d+$/.test(w));
+}
+const inOrder = (want, got) => {
+  let at = 0;
+  for (const w of got) if (w === want[at]) at++;
+  return at === want.length;
+};
+function understood(item, text) {
+  const [ref, hyp] = [words(item.text, item.lang), words(text, item.lang)];
+  const [want, got] = [names(ref, item.lang), names(hyp, item.lang)];
+  if (!within(want.callsigns, got.callsigns) || !within(want.points, got.points)) return false;
+  const said = orders(item.text, item.lang);
+  return said ? orders(text, item.lang) === said : inOrder(body(ref, item.lang), body(hyp, item.lang));
+}
+
 function score(items, textOf) {
-  const s = { n: 0, said: 0, wrong: 0, callsigns: 0, withPoints: 0, points: 0, exact: 0, misses: [] };
+  const s = { n: 0, said: 0, wrong: 0, callsigns: 0, withPoints: 0, points: 0, exact: 0, order: 0, misses: [], lost: [] };
   for (const item of items) {
     const ref = words(item.text, item.lang);
     const hyp = words(textOf(item), item.lang);
@@ -76,6 +103,9 @@ function score(items, textOf) {
     s.said += ref.length;
     s.wrong += d;
     s.exact += d === 0;
+    const ok = understood(item, textOf(item));
+    s.order += ok;
+    if (!ok) s.lost.push(`${item.file}\n   said:  ${item.text}\n   wrote: ${textOf(item)}`);
     s.callsigns += within(want.callsigns, got.callsigns);
     if (want.points.length) {
       s.withPoints++;
@@ -90,7 +120,7 @@ const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(1)}%` : "-").padStart(7);
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : null);
 const results = readdirSync(new URL("results/", data)).filter((f) => f.endsWith(".json")).sort();
 
-console.log("result".padEnd(22), "lang kind    n  | as heard: words callsigns points   exact | tidied: words callsigns points   exact | median s");
+console.log("result".padEnd(22), "lang kind    n  | as heard: words callsigns points   exact | tidied: words callsigns points   exact   order | median s");
 for (const file of results) {
   const name = file.replace(/\.json$/, "");
   const res = JSON.parse(readFileSync(new URL(`results/${file}`, data)));
@@ -100,13 +130,14 @@ for (const file of results) {
       if (!items.length) continue;
       const raw = score(items, (i) => res[i.file].text);
       // The page tidies the server's text carefully, and the browser's own by sound.
-      const careful = !name.startsWith("browser");
+      const careful = /^(server|careful)/.test(name);
       const fix = (text) => tidy(text, { lang, rules, careful });
       const done = score(items, (i) => fix(res[i.file].text));
       const ms = items.map((i) => res[i.file].ms).sort((a, b) => a - b);
       const row = (s) => `${pct(s.said - s.wrong, s.said)} ${pct(s.callsigns, s.n)}  ${pct(s.points, s.withPoints)} ${pct(s.exact, s.n)}`;
-      console.log(name.padEnd(22), lang.padEnd(4), kind.padEnd(5), String(items.length).padStart(3), " |          ", row(raw), "|        ", row(done), "|", (ms[ms.length >> 1] / 1000).toFixed(2));
+      console.log(name.padEnd(22), lang.padEnd(4), kind.padEnd(5), String(items.length).padStart(3), " |          ", row(raw), "|        ", row(done), pct(done.order, done.n), "|", (ms[ms.length >> 1] / 1000).toFixed(2));
       if (arg("--misses") === name) console.log(done.misses.join("\n"));
+      if (arg("--lost") === name) console.log(done.lost.join("\n"));
       if (arg("--tidy-harm") === name) {
         // Recordings the tidying made worse: what it changed, where the words were right or closer before.
         for (const i of items) {
