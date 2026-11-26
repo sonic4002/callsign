@@ -164,7 +164,9 @@ const cycle = (count, per, o, offset = 0) =>
 // The shadow is drawn before this, so it stays on the ground.
 function lift(ctx, entry, o, i = 0) {
   if (o.grounded) return; // a picture of the unit, as on a build button: drawn where it stands
-  if (entry.altitude) ctx.translate(0, -entry.altitude * METRE + Math.sin(o.time * 2.3 + o.seed + i * 1.9) * 1.2);
+  // `alt` is how far up it is, 0 on the ground to 1: a strike aircraft climbs from its pad.
+  const up = o.alt ?? 1;
+  if (entry.altitude) ctx.translate(0, (-entry.altitude * METRE + Math.sin(o.time * 2.3 + o.seed + i * 1.9) * 1.2) * up);
 }
 
 function animatedInfantry(ctx, entry, o) {
@@ -244,7 +246,10 @@ function animatedVehicle(ctx, entry, o) {
   const go = o.go ?? (o.moving ? 1 : 0);
   if (naval) wake(ctx, o.turn, go, o.time + o.seed);
   else {
-    shadow(ctx, 26, 11, entry.altitude ? 0.22 : 0.32);
+    // What flies casts a fainter shadow the higher it is. A plane's is the shape of a
+    // plane, so that the eye ties the machine in the air to its place on the ground.
+    if (o.alt !== undefined) planeShadow(ctx, o.turn, 0.34 - 0.12 * o.alt);
+    else shadow(ctx, 26, 11, entry.altitude ? 0.22 : 0.32);
     if (!entry.altitude && !o.grounded) dust(ctx, o.turn, go, o.time, o.seed);
   }
   ctx.save();
@@ -254,7 +259,7 @@ function animatedVehicle(ctx, entry, o) {
   // Under way it shows its moving frames: tracks and wheels turning with the ground, a
   // boat's bow up, an aircraft nose down or banked into its turn.
   let anim = "idle";
-  if (go > 0.15 && entry.anims.move) anim = "move";
+  if ((go > 0.15 || (o.alt ?? 0) > 0.05) && entry.anims.move) anim = "move"; // a plane in the air is never at rest
   if (entry.altitude && go > 0.15 && Math.abs(o.turnRate ?? 0) > 0.7 && entry.anims.bankLeft) anim = o.turnRate < 0 ? "bankLeft" : "bankRight";
   const count = entry.anims[anim][1];
   const spun = Math.floor(o.time * (entry.fps?.[anim] ?? 12)) % count; // rotors turn by the clock
@@ -362,6 +367,17 @@ function disc(ctx, color, x, y, rx, ry = rx) {
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
   ctx.fill();
+}
+
+// planeShadow is a fuselage and a wing on the ground, lying along the screen heading `turn`.
+function planeShadow(ctx, turn, alpha) {
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  for (const [rx, ry, by] of [[30, 5, 0], [7, 26, 0.5]]) {
+    ctx.beginPath();
+    ctx.ellipse(2, 1, rx, ry, turn, 0, TAU);
+    ctx.fill();
+    if (by) continue;
+  }
 }
 
 export function shadow(ctx, rx, ry = rx / 2, alpha = 0.32) {

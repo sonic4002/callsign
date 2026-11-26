@@ -10,6 +10,7 @@ import { optionsFor } from "../brain-jev.mjs";
 import { ruleBrain, wantedUnit } from "../brain-rule.mjs";
 import { leaderPrompt, operatorPrompt } from "../prompts.mjs";
 import { leaderToolsFor } from "../tools.mjs";
+import { hintCalls, hintPhrases, hintWords } from "../../client/voice/hints.js";
 import { rules, run, status } from "./orders.mjs";
 
 const aegis = rules.factions.aegis.units;
@@ -38,6 +39,11 @@ test("both armies have a strike aircraft, dearer than the helicopter, under one 
   const taken = [cs.player, cs.operator, cs.contact, cs.hauler, ...Object.entries(cs.classes).filter(([k]) => k !== "comet").map(([, v]) => v)].flatMap((t) => [t.en.toLowerCase(), t.he]);
   for (const map of Object.values(rules.maps)) for (const p of map.points) taken.push(p.callsign.en.toLowerCase(), p.callsign.he, ...(p.aliases ?? []).map((a) => a.toLowerCase()));
   assert.ok(!taken.includes("comet") && !taken.includes("שביט"));
+  // The recognisers are told the new callsign with the others, glued the Hebrew way too.
+  assert.ok(hintWords(rules, "en").includes("Comet") && hintWords(rules, "he").includes("שביט"));
+  assert.ok(hintPhrases(rules, "he").includes("ושביט"));
+  assert.match(hintCalls(rules, "en"), /Comet \d, this is Hammer/);
+  assert.match(hintCalls(rules, "he"), /שביט \d, כאן פטיש/);
   for (const u of [aegis.strikeJet, ashfall.propBomber]) {
     assert.equal(u.requires, "airbase");
     assert.equal(u.callsign, "comet");

@@ -19,7 +19,7 @@ Browser real-time strategy game where every squad is an AI agent, commanded by v
 ## Language and radio
 - Hebrew and English are first-class from the first commit. All strings in `client/i18n/he.json` and `en.json`; a missing key fails the build. UI mirrors for RTL; the map never mirrors.
 - All radio talk follows real procedure: "<to>, this is <from>…", Over / Out (never "over and out"), Roger, Wilco, Say again, Stand by, Correction, Radio silence. Hebrew: עבור, סוף, רות, רות יבוצע, אמור שנית, המתן, תיקון, דממת אלחוט.
-- Map points use only letters shared by NATO and the IDF alphabet (Foxtrot = פסל, Kilo = כרמל, Sierra = סמך…). Never use ר for a point. Callsigns: Hammer/פטיש (player), Anvil/סדן (operator), Viper/צפע, Rhino/קרנף, Hawk/בז, Shark/כריש.
+- Map points use only letters shared by NATO and the IDF alphabet (Foxtrot = פסל, Kilo = כרמל, Sierra = סמך…). Never use ר for a point. Callsigns: Hammer/פטיש (player), Anvil/סדן (operator), Viper/צפע, Rhino/קרנף, Hawk/בז, Shark/כריש, Comet/שביט (strike aircraft).
 - Radio routing is done by code (callsign match in both languages), never by an LLM.
 
 ## Art
