@@ -73,13 +73,15 @@ shell:
 	$(DOCKER) -it $(IMAGE) bash
 
 # Download the in-browser speech recognisers (Hebrew and English) and their runtime, about
-# 245 MB, into assets/models/ and client/vendor/ort/. Pinned versions, checked by SHA-256.
+# 150 MB, into assets/models/ and client/vendor/ort/. Pinned versions, checked by SHA-256.
+# ALL=1 also fetches the older Hebrew recogniser (165 MB), which the page uses only when
+# the first is not on the server.
 voice-models:
-	$(DOCKER) $(IMAGE) node client/voice/fetch-models.mjs
+	$(DOCKER) $(IMAGE) node client/voice/fetch-models.mjs $(if $(ALL),--all)
 
 # Transcribe the test recording with the real models (needs voice-models first).
 voice-test:
-	$(DOCKER) --network none -e CALLSIGN_VOICE_MODELS=1 $(IMAGE) node --test client/voice/voice.test.mjs
+	$(DOCKER) --network none -e CALLSIGN_VOICE_MODELS=1 $(IMAGE) node --test client/voice/voice.test.mjs client/voice/transducer.test.mjs
 
 # ---- art: sprites generated on this machine's GPU (see art/ and assets/sprites/CREDITS.md) ----
 ART := docker run --rm --init -u $(shell id -u):$(shell id -g) -v $(CURDIR):/src
