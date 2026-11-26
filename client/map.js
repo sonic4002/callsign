@@ -1171,6 +1171,7 @@ export class Scene {
     const h = size + 7;
     if (avoid) sy += clearOf(this.plates, sx, sy, w, h);
     if (keep || avoid) this.plates.push([sx - w / 2, sy - h / 2, w, h]);
+    this.lastPlate = [sx - w / 2, sy - h / 2, w, h];
     ctx.fillStyle = `rgba(10,14,16,${alpha})`;
     ctx.beginPath();
     ctx.roundRect(sx - w / 2, sy - h / 2, w, h, 3);
@@ -1186,6 +1187,7 @@ export class Scene {
   labels(buildScale, unitScale) {
     const { rules, state, cam } = this;
     this.plates = []; // the plates other names must keep clear of, this frame
+    this.squadPlates = []; // where each squad's name is drawn: a press on a name is a press on the squad
     const lang = this.lang();
     const tall = { hq: 100, landRig: 92, seaRig: 88, point: 60 };
     // Each gold field says how full it is, as last seen. The isolate marks keep the
@@ -1248,7 +1250,8 @@ export class Scene {
       }
       if (!group.own) {
         // An enemy in sight gets a name the player can say: "Viper 1 attack Target 3".
-        this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88` });
+        this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88`, avoid: true });
+        this.squadPlates.push({ group, box: this.lastPlate });
         continue;
       }
       if (group.hauler) {
@@ -1262,14 +1265,17 @@ export class Scene {
         size: 12,
         color: sideColor[group.side],
         border: group.id === this.selected ? SELECT : `${sideColor[group.side]}88`,
+        avoid: true, // two squads standing together keep their names apart, each one pressable
       });
+      this.squadPlates.push({ group, box: this.lastPlate });
+      const plateY = this.lastPlate[1] + h / 2; // where the name ended up, clear of the others
       // Rank chevrons under the name: one for a Sergeant's brain, two for a Veteran's.
       const { ctx } = this;
       ctx.strokeStyle = "#e3b341";
       ctx.lineWidth = 1.6;
       ctx.lineJoin = "round";
       for (let i = 0; i < (group.view.tier ?? 1) - 1; i++) {
-        const y = low + 16 * unitScale + 4 + h / 2 + 4 + i * 4;
+        const y = plateY + h / 2 + 4 + i * 4;
         ctx.beginPath();
         ctx.moveTo(sx - 6, y);
         ctx.lineTo(sx, y + 3);
@@ -1277,7 +1283,7 @@ export class Scene {
         ctx.stroke();
       }
       // The rank the squad has earned, in silver beside the brass, and a hero's health.
-      const under = low + 16 * unitScale + 4 + h / 2 + 2;
+      const under = plateY + h / 2 + 2;
       drawRank(ctx, group.view.rank, sx + ((group.view.tier ?? 1) > 1 ? 9 : -6), under, 12);
       if (group.view.hero) {
         const hp = Math.max(0, Math.min(1, group.view.hero.hp ?? 1));
@@ -1568,17 +1574,26 @@ export class Scene {
     if (!this.rules || !this.state) return {};
     let squad = null;
     let contact = null;
+    // A squad's name is the squad: easier to hit than a soldier, and never two in one place.
+    for (const { group, box } of this.squadPlates ?? []) {
+      if ((group.own && group.side !== side) || group.hauler) continue;
+      if (sx >= box[0] - 5 && sx <= box[0] + box[2] + 5 && sy >= box[1] - 5 && sy <= box[1] + box[3] + 5) return group.own ? { squad: group.view } : { contact: group.view };
+    }
     let bd = 26;
+    let near = null; // one of our own squads a little further off: a press beside it means it, not the ground
+    let nd = 46;
     for (const group of this.groups.values()) {
       if ((group.own && group.side !== side) || group.hauler) continue; // haulers take no radio calls
       for (const v of group.visuals) {
         const [vx, vy] = this.cam.screen(v.px, v.py);
         const d = Math.hypot(vx - sx, vy - 10 - sy);
         if (d < bd) [squad, contact, bd] = group.own ? [group.view, null, d] : [null, group.view, d];
+        if (group.own && d < nd) [near, nd] = [group.view, d];
       }
     }
     if (squad) return { squad };
     if (contact) return { contact };
+    if (near) return { squad: near };
     // A landmark or a bridge before the point it stands beside: it is the smaller target.
     const place = this.placeUnder(sx, sy);
     if (place) return place;
