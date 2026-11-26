@@ -26,7 +26,7 @@ import { drawMiniMap } from "./terrain.js";
 import { attachGestures, fingers } from "./touch.js";
 import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
-import { hintCalls } from "./voice/hints.js";
+import { hintCalls, hintPhrases } from "./voice/hints.js";
 import { Voice } from "./voice/voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -700,7 +700,8 @@ $("text").addEventListener("keydown", (ev) => {
 // ---- voice ----
 // Push-to-talk: hold the button, or the key left of 1, and speak a call. It is recognised
 // by the game server when it offers that (the recording is sent there and not kept), else
-// in this browser; then tidied into procedure, and put in the box to check and send.
+// in this browser, as it is spoken; then tidied into procedure, and put in the box to
+// check and send.
 
 let voiceState = "idle";
 let voiceDetail = {};
@@ -721,7 +722,9 @@ function renderVoice() {
   $("lobby-voice").textContent = fetching ? t("voice.loading", voiceDetail) : voice.ready.has(lang) ? t("voiceReady") : "";
   const status = $("voice-status");
   status.hidden = voiceState === "idle";
-  status.textContent = voiceState === "idle" ? "" : t(`voice.${voiceState}`, voiceDetail);
+  // While the button is held, a recogniser that writes as it listens shows what it has so far.
+  const hearing = voiceState === "listening" && voiceDetail.text;
+  status.textContent = voiceState === "idle" ? "" : t(hearing ? "voice.hearing" : `voice.${voiceState}`, voiceDetail);
   status.className = ["unsupported", "insecure", "denied", "missing", "failed"].includes(voiceState) ? "warn" : "";
   $("ptt").title = t(voice.remote ? "voiceHint.server" : "voiceHint");
   $("ptt").classList.toggle("live", voiceState === "listening");
@@ -735,7 +738,15 @@ function talk() {
     music.setMuted(true);
   }
   speech.key(true); // keyed up: the set cannot receive
-  voice.start(lang);
+  // The names and words of this net, for the recogniser in this browser to listen for.
+  // Whatever goes wrong in listing them, the call is still recorded.
+  let phrases = [];
+  try {
+    phrases = rules ? hintPhrases(rules, lang) : [];
+  } catch (err) {
+    console.warn("phrase list failed", err);
+  }
+  voice.start(lang, { phrases });
 }
 
 // callsigns lists what a call to this side can open with: its squads' class names, the

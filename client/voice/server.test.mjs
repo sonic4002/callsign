@@ -1,5 +1,7 @@
 // Push-to-talk when the game server transcribes: the recording goes there, and the
 // recogniser in the browser is fetched and used only when the server lets the player down.
+// And push-to-talk without one, where a browser with audio worklets hands the recording
+// to the recogniser while it is being made.
 // The browser's microphone, recorder, audio decoder and worker are played by stand-ins.
 
 import assert from "node:assert/strict";
@@ -7,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { hintCalls, hintWords } from "./hints.js";
+import { Resampler } from "./resample.js";
 
 let audio = new Float32Array(0); // what the next recording decodes to
 const workers = [];
@@ -38,7 +41,45 @@ class FakeWorker {
   postMessage(m) {
     this.posted.push(m);
     if (m.type === "transcribe") queueMicrotask(() => this.listeners.message({ data: { type: "result", id: m.id, text: "from the browser" } }));
+    if (m.type === "end") queueMicrotask(() => this.listeners.message({ data: { type: "result", id: m.id, text: "from the browser, heard live" } }));
   }
+}
+// A browser with audio worklets: the context runs at 48 kHz and its tap node is fed by the test.
+const taps = [];
+class LiveCtx {
+  state = "running";
+  close() {}
+  sampleRate = 48000;
+  destination = {};
+  audioWorklet = { addModule: async () => {} };
+  createMediaStreamSource = () => ({ connect() {}, disconnect() {} });
+  createGain = () => ({ gain: {}, connect() {} });
+}
+class TapNode {
+  told = [];
+  port = {
+    postMessage: (m) => {
+      this.told.push(m);
+      if (m === "flush") queueMicrotask(() => this.port.onmessage({ data: "flushed" }));
+    },
+  };
+  constructor() {
+    taps.push(this);
+  }
+  connect() {}
+  // hear plays `seconds` of microphone audio into the tap, a tenth of a second at a time.
+  hear(seconds, level = 0.5) {
+    for (let i = 0; i < seconds * 10; i++) this.port.onmessage({ data: Float32Array.from({ length: 4800 }, (_, j) => level * Math.sin(j / 15)) });
+  }
+}
+function withWorklets(t) {
+  const before = window.AudioContext;
+  Object.assign(window, { AudioContext: LiveCtx, AudioWorkletNode: TapNode });
+  taps.length = 0;
+  t.after(() => {
+    window.AudioContext = before;
+    delete window.AudioWorkletNode;
+  });
 }
 class Ctx {
   decodeAudioData = async () => ({ duration: audio.length / 16000 });
@@ -177,6 +218,95 @@ test("a recording ends at fifteen seconds even with the button held, and is cut 
   await voice.stop("he");
   t.mock.timers.tick(20000);
   assert.equal(limits, 1);
+});
+
+test("with audio worklets and no server, a call is handed to the worker while it is spoken", async (t) => {
+  withWorklets(t);
+  const { voice, states } = fresh(false);
+  const details = [];
+  voice.onState = (s, d) => (states.push(s), details.push(d));
+  await voice.start("he", { phrases: ["צפע", "כרמל"] });
+  const [tap] = taps;
+  assert.deepEqual(tap.told, ["on"]);
+  tap.hear(2);
+  const posted = workers[0].posted;
+  assert.deepEqual(posted.slice(0, 2), [{ type: "load", lang: "he" }, { type: "begin", id: 1, lang: "he", phrases: ["צפע", "כרמל"] }]);
+  const sent = posted.filter((m) => m.type === "audio");
+  assert.ok(sent.length >= 19 && sent.every((m) => m.id === 1 && m.samples.length >= 1500 && m.samples.length <= 1700), "about a tenth of a second at 16 kHz each");
+  // What the worker has written so far is shown while the button is held.
+  workers[0].listeners.message({ data: { type: "partial", id: 1, text: "צפע אחת" } });
+  assert.deepEqual([states.at(-1), details.at(-1)], ["listening", { text: "צפע אחת" }]);
+  assert.equal(await voice.stop("he", ["צפע"]), "from the browser, heard live");
+  assert.deepEqual(tap.told, ["on", "flush"]);
+  assert.deepEqual(posted.at(-1), { type: "end", id: 1, openers: ["צפע"] });
+  assert.ok(!posted.some((m) => m.type === "transcribe"), "the recording is not sent a second time");
+  assert.equal(states.at(-1), "idle");
+  // The next call uses the same tap, and a new recording in the worker.
+  await voice.start("he");
+  taps[0].hear(1);
+  await voice.stop("he");
+  assert.equal(taps.length, 1);
+  assert.equal(posted.at(-1).id, 2);
+});
+
+test("a live recording that holds no speech is dropped in the worker too", async (t) => {
+  withWorklets(t);
+  const { voice, states } = fresh(false);
+  await voice.start("he");
+  taps[0].hear(2, 0.001);
+  assert.equal(await voice.stop("he"), "");
+  assert.equal(states.at(-1), "nothing");
+  assert.deepEqual(workers[0].posted.at(-1), { type: "cancel", id: 1 });
+});
+
+test("with a server the live recording goes there whole, and the worker hears nothing", async (t) => {
+  withWorklets(t);
+  const { voice } = fresh();
+  answer = async () => ({ ok: true, status: 200, json: async () => ({ text: "from the server" }) });
+  await voice.start("he", { phrases: ["צפע"] });
+  taps[0].hear(2);
+  assert.equal(await voice.stop("he", [], "hints"), "from the server");
+  assert.equal(workers.length, 0);
+  const sent = calls[0].options.body;
+  assert.ok(sent instanceof Int16Array && Math.abs(sent.length - 2 * 16000) < 200 && sent.some((v) => Math.abs(v) > 10000), `${sent.length} samples at 16 kHz`);
+  // And when the server lets the player down, the browser recognises the kept recording.
+  answer = async () => ({ ok: false, status: 502, json: async () => ({}) });
+  voice.restUntil = 0;
+  await voice.start("he", { phrases: ["צפע"] });
+  taps[0].hear(2);
+  assert.equal(await voice.stop("he", ["צפע"], "hints"), "from the browser");
+  const m = workers[0].posted.at(-1);
+  assert.deepEqual([m.type, m.phrases, m.openers], ["transcribe", ["צפע"], ["צפע"]]);
+});
+
+test("the model is not fetched ahead on mobile data or when the browser is saving data", () => {
+  for (const connection of [{ type: "cellular" }, { saveData: true }]) {
+    const { voice } = fresh(false);
+    navigator.connection = connection;
+    voice.prepare("he");
+    assert.equal(workers.length, 0, JSON.stringify(connection));
+    delete navigator.connection;
+    voice.prepare("he");
+    assert.equal(workers.length, 1);
+  }
+});
+
+test("resampler: speech passes, what 16 kHz cannot carry is removed, pieces join up", () => {
+  const tone = (hz, rate, n) => Float32Array.from({ length: n }, (_, i) => Math.sin((2 * Math.PI * hz * i) / rate));
+  const loud = (x) => Math.sqrt(x.subarray(200).reduce((a, v) => a + v * v, 0) / (x.length - 200)) * Math.SQRT2;
+  for (const rate of [48000, 44100]) {
+    const speech = new Resampler(rate).push(tone(1000, rate, rate));
+    assert.ok(Math.abs(speech.length - 16000) < 40, `${speech.length} samples from a second at ${rate}`);
+    assert.ok(Math.abs(loud(speech) - 1) < 0.02, `a 1 kHz tone keeps its level at ${rate}: ${loud(speech)}`);
+    assert.ok(loud(new Resampler(rate).push(tone(11000, rate, rate))) < 0.02, "an 11 kHz tone is gone");
+    const whole = new Resampler(rate).push(tone(440, rate, rate));
+    const r = new Resampler(rate);
+    const parts = [];
+    for (let i = 0; i < rate; i += 1000) parts.push(...r.push(tone(440, rate, rate).subarray(i, i + 1000)));
+    assert.equal(parts.length, whole.length);
+    assert.ok(parts.every((v, i) => Math.abs(v - whole[i]) < 1e-6));
+  }
+  assert.deepEqual([...new Resampler(16000).push(Float32Array.of(0.5, -0.5))], [0.5, -0.5]);
 });
 
 test("hints are the net's own words in the language spoken", () => {
