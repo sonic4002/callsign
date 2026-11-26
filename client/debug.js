@@ -1022,7 +1022,7 @@ function rosterRow(sq, canAct) {
   }
   li.append(name, pips, el("span", "order", orderText(sq)), tier);
   if (unit.hero) heroRow(li, sq, unit, { t, name: (id) => state.squads.find((s) => s.id === id)?.callsign[lang] ?? "" });
-  li.addEventListener("click", () => select(sq));
+  li.addEventListener("click", () => (scene.selected === sq.id ? unselect() : select(sq)));
   return li;
 }
 
@@ -1323,6 +1323,24 @@ function renderRally(canAct) {
 
 
 // select marks a squad and starts a call to it.
+// unselect lets go of the selected squad: nothing is marked, and a press on the map sends
+// nobody anywhere.
+function unselect() {
+  if (!scene.selected) return;
+  scene.selected = 0;
+  drawn.roster = "";
+  if ($("text").value === opening) $("text").value = "";
+  opening = "";
+  hideOrders();
+  renderSidebar();
+}
+// Escape, a right click on the map, or a second press on the squad's row lets go of it.
+addEventListener("keydown", (ev) => ev.key === "Escape" && !placing && $("help").hidden !== false && unselect());
+$("map").addEventListener("contextmenu", (ev) => {
+  ev.preventDefault();
+  unselect();
+});
+
 function select(sq) {
   scene.selected = sq.id;
   drawn.roster = "";

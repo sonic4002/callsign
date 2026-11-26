@@ -11,7 +11,7 @@
 // in caches of its own named callsign-voice-…; those are left alone here, so that a new
 // version of the page does not make a phone download 70 MB of speech model again).
 
-const CACHE = "callsign-13";
+const CACHE = "callsign-14";
 const VOICE = /^callsign-voice-/; // the speech worker's own caches (client/voice/worker.js)
 const NEVER = [/^\/ws\b/, /^\/tts\//, /^\/relay\//, /^\/mcp\b/, /^\/assets\/models\//, /^\/assets\/voice-cache\//, /^\/vendor\//];
 const PICTURES = [/^\/assets\/sprites\//, /^\/assets\/audio\//];
