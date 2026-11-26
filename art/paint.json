@@ -79,6 +79,22 @@
         "subject": "a small dark chin gun turret of a helicopter, seen alone"
       }
     },
+    "strikeJet": {
+      "grid": [
+        1,
+        2
+      ],
+      "subject": "a compact blue-grey military ground-attack jet aeroplane with swept wings, pale grey wing tips, two tail fins and a dark glass canopy",
+      "wreck": "the burnt-out blackened wreck of a crashed jet aeroplane, scorched dark steel, no flames, no smoke"
+    },
+    "propBomber": {
+      "grid": [
+        1,
+        2
+      ],
+      "subject": "an old patched sand-coloured single-propeller aeroplane with straight wings, a rust-red engine cowl and tail fin, olive and rust repair panels and a dark glass canopy",
+      "wreck": "the burnt-out blackened wreck of a crashed propeller aeroplane, scorched dark steel, no flames, no smoke"
+    },
     "patrolBoat": {
       "grid": [
         1,
