@@ -362,6 +362,7 @@ func (rm *Room) hello(c *Client) []byte {
 		"log":     append([]Message{}, rm.logs[side]...),
 		"lobby":   rm.lobby(),
 		"command": rm.cmd[side].view(),
+		"netlang": rm.lang[side]["player"], // the commander's language, "" before it is known
 	}
 	if st, ok := rm.station(c.ID); ok {
 		h["station"] = rm.name(st, side)

@@ -95,7 +95,9 @@ export class Agent {
     this.wakes = 0;
     this.over = hello.state.over;
     this.traffic = hello.log.slice(-8).map((m) => m.text);
-    this.netLang = hello.log.findLast((m) => m.from.key === "player")?.lang; // a squad joining mid-match learns it too
+    // A squad joining mid-match learns the net's language too: what Hammer last spoke, or
+    // the language of the commander's page before a word was said.
+    this.netLang = hello.log.findLast((m) => m.from.key === "player")?.lang ?? (["he", "en"].includes(hello.netlang) ? hello.netlang : undefined);
     // What the match's host chose for the brains that need no key: the operator's
     // initiative (1 to 3), and whether squads take orders through the fast decision model.
     this.level = hello.lobby?.anvil || undefined;
@@ -153,6 +155,11 @@ export class Agent {
       if (m.kind === "ack") return;
       if (mine && m.from.key === "player") this.#enqueue({ kind: "radio", msg: m });
       else this.#enqueue({ kind: "heard", msg: m, ...(mine ? { forMe: true } : {}) });
+      return;
+    }
+    if (frame.type === "netlang") {
+      // The language of the commander's page: the net is in it before a word is said.
+      if (frame.lang === "he" || frame.lang === "en") this.netLang = frame.lang;
       return;
     }
     if (frame.type === "direct") {

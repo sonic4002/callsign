@@ -101,6 +101,8 @@ func (rm *Room) SetLang(c *Client, lang string) error {
 		return fmt.Errorf("unknown language %q", lang)
 	}
 	rm.lang[c.ID.Side]["player"] = lang
+	// The side's agents write in it from their first line, before the commander has spoken.
+	rm.broadcast(c.ID.Side, map[string]any{"type": "netlang", "lang": lang})
 	return nil
 }
 
