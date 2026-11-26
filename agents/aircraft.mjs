@@ -127,15 +127,17 @@ export function strikeEventLines(e, say, where, status) {
 }
 
 // strikeTasks is the level-3 operator's use of its strike squads while it runs the
-// fight: one that stands armed with no order is sent at the enemy squad nearest the
-// base that bombs can hurt, else at an enemy defence or power structure its side has
-// seen, else at any other structure of the enemy's. It returns { squad, contact } and
-// { squad, structure } tasks; the operator puts them into words.
+// fight: one that stands armed with no order is sent at the enemy squad in sight nearest
+// the base that bombs can hurt, else at an enemy defence or power structure its side has
+// seen, else at any other structure of the enemy's; and with nothing known to bomb, one
+// flies over the enemy headquarters to look. It returns { squad, contact },
+// { squad, structure } and { squad, look } tasks; the operator puts them into words.
 export function strikeTasks({ status, rules, side, squads, structures, dist }) {
   const hq = rules.map.points.find((p) => p.kind === "hq" && p.owner === side);
+  const enemyHQ = rules.map.points.find((p) => p.kind === "hq" && p.owner !== side);
   const out = [];
   const taken = new Set((status.squads ?? []).map((q) => q.order?.place || q.order?.contact).filter(Boolean));
-  const prey = (status.contacts ?? []).filter((c) => c.class !== "air" && !c.parked && hq && dist(c, hq) <= 700).sort((a, b) => dist(a, hq) - dist(b, hq) || a.id - b.id);
+  const prey = (status.contacts ?? []).filter((c) => c.class !== "air" && !c.parked && hq).sort((a, b) => dist(a, hq) - dist(b, hq) || a.id - b.id);
   const worth = { defence: 0, power: 1, airbase: 2, refinery: 3 };
   const marks = structures.filter((st) => st.whose === "enemy" && !st.building).sort((a, b) => (worth[a.role] ?? 9) - (worth[b.role] ?? 9) || a.id.localeCompare(b.id));
   for (const sq of squads) {
@@ -148,6 +150,8 @@ export function strikeTasks({ status, rules, side, squads, structures, dist }) {
     } else if (st) {
       taken.add(st.id);
       out.push({ squad: sq, structure: st });
+    } else if (enemyHQ && marks.length === 0 && !out.some((t) => t.look)) {
+      out.push({ squad: sq, look: enemyHQ.id });
     }
   }
   return out;

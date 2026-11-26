@@ -367,11 +367,16 @@ function fightMoves({ wake, rules, agent }, mem, lang) {
     }
   }
   // Strike aircraft standing armed are sent at what the ground squads cannot reach: an
-  // enemy squad near the base, else a defence or a power structure the side has seen.
+  // enemy squad in sight, else a defence or a power structure the side has seen. With
+  // nothing known to bomb, one flies over the enemy headquarters to look, now and then.
   const planes = s.squads.filter((sq) => isStrike(unitOf(sq)) && !hammers.has(sq.callsign.en) && !fresh(sq, 20));
   const known = compactStructures(s, side);
   for (const t of strikeTasks({ status: s, rules, side, squads: planes, structures: known, dist })) {
     if (moves.length >= 3) break;
+    if (t.look) {
+      if (once("look", 150)) task([t.squad], say("opMove", { place: name(t.look) }));
+      continue;
+    }
     const def = t.structure && Object.values(rules.factions).flatMap((f) => Object.values(f.structures)).find((d) => d.name.en === t.structure.name);
     const place = t.contact ? `${rules.callsigns.contact[lang]} ${t.contact}` : `${def?.name[lang] ?? t.structure.name} ${t.structure.id}`;
     task([t.squad], say("opAttack", { place }));

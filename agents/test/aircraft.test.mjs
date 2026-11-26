@@ -164,7 +164,14 @@ test("the operator knows a plane when it is asked for one, buys one when the gro
   const heard = parked();
   heard.structures.push({ id: "s9", kind: "rocketNest", name: "Rocket Nest", role: "defence", side: 1, near: "K", x: 1150, y: 260, hp: 1, building: 1 });
   assert.deepEqual((await run(ruleBrain(), { agent: pilot("en"), wake: wake(order, heard) }))[0], ["attack", { place: "s9", contact: 0 }]);
-  // An enemy squad near the base comes first, in the net's language.
+  // With nothing known to bomb it is sent to look at the enemy's headquarters, once in a while.
+  const blind = { ...fight, structures: base };
+  const brain = ruleBrain();
+  const look = await run(brain, { agent: anvil, wake: quiet(blind) });
+  assert.deepEqual(look.filter(([name, input]) => name === "radio" && input.to.includes("Comet 1")), [["radio", { to: ["Comet 1"], body: "Move to Zulu", end: "over" }]]);
+  const soon = await run(brain, { agent: anvil, wake: quiet({ ...blind, timeLeft: blind.timeLeft - 60 }) });
+  assert.deepEqual(soon.filter(([name, input]) => name === "radio" && input.to.includes("Comet 1")), []);
+  // An enemy squad in sight comes first, in the net's language.
   const raid = { ...fight, contacts: [{ id: 7, unit: "technical", class: "vehicle", near: "A", x: 300, y: 480, teams: [{}] }] };
   const he = await run(ruleBrain(), { agent: { ...anvil, lang: "he" }, wake: quiet(raid) });
   assert.ok(he.some(([name, input]) => name === "radio" && input.to.includes("Comet 1") && input.body === "תקפו את מטרה 7"), JSON.stringify(he));
