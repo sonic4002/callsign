@@ -20,7 +20,7 @@ export class Agent {
   // `join` is added to the address the agent joins with: its host's id, and { room, key } or
   // { room, token } for a server that holds rooms.
   // `where` says where this agent runs, for its commander's view: "server" or "browser".
-  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 2500, wakesPerConversation = 15, quietMs = 30_000, gatherMs = 1500, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
+  constructor({ server, side, role, squad = 0, brain, log = console.log, standByMs = 12_000, wakesPerConversation = 15, quietMs = 30_000, gatherMs = 1500, join = {}, where = typeof WorkerGlobalScope === "undefined" ? "server" : "browser" }) {
     Object.assign(this, { server, side, role, squad, brain, log, standByMs, wakesPerConversation, quietMs, gatherMs, join });
     // What this agent tells its own commander about itself; see telemetry.mjs.
     this.tele = new Telemetry({ role, squad, brain: brain?.name ?? "", where, limit: wakesPerConversation, send: (report) => this.link.send({ type: "telemetry", telemetry: report }) });
@@ -250,7 +250,8 @@ export class Agent {
     const timer =
       call && (this.brain.slowFor?.({ role: this.role, tier: this.tier }) ?? this.brain.slow)
         ? setTimeout(() => {
-            // Thinking takes a moment; say so, the way a real operator would.
+            // Only a long wait is worth a line on the net: the page already shows who is
+            // thinking, and a "Stand by" before every answer just crowds the radio.
             if (answered) return;
             this.link.tool("radio", { to: [call.from.en], body: standBy[this.lang] ?? standBy.en, end: "out" }).catch(() => {});
             this.tele.saidStandBy();
