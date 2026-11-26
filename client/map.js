@@ -23,6 +23,7 @@ import { fingers, pixelRatio, smoothing } from "./touch.js";
 export const sideColor = { [-1]: "#cfd3c8", 0: "#4da3ff", 1: "#ff6b4a" };
 const nerveColor = { steady: "#63d68a", shaken: "#f0c04a", pinned: "#ff5a5a" };
 const TAU = Math.PI * 2;
+const SELECT = "#ffd84a"; // the mark of the squad the player has selected
 const RES = 1.5; // terrain is baked at this many pixels per iso unit, less on a big map
 const BAKE_PIXELS = 11e6; // the most pixels the baked terrain may have: phones refuse more
 // A big map's whole picture is coarse, so the part in view is baked again in sharp tiles
@@ -790,11 +791,16 @@ export class Scene {
         ctx.lineWidth = 1.6;
         ctx.stroke();
         if (group.id === this.selected) {
+          // The selected squad: a bright ring that breathes under every team of it.
+          const r = (wide + 6 + 2 * Math.sin(time * 5)) * unitScale;
           ctx.beginPath();
-          ctx.ellipse(sx, sy, (wide + 4 + Math.sin(time * 5)) * unitScale, ((wide + 4 + Math.sin(time * 5)) / 2) * unitScale, 0, 0, TAU);
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1.4;
+          ctx.ellipse(sx, sy, r, r / 2, 0, 0, TAU);
+          ctx.strokeStyle = SELECT;
+          ctx.lineWidth = 3;
+          ctx.setLineDash([r * 0.5, r * 0.28]);
+          ctx.lineDashOffset = -time * 18;
           ctx.stroke();
+          ctx.setLineDash([]);
         }
         if (group.own && this.showNerve() && v.nerve) {
           ctx.beginPath();
@@ -1165,6 +1171,24 @@ export class Scene {
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner], keep: true });
     }
     this.structureLabels(buildScale);
+    if (this.pinged) {
+      const age = (performance.now() - this.pinged.t0) / 1800;
+      if (age >= 1) this.pinged = null;
+      else {
+        const { ctx } = this;
+        const [px, py] = cam.screen(this.pinged.x, this.pinged.y);
+        for (const k of [0, 0.35]) {
+          const a = (age * 2.2 + k) % 1;
+          ctx.beginPath();
+          ctx.ellipse(px, py, 6 + 20 * a, 3 + 10 * a, 0, 0, TAU);
+          ctx.strokeStyle = SELECT;
+          ctx.globalAlpha = (1 - a) * (1 - age);
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
     this.compass();
     this.landmarkLabels(buildScale, lang);
     for (const group of this.groups.values()) {
@@ -1172,6 +1196,21 @@ export class Scene {
       const cx = group.visuals.reduce((a, v) => a + v.x, 0) / group.visuals.length;
       const low = Math.max(...group.visuals.map((v) => cam.screen(v.px, v.py)[1]));
       const [sx] = cam.screen(cx, group.visuals.reduce((a, v) => a + v.y, 0) / group.visuals.length);
+      if (group.id === this.selected) {
+        // An arrow over the selected squad, bobbing, seen above whatever stands around it.
+        const { ctx } = this;
+        const high = Math.min(...group.visuals.map((v) => cam.screen(v.px, v.py)[1])) - (group.small ? 34 : 58) * unitScale - 6 + 3 * Math.sin(performance.now() / 160);
+        ctx.beginPath();
+        ctx.moveTo(sx - 9, high - 12);
+        ctx.lineTo(sx + 9, high - 12);
+        ctx.lineTo(sx, high);
+        ctx.closePath();
+        ctx.fillStyle = SELECT;
+        ctx.strokeStyle = "#1a1608";
+        ctx.lineWidth = 1.5;
+        ctx.fill();
+        ctx.stroke();
+      }
       if (!group.own) {
         // An enemy in sight gets a name the player can say: "Viper 1 attack Target 3".
         this.plate(this.contactName(group.view, lang), sx, low + 16 * unitScale + 4, { size: 12, color: sideColor[group.side], border: `${sideColor[group.side]}88` });
@@ -1187,7 +1226,7 @@ export class Scene {
       const h = this.plate(cover ? `${group.view.callsign[lang]}  ⛨ ⁦${cover}%⁩` : group.view.callsign[lang], sx, low + 16 * unitScale + 4, {
         size: 12,
         color: sideColor[group.side],
-        border: group.id === this.selected ? "#ffffff" : `${sideColor[group.side]}88`,
+        border: group.id === this.selected ? SELECT : `${sideColor[group.side]}88`,
       });
       // Rank chevrons under the name: one for a Sergeant's brain, two for a Veteran's.
       const { ctx } = this;
@@ -1390,6 +1429,11 @@ export class Scene {
     if (!this.rules) return null;
     const hit = placeAt(this.rules.map, ...this.cam.world(sx, sy), Math.max(26, 20 / this.cam.zoom));
     return hit.landmark || hit.bridge ? hit : null;
+  }
+
+  // ping marks a spot on the ground for a moment: where a squad was just sent.
+  ping(x, y) {
+    this.pinged = { x, y, t0: performance.now() };
   }
 
   // showName shows a landmark's or bridge's name for a few seconds, as after a tap.

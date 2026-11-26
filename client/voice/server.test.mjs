@@ -54,6 +54,7 @@ class LiveCtx {
   audioWorklet = { addModule: async () => {} };
   createMediaStreamSource = () => ({ connect() {}, disconnect() {} });
   createGain = () => ({ gain: {}, connect() {} });
+  decodeAudioData = async () => ({ duration: audio.length / 16000 });
 }
 class TapNode {
   told = [];
@@ -259,24 +260,19 @@ test("a live recording that holds no speech is dropped in the worker too", async
   assert.deepEqual(workers[0].posted.at(-1), { type: "cancel", id: 1 });
 });
 
-test("with a server the live recording goes there whole, and the worker hears nothing", async (t) => {
+test("with a server the call is recorded whole by the browser's recorder, with no tap to depend on", async (t) => {
   withWorklets(t);
   const { voice } = fresh();
   answer = async () => ({ ok: true, status: 200, json: async () => ({ text: "from the server" }) });
-  await voice.start("he", { phrases: ["צפע"] });
-  taps[0].hear(2);
-  assert.equal(await voice.stop("he", [], "hints"), "from the server");
+  assert.equal(await speak(voice, 2), "from the server");
+  assert.equal(taps.length, 0, "a phone may put the audio context to sleep; the recorder does not need it");
   assert.equal(workers.length, 0);
   const sent = calls[0].options.body;
-  assert.ok(sent instanceof Int16Array && Math.abs(sent.length - 2 * 16000) < 200 && sent.some((v) => Math.abs(v) > 10000), `${sent.length} samples at 16 kHz`);
+  assert.ok(sent instanceof Int16Array && sent.length === 2 * 16000, `${sent.length} samples at 16 kHz`);
   // And when the server lets the player down, the browser recognises the kept recording.
   answer = async () => ({ ok: false, status: 502, json: async () => ({}) });
-  voice.restUntil = 0;
-  await voice.start("he", { phrases: ["צפע"] });
-  taps[0].hear(2);
-  assert.equal(await voice.stop("he", ["צפע"], "hints"), "from the browser");
-  const m = workers[0].posted.at(-1);
-  assert.deepEqual([m.type, m.phrases, m.openers], ["transcribe", ["צפע"], ["צפע"]]);
+  assert.equal(await speak(voice, 2), "from the browser");
+  assert.equal(workers[0].posted.at(-1).type, "transcribe");
 });
 
 test("the model is not fetched ahead on mobile data or when the browser is saving data", () => {

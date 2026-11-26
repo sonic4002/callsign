@@ -127,6 +127,13 @@ export class Voice {
     // Made (and woken) inside the press itself: some browsers start audio only then.
     const ctx = this.#context();
     try {
+      // A microphone the phone took away in the middle of a match (a call, another app,
+      // the screen going dark) may still look open while it gives only silence: ask again.
+      const track = this.stream?.getAudioTracks?.()[0];
+      if (track && (track.readyState !== "live" || track.muted)) {
+        for (const tr of this.stream.getTracks?.() ?? []) tr.stop();
+        this.stream = null;
+      }
       if (!this.stream?.active) {
         this.onState("asking");
         // Plain audio: the music is muted while talking, and the recognisers cope with
@@ -138,7 +145,10 @@ export class Voice {
       return this.onState(err.name === "NotAllowedError" || err.name === "SecurityError" ? "denied" : "failed", { message: err.message });
     }
     if (!this.held) return this.onState("idle"); // released while the browser was asking
-    const tap = await this.#listen(ctx);
+    // The live tap is for the recogniser in this browser, which hears the call as it is
+    // spoken. A server that transcribes wants the whole call, and the browser's own
+    // recorder makes that without depending on an audio context a phone may have put to sleep.
+    const tap = this.remote && Date.now() >= this.restUntil ? null : await this.#listen(ctx);
     if (!this.held) return this.onState("idle"); // or while the worklet was being set up
     const recorder = tap ? this.#live(tap, lang) : this.#whole();
     this.recorder = recorder;
@@ -219,7 +229,11 @@ export class Voice {
   // resolves with the tap, or with null where recordings have to be made whole.
   async #listen(ctx) {
     if (this.noTap || !ctx?.audioWorklet || !window.AudioWorkletNode) return null;
-    if (this.tap?.stream === this.stream) return ctx.state === "running" ? this.tap : null;
+    if (this.tap?.stream === this.stream) {
+      // A phone suspends the context behind the page's back; wake it before giving up on it.
+      if (ctx.state !== "running") await Promise.race([ctx.resume(), sleep(400)]).catch(() => {});
+      return ctx.state === "running" ? this.tap : null;
+    }
     try {
       // A context the browser will not start is no use for this call; the next may fare better.
       if (ctx.state !== "running") await Promise.race([ctx.resume(), sleep(400)]);
@@ -273,6 +287,8 @@ export class Voice {
     recorder.audio = async () => {
       await Promise.race([flushed, sleep(FLUSH_WAIT)]);
       recorder.state = "inactive";
+      // A tap that handed over nothing is not working here: the next call is recorded whole.
+      if (!chunks.length) this.noTap = true;
       return joined(chunks);
     };
     return recorder;

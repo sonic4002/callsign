@@ -1421,7 +1421,16 @@ function mapClick(ev) {
   // A landmark, a bridge or a point: with a squad selected the orders it can be given
   // there, with none its name goes into the message.
   const place = hit.landmark ?? hit.bridge ?? hit.point;
-  if (!place) return;
+  if (!place) {
+    // Open ground with a squad selected: it is sent there at once, by a call that says
+    // the spot the way the net reads one, so many metres each way from the nearest point.
+    if (!squad || state.over) return;
+    const spot = spotAt(rules, ...scene.cam.world(sx, sy));
+    if (spot.x < 0 || spot.y < 0 || spot.x > rules.map.width || spot.y > rules.map.height) return;
+    scene.ping(spot.x, spot.y);
+    const where = spot.east || spot.south ? spotWords(t, spot, pointName(spot.point)) : pointName(spot.point);
+    return order(call("move", { to: squad.callsign[lang], point: where }));
+  }
   const kind = hit.landmark ? "landmark" : hit.bridge ? "bridge" : "point";
   const name = kind === "point" ? place.callsign[lang] : place.name[lang];
   if (kind !== "point") scene.showName(place.id);

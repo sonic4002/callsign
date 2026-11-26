@@ -16,7 +16,7 @@ const tool = (name, description, properties) => ({
 // A place is where an order sends the squad. The server reads all of these forms.
 const place = (what) => ({
   type: "string",
-  description: `${what} One of: a map point by id or any of its names ("F", "Foxtrot", "פסל", "the town"); a landmark or bridge by its id from the map list ("F-house-1", "bridge-south") or by its name ("the grove north of Foxtrot"); or a spot off a point, as "<bearing> of <point> [<metres>]" ("north of Foxtrot", "NE of D 150").`,
+  description: `${what} One of: a map point by id or any of its names ("F", "Foxtrot", "פסל", "the town"); a landmark or bridge by its id from the map list ("F-house-1", "bridge-south") or by its name ("the grove north of Foxtrot"); a spot off a point, as "<bearing> of <point> [<metres>]" ("north of Foxtrot", "NE of D 150"); or an exact spot, when the order gave a distance each way: keep both distances, as "N350 E30 of D" or in the order's own words ("350 metres north and 30 metres east of Delta"), and never round it to one bearing.`,
 });
 
 // The kinds a station may give its own transmission; the server knows the rest itself.
