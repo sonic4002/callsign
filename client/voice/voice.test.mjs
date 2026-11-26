@@ -36,6 +36,7 @@ const heard = {
     ["ריש אחת כאן פטישה חזק בשמח עבור", "כריש 1, כאן פטיש, חזק בסמך, עבור."],
     ["צפע אחת וקרנף אחת כאן פטיש נועו לכרמל סוף", "צפע 1 וקרנף 1, כאן פטיש, נועו לכרמל, סוף."],
     ["סדן, כאן פטיש, קנה טנק, עבור.", "סדן, כאן פטיש, קנה טנק, עבור."],
+    ["קרנף אחד כאן פטיש תקפו את כרמל עבור עבור", "קרנף 1, כאן פטיש, תקפו את כרמל, עבור."],
   ],
 };
 
@@ -139,6 +140,8 @@ test("relaxed: a callsign that only sounds right is respelled when its number fo
   assert.equal(relaxed("צבע 1 תפוס את דוד", { lang: "he", rules }), "צפע 1 תפוס את דוד");
   assert.equal(relaxed("צבע אחת תקוף", { lang: "he", rules }), "צפע 1 תקוף");
   assert.equal(relaxed("vapour two attack gulf", { lang: "en", rules }), "Viper 2 attack Golf");
+  assert.equal(relaxed("Viper, too, hold Delta.", { lang: "en", rules }), "Viper 2, hold Delta.");
+  assert.equal(relaxed("Anvil, to the bridge", { lang: "en", rules }), "Anvil, to the bridge"); // not a number: nothing sets it off
   assert.equal(relaxed("what is happening at Kilo?", { lang: "en", rules }), "what is happening at Kilo?");
   assert.equal(relaxed("buy a tank", { lang: "en", rules }), "buy a tank");
   assert.equal(tidy("Viper 2, this is Hammer. Hold Foxtrot. Over.", { lang: "en", rules }), "Viper 2, this is Hammer. Hold Foxtrot. Over.");
