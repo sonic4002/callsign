@@ -3,6 +3,7 @@ package room
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -205,5 +206,44 @@ func TestCuesFollowTheCommandersPageLanguageBeforeTheySpeak(t *testing.T) {
 	cues := cuesHeard(t, hammer)
 	if len(cues) == 0 || cues[0].Lang != "he" || !strings.Contains(cues[0].Text, "הבנייה הושלמה") {
 		t.Fatalf("the cue was not in Hebrew: %+v", cues)
+	}
+}
+
+func TestTheCommanderSendsASquadByHandAndItAnswersWilco(t *testing.T) {
+	rm := actRoom(t)
+	hammer := join(t, rm, 0, RoleHammer, 0)
+	enemy := join(t, rm, 1, RoleHammer, 0)
+	var mine *sim.Squad
+	for _, sq := range rm.sim.Squads {
+		if sq.Alive && sq.Side == 0 && mine == nil {
+			mine = sq
+		}
+	}
+	if mine == nil {
+		t.Fatal("no squad to order")
+	}
+	before := len(rm.logs[0])
+	args := fmt.Sprintf(`{"squad":%d,"order":"move","place":"N200 E100 of A"}`, mine.ID)
+	if _, err := act(rm, hammer, ActOrder, args); err != nil {
+		t.Fatal(err)
+	}
+	if mine.Order.Kind != ToolMove || mine.Order.Place != "N200 E100 of A" {
+		t.Fatalf("order = %+v", mine.Order)
+	}
+	if !rm.traffic[0].hammers[mine.ID] {
+		t.Fatal("a squad sent by hand is Hammer's own")
+	}
+	if len(rm.logs[0]) != before+1 || rm.logs[0][len(rm.logs[0])-1].Body != "Wilco" || rm.logs[0][len(rm.logs[0])-1].End != "out" {
+		t.Fatalf("the squad answers Wilco, out: %+v", rm.logs[0][before:])
+	}
+	// Not the enemy's squad, not an order that needs words, not a place that is nowhere.
+	if _, err := act(rm, enemy, ActOrder, args); !errors.Is(err, sim.ErrNoSquad) {
+		t.Fatalf("the enemy ordering it: %v", err)
+	}
+	if _, err := act(rm, hammer, ActOrder, fmt.Sprintf(`{"squad":%d,"order":"capture","place":"A"}`, mine.ID)); err == nil {
+		t.Fatal("capture by hand was taken")
+	}
+	if _, err := act(rm, hammer, ActOrder, fmt.Sprintf(`{"squad":%d,"order":"move","place":"nowhere"}`, mine.ID)); !errors.Is(err, sim.ErrNoPoint) {
+		t.Fatalf("a place that is nowhere: %v", err)
 	}
 }

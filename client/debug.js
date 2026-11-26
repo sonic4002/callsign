@@ -669,6 +669,16 @@ function acted(frame) {
   }, 4000);
 }
 
+// send gives a squad one of the three plain orders by hand: the game applies it at once
+// and the squad answers "Wilco, out" by itself. Anything else a squad is told is a call.
+const BY_HAND = ["move", "hold", "attack"];
+function send(squad, action, where) {
+  hideOrders();
+  act("order", { squad: squad.id, order: action, ...where });
+}
+// byHand wraps a menu's `say`: a plain order is sent by hand, the rest stay radio calls.
+const byHand = (squad, where, say) => (action) => (BY_HAND.includes(action) ? void send(squad, action, where) : say(action));
+
 function order(text) {
   if (!transmit(text)) return;
   if (sent.at(-1) !== text) sent.push(text);
@@ -1397,7 +1407,7 @@ function mapClick(ev) {
     if (!mine) return draft($("text").value + name);
     // With a squad picked, an enemy offers one action: attack it. A hero may seize a vehicle.
     const acts = heroOrders(rules, mine, { kind: "contact", cls: hit.contact.class }, ["attack"]);
-    return offerOrders({ title: `${mine.callsign[lang]} → ${name}`, actions: acts, say: (action) => call(action, { to: mine.callsign[lang], point: name }) }, box, sx, sy);
+    return offerOrders({ title: `${mine.callsign[lang]} → ${name}`, actions: acts, say: byHand(mine, { contact: hit.contact.id }, (action) => call(action, { to: mine.callsign[lang], point: name })) }, box, sx, sy);
   }
   if (hit.structure) {
     // An enemy structure: engineers are sent to take it over, anyone else to attack it.
@@ -1409,7 +1419,7 @@ function mapClick(ev) {
     const actions = heroOrders(rules, mine, { kind: "structure" }, unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"]);
     const tech = st.role === "tech"; // not "the enemy's": it may be nobody's
     const say = (action) => (action === "plant" ? call("plantStructure", { to: mine.callsign[lang], structure: structureName(st) }) : call(`${action === "capture" ? "capture" : "attackStructure"}${tech ? "Tech" : ""}`, { to: mine.callsign[lang], structure: structureName(st) }));
-    return offerOrders({ title: `${mine.callsign[lang]} → ${structureName(st)}`, actions, say }, box, sx, sy);
+    return offerOrders({ title: `${mine.callsign[lang]} → ${structureName(st)}`, actions, say: byHand(mine, { place: st.id }, say) }, box, sx, sy);
   }
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (hit.gusher && !hit.landmark && !hit.bridge) {
@@ -1428,8 +1438,7 @@ function mapClick(ev) {
     const spot = spotAt(rules, ...scene.cam.world(sx, sy));
     if (spot.x < 0 || spot.y < 0 || spot.x > rules.map.width || spot.y > rules.map.height) return;
     scene.ping(spot.x, spot.y);
-    const where = spot.east || spot.south ? spotWords(t, spot, pointName(spot.point)) : pointName(spot.point);
-    return order(call("move", { to: squad.callsign[lang], point: where }));
+    return send(squad, "move", { place: spot.east || spot.south ? spotForm(spot) : spot.point });
   }
   const kind = hit.landmark ? "landmark" : hit.bridge ? "bridge" : "point";
   const name = kind === "point" ? place.callsign[lang] : place.name[lang];
@@ -1437,7 +1446,7 @@ function mapClick(ev) {
   if (!squad) return draft($("text").value + name);
   const said = kind === "point" ? name : placeName(place.id);
   const target = kind === "point" && place.kind === "hq" && place.owner !== side ? "enemyHQ" : kind;
-  offerOrders({ title: `${squad.callsign[lang]} → ${name}`, actions: heroOrders(rules, squad, { kind: target }, ordersFor(kind)), say: (action) => call(action, { to: squad.callsign[lang], point: said }) }, box, sx, sy);
+  offerOrders({ title: `${squad.callsign[lang]} → ${name}`, actions: heroOrders(rules, squad, { kind: target }, ordersFor(kind)), say: byHand(squad, { place: place.id }, (action) => call(action, { to: squad.callsign[lang], point: said })) }, box, sx, sy);
 }
 
 // offerOrders opens the one small menu of the map: the orders for a squad at a place, an
@@ -1451,6 +1460,7 @@ let orderCall = null;
 function offerOrders({ title, facts = "", actions, gold = {}, say }, box, sx, sy) {
   const menu = $("orders");
   orderCall = say;
+  $("orders-units").hidden = true;
   $("orders-title").textContent = title;
   $("orders-facts").textContent = facts;
   for (const button of menu.querySelectorAll("button")) {
@@ -1515,6 +1525,37 @@ function offerStructure(st, squad, box, sx, sy) {
     return null;
   };
   offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
+  offerUnits(def);
+}
+
+// offerUnits lists, in the menu of one of the player's structures, the units it makes:
+// each with its price, pressable when it can be bought now. A press is a press on the
+// unit's own card in the Reinforcements tab, which is also brought forward and lit.
+function offerUnits(def) {
+  const cards = (def.unlocks ?? []).map((id) => $("build").querySelector(`button[data-unit="${id}"]`)).filter(Boolean);
+  const list = $("orders-units");
+  list.replaceChildren();
+  list.hidden = cards.length === 0;
+  if (!cards.length) return;
+  showBuildTab("units");
+  for (const card of $("build").querySelectorAll("button[data-unit]")) card.classList.toggle("from-here", cards.includes(card));
+  setTimeout(() => cards.forEach((card) => card.classList.remove("from-here")), 6000);
+  cards[0].scrollIntoView({ block: "nearest", inline: "nearest" });
+  for (const card of cards) {
+    const unit = unitDef(rules, card.dataset.unit);
+    const button = el("button", "", "");
+    button.type = "button";
+    button.disabled = card.disabled || card.classList.contains("locked");
+    const why = card.classList.contains("locked") ? card.title : state.gold < unit.cost ? t("unit.noGold") : "";
+    button.append(el("span", "", unit.name[lang]), el("bdi", "gold", String(unit.cost)));
+    if (why) button.append(el("small", "why", why));
+    button.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      card.click();
+      hideOrders();
+    });
+    list.append(button);
+  }
 }
 
 // ---- where the build panel sits ----

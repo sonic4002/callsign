@@ -577,3 +577,11 @@ footer.panel label { display: block; margin-block-end: .3rem; }
   #map-wrap > #radar-box #radar-map { max-block-size: 7rem; }
   #map-wrap > #radar-box.off { max-inline-size: 9.5rem; font-size: .68rem; }
 }
+
+/* The units a structure makes, listed in its own menu and lit on their cards. */
+#orders #orders-units { flex-direction: column; align-items: stretch; gap: .25rem; border-block-start: 1px solid var(--line, #2a332c); padding-block-start: .4rem; }
+#orders #orders-units[hidden] { display: none; }
+#orders-units button { justify-content: space-between; gap: .8rem; }
+#orders-units button:disabled { opacity: .55; }
+#orders-units .why { color: var(--warn); }
+#build button.from-here { outline: 2px solid var(--brass); outline-offset: -2px; box-shadow: 0 0 12px rgba(255, 216, 74, .55); }

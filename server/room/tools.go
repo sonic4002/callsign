@@ -64,6 +64,8 @@ type toolArgs struct {
 	Run       string `json:"run"`
 	Field     string `json:"field"`  // haul: a gold field by its point ("Kilo", "K", "the airfield"), or "auto"
 	Hauler    int    `json:"hauler"` // haul: one hauler's id, or 0 for all of them
+	Squad     int    `json:"squad"`  // a direct order from the commander's page: the squad's id
+	Order     string `json:"order"`  // and the order: move, hold or attack
 }
 
 // Tool runs one game tool for a client and returns its result.
@@ -115,7 +117,13 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 	}
 
 	// move, hold, attack, repair: always the caller's own squad.
-	cmd := sim.Command{Side: side, Kind: name, Squad: c.ID.Squad, Contact: a.Contact}
+	return rm.orderSquad(side, c.ID.Squad, name, a)
+}
+
+// orderSquad gives one squad an order at a place or against a contact, and returns the
+// order as the squad now has it.
+func (rm *Room) orderSquad(side, squad int, name string, a toolArgs) (any, error) {
+	cmd := sim.Command{Side: side, Kind: name, Squad: squad, Contact: a.Contact}
 	where := a.Place
 	if where == "" {
 		where = a.Point
@@ -124,7 +132,7 @@ func (rm *Room) Tool(c *Client, name string, raw json.RawMessage) (any, error) {
 		// One resolver for every kind of place: a point, a landmark, a bridge, a structure
 		// by id or by name, or a bearing from a point (build.go).
 		var x, y float64
-		if sq := rm.sim.Squad(c.ID.Squad); sq != nil {
+		if sq := rm.sim.Squad(squad); sq != nil {
 			x, y = sq.Center()
 		}
 		place, err := rm.place(side, where, name == ToolAttack || name == ToolPlant, x, y)

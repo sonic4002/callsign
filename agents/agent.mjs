@@ -159,7 +159,12 @@ export class Agent {
       // Hammer built, bought, cancelled, sold, repaired or set a rally point by hand, from
       // the panel. The operator keeps it in its picture of the net; it is not a call, and
       // nobody is woken for it.
-      if (this.role === "anvil") {
+      // A squad Hammer sent somewhere by hand has its order already and has answered
+      // "Wilco" by the game's own code; its leader notes whose order it is on, unwoken.
+      const mine = frame.act === "order" && this.role === "squad" && frame.result?.id === this.squad;
+      if (mine) this.commander = "Hammer";
+      if (frame.lang === "he" || frame.lang === "en") this.netLang = frame.lang; // the net follows the commander's language
+      if (this.role === "anvil" || mine) {
         this.traffic.push(directLine(frame));
         if (this.traffic.length > 8) this.traffic.shift();
       }
@@ -459,8 +464,9 @@ export function directLine(frame) {
     sell: `sold the ${r.name ?? "structure"}`,
     repair: `began repairing the ${r.name ?? "structure"}`,
     rally: "set a rally point",
+    order: `ordered ${r.squad?.en ?? "a squad"} to ${r.order?.order ?? "move"}${r.order?.place || r.order?.point ? ` at ${r.order.place || r.order.point}` : r.order?.contact ? ` contact ${r.order.contact}` : ""}; it is on Hammer's order and has acknowledged`,
   }[frame.act];
-  return `(no call) Hammer, from the panel, ${what ?? frame.act}.`;
+  return `(no call) Hammer, by hand, ${what ?? frame.act}.`;
 }
 
 // callsFor reports whether a transmission is a call this station must act on. "Out" means
