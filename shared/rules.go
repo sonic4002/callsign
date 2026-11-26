@@ -135,7 +135,8 @@ type Unit struct {
 	// sortie, 0 for every other unit. Damage is what one bomb does at the middle of its
 	// blast, BlastRadius how far the blast reaches, and RearmSeconds how long the squad
 	// stands at its airbase after a strike before it can fly again.
-	// Evade is the share of the shots fired at it in flight that its speed makes miss.
+	// Evade is the share of the shots squads fire at it in flight that its speed makes
+	// miss; defences are not fooled.
 	Bombs        int     `json:"bombs,omitempty"`
 	BlastRadius  float64 `json:"blastRadius,omitempty"`
 	RearmSeconds float64 `json:"rearmSeconds,omitempty"`

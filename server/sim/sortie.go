@@ -38,6 +38,9 @@ const (
 	// ReasonNoAirbase is why a strike squad was lost: it had no airbase left to land at.
 	ReasonNoAirbase = "no_airbase"
 
+	// closeUp is how far from its target a strike squad closes its formation to drop.
+	closeUp = 260.0
+
 	// strikeSeconds is how long a bomb's blast stays in the snapshots, for the page to draw.
 	strikeSeconds = 1.5
 )
@@ -107,6 +110,10 @@ func (s *Sim) airbaseFor(sq *Squad) *Structure {
 	return best
 }
 
+// wingSpace is how much wider than a ground squad's formation a strike squad stands on
+// its apron and flies: wings need the room. Over its target it closes up to drop.
+const wingSpace = 2.2
+
 // padSlot is where one plane of a squad stands at its airbase: each squad has a corner
 // of the apron by its number, so that two squads of one base do not stand in a heap.
 func (s *Sim) padSlot(sq *Squad, st *Structure, slot int) (float64, float64) {
@@ -114,7 +121,7 @@ func (s *Sim) padSlot(sq *Squad, st *Structure, slot int) (float64, float64) {
 	k := (sq.Num - 1) % 4
 	cx, cy := st.X+apron*float64(2*(k%2)-1), st.Y+apron*float64(2*(k/2)-1)
 	ox, oy := s.formation(sq.unit, slot, sq.Side)
-	return s.clamp("air", cx+ox, cy+oy)
+	return s.clamp("air", cx+ox*wingSpace, cy+oy*wingSpace)
 }
 
 // park stands a strike squad at an airbase, armed and with no order. With no airbase to
@@ -129,7 +136,7 @@ func (s *Sim) park(sq *Squad, st *Structure) {
 	for i := range sq.Teams {
 		t := &sq.Teams[i]
 		t.X, t.Y = s.padSlot(sq, st, i)
-		t.Action, t.dropped = ActIdle, false
+		t.Action = ActIdle
 	}
 	sq.Order = Order{Kind: OrderNone}
 }
@@ -281,6 +288,10 @@ func (s *Sim) sortiePlan(tr *teamRef) plan {
 	switch a.State {
 	case SortieOut:
 		ox, oy := s.formation(tr.u, tr.slot, sq.Side)
+		// Spread out on the way, and closing up over the last stretch, so the bombs fall together.
+		if cx, cy := sq.Center(); dist(cx, cy, sq.Order.X, sq.Order.Y) > closeUp {
+			ox, oy = ox*wingSpace, oy*wingSpace
+		}
 		x, y := s.clamp("air", sq.Order.X+ox, sq.Order.Y+oy)
 		return plan{act: ActAdvance, x: x, y: y}
 	case SortieBack:
@@ -326,50 +337,45 @@ func (s *Sim) strikes(live []*teamRef) {
 		if !sq.Alive || a == nil || a.grounded() {
 			continue
 		}
-		over, dropped := true, 0
+		// The planes of a squad fly together: the first to reach its place is the squad
+		// reaching it, and the others, a step behind, drop with it.
+		var planes []*teamRef
+		first, all := false, true
 		for _, tr := range live {
 			if tr.sq != sq || tr.t.Members == 0 {
 				continue
 			}
-			if p := tr.plan; p.act != ActAdvance || dist(tr.t.X, tr.t.Y, p.x, p.y) > 0.5 {
-				over = false
-				continue
-			}
-			if a.State == SortieOut && sq.Order.Kind == OrderAttack && !tr.t.dropped {
-				s.bomb(tr, live)
-				tr.t.dropped = true
-				dropped += tr.u.Bombs * tr.t.Members
-			}
+			planes = append(planes, tr)
+			there := tr.plan.act == ActAdvance && dist(tr.t.X, tr.t.Y, tr.plan.x, tr.plan.y) <= 0.5
+			first, all = first || there, all && there
 		}
 		cx, cy := sq.Center()
 		switch {
-		case dropped > 0 || (over && a.State == SortieOut && sq.Order.Kind == OrderAttack):
-			// The planes fly together and drop together; one that was a step behind has
-			// dropped by the time the squad turns.
-			if !over {
-				continue
-			}
+		case a.State == SortieOut && sq.Order.Kind == OrderAttack && first:
 			o := sq.Order
-			e := Event{Side: sq.Side, Kind: EvStrike, Squad: sq.ID, Point: s.nearestPoint(o.X, o.Y), Count: sq.unit.Bombs * len(liveTeamsOf(sq)), Contact: o.Contact}
+			e := Event{Side: sq.Side, Kind: EvStrike, Squad: sq.ID, Point: s.nearestPoint(o.X, o.Y), Contact: o.Contact}
+			for _, tr := range planes {
+				s.bomb(tr, tr.plan.x, tr.plan.y, live)
+				e.Count += tr.u.Bombs * tr.t.Members
+			}
 			if st := s.structure(o.Structure); st != nil {
 				e.Structure, e.Unit = st.PlaceID(), st.Kind
 			} else if o.Contact == 0 {
 				e.Place = o.Place
 			}
 			s.emit(e)
-			a.Bombs = 0
+			a.Bombs, a.State = 0, SortieBack
 			if !s.strikeAgain(sq) {
 				sq.Order = Order{Kind: OrderReturn, Tick: s.Tick}
 			}
-			a.State = SortieBack
-		case over && a.State == SortieOut:
+		case a.State == SortieOut && first:
 			// A flight over a place: it has seen what is there, and turns for home.
 			s.emit(Event{Side: sq.Side, Kind: EvOverhead, Squad: sq.ID, Point: s.nearestPoint(cx, cy), Place: sq.Order.Place, Count: len(sq.Contacts)})
 			sq.Order = Order{Kind: OrderReturn, Tick: s.Tick}
 			a.State = SortieBack
-		case over && a.State == SortieBack:
-			for i := range sq.Teams {
-				sq.Teams[i].dropped, sq.Teams[i].Action = false, ActIdle
+		case a.State == SortieBack && all:
+			for _, tr := range planes {
+				tr.t.Action = ActIdle
 			}
 			if sq.Order.Kind == OrderReturn {
 				sq.Order = Order{Kind: OrderNone}
@@ -381,16 +387,6 @@ func (s *Sim) strikes(live []*teamRef) {
 			}
 		}
 	}
-}
-
-func liveTeamsOf(sq *Squad) []*Team {
-	var out []*Team
-	for i := range sq.Teams {
-		if sq.Teams[i].Members > 0 {
-			out = append(out, &sq.Teams[i])
-		}
-	}
-	return out
 }
 
 // strikeAgain reports whether a strike squad's attack order stands after a pass: its
@@ -413,13 +409,13 @@ func (s *Sim) strikeAgain(sq *Squad) bool {
 	return o.Point != "" && o.Point == s.R.HQPoint(1-sq.Side).ID
 }
 
-// bomb is one plane's load going off under it. Everything of the enemy's inside the
+// bomb is one plane's load going off at (x, y), the place it was flying to. Everything of the enemy's inside the
 // blast is hit, seen or not, less toward the edge: fireteams (not aircraft), structures
 // and fences, the headquarters, and the bridge or the building the order named. Cover
 // and walls take off what they take off a shot.
-func (s *Sim) bomb(tr *teamRef, live []*teamRef) {
+func (s *Sim) bomb(tr *teamRef, x, y float64, live []*teamRef) {
 	sq, t, u := tr.sq, tr.t, tr.u
-	x, y, r := t.X, t.Y, u.BlastRadius
+	r := u.BlastRadius
 	power := u.Damage * float64(u.Bombs) * float64(t.Members)
 	share := func(d float64) float64 { return 1 - 0.6*math.Max(0, d)/r }
 	t.lastFire = s.Tick
@@ -452,7 +448,10 @@ func (s *Sim) bomb(tr *teamRef, live []*teamRef) {
 		if st.Ruin || st.Gone || st.Side == sq.Side || (st.Tech() && st.ID != sq.Order.Structure) {
 			continue // a tech building is bombed only on an order: it is worth more taken than broken
 		}
-		d, vs := s.reach(t, st), u.Against(st.def.TargetClass())
+		d, vs := dist(x, y, st.X, st.Y)-st.def.Footprint, u.Against(st.def.TargetClass())
+		if st.def.Role == shared.RoleFence {
+			d = segDist(x, y, st.AX, st.AY, st.BX, st.BY)
+		}
 		if d > r || vs == 0 {
 			continue
 		}
@@ -476,8 +475,9 @@ func (s *Sim) bomb(tr *teamRef, live []*teamRef) {
 	}
 }
 
-// evades is the multiplier on the chance of a shot at a team: a strike aircraft in flight
-// is fast, and slips its unit's share of what is fired at it. On the ground it slips none.
+// evades is the multiplier on the chance of a squad's shot at a team: a strike aircraft in
+// flight is fast, and slips its unit's share of what soldiers, vehicles and boats fire at
+// it. On the ground it slips none, and a defence built to track aircraft is not fooled.
 func (s *Sim) evades(tgt *teamRef) float64 {
 	if a := tgt.sq.sortie; a != nil && !a.grounded() {
 		return 1 - tgt.u.Evade

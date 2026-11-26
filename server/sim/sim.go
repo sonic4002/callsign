@@ -140,7 +140,6 @@ type Team struct {
 	// Where the team stood a tick ago, and when a vehicle last ran one of its men down (crush.go).
 	prevX, prevY float64
 	crushTick    int
-	dropped      bool // a plane that has let its bombs go on this sortie (sortie.go)
 
 	// The team's body among the others (bodies.go).
 	dx, dy     float64 // the step it has made this tick

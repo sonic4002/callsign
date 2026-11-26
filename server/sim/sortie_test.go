@@ -370,3 +370,69 @@ func TestTheTwoStrikeAircraftAreAFairMatch(t *testing.T) {
 		t.Fatalf("health for gold under fire: %.1f against %.1f", a, b)
 	}
 }
+
+func TestAStrikeThatDestroysItsTargetStillSpendsItsBombs(t *testing.T) {
+	// The planes of a squad reach their target a step apart. A target that falls to the
+	// first bombs must not leave the squad with its load and no strike to report.
+	s := newSim(t, 1)
+	jet := buyFielded(t, s, 0, "strikeJet")
+	nest := rules.Factions["ashfall"].Structures["gunNest"]
+	wealth(s, 1, nest.Cost)
+	must(t, s, sim.Command{Side: 1, Kind: sim.CmdBuild, Structure: "gunNest", Place: "base:front"})
+	run(s, nest.BuildSeconds+1)
+	scout(t, s, jet)
+	gun := seen(s, 0, own(s, 1, shared.RoleDefence).ID)
+	if gun == nil || !jet.Alive {
+		t.Fatalf("the flight over Zulu did not show the gun nest (jet alive %v)", jet.Alive)
+	}
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdAttack, Squad: jet.ID, Place: gun.ID})
+	ev := until(t, s, sim.EvStrike, 0, 30)
+	run(s, 0.3)
+	if now := seen(s, 1, gun.ID); !now.Ruin {
+		t.Fatalf("four bombs on a gun nest left it at %.2f", now.HP)
+	}
+	var strike sim.Event
+	for _, e := range ev {
+		if e.Kind == sim.EvStrike {
+			strike = e
+		}
+	}
+	if strike.Structure != gun.ID || strike.Count != 4 {
+		t.Fatalf("the strike was reported as %+v", strike)
+	}
+	if a := sortieOf(t, s, jet); a.Bombs != 0 || a.State != sim.SortieBack || jet.Order.Kind != sim.OrderReturn {
+		t.Fatalf("its target gone, the jet should be flying home empty: %+v, order %q", a, jet.Order.Kind)
+	}
+	until(t, s, sim.EvRearmed, 0, 60)
+}
+
+func TestAStrikeBringsDownABridgeAndThenStops(t *testing.T) {
+	s := newSim(t, 1)
+	jet := buyFielded(t, s, 0, "strikeJet")
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdAttack, Squad: jet.ID, Place: "bridge-west"})
+	strikes, fell := 0, false
+	for i := 0; i < 3000 && !fell; i++ {
+		for _, e := range s.Step() {
+			if e.Kind == sim.EvStrike && e.Side == 0 {
+				strikes++
+				if e.Place != "bridge-west" {
+					t.Fatalf("the strike was reported on %q", e.Place)
+				}
+			}
+			fell = fell || (e.Kind == sim.EvBridgeFell && e.Place == "bridge-west")
+		}
+	}
+	if !fell || strikes < 2 {
+		t.Fatalf("the west bridge should fall to a second sortie (fell %v after %d strikes)", fell, strikes)
+	}
+	run(s, 40)
+	if a := sortieOf(t, s, jet); a.State != sim.SortieParked || jet.Order.Kind != sim.OrderNone {
+		t.Fatalf("the bridge is down and the jet is %+v under order %q", a, jet.Order.Kind)
+	}
+	// The other bridges were never the target, and stand untouched.
+	for _, b := range s.Snapshot(sim.Spectator).Bridges {
+		if b.ID != "bridge-west" && (!b.Standing || b.HP < 1) {
+			t.Fatalf("%s was hit: %+v", b.ID, b)
+		}
+	}
+}

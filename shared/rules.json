@@ -792,7 +792,7 @@
           "teams": 2, "members": 1, "hp": 150, "armor": 0.2,
           "speed": 160, "range": 60, "sight": 300,
           "damage": 100, "cooldownTicks": 10, "accuracy": 1, "nerveResist": 0,
-          "bombs": 2, "blastRadius": 60, "rearmSeconds": 14, "evade": 0.5, "noCapture": true,
+          "bombs": 2, "blastRadius": 60, "rearmSeconds": 14, "evade": 0.75, "noCapture": true,
           "vs": { "air": 0, "infantry": 0.5, "hq": 0.3, "structure": 2, "fence": 2 }
         },
         "rocketLauncher": {
@@ -909,7 +909,7 @@
           "teams": 3, "members": 1, "hp": 130, "armor": 0.05,
           "speed": 120, "range": 55, "sight": 300,
           "damage": 135, "cooldownTicks": 10, "accuracy": 1, "nerveResist": 0,
-          "bombs": 1, "blastRadius": 55, "rearmSeconds": 10, "evade": 0.5, "noCapture": true,
+          "bombs": 1, "blastRadius": 55, "rearmSeconds": 10, "evade": 0.75, "noCapture": true,
           "vs": { "air": 0, "infantry": 0.5, "hq": 0.3, "structure": 2, "fence": 2 }
         },
         "rpgTeam": {
