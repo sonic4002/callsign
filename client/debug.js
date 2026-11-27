@@ -878,14 +878,21 @@ function renderSidebar() {
   const units = [...Object.entries(rules.factions[faction]?.units ?? {}), ...(state.foreignUnits ?? []).map((id) => [id, unitDef(rules, id)])];
   const locks = units.map(([id]) => unitLock(state, rules, faction, side, id) ?? heroLock(state, rules, faction, side, id));
   const room = (u) => (u.class === "hauler" ? haulerCount < rules.match.haulerCap : pop < cap);
-  const buildKey = JSON.stringify([lang, faction, canAct, units.map(([id, u]) => [id, room(u) && state.gold >= u.cost]), locks.map((l) => l?.id)]);
+  // A structure pressed on the map narrows the bar to what it makes, while it stands.
+  if (madeBy && !(state.structures ?? []).some((st) => st.id === madeBy.id && st.side === side && !st.ruin)) madeBy = null;
+  const from = madeBy && structureDef(rules, madeBy);
+  const cards = units.map(([id, u], i) => ({ id, u, lock: locks[i] })).filter(({ id, u }) => !from || makes(from, id, u));
+  $("made-by").hidden = !from;
+  if (from) $("made-by-name").textContent = t("build.from", { structure: structureName(madeBy) });
+  const buildKey = JSON.stringify([lang, faction, canAct, madeBy?.id, cards.map(({ id, u, lock }) => [id, room(u) && state.gold >= u.cost, lock?.id])]);
   if (buildKey !== drawn.build) {
     drawn.build = buildKey;
-    $("build").replaceChildren(...units.map(([id, u], i) => buildButton(id, u, canAct && room(u) && state.gold >= u.cost && !locks[i], locks[i])));
+    $("build").replaceChildren(...cards.map(({ id, u, lock }) => buildButton(id, u, canAct && room(u) && state.gold >= u.cost && !lock, lock)));
   }
   renderHaulers(haulers, haulerCount);
   renderDeploying(deploying);
   renderStructures(canAct);
+  numberCards();
 }
 
 // renderHaulers lists the side's gold haulers: what each is doing and how full it is. The
@@ -1093,9 +1100,51 @@ for (const tab of document.querySelectorAll("[data-build-tab]")) {
   tab.addEventListener("click", () => {
     localStorage.setItem("callsign.buildTab", tab.dataset.buildTab);
     showBuildTab(tab.dataset.buildTab);
+    showMadeBy(null); // the tab itself is the whole list
   });
 }
 showBuildTab(buildTab);
+
+// A structure of the player's pressed on the map narrows the Reinforcements bar to the
+// units it makes. The whole list comes back with the button beside it, a press on a tab,
+// a press anywhere else on the map, or Escape.
+let madeBy = null; // the structure pressed, as the state had it
+const makes = (def, id, unit) => unit.requires === def.role || (def.unlocks ?? []).includes(id);
+function showMadeBy(st) {
+  const def = st && structureDef(rules, st);
+  const any = def && [...Object.entries(rules.factions[faction]?.units ?? {}), ...(state.foreignUnits ?? []).map((id) => [id, unitDef(rules, id)])].some(([id, u]) => makes(def, id, u));
+  if ((any ? st.id : null) === (madeBy?.id ?? null)) return;
+  madeBy = any ? st : null;
+  if (madeBy) showBuildTab("units");
+  renderSidebar();
+  $("build").scrollLeft = 0;
+}
+$("made-by-clear").addEventListener("click", () => showMadeBy(null));
+
+// ---- the build bar by keyboard ----
+//
+// Keys 1 to 9 press the first nine cards of the tab that is showing, in the order they
+// stand. Not while a call is being typed: there a digit is part of a callsign.
+const buildCards = (pane = buildTab) => [...$(pane === "units" ? "build" : "structures").querySelectorAll(pane === "units" ? ".unit > button[data-unit]" : ":scope > button")];
+function numberCards() {
+  for (const pane of ["structures", "units"]) {
+    buildCards(pane).forEach((card, i) => {
+      const key = i < 9 ? String(i + 1) : "";
+      const cap = card.querySelector(":scope > kbd") ?? card.appendChild(document.createElement("kbd"));
+      if (cap.textContent !== key) cap.textContent = key;
+    });
+  }
+}
+addEventListener("keydown", (ev) => {
+  if (!/^[1-9]$/.test(ev.key) || ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) return;
+  if (ev.target.closest?.("input, textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;
+  if (!me || !state || state.over || !$("overlay").hidden || $("help").hidden === false) return;
+  const card = buildCards()[Number(ev.key) - 1];
+  if (!card) return;
+  ev.preventDefault();
+  card.scrollIntoView({ block: "nearest", inline: "nearest" });
+  card.click(); // a card that cannot be pressed now takes no press from a key either
+});
 
 // buildBadges puts a count on each tab of what is under way behind it.
 function buildBadges(rising, deploying) {
@@ -1335,7 +1384,7 @@ function unselect() {
   renderSidebar();
 }
 // Escape, a right click on the map, or a second press on the squad's row lets go of it.
-addEventListener("keydown", (ev) => ev.key === "Escape" && !placing && $("help").hidden !== false && unselect());
+addEventListener("keydown", (ev) => ev.key === "Escape" && !placing && $("help").hidden !== false && (unselect(), hideOrders(), showMadeBy(null)));
 $("map").addEventListener("contextmenu", (ev) => {
   ev.preventDefault();
   unselect();
@@ -1378,6 +1427,7 @@ canvas.addEventListener("pointermove", (ev) => {
   scene.hover = { x: ev.clientX - box.left, y: ev.clientY - box.top };
   // The ghost of a structure being placed follows the mouse.
   if (placing?.mode === "build" && state) moveGhost(...scene.cam.world(scene.hover.x, scene.hover.y));
+  canvas.classList.toggle("on-name", !placing && scene.overName(scene.hover.x, scene.hover.y)); // a name is a button
 });
 canvas.addEventListener("pointerleave", () => (scene.hover = null));
 canvas.addEventListener(
@@ -1415,6 +1465,7 @@ function mapClick(ev) {
   }
   if (placing?.mode === "rally") return placeRally(...scene.cam.world(sx, sy));
   const hit = scene.pick(sx, sy, side);
+  if (!(hit.structure?.side === side)) showMadeBy(null); // the bar follows what was pressed
   if (hit.squad) {
     // The squad already picked, tapped again: what it can do where it stands.
     if (hit.squad.id === scene.selected && canDigIn(unitDef(rules, hit.squad.unit))) {
@@ -1482,7 +1533,6 @@ let orderCall = null;
 function offerOrders({ title, facts = "", actions, gold = {}, say }, box, sx, sy) {
   const menu = $("orders");
   orderCall = say;
-  $("orders-units").hidden = true;
   $("orders-title").textContent = title;
   $("orders-facts").textContent = facts;
   for (const button of menu.querySelectorAll("button")) {
@@ -1524,9 +1574,11 @@ function saidStructure(st) {
 
 // offerStructure opens the menu for one of the player's own structures: where the units
 // it makes gather, the last unit in its line taken back, its repair and its sale. With
-// an engineer squad selected it also offers to send them in to mend it.
+// an engineer squad selected it also offers to send them in to mend it. The units it
+// makes are not in the menu: the Reinforcements bar is narrowed to them (showMadeBy).
 function offerStructure(st, squad, box, sx, sy) {
   const def = structureDef(rules, st);
+  showMadeBy(st);
   const engineers = Boolean(squad && unitDef(rules, squad.unit)?.captureSeconds);
   const line = (state.deploying ?? []).filter((d) => d.side === side && d.from === st.id);
   const makes = Object.values(rules.factions[faction]?.units ?? {}).some((u) => u.requires === st.role);
@@ -1547,37 +1599,6 @@ function offerStructure(st, squad, box, sx, sy) {
     return null;
   };
   offerOrders({ title: structureName(st), facts: facts.join(" · "), actions, gold: { sell: `+${sellValue(rules, def)}`, repair: `−${repairCost(rules, def, st)}` }, say }, box, sx, sy);
-  offerUnits(def);
-}
-
-// offerUnits lists, in the menu of one of the player's structures, the units it makes:
-// each with its price, pressable when it can be bought now. A press is a press on the
-// unit's own card in the Reinforcements tab, which is also brought forward and lit.
-function offerUnits(def) {
-  const cards = (def.unlocks ?? []).map((id) => $("build").querySelector(`button[data-unit="${id}"]`)).filter(Boolean);
-  const list = $("orders-units");
-  list.replaceChildren();
-  list.hidden = cards.length === 0;
-  if (!cards.length) return;
-  showBuildTab("units");
-  for (const card of $("build").querySelectorAll("button[data-unit]")) card.classList.toggle("from-here", cards.includes(card));
-  setTimeout(() => cards.forEach((card) => card.classList.remove("from-here")), 6000);
-  cards[0].scrollIntoView({ block: "nearest", inline: "nearest" });
-  for (const card of cards) {
-    const unit = unitDef(rules, card.dataset.unit);
-    const button = el("button", "", "");
-    button.type = "button";
-    button.disabled = card.disabled || card.classList.contains("locked");
-    const why = card.classList.contains("locked") ? card.title : state.gold < unit.cost ? t("unit.noGold") : "";
-    button.append(el("span", "", unit.name[lang]), el("bdi", "gold", String(unit.cost)));
-    if (why) button.append(el("small", "why", why));
-    button.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      card.click();
-      hideOrders();
-    });
-    list.append(button);
-  }
 }
 
 // ---- where the build panel sits ----

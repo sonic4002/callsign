@@ -1188,6 +1188,7 @@ export class Scene {
     const { rules, state, cam } = this;
     this.plates = []; // the plates other names must keep clear of, this frame
     this.squadPlates = []; // where each squad's name is drawn: a press on a name is a press on the squad
+    this.pointPlates = []; // and each point's: its name stays readable over the fog, where the ground does not
     const lang = this.lang();
     const tall = { hq: 100, landRig: 92, seaRig: 88, point: 60 };
     // Each gold field says how full it is, as last seen. The isolate marks keep the
@@ -1204,8 +1205,12 @@ export class Scene {
       const income = rules.rigs[p.kind].income;
       // The isolate marks keep "+15" reading left to right inside a Hebrew label.
       const sub = income ? `${p.name[lang]} ⁦+${income}⁩` : p.name[lang];
-      if (cam.zoom >= 0.25) this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55, keep: true });
+      if (cam.zoom >= 0.25) {
+        this.plate(sub, sx, top, { size: 11, color: "#b9c2b6", border: "rgba(0,0,0,0)", bold: false, alpha: 0.55, keep: true });
+        this.pointPlates.push({ point: p, box: this.lastPlate });
+      }
       this.plate(`${p.id} · ${p.callsign[lang]}`, sx, top - 19, { size: 13, color: "#f2f4ee", border: sideColor[live.owner], keep: true });
+      this.pointPlates.push({ point: p, box: this.lastPlate });
     }
     this.structureLabels(buildScale);
     if (this.pinged) {
@@ -1564,10 +1569,16 @@ export class Scene {
   // ---- picking ----
 
   // pick says what is under a point of the view: one of our squads, an enemy in sight,
-  // a landmark, a bridge, or a map point.
+  // a landmark, a bridge, or a map point (its ground, or its name).
   // contactName is what the player calls an enemy squad in sight, e.g. "Target 3".
   contactName(view, lang) {
     return `${this.rules.callsigns.contact[lang]} ${view.id}`;
+  }
+
+  // overName reports whether a point of the view is on a name that can be pressed.
+  overName(sx, sy) {
+    const on = ({ box }) => sx >= box[0] - 4 && sx <= box[0] + box[2] + 4 && sy >= box[1] - 4 && sy <= box[1] + box[3] + 4;
+    return (this.pointPlates ?? []).some(on) || (this.squadPlates ?? []).some(on);
   }
 
   pick(sx, sy, side) {
@@ -1593,6 +1604,10 @@ export class Scene {
     }
     if (squad) return { squad };
     if (contact) return { contact };
+    // A point's name is the point, wherever its ground is and whether or not it can be seen.
+    for (const { point, box } of this.pointPlates ?? []) {
+      if (sx >= box[0] - 4 && sx <= box[0] + box[2] + 4 && sy >= box[1] - 4 && sy <= box[1] + box[3] + 4) return { point };
+    }
     if (near) return { squad: near };
     // A landmark or a bridge before the point it stands beside: it is the smaller target.
     const place = this.placeUnder(sx, sy);

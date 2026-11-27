@@ -13,7 +13,7 @@ tags:
   - topic/build
   - topic/placement
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -76,6 +76,14 @@ One card per unit of the faction, plus any unit a captured structure lets this s
 | `×` beside the card | Shown while one is in a line: `act("cancel", {unit})` takes the last one back out |
 
 A press sends `{type:"act", name:"buy", args:{unit}}`: the unit joins the line of the structure that makes it. Queue rules are in [[Placement and Production Queues]].
+
+### Narrowed to one structure
+
+Pressing one of the player's own structures on the map narrows the Reinforcements tab to the units that structure makes (`showMadeBy`; a unit belongs to it when its `requires` is the structure's role or the structure's `unlocks` names it) and brings the tab forward. `#made-by` names the structure beside the cards and carries a "Show all" button. The whole list also comes back on a press on either tab, a press anywhere else on the map, Escape, or when the structure no longer stands. Before 2026-11-27 the units were listed in the menu that opens at the structure instead.
+
+### Keys 1 to 9
+
+Keys `1` to `9` press the first nine cards of the tab that is showing, in the order they stand (so they follow a narrowed list). Each card carries its key in a small cap (`numberCards`), hidden where the pointer is coarse. The keys do nothing while the radio box or any other field has the focus (a digit there is part of a callsign), while a dialog, the help window or the start screen is open, or when the match is over. A card that cannot be pressed takes no press from its key either.
 
 ### "Requested" by radio
 

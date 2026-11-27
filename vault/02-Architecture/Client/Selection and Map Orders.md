@@ -13,7 +13,7 @@ tags:
   - topic/orders
   - topic/selection
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -61,7 +61,7 @@ Push-to-talk uses the selection too: a spoken order that opens with no known cal
 
 ## What a press on the map means (`mapClick`)
 
-`Scene.pick(sx, sy, side)` returns, in this order of preference: a squad (ours) or a contact (enemy in sight), a landmark or bridge, a structure, then a point and/or a gold field.
+`Scene.pick(sx, sy, side)` returns, in this order of preference: a squad (ours) or a contact (enemy in sight), a landmark or bridge, a structure, then a point and/or a gold field. A point's two name plates (`pointPlates`, its letter and callsign, and its place name) count as the point itself and are tested right after a squad or contact under the press: the names are drawn over the fog, so a point whose ground has never been seen can still be pressed (since 2026-11-27). Under a mouse the pointer becomes a hand over a name (`Scene.overName`).
 
 | Pressed | No squad selected | A squad selected |
 |---|---|---|
@@ -106,7 +106,7 @@ For one of the player's own standing structures, `structureActions` (in `power.j
 | Mend | Damaged and engineers are selected | Radio call `call.mend` to that squad (an order to a squad, so it is spoken) |
 | Sell (shows `+value`) | Always | `act("sell", {place: st.id})` |
 
-The menu's facts line gives health or build percentage, "repairing", "no power" and the rally place. Below the buttons it lists the units the structure makes with their prices (`offerUnits`); pressing one presses that unit's own card in the build bar, which is brought forward and lit for 6 s. When the side has two structures of a kind, calls name it with its id (`saidStructure`).
+The menu's facts line gives health or build percentage, "repairing", "no power" and the rally place. The units the structure makes are not in the menu: pressing the structure narrows the Reinforcements tab of the build bar to them (`showMadeBy`, see [[Build Bar]]). When the side has two structures of a kind, calls name it with its id (`saidStructure`).
 
 ## Gestures (`client/touch.js`)
 

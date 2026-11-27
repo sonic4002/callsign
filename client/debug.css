@@ -27,6 +27,7 @@ main { display: flex; height: 100%; }
 #map-wrap { flex: 1; position: relative; min-block-size: 0; overflow: hidden; }
 #map { display: block; cursor: grab; touch-action: none; }
 #map.dragging { cursor: grabbing; }
+#map.on-name:not(.dragging) { cursor: pointer; }
 
 .panel {
   background: linear-gradient(var(--panel-2), var(--panel));
@@ -579,9 +580,16 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 }
 
 /* The units a structure makes, listed in its own menu and lit on their cards. */
-#orders #orders-units { flex-direction: column; align-items: stretch; gap: .25rem; border-block-start: 1px solid var(--line, #2a332c); padding-block-start: .4rem; }
-#orders #orders-units[hidden] { display: none; }
-#orders-units button { justify-content: space-between; gap: .8rem; }
-#orders-units button:disabled { opacity: .55; }
-#orders-units .why { color: var(--warn); }
-#build button.from-here { outline: 2px solid var(--brass); outline-offset: -2px; box-shadow: 0 0 12px rgba(255, 216, 74, .55); }
+/* The structure the Reinforcements bar is narrowed to, and the way back to the whole list. */
+#made-by { margin: 0 0 .4rem; font-size: .76rem; color: var(--brass); display: flex; gap: .35rem; align-items: baseline; flex-wrap: wrap; }
+#made-by[hidden] { display: none; }
+#made-by button { margin-inline-start: auto; font-size: .72rem; padding: .1rem .5rem; }
+#build-panel.under-map #made-by { flex: 0 0 7.5rem; flex-direction: column; align-items: flex-start; justify-content: center; margin: 0; gap: .25rem; }
+#build-panel.under-map #made-by button { margin: 0; }
+/* The key that presses a card (1 to 9), shown where there is a keyboard. */
+#structures > button > kbd, #build .unit > button > kbd {
+  position: absolute; inset-block-end: .2rem; inset-inline-end: .25rem; min-inline-size: 1.05rem; padding: 0 .2rem;
+  font: 700 .64rem/1.05rem ui-monospace, monospace; color: var(--muted); background: #10161a; border: 1px solid var(--edge-hi); border-radius: 3px;
+}
+#structures > button > kbd:empty, #build .unit > button > kbd:empty { display: none; }
+@media (pointer: coarse) { #structures > button > kbd, #build .unit > button > kbd { display: none; } }
