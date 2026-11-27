@@ -86,7 +86,8 @@ type Structure struct {
 	Site string
 	paid [2]bool
 	// rally is where the units this structure makes gather, nil for beside it (queue.go).
-	rally *rallyPoint
+	rally         *rallyPoint
+	disabledUntil int // EMP or cyber blackout disables turrets, radar and super powers
 }
 
 // PlaceID is the id an order names this structure by.
@@ -412,10 +413,18 @@ func (s *Sim) build(c Command) (*Structure, error) {
 	if def == nil || def.Role == shared.RoleHQ {
 		return nil, ErrNoStructure
 	}
-	for _, role := range def.Requires {
-		if !s.Has(c.Side, role) {
-			_, need := f.StructureOfRole(role)
-			return nil, fmt.Errorf("%w: the %s needs %s first", ErrNeedsStructure, def.Name.En, a(need.Name.En))
+	if def.Role == shared.RoleSuperweapon && s.superLimit == 0 {
+		return nil, ErrSuperPowersOff
+	}
+	if def.Role == shared.RoleSuperweapon && s.superStructure(c.Side) != nil {
+		return nil, fmt.Errorf("%w: 1 superweapon complex", ErrBaseFull)
+	}
+	if !(def.Role == shared.RoleSuperweapon && s.superFast) {
+		for _, role := range def.Requires {
+			if !s.Has(c.Side, role) {
+				_, need := f.StructureOfRole(role)
+				return nil, fmt.Errorf("%w: the %s needs %s first", ErrNeedsStructure, def.Name.En, a(need.Name.En))
+			}
 		}
 	}
 	// Nothing that uses power is started on power the side does not have: a power
@@ -725,6 +734,9 @@ func (s *Sim) construct() {
 		s.emit(Event{Side: st.Side, Kind: EvStructureBuilt, Structure: st.PlaceID(), Unit: st.Kind, Point: s.nearestPoint(st.X, st.Y)})
 		if st.def.Role == shared.RoleRefinery {
 			s.grantHauler(st) // a finished refinery brings its first hauler
+		}
+		if st.def.Role == shared.RoleSuperweapon {
+			s.onSuperStructureBuilt(st.Side)
 		}
 	}
 }
@@ -1152,6 +1164,9 @@ func (s *Sim) engineers() {
 				Squad: b2i(side == sq.Side, sq.ID), Point: s.nearestPoint(st.X, st.Y), Owner: &st.Side})
 		}
 		s.techTaken(st, from)
+		if st.def.Role == shared.RoleSuperweapon && st.Standing() {
+			s.onSuperStructureBuilt(st.Side)
+		}
 		for i := range sq.Teams {
 			sq.Teams[i].Members, sq.Teams[i].HP = 0, 0
 		}
@@ -1251,8 +1266,9 @@ type StructureView struct {
 	Run      int     `json:"run,omitempty"`
 	// Repairing is set on an own structure that is being mended for gold.
 	Repairing bool `json:"repairing,omitempty"`
-	// Dark is set on a structure that uses power while its side is short of power.
-	Dark bool `json:"dark,omitempty"`
+	// Dark is set on a structure that uses power while its side is short of power or disabled.
+	Dark     bool `json:"dark,omitempty"`
+	Disabled bool `json:"disabled,omitempty"`
 	// A fence segment's ends.
 	AX float64 `json:"ax,omitempty"`
 	AY float64 `json:"ay,omitempty"`
@@ -1291,9 +1307,10 @@ func (s *Sim) structureViews(side int) []StructureView {
 			}
 			v.Side, v.HP, v.Ruin, v.Building, v.Visible = m.Side, m.HP, m.Ruin, m.Building, m.Visible
 		}
-		// A structure that uses power stands dark while its side is short of it; an
+		// A structure that uses power stands dark while its side is short of it or EMP/cyber disabled; an
 		// enemy's shows that only while it is in sight.
-		v.Dark = v.Visible && !v.Ruin && v.Building >= 1 && st.def.Power < 0 && s.power[st.Side].low
+		v.Disabled = v.Visible && !v.Ruin && v.Building >= 1 && st.disabledUntil > s.Tick
+		v.Dark = v.Disabled || (v.Visible && !v.Ruin && v.Building >= 1 && st.def.Power < 0 && s.power[st.Side].low)
 		out = append(out, v)
 	}
 	return out
@@ -1320,6 +1337,7 @@ func (s *Sim) hashStructures(put func(uint64), f func(float64)) {
 		}
 		f(st.repairDebt)
 		put(flags)
+		put(uint64(int64(st.disabledUntil)))
 		if st.rally != nil {
 			f(st.rally.X)
 			f(st.rally.Y)

@@ -103,7 +103,7 @@ func (s *Sim) Power(side int) PowerView {
 // powered reports whether a structure is doing its work: it stands, and it is not a
 // power user on a side that is short of power.
 func (s *Sim) powered(st *Structure) bool {
-	return st.Standing() && !(st.def.Power < 0 && s.power[st.Side].low)
+	return st.Standing() && s.Tick >= st.disabledUntil && !(st.def.Power < 0 && s.power[st.Side].low)
 }
 
 // Radar reports whether a side has its mini map: its radar structure stands and the side

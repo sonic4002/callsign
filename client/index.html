@@ -24,6 +24,20 @@
       <canvas id="map" dir="ltr"></canvas>
       <!-- The mini map sits on the map itself, beside the zoom buttons. -->
       <div id="radar-box" data-i18n-aria="radar"><canvas id="radar-map" dir="ltr"></canvas><p id="radar-off" hidden></p></div>
+      <!-- Tactical Super Power launch bar (shown once super weapons are unlocked) and aiming hint banner. -->
+      <aside id="super-bar" hidden>
+        <header>
+          <strong data-i18n="super.barTitle"></strong>
+          <button type="button" id="super-bar-toggle" data-i18n-aria="super.toggle">▾</button>
+        </header>
+        <div id="super-bar-list"></div>
+      </aside>
+      <div id="super-aim" hidden>
+        <strong id="super-aim-title"></strong>
+        <span id="super-aim-hint"></span>
+        <button type="button" class="primary" id="super-aim-fire" data-i18n="super.aimFire" hidden></button>
+        <button type="button" id="super-aim-cancel" data-i18n="placer.cancel"></button>
+      </div>
       <div id="zoom" dir="ltr">
         <button type="button" id="zoom-in" data-i18n-aria="zoomIn">+</button>
         <button type="button" id="zoom-out" data-i18n-aria="zoomOut">−</button>
@@ -209,6 +223,17 @@
         <legend data-i18n="lobby.map"></legend>
         <div id="lobby-map-cards"></div>
       </fieldset>
+      <label id="lobby-superpowers-row"><span data-i18n="lobby.superPowers"></span>
+        <select name="superPowers" id="lobby-superpowers">
+          <option value="0" data-i18n="lobby.sp.0"></option>
+          <option value="1" data-i18n="lobby.sp.1"></option>
+          <option value="2" data-i18n="lobby.sp.2" selected></option>
+          <option value="3" data-i18n="lobby.sp.3"></option>
+          <option value="4" data-i18n="lobby.sp.4"></option>
+          <option value="all" data-i18n="lobby.sp.all"></option>
+        </select>
+        <small id="lobby-superpowers-about"></small>
+      </label>
       <!-- The less often changed choices fold away, with what they are set to in one line. -->
       <details id="lobby-more">
         <summary><span data-i18n="lobby.more"></span> <small id="lobby-more-now"></small></summary>
@@ -276,6 +301,20 @@
       <summary data-i18n="credits"></summary>
       <ul id="credits-list"></ul>
     </details>
+  </div>
+</div>
+<div id="super-picker" hidden>
+  <div class="card">
+    <header>
+      <h1 data-i18n="super.pickTitle"></h1>
+      <span id="super-pick-count" dir="ltr"></span>
+    </header>
+    <p id="super-pick-about" data-i18n="super.pickAbout"></p>
+    <div id="super-pick-grid"></div>
+    <div class="row">
+      <button type="button" class="primary" id="super-pick-confirm" data-i18n="super.pickConfirm"></button>
+      <button type="button" id="super-pick-cancel" data-i18n="placer.cancel"></button>
+    </div>
   </div>
 </div>
 <div id="help" hidden>

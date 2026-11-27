@@ -178,9 +178,21 @@ func (rm *Room) toolBuild(side int, a toolArgs) (any, error) {
 	if cmd.Run, err = fenceRun(a.Run); err != nil {
 		return nil, err
 	}
+	if len(a.Powers) > 0 {
+		if def, ok := rm.r.StructureDef(rm.sim.Sides[side].Faction, key); ok && def.Role == shared.RoleSuperweapon {
+			if _, err := rm.sim.ValidateSuperPowers(side, a.Powers); err != nil {
+				return nil, err
+			}
+		}
+	}
 	st, err := rm.sim.Build(cmd)
 	if err != nil {
 		return nil, err
+	}
+	if len(a.Powers) > 0 && st.Def().Role == shared.RoleSuperweapon {
+		if _, err := rm.sim.SelectSuperPowers(side, a.Powers); err != nil {
+			return nil, err
+		}
 	}
 	def := st.Def()
 	if own {

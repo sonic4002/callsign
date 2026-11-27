@@ -49,8 +49,9 @@ type Config struct {
 	// Base starts both sides with these base structures standing, by role, in place of
 	// the rules' opening (the headquarters alone). Tests of what comes after the opening
 	// use it: a refinery among them has brought its hauler.
-	Base      []string
-	StartGold int // gold each side starts with; 0 uses the rules default
+	Base        []string
+	StartGold   int    // gold each side starts with; 0 uses the rules default
+	SuperPowers string // "0", "1".."4", "all" ("" defaults to "2")
 }
 
 type Side struct {
@@ -161,9 +162,11 @@ type Team struct {
 	claimed        bool
 	claimFor       [2]float64
 	claimX, claimY float64
-	claimTick      int
-	claimSeen      int
-	claimWait      int
+	claimTick     int
+	claimSeen     int
+	claimWait     int
+	stunUntil     int // EMP stun: cannot move or fire while Tick < stunUntil
+	revealedUntil int // Cyber blackout: stealth disabled while Tick < revealedUntil
 }
 
 type Squad struct {
@@ -235,7 +238,18 @@ type Sim struct {
 	seized  []seizure
 	// Blasts are the bombs that have just gone off (sortie.go).
 	Blasts []Blast
-	Over   bool
+	// Super powers (superpowers.go): active strikes, permanent craters and lingering hazards.
+	SuperStrikes []*SuperStrike
+	Craters      []Crater
+	Hazards      []Hazard
+	supers       [2]sideSuper
+	superLimit   int
+	superFast    bool
+	superMode    string
+	superStrikeN int
+	craterN      int
+	hazardN      int
+	Over         bool
 	Winner int
 	Reason string
 
@@ -298,6 +312,7 @@ func New(r *shared.Rules, cfg Config) (*Sim, error) {
 		}
 	}
 	s.initStructures(cfg.FullBase, cfg.Base)
+	s.initSuperPowers(cfg.SuperPowers)
 	s.initTech()
 	startGold := cfg.StartGold
 	if startGold <= 0 {
@@ -605,6 +620,7 @@ func (s *Sim) Step() []Event {
 	s.defencesFire(live)
 	s.heroes(live)
 	s.strikes(live)
+	s.stepSuperPowers(live)
 	s.resolveSandbags()
 	s.resolveDamage(live)
 	s.resolveStructures()
@@ -648,7 +664,7 @@ func (s *Sim) spot(live []*teamRef) {
 		// Inside a building a team is seen only from close by, or once it has fired.
 		hidden := tr.t.In != "" && !fired
 		// A stealthy unit is seen only from close by until it fires; a defence sees it at its range.
-		stealth := tr.u.Stealth > 0 && !fired
+		stealth := tr.u.Stealth > 0 && !fired && s.Tick >= tr.t.revealedUntil
 		tr.t.Spotted = fired || (!hidden && !stealth && s.postSees(enemy, tr.t.X, tr.t.Y)) || (stealth && s.defenceSees(enemy, tr.t.X, tr.t.Y))
 		for _, o := range live {
 			d := dist(tr.t.X, tr.t.Y, o.t.X, o.t.Y)
@@ -681,8 +697,8 @@ func (s *Sim) move(tr *teamRef) {
 		}
 		return
 	}
-	if s.Tick < t.yield {
-		return // standing aside for a friend that is going past
+	if s.Tick < t.yield || s.Tick < t.stunUntil {
+		return // standing aside for a friend, or stunned by EMP
 	}
 	speed := s.stride(tr)
 	// Around water, mountains and whatever has been built: head for the next corner.
@@ -722,7 +738,7 @@ func (s *Sim) fire(tr *teamRef) {
 	if t.Cooldown > 0 {
 		t.Cooldown--
 	}
-	if tr.plan.act != ActFire || t.Cooldown > 0 {
+	if tr.plan.act != ActFire || t.Cooldown > 0 || s.Tick < t.stunUntil {
 		return
 	}
 	nerve := s.Nerve(t)

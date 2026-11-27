@@ -72,7 +72,7 @@ func (s *Sim) techTaken(st *Structure, from int) {
 func (s *Sim) techWork() {
 	quiet := int(s.R.Nerve.QuietSeconds * float64(s.R.TickRate))
 	for _, st := range s.Structures {
-		if st.Side < 0 || !st.Tech() || !st.Standing() {
+		if st.Side < 0 || !st.Tech() || !st.Standing() || st.disabledUntil > s.Tick {
 			continue
 		}
 		switch st.def.Effect {

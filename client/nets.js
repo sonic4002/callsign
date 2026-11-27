@@ -41,6 +41,7 @@ const eventLevels = {
   charge_planted: NORMAL,
   charge_blew: NORMAL,
   promoted: NORMAL,
+  super_launched: NORMAL,
   upgraded: FULL,
   deploying: FULL,
   structure_started: FULL,

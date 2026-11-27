@@ -165,6 +165,7 @@ func (s *Sim) observe() {
 		}
 		s.observeHaul(side)
 		s.observeMap(side)
+		s.observeCraters(side)
 	}
 }
 

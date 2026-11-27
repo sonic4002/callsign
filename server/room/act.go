@@ -29,8 +29,10 @@ const (
 	ActCancel = "cancel"
 	ActSell   = "sell"
 	ActRepair = "repair"
-	ActRally  = "rally"
-	ActOrder  = "order"
+	ActRally       = "rally"
+	ActOrder       = "order"
+	ActSuperSelect = "super_select"
+	ActSuperFire   = "super_fire"
 )
 
 // ErrNotCommander refuses a direct action from anyone but a side's commander.
@@ -75,6 +77,16 @@ func (rm *Room) Act(c *Client, act string, raw json.RawMessage) (any, error) {
 		res, err = rm.toolRally(side, a)
 	case ActOrder:
 		res, err = rm.directOrder(side, a)
+	case ActSuperSelect:
+		chosen, serr := rm.sim.SelectSuperPowers(side, a.Powers)
+		res, err = map[string]any{"chosen": chosen}, serr
+	case ActSuperFire:
+		st, ferr := rm.sim.FireSuperPower(side, a.Power, a.X, a.Y, a.X2, a.Y2, a.Targets)
+		if ferr == nil {
+			res = map[string]any{"id": st.ID, "power": st.Power, "x": st.X, "y": st.Y, "impactTick": st.ImpactTick}
+		} else {
+			err = ferr
+		}
 	default:
 		return nil, fmt.Errorf("unknown action %q", act)
 	}

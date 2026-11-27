@@ -13,6 +13,7 @@ import { cueMark, cued, cueVoice, foldLog, spoken, stripPick } from "./cues.js";
 import { heard, onCommandNet, onSquadNet, traffic } from "./nets.js";
 import { createRoom, forgetSeat, freeSeat, onlyThisMachine, pageFor, roomInfo, saveSeat, savedSeat, serverInfo, shareLink, takeSeat } from "./lobby.js";
 import { Scene, sideColor } from "./map.js";
+import { isValidSuperTarget } from "./superpowers-fx.js";
 import { Music } from "./music.js";
 import { Sfx } from "./sfx.js";
 import { haulerRows } from "./gold.js";
@@ -91,6 +92,11 @@ function applyLanguage() {
   monitor.sync(true);
   renderTrack();
   coach.render();
+  if (aiming) {
+    aiming.invalidText = t("super.aimInvalid");
+    renderAimBanner();
+  }
+  if (pickerState) renderSuperPicker();
 }
 
 // An empty box follows the page so the placeholder reads the right way; typed text
@@ -296,7 +302,10 @@ function onFrame(frame) {
       faction = frame.faction;
       tellLanguage();
       lobby = frame.lobby ?? null;
+      scene.pace = lobby?.pace || 1;
       lobbyError = null;
+      closeSuperPicker();
+      stopAiming();
       readyUp();
       entries = frame.log.map((m) => ({ kind: "radio", message: m }));
       command = frame.command ?? { mode: "orders", buy: false };
@@ -329,6 +338,7 @@ function onFrame(frame) {
     case "lobby": {
       const other = lobby?.seats[1 - side];
       lobby = frame.lobby;
+      scene.pace = lobby?.pace || 1;
       const now = lobby.seats[1 - side];
       // The other commander leaving or returning mid-match is news; their squads fight on.
       if (me && lobby.phase === "playing" && other?.taken && other.online !== now.online) system(now.online ? "lobby.back" : "lobby.left", {}, "warn");
@@ -387,6 +397,7 @@ function onFrame(frame) {
       if (frame.event.side === side && frame.event.kind.startsWith("structure_")) frame.event.kind = structureEvent(frame.event, side);
       // A rally point put back beside the structures reads differently from one that was set.
       if (frame.event.kind === "rally_set" && !frame.event.place) frame.event.kind = "rally_home";
+      if (frame.event.kind === "super_incoming" && !frame.event.point) frame.event.kind = "super_incoming_global";
       // Pinned, contact and the like are for the squads to say on the radio, not for a HUD.
       // News the operator's base cue tells is left to the cue: one line, not two. Someone
       // watching hears no cues and reads the page's own lines.
@@ -446,7 +457,7 @@ function drawLog(log, lines, withStrip) {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", unit: unitDef(rules, ev.unit ?? "")?.name[lang] ?? "", gold: ev.count, count, ...eventNames(rules, ev, lang) };
+        const vars = { point: ev.point ? pointName(ev.point) : "", place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", unit: unitDef(rules, ev.unit ?? "")?.name[lang] ?? "", power: rules?.superPowers?.find((p) => p.id === ev.unit)?.name?.[lang] ?? ev.unit ?? "", gold: ev.count, count, ...eventNames(rules, ev, lang) };
         text.textContent = count > 1 && `eventMany.${ev.kind}` in strings.en ? t(`eventMany.${ev.kind}`, vars) : times(t(`event.${ev.kind}`, vars));
       } else {
         time.textContent = clock(e.tick);
@@ -892,6 +903,7 @@ function renderSidebar() {
   renderHaulers(haulers, haulerCount);
   renderDeploying(deploying);
   renderStructures(canAct);
+  renderSuperPowers(canAct);
   numberCards();
 }
 
@@ -1191,7 +1203,7 @@ function structureButton(card, canAct) {
   drawIcon(g, id, def, faction, sideColor[side]);
   const names = (ids) => ids.map((u) => unitDef(rules, u)?.name[lang] ?? u).join(", ");
   const what =
-    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "power" ? t("structure.power") : def.role === "radar" ? t("structure.radar") : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
+    def.unlocks.length ? t("structure.unlocks", { units: names(def.unlocks) }) : def.role === "superweapon" ? t("structure.superweapon") : def.role === "power" ? t("structure.power") : def.role === "radar" ? t("structure.radar") : def.role === "refinery" ? t("structure.refinery") : def.role === "fence" ? t("structure.fence") : def.vs?.infantry === 0 ? t("structure.antiAir") : def.role === "defence" ? t("structure.defence") : "";
   const why = {
     ready: what,
     poor: what,
@@ -1216,7 +1228,14 @@ function structureButton(card, canAct) {
   const tag = powerTag(def, short);
   if (tag) button.querySelector(".cost").after(tag);
   if (short) button.title = t("structure.short");
-  button.addEventListener("click", () => startPlacing(id, def));
+  button.addEventListener("click", () => {
+    const want = Math.min(state?.superPowers?.limit ?? 2, rules?.superPowers?.length ?? 15);
+    if (def.role === "superweapon" && state?.superPowers && !state.superPowers.fast && (state.superPowers.chosen?.length ?? 0) < want) {
+      openSuperPicker({ build: { id, def } });
+      return;
+    }
+    startPlacing(id, def);
+  });
   return button;
 }
 
@@ -1229,9 +1248,10 @@ function structureButton(card, canAct) {
 let placing = null; // { mode: "build", id, def, faction, spot, why, touch } or { mode: "rally" }
 let pointerKind = "mouse"; // what last touched the map
 
-function startPlacing(id, def) {
+function startPlacing(id, def, powers = null) {
+  stopAiming();
   hideOrders();
-  placing = { mode: "build", id, def, faction, spot: null, why: "", run: RUNS[0].id, segs: null, touch: matchMedia("(pointer: coarse)").matches };
+  placing = { mode: "build", id, def, faction, powers, spot: null, why: "", run: RUNS[0].id, segs: null, touch: matchMedia("(pointer: coarse)").matches };
   scene.placing = placing;
   // Start on ground that will take it: under the middle of the view when that fits,
   // otherwise the nearest that does, brought into view.
@@ -1315,11 +1335,13 @@ function confirmPlacing() {
   if (placing?.mode !== "build" || !placing.spot || !me) return;
   // The base may have changed since the ghost was put down.
   if (judge()) return renderPlacer();
-  const { def, spot, run, id: placing_id } = placing;
+  const { def, spot, run, id: placing_id, powers } = placing;
   stopPlacing();
   // It starts at once, on that spot; a fence the way it was turned.
   const card = $("structures").querySelector(`[data-structure="${placing_id}"]`);
-  act("build", { structure: placing_id, place: spotForm(spot), run: def.role === "fence" ? run : "" }, card);
+  const payload = { structure: placing_id, place: spotForm(spot), run: def.role === "fence" ? run : "" };
+  if (powers?.length) payload.powers = powers;
+  act("build", payload, card);
 }
 
 $("placer-ok").addEventListener("click", confirmPlacing);
@@ -1336,6 +1358,7 @@ $("placer-home").addEventListener("click", () => {
 });
 // startRally asks where new squads gather: all of them, or those one structure makes.
 function startRally(structure = null) {
+  stopAiming();
   hideOrders();
   scene.placing = null;
   placing = { mode: "rally", structure };
@@ -1383,14 +1406,279 @@ function unselect() {
   hideOrders();
   renderSidebar();
 }
+// ---- Super Powers: picker modal, tactical launch bar and custom targeting cursor ----
+
+let aiming = null; // { id, def, start: {x,y}|null, targets: [{x,y}] }
+let pickerState = null; // { build: {id,def}|null, picked: Set<string>, limit: number }
+
+const fmtSecs = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.ceil(s)) % 60).padStart(2, "0")}`;
+
+function openSuperPicker({ build = null } = {}) {
+  const spState = state?.superPowers;
+  const all = rules?.superPowers ?? [];
+  if (!spState || !all.length || spState.limit <= 0) return;
+  stopAiming();
+  stopPlacing();
+  pickerState = {
+    build,
+    limit: spState.limit,
+    picked: new Set(spState.chosen ?? []),
+  };
+  renderSuperPicker();
+  $("super-picker").hidden = false;
+}
+
+function closeSuperPicker() {
+  pickerState = null;
+  $("super-picker").hidden = true;
+}
+
+function renderSuperPicker() {
+  if (!pickerState || !rules?.superPowers) return;
+  const { picked, limit, build } = pickerState;
+  const want = Math.min(limit, rules.superPowers.length);
+  $("super-pick-count").textContent = `${picked.size} / ${want}`;
+  $("super-pick-confirm").textContent = t(build ? "super.pickConfirm" : "super.pickSave");
+  $("super-pick-confirm").disabled = picked.size !== want;
+  const cards = rules.superPowers.map((sp) => {
+    const btn = el("button", `sp-card${picked.has(sp.id) ? " picked" : ""}`);
+    btn.type = "button";
+    btn.style.setProperty("--sp-col", sp.color || "#7ce8ff");
+    const head = el("span", "sp-head");
+    head.append(el("strong", "", sp.name[lang]), el("span", "sp-meta", `${fmtSecs(sp.cooldownSeconds)} · ${t(`super.cursor.${sp.cursor}`)}`));
+    btn.append(head, el("p", "", sp.about[lang]));
+    btn.addEventListener("click", () => {
+      if (picked.has(sp.id)) picked.delete(sp.id);
+      else if (picked.size < want) picked.add(sp.id);
+      renderSuperPicker();
+    });
+    return btn;
+  });
+  $("super-pick-grid").replaceChildren(...cards);
+}
+
+$("super-pick-cancel").addEventListener("click", closeSuperPicker);
+$("super-pick-confirm").addEventListener("click", () => {
+  if (!pickerState || !rules?.superPowers) return;
+  const want = Math.min(pickerState.limit, rules.superPowers.length);
+  if (pickerState.picked.size !== want) return;
+  const chosenIds = [...pickerState.picked];
+  const build = pickerState.build;
+  closeSuperPicker();
+  if (build) startPlacing(build.id, build.def, chosenIds);
+  else act("super_select", { powers: chosenIds });
+});
+
+$("super-bar-toggle").addEventListener("click", () => {
+  const collapsed = $("super-bar").classList.toggle("collapsed");
+  $("super-bar-toggle").textContent = collapsed ? "▸" : "▾";
+});
+
+function startAiming(sp) {
+  stopPlacing();
+  hideOrders();
+  const touch = matchMedia("(pointer: coarse)").matches || pointerKind !== "mouse";
+  const [cx, cy] = scene.cam.world(scene.cam.w / 2, scene.cam.h / 2);
+  const clampW = (v, hi) => Math.max(24, Math.min(hi - 24, v));
+  const spot = rules?.map ? { x: clampW(cx, rules.map.width), y: clampW(cy, rules.map.height) } : { x: cx, y: cy };
+  aiming = { id: sp.id, def: sp, start: null, end: null, spot, targets: [], touch, invalidText: t("super.aimInvalid") };
+  scene.aiming = aiming;
+  canvas.classList.add("aiming-super");
+  renderAimBanner();
+  renderSuperPowers(Boolean(me) && !state?.over);
+}
+
+function stopAiming() {
+  if (!aiming) return;
+  aiming = null;
+  scene.aiming = null;
+  canvas.classList.remove("aiming-super");
+  renderAimBanner();
+  if (state) renderSuperPowers(Boolean(me) && !state?.over);
+}
+
+function renderAimBanner() {
+  $("super-aim").hidden = !aiming;
+  if (!aiming) return;
+  const sp = aiming.def;
+  const touch = Boolean(aiming.touch);
+  $("super-aim-title").textContent = sp.name[lang];
+  $("super-aim-hint").textContent =
+    sp.cursor === "line" || sp.cursor === "strip"
+      ? t(touch ? "super.aimLineTouch" : "super.aimLine")
+      : sp.cursor === "multi3"
+        ? t(touch ? "super.aimMultiTouch" : "super.aimMulti", { done: aiming.targets.length })
+        : t(touch ? "super.aimCircleTouch" : "super.aimCircle");
+  const fireBtn = $("super-aim-fire");
+  fireBtn.hidden = !touch;
+  if (touch) {
+    const spotOk = Boolean(aiming.spot && isValidSuperTarget(rules, sp, aiming.spot.x, aiming.spot.y));
+    const lockStep = sp.cursor === "multi3" && aiming.targets.length < 2;
+    fireBtn.textContent = t(lockStep ? "super.aimLock" : "super.aimFire");
+    fireBtn.disabled = !spotOk;
+  }
+}
+
+$("super-aim-cancel").addEventListener("click", stopAiming);
+$("super-aim-fire").addEventListener("click", () => {
+  if (!aiming?.spot) return;
+  const sp = aiming.def;
+  const { x: wx, y: wy } = aiming.spot;
+  if (!isValidSuperTarget(rules, sp, wx, wy)) return;
+  if (sp.cursor === "line" || sp.cursor === "strip") {
+    const start = aiming.start ?? { x: wx, y: wy };
+    const end =
+      aiming.end ??
+      (aiming.start && Math.hypot(wx - start.x, wy - start.y) > 15
+        ? { x: wx, y: wy }
+        : { x: Math.min(rules.map.width - 12, start.x + (sp.length || 260)), y: start.y });
+    const id = aiming.id;
+    stopAiming();
+    act("super_fire", { power: id, x: start.x, y: start.y, x2: end.x, y2: end.y });
+    return;
+  }
+  if (sp.cursor === "multi3") {
+    aiming.targets.push({ x: wx, y: wy });
+    if (aiming.targets.length < 3) {
+      renderAimBanner();
+      return;
+    }
+    const id = aiming.id;
+    const targets = aiming.targets.slice(0, 3);
+    stopAiming();
+    act("super_fire", { power: id, x: targets[0].x, y: targets[0].y, targets });
+    return;
+  }
+  const id = aiming.id;
+  stopAiming();
+  act("super_fire", { power: id, x: wx, y: wy });
+});
+
+function handleSuperClick(wx, wy) {
+  if (!aiming) return false;
+  const sp = aiming.def;
+  if (aiming.touch || pointerKind !== "mouse") {
+    aiming.touch = true;
+    aiming.spot = { x: wx, y: wy };
+    if ((sp.cursor === "line" || sp.cursor === "strip") && isValidSuperTarget(rules, sp, wx, wy)) {
+      if (!aiming.start) {
+        aiming.start = { x: wx, y: wy };
+        aiming.end = null;
+      } else {
+        aiming.end = { x: wx, y: wy };
+      }
+    }
+    renderAimBanner();
+    return true;
+  }
+  if (!isValidSuperTarget(rules, sp, wx, wy)) return true;
+  if (sp.cursor === "line" || sp.cursor === "strip") {
+    if (!aiming.start) {
+      aiming.start = { x: wx, y: wy };
+      return true;
+    }
+    const { x, y } = aiming.start;
+    const id = aiming.id;
+    stopAiming();
+    act("super_fire", { power: id, x, y, x2: wx, y2: wy });
+    return true;
+  }
+  if (sp.cursor === "multi3") {
+    aiming.targets.push({ x: wx, y: wy });
+    if (aiming.targets.length < 3) {
+      renderAimBanner();
+      return true;
+    }
+    const id = aiming.id;
+    const targets = aiming.targets.slice(0, 3);
+    stopAiming();
+    act("super_fire", { power: id, x: targets[0].x, y: targets[0].y, targets });
+    return true;
+  }
+  const id = aiming.id;
+  stopAiming();
+  act("super_fire", { power: id, x: wx, y: wy });
+  return true;
+}
+
+function renderSuperPowers(canAct) {
+  const sp = state?.superPowers;
+  const show = Boolean(me && sp && sp.limit > 0 && sp.hasBuilding && !state.over);
+  $("super-bar").hidden = !show;
+  if (!show) {
+    if (aiming) stopAiming();
+    return;
+  }
+  const slots = sp.slots ?? [];
+  const want = Math.min(sp.limit, rules?.superPowers?.length ?? 15);
+  const needPick = !sp.fast && (sp.chosen?.length ?? 0) < want;
+  const key = JSON.stringify([lang, canAct, sp.buildingReady, sp.powered, needPick, aiming?.id ?? "", slots.map((s) => [s.id, s.ready])]);
+  if (key !== drawn.superBar) {
+    drawn.superBar = key;
+    const nodes = [];
+    if (needPick) {
+      const btn = el("button", "sp-choose", t("super.choose"));
+      btn.type = "button";
+      btn.disabled = !canAct;
+      btn.addEventListener("click", () => openSuperPicker());
+      nodes.push(btn);
+    }
+    for (const slot of slots) {
+      const def = rules?.superPowers?.find((p) => p.id === slot.id);
+      if (!def) continue;
+      const cls = `sp-slot${slot.ready ? " ready" : ""}${!sp.powered && sp.buildingReady ? " offline" : ""}${aiming?.id === slot.id ? " aiming" : ""}`;
+      const btn = el("button", cls);
+      btn.type = "button";
+      btn.dataset.power = slot.id;
+      btn.style.setProperty("--sp-col", def.color || "#7ce8ff");
+      btn.disabled = !canAct || !slot.ready;
+      btn.title = def.about[lang];
+      btn.append(el("i", "sp-fill"), el("span", "sp-dot"), el("span", "sp-name", def.name[lang]), el("span", "sp-state", ""));
+      btn.addEventListener("click", () => (aiming?.id === slot.id ? stopAiming() : startAiming(def)));
+      nodes.push(btn);
+    }
+    $("super-bar-list").replaceChildren(...nodes);
+  }
+  // Update live progress bars & countdown timers in place every state tick.
+  const rate = rules?.tickRate || 10;
+  for (const slot of slots) {
+    const btn = $("super-bar-list").querySelector(`button[data-power="${slot.id}"]`);
+    if (!btn) continue;
+    const fill = btn.querySelector(".sp-fill");
+    const lbl = btn.querySelector(".sp-state");
+    if (!sp.buildingReady) {
+      fill.style.inlineSize = `${Math.round((sp.buildingProgress ?? 0) * 100)}%`;
+      lbl.textContent = t("super.building", { percent: Math.round((sp.buildingProgress ?? 0) * 100) });
+    } else if (!sp.powered) {
+      fill.style.inlineSize = "0%";
+      lbl.textContent = t("super.offline");
+    } else if (slot.ready) {
+      fill.style.inlineSize = "100%";
+      lbl.textContent = t("super.ready");
+    } else {
+      const leftTicks = Math.max(0, slot.readyTick - (state.tick ?? 0));
+      const pct = Math.max(0, Math.min(100, (1 - leftTicks / Math.max(1, slot.cooldownTicks)) * 100));
+      fill.style.inlineSize = `${Math.round(pct)}%`;
+      lbl.textContent = fmtSecs(leftTicks / rate);
+    }
+  }
+}
+
 // Escape, a right click on the map, or a second press on the squad's row lets go of it.
-addEventListener("keydown", (ev) => ev.key === "Escape" && !placing && $("help").hidden !== false && (unselect(), hideOrders(), showMadeBy(null)));
+addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape") return;
+  if (!$("super-picker").hidden) return closeSuperPicker();
+  if (aiming) return stopAiming();
+  if (!placing && $("help").hidden !== false) (unselect(), hideOrders(), showMadeBy(null));
+});
 $("map").addEventListener("contextmenu", (ev) => {
   ev.preventDefault();
+  if (aiming) return stopAiming();
   unselect();
 });
 
 function select(sq) {
+  stopAiming();
   scene.selected = sq.id;
   drawn.roster = "";
   renderSidebar();
@@ -1457,6 +1745,10 @@ function mapClick(ev) {
   const box = canvas.getBoundingClientRect();
   const sx = ev.clientX - box.left;
   const sy = ev.clientY - box.top;
+  if (aiming) {
+    handleSuperClick(...scene.cam.world(sx, sy));
+    return;
+  }
   if (placing?.mode === "build") {
     moveGhost(...scene.cam.world(sx, sy));
     // A mouse click on green ground is the confirmation; a finger only moves the ghost.
@@ -1687,6 +1979,8 @@ function renderOverlay() {
   // The pace is chosen by whoever makes the match; what it does to the squads is said here.
   const speed = chosen("speed") ?? "normal";
   $("lobby-speed-about").textContent = t(`lobby.speedAbout.${speed}`);
+  const spMode = chosen("superPowers") ?? "2";
+  $("lobby-superpowers-about").textContent = t(`lobby.spAbout.${spMode}`);
   renderChoices();
 
   const view = lobby ?? found?.lobby ?? null;
@@ -1721,7 +2015,8 @@ function renderChoices() {
   // The folded-away choices in one line: gold, length, pace, and whether Anvil holds the purse.
   const gold = $("lobby-gold").value === "other" ? $("lobby-gold-other").value : $("lobby-gold").value;
   const pace = chosen("speed") ?? "normal";
-  const now = [t("lobby.goldNow", { gold: gold ?? "" }), t("lobby.minutes", { minutes: Number(chosen("length") ?? 600) / 60 }), t(`lobby.speed.${pace}`)];
+  const spMode = chosen("superPowers") ?? "2";
+  const now = [t("lobby.goldNow", { gold: gold ?? "" }), t("lobby.minutes", { minutes: Number(chosen("length") ?? 600) / 60 }), t(`lobby.speed.${pace}`), t(`lobby.sp.${spMode}`)];
   if (chosen("purse") === "on") now.push(t("lobby.purseNow"));
   $("lobby-more-now").textContent = now.join(" · ");
   for (const card of $("lobby-map-cards").children) {
@@ -1865,12 +2160,14 @@ $("start").addEventListener("click", () => {
     const friend = chosen("opponent") === "friend";
     localStorage.setItem("callsign.level", chosen("bot"));
     localStorage.setItem("callsign.speed", chosen("speed"));
+    localStorage.setItem("callsign.superPowers", chosen("superPowers") ?? "2");
     localStorage.setItem("callsign.map", chosen("map") ?? "");
     return makeMatch({
       opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"),
       speed: chosen("speed"), purse: chosen("purse") === "on",
       anvil: Number(chosen("anvil")) || 3, fast: chosen("fast") === "on",
       map: chosen("map") ?? "", startGold: chosenGold(),
+      superPowers: chosen("superPowers") ?? "2",
     });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
@@ -2017,6 +2314,8 @@ $("lobby-new").elements.side.value = String(side);
 const speeds = (offer?.speeds ?? []).map((s) => s.name);
 $("lobby-speed-row").hidden = speeds.length === 0; // an older server has one pace only
 $("lobby-speed").value = [localStorage.getItem("callsign.speed"), offer?.speed, "normal"].find((name) => speeds.includes(name)) ?? "normal";
+const spModes = offer?.superPowers ?? ["0", "1", "2", "3", "4", "all"];
+$("lobby-superpowers").value = [localStorage.getItem("callsign.superPowers"), offer?.superPowerDefault, "2"].find((m) => spModes.includes(m)) ?? "2";
 // The maps on offer, each with a small drawing of itself, and the gold a match starts with.
 const mapIds = offer?.maps?.map((m) => m.id) ?? Object.keys(baseRules?.maps ?? {});
 const lastMap = localStorage.getItem("callsign.map");
@@ -2056,7 +2355,7 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // For tests and screenshots: skip the lobby. A commander gets a match against the
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
-  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "", fast: query.has("fast"), anvil: Number(query.get("anvil")) || 0 });
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "", fast: query.has("fast"), anvil: Number(query.get("anvil")) || 0, superPowers: query.get("superPowers") ?? "2" });
 } else if (query.has("learn") && role !== "spectator") {
   startLesson(); // ?learn goes straight into the first lesson
 }

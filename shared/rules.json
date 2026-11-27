@@ -728,6 +728,8 @@
           "cost": 220, "buildSeconds": 8, "hp": 900, "armor": 0.3, "requires": ["barracks"], "unlocks": ["patrolBoat"], "footprint": 44, "sight": 180, "power": -15 },
         "airbase": { "name": { "en": "Airbase", "he": "בסיס האוויר" }, "role": "airbase", "capturable": true,
           "cost": 300, "buildSeconds": 12, "hp": 1000, "armor": 0.3, "requires": ["radar"], "unlocks": ["helicopter", "strikeJet"], "footprint": 54, "sight": 180, "power": -20 },
+        "strategicCommand": { "name": { "en": "Strategic Command", "he": "פיקוד אסטרטגי" }, "role": "superweapon", "capturable": true,
+          "cost": 500, "buildSeconds": 14, "hp": 1500, "armor": 0.45, "requires": ["radar"], "unlocks": [], "footprint": 50, "sight": 240, "power": -25 },
         "sentryGun": { "name": { "en": "Sentry Gun", "he": "תותח זקיף" }, "role": "defence",
           "cost": 150, "buildSeconds": 6, "hp": 420, "armor": 0.5, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 310, "power": -10,
           "range": 290, "damage": 20, "cooldownTicks": 6, "accuracy": 0.65, "vs": { "air": 0.3 } },
@@ -844,6 +846,8 @@
           "cost": 250, "buildSeconds": 10, "hp": 760, "armor": 0.2, "requires": ["barracks"], "unlocks": ["speedboat"], "footprint": 44, "sight": 180, "power": -15 },
         "launchYard": { "name": { "en": "Launch Yard", "he": "חצר השיגור" }, "role": "airbase", "capturable": true,
           "cost": 400, "buildSeconds": 14, "hp": 700, "armor": 0.2, "requires": ["radar"], "unlocks": ["fpvSwarm", "propBomber"], "footprint": 50, "sight": 180, "power": -20 },
+        "blackSite": { "name": { "en": "Black-Site Silo", "he": "הסילו הסודי" }, "role": "superweapon", "capturable": true,
+          "cost": 480, "buildSeconds": 13, "hp": 1300, "armor": 0.35, "requires": ["radar"], "unlocks": [], "footprint": 50, "sight": 240, "power": -25 },
         "gunNest": { "name": { "en": "Gun Nest", "he": "קן מקלעים" }, "role": "defence",
           "cost": 120, "buildSeconds": 5, "hp": 330, "armor": 0.35, "requires": ["barracks"], "unlocks": [], "footprint": 16, "sight": 300, "power": -10,
           "range": 280, "damage": 13, "cooldownTicks": 4, "accuracy": 0.55, "vs": { "air": 0.5 } },
@@ -1109,5 +1113,127 @@
       "correction": { "en": ["correction"], "he": ["תיקון"] },
       "radioSilence": { "en": ["radio silence"], "he": ["דממת אלחוט"] }
     }
-  }
+  },
+  "superPowers": [
+    {
+      "id": "rodOfGod",
+      "name": { "en": "Rod of God", "he": "מטה האלוהים" },
+      "about": { "en": "Hypersonic tungsten rod from orbit. Vaporises the core, blasts the surrounding zone and carves a permanent crater.", "he": "מוט טונגסטן היפרסוני מהחלל. מוחק את מרכז הפגיעה, מרסק את הסביבה ויוצר מכתש קבוע." },
+      "faction": "aegis", "cursor": "circle", "color": "#7ce8ff",
+      "cooldownSeconds": 300, "initialSeconds": 45, "delaySeconds": 3.5, "durationSeconds": 0,
+      "radius": 170, "coreRadius": 78, "damage": 950, "structureDamage": 1800, "stress": 0.7, "craterRadius": 72
+    },
+    {
+      "id": "tacticalNuke",
+      "name": { "en": "Tactical Nuke", "he": "פצצה גרעינית טקטית" },
+      "about": { "en": "Ballistic nuclear warhead. Massive devastation, shatters enemy nerve and leaves lethal radioactive fallout for 45s.", "he": "ראש קרב גרעיני בליסטי. הרס אדיר, שובר את המורל ומשאיר נשורת רדיואקטיבית קטלנית ל-45 שניות." },
+      "faction": "any", "cursor": "circle", "color": "#ff9e2c",
+      "cooldownSeconds": 420, "initialSeconds": 60, "delaySeconds": 5.0, "durationSeconds": 45,
+      "radius": 230, "coreRadius": 115, "damage": 1200, "structureDamage": 2200, "stress": 1.0, "craterRadius": 100
+    },
+    {
+      "id": "chemicalStrike",
+      "name": { "en": "Chemical Strike", "he": "תקיפה כימית" },
+      "about": { "en": "Mustard & nerve canisters burst into a drifting toxic cloud for 35s. Flushes garrisons and melts infantry; spares structures.", "he": "פגזי גז עצבים שמתפשטים בענן רעיל נסחף ברוח ל-35 שניות. מרוקן מבנים וממיס חי״ר ללא פגיעה במבנים." },
+      "faction": "ashfall", "cursor": "windCircle", "color": "#a8e63d",
+      "cooldownSeconds": 240, "initialSeconds": 35, "delaySeconds": 3.0, "durationSeconds": 35,
+      "radius": 155, "damage": 38, "structureDamage": 0, "stress": 0.65, "count": 4
+    },
+    {
+      "id": "lightningStorm",
+      "name": { "en": "Lightning Storm", "he": "סופת ברקים" },
+      "about": { "en": "Ionospheric thunderhead slams 14 high-voltage bolts over 12s, prioritising tanks, aircraft, power plants and radar.", "he": "ענן סופה יונוספרי שמנחית 14 מכות ברק לאורך 12 שניות, עם עדיפות לטנקים, מטוסים, תחנות כוח ומכ״ם." },
+      "faction": "aegis", "cursor": "circle", "color": "#64b5ff",
+      "cooldownSeconds": 330, "initialSeconds": 45, "delaySeconds": 3.0, "durationSeconds": 12,
+      "radius": 210, "coreRadius": 55, "damage": 340, "structureDamage": 460, "stress": 0.45, "count": 14
+    },
+    {
+      "id": "droneSwarm",
+      "name": { "en": "Hunter-Killer Swarm", "he": "נחיל רחפני ציד" },
+      "about": { "en": "18 micro-FPV attack drones flood the zone for 15s, actively locking and dive-bombing enemy armour, haulers and troops.", "he": "18 רחפני תקיפה מתאבדים מציפים את האזור ל-15 שניות, ננעלים וצוללים על שריון, משאיות וחי״ר." },
+      "faction": "ashfall", "cursor": "circle", "color": "#ff5d47",
+      "cooldownSeconds": 210, "initialSeconds": 30, "delaySeconds": 2.0, "durationSeconds": 15,
+      "radius": 195, "coreRadius": 42, "damage": 210, "structureDamage": 140, "stress": 0.4, "count": 18
+    },
+    {
+      "id": "cyberBlackout",
+      "name": { "en": "Cyber Blackout", "he": "השבתת סייבר" },
+      "about": { "en": "28s electronic-warfare dome. Disables enemy turrets, radar and production, jams comms and exposes stealth units.", "he": "כיפת לוחמה אלקטרונית ל-28 שניות. משביתה צריחים, מכ״ם וייצור אויב, משבשת קשר וחושפת יחידות חמקן." },
+      "faction": "aegis", "cursor": "circle", "color": "#2ef2d6",
+      "cooldownSeconds": 210, "initialSeconds": 30, "delaySeconds": 1.5, "durationSeconds": 28,
+      "radius": 270, "damage": 0, "structureDamage": 0, "stress": 0.35
+    },
+    {
+      "id": "orbitalLaser",
+      "name": { "en": "Orbital Laser Sweep", "he": "קרן לייזר מסלולית" },
+      "about": { "en": "Drag a path on the map: an orbital plasma beam slices 260m across armour, walls and bases, leaving a molten trench.", "he": "גררו קו על המפה: קרן פלזמה מהחלל חותכת לאורך 260 מטר דרך טנקים, חומות ומבנים ומשאירה חריץ מותך." },
+      "faction": "aegis", "cursor": "line", "color": "#4dc3ff",
+      "cooldownSeconds": 270, "initialSeconds": 40, "delaySeconds": 2.5, "durationSeconds": 4.0,
+      "radius": 52, "length": 260, "width": 52, "damage": 620, "structureDamage": 920, "stress": 0.6
+    },
+    {
+      "id": "thermobaricMoab",
+      "name": { "en": "Thermobaric MOAB", "he": "פצצת וואקום תרמוברית" },
+      "about": { "en": "Parachuted fuel-air bomb. Aerosol cloud ignites in a vacuum shockwave that clears every garrison and sandbag with no fallout.", "he": "פצצת דלק-אוויר מוצנחת. ענן אירוסול מתלקח בגל הדף ואקום שמנקה כל מבנה ושק חול בלי נשורת." },
+      "faction": "ashfall", "cursor": "circle", "color": "#ff7a29",
+      "cooldownSeconds": 300, "initialSeconds": 45, "delaySeconds": 4.0, "durationSeconds": 0,
+      "radius": 195, "coreRadius": 100, "damage": 780, "structureDamage": 950, "stress": 0.95, "craterRadius": 60
+    },
+    {
+      "id": "empPulse",
+      "name": { "en": "EMP Pulse", "he": "פולס אלקטרומגנטי" },
+      "about": { "en": "High-altitude electromagnetic burst. Freezes enemy vehicles, turrets and structures for 22s and crashes all aircraft inside.", "he": "פיצוץ אלקטרומגנטי בגובה רב. משתק רכבים, צריחים ומבנים ל-22 שניות ומרסק מיד כל כלי טיס באזור." },
+      "faction": "aegis", "cursor": "circle", "color": "#58a6ff",
+      "cooldownSeconds": 240, "initialSeconds": 35, "delaySeconds": 2.0, "durationSeconds": 22,
+      "radius": 235, "damage": 40, "structureDamage": 0, "stress": 0.3
+    },
+    {
+      "id": "napalmRun",
+      "name": { "en": "Napalm Carpet Run", "he": "הפצצת נפאלם" },
+      "about": { "en": "Drag flight direction: twin low-pass jets lay a 280m wall of white phosphorus and burning napalm for 25s.", "he": "גררו כיוון טיסה: זוג מטוסים בטיסה נמוכה מניחים קיר אש ונפאלם באורך 280 מטר ל-25 שניות." },
+      "faction": "ashfall", "cursor": "strip", "color": "#ff5522",
+      "cooldownSeconds": 210, "initialSeconds": 30, "delaySeconds": 3.0, "durationSeconds": 25,
+      "radius": 52, "length": 280, "width": 88, "damage": 45, "structureDamage": 32, "stress": 0.55, "count": 7
+    },
+    {
+      "id": "artilleryFirestorm",
+      "name": { "en": "Artillery Firestorm", "he": "סופת ארטילריה" },
+      "about": { "en": "22 heavy off-map shells rain over 12s, pinning entire armies, shattering fortifications and pockmarking the ground.", "he": "22 פגזים כבדים נוחתים לאורך 12 שניות, מרתקים צבאות שלמים, מרסקים ביצורים ומנקבים את הקרקע במכתשים." },
+      "faction": "any", "cursor": "circle", "color": "#f0b43a",
+      "cooldownSeconds": 270, "initialSeconds": 40, "delaySeconds": 3.0, "durationSeconds": 12,
+      "radius": 215, "coreRadius": 58, "damage": 240, "structureDamage": 310, "stress": 0.6, "craterRadius": 28, "count": 22
+    },
+    {
+      "id": "scudSalvo",
+      "name": { "en": "SCUD Cluster Salvo", "he": "מטח טילי סקאד" },
+      "about": { "en": "6 heavy ballistic rockets arc down across a wide scatter zone, demolishing sprawling bases, power grids and bridges.", "he": "6 טילים בליסטיים כבדים צוללים באזור פיזור רחב ומחריבים בסיסים, תחנות כוח וגשרים." },
+      "faction": "ashfall", "cursor": "scatterCircle", "color": "#e8643c",
+      "cooldownSeconds": 330, "initialSeconds": 45, "delaySeconds": 4.0, "durationSeconds": 4.5,
+      "radius": 235, "coreRadius": 80, "damage": 480, "structureDamage": 820, "stress": 0.7, "craterRadius": 46, "count": 6
+    },
+    {
+      "id": "tunnelAmbush",
+      "name": { "en": "Subterranean Breach", "he": "פריצה תת-קרקעית" },
+      "about": { "en": "4s seismic tremor erupts beneath any land target: blasts structures above with a sinkhole and deploys an instant ambush force.", "he": "רעידת אדמה של 4 שניות מתחת לכל יעד יבשתי: מפוצצת מבנים מעליה ומזניקה כוח מארב ישירות מאחורי קווי האויב." },
+      "faction": "ashfall", "cursor": "circle", "color": "#d48d46",
+      "cooldownSeconds": 240, "initialSeconds": 35, "delaySeconds": 4.0, "durationSeconds": 0,
+      "radius": 135, "coreRadius": 85, "damage": 520, "structureDamage": 1050, "stress": 0.75, "craterRadius": 56
+    },
+    {
+      "id": "radioSpoof",
+      "name": { "en": "Phantom Signal", "he": "אות רפאים" },
+      "about": { "en": "24s psy-ops broadcast spawns holographic decoy tanks and troops on enemy radar while draining enemy squad nerve.", "he": "שידור לוחמה פסיכולוגית ל-24 שניות שיוצר טנקי דמה הולוגרפיים במכ״ם האויב ושוחק את המורל של כוחותיו." },
+      "faction": "ashfall", "cursor": "circle", "color": "#c97aff",
+      "cooldownSeconds": 180, "initialSeconds": 25, "delaySeconds": 1.5, "durationSeconds": 24,
+      "radius": 245, "damage": 0, "structureDamage": 0, "stress": 0.75, "count": 8
+    },
+    {
+      "id": "cruiseMissiles",
+      "name": { "en": "Naval Cruise Salvo", "he": "מטח טילי שיוט" },
+      "about": { "en": "Mark 3 separate targets on the map: 3 low-skimming Tomahawk missiles streak in from off-map to snipe key structures.", "he": "סמנו 3 מטרות נפרדות על המפה: 3 טילי שיוט בגובה נמוך טסים מקצה המפה לחסל מבנים מרכזיים בדיוק כירורגי." },
+      "faction": "aegis", "cursor": "multi3", "color": "#ff4d6d",
+      "cooldownSeconds": 270, "initialSeconds": 40, "delaySeconds": 5.0, "durationSeconds": 0,
+      "radius": 88, "coreRadius": 52, "damage": 560, "structureDamage": 1150, "stress": 0.5, "craterRadius": 40, "count": 3
+    }
+  ]
 }

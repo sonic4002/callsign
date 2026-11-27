@@ -472,6 +472,8 @@ export function directLine(frame) {
     sell: `sold the ${r.name ?? "structure"}`,
     repair: `began repairing the ${r.name ?? "structure"}`,
     rally: "set a rally point",
+    super_select: "armed super powers",
+    super_fire: `launched super power ${r.power ?? ""}`.trim(),
     order: `ordered ${r.squad?.en ?? "a squad"} to ${r.order?.order ?? "move"}${r.order?.place || r.order?.point ? ` at ${r.order.place || r.order.point}` : r.order?.contact ? ` contact ${r.order.contact}` : ""}; it is on Hammer's order and has acknowledged`,
   }[frame.act];
   return `(no call) Hammer, by hand, ${what ?? frame.act}.`;

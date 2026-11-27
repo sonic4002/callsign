@@ -19,8 +19,9 @@ const (
 	// RoleTech is a building of no army that stands on the map from the start: whoever's
 	// engineers take it gets what it gives (gold, healing, repairs).
 	RoleTech  = "tech"
-	RolePower = "power" // supplies the power the other structures use (sim/power.go)
-	RoleRadar = "radar" // turns the mini map on, and is what the airbase needs
+	RolePower       = "power"       // supplies the power the other structures use (sim/power.go)
+	RoleRadar       = "radar"       // turns the mini map on, and is what the airbase needs
+	RoleSuperweapon = "superweapon" // unlocks and charges chosen super powers (sim/superpowers.go)
 )
 
 // What a tech building gives its holder.
@@ -209,7 +210,7 @@ func (r *Rules) checkStructures(name string, f *Faction) error {
 			return fmt.Errorf("structure %s has a bad stat", id)
 		}
 		switch st.Role {
-		case RoleHQ, RoleBarracks, RoleWorks, RoleAirbase, RoleDockyard, RoleRefinery, RoleRadar:
+		case RoleHQ, RoleBarracks, RoleWorks, RoleAirbase, RoleDockyard, RoleRefinery, RoleRadar, RoleSuperweapon:
 		case RolePower:
 			if st.Power <= 0 {
 				return fmt.Errorf("power structure %s supplies no power", id)

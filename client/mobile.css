@@ -304,3 +304,33 @@ body.no-server #no-server {
   #power[hidden] { display: none; }
   #power .label, #power .bar, #power .state { display: none; }
 }
+
+/* ---- super powers bar, touch aiming banner and picker modal on phones ---- */
+@media (max-width: 700px), (max-height: 500px), (pointer: coarse) and (max-width: 1100px) {
+  #super-bar {
+    left: .45rem; inset-block-end: .45rem;
+    max-inline-size: min(14.5rem, calc(100% - 6.8rem));
+    max-block-size: calc(100% - 4.2rem);
+  }
+  #super-bar > header button { min-inline-size: 38px; min-block-size: 36px; font-size: .9rem; }
+  #super-bar-list button.sp-slot, #super-bar-list button.sp-choose {
+    min-inline-size: 0; min-block-size: 44px; padding: .42rem .55rem; font-size: .8rem;
+  }
+  #super-aim {
+    inset-block-start: .45rem; gap: .4rem .55rem; padding: .45rem .6rem;
+    max-inline-size: calc(100% - .9rem); font-size: .78rem;
+  }
+  #super-aim button { min-block-size: 44px; min-inline-size: 4.8rem; padding-inline: .75rem; font-size: .85rem; }
+  #super-picker { padding: .4rem; align-items: stretch; }
+  #super-picker .card {
+    inline-size: 100%; max-block-size: calc(100dvh - var(--safe-t) - var(--safe-b) - .8rem);
+    padding: .85rem .9rem;
+  }
+  #super-pick-grid { grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); }
+  #super-pick-grid button.sp-card { min-block-size: 56px; padding: .6rem .7rem; }
+  #super-picker .row { flex-wrap: wrap; }
+  #super-picker .row button { min-block-size: 46px; flex: 1 1 auto; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  #super-bar { max-block-size: calc(100% - 1rem); max-inline-size: min(13.5rem, 48%); }
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/coder/websocket"
 
 	"callsign/server/bot"
+	"callsign/server/sim"
 	"callsign/shared"
 )
 
@@ -128,8 +129,9 @@ type Options struct {
 	Speed         string // how fast the match's clock runs, "" for normal (see Speeds)
 	Purse         bool   // the operators may buy on their own from the start
 	Map           string // the map id, "" for the default
-	StartGold     int    // gold each side starts with, 0 for the rules default
-	Anvil         int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
+	StartGold   int    // gold each side starts with, 0 for the rules default
+	SuperPowers string // "0", "1".."4", "all" ("" defaults to "2")
+	Anvil       int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
 	Fast          *bool  // squads take orders through the fast decision model; nil for the server's usual
 }
 
@@ -168,6 +170,9 @@ func tickEvery(base time.Duration, speed string) time.Duration {
 // The gold a match may start with, as the lobby offers it. None is below what a
 // refinery costs, since the match opens by building one.
 var StartGolds = []int{1000, 2500, 5000, 10000}
+
+// SuperPowerModes are the super-power allowances a player may choose in the lobby.
+var SuperPowerModes = []string{"0", "1", "2", "3", "4", "all"}
 
 // A lesson lasts as long as its learner needs, within what a match may; and only so many
 // run at once, since anyone can start one.
@@ -231,6 +236,10 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
 		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
 	}
+	_, _, spNorm, spOK := sim.ParseSuperPowers(o.SuperPowers, len(h.r.SuperPowers))
+	if !spOK {
+		return nil, 0, "", errors.New("super powers must be 0, 1, 2, 3, 4 or all")
+	}
 	if o.Anvil < 0 || o.Anvil > 3 {
 		return nil, 0, "", errors.New("the operator's initiative is 1, 2 or 3")
 	}
@@ -255,10 +264,11 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if lesson {
 		length, o.Watch = lessonSeconds, false // nobody is hurried, and nobody watches
 		o.Map = ""                             // the lesson is written for the small map
+		spNorm = "0"                           // lessons stay focused on fundamentals
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase, Base: h.cfg.Base,
-		Map: o.Map, StartGold: o.StartGold,
+		Map: o.Map, StartGold: o.StartGold, SuperPowers: spNorm,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
 		Anvil: o.Anvil, Fast: fast && !lesson, // a lesson spends nothing
 	}
@@ -485,9 +495,11 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		"levels":     BotLevels,    // the scripted enemies on offer, easiest first
 		"level":      h.usualBot(), // the one the lobby starts on
 		"length":     length,
-		"startGolds": StartGolds, // the starting gold on offer; any amount within the limits is taken
-		"startGold":  h.r.Match.StartGold,
-		"goldLimits": []int{MinStartGold, MaxStartGold},
+		"startGolds":        StartGolds, // the starting gold on offer; any amount within the limits is taken
+		"startGold":         h.r.Match.StartGold,
+		"goldLimits":        []int{MinStartGold, MaxStartGold},
+		"superPowers":       SuperPowerModes,
+		"superPowerDefault": "2",
 		"speeds":     Speeds,      // the paces on offer, slowest first
 		"speed":      SpeedNormal, // the one the lobby starts on
 		"maps":       h.mapList(), // the maps on offer, smallest first
@@ -507,10 +519,11 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Bot       string `json:"bot"`
 		Speed     string `json:"speed"`
 		Purse     bool   `json:"purse"`
-		Map       string `json:"map"`
-		StartGold int    `json:"startGold"`
-		Anvil     int    `json:"anvil"`
-		Fast      *bool  `json:"fast"`
+		Map         string `json:"map"`
+		StartGold   int    `json:"startGold"`
+		SuperPowers string `json:"superPowers"`
+		Anvil       int    `json:"anvil"`
+		Fast        *bool  `json:"fast"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -523,7 +536,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, Anvil: in.Anvil, Fast: in.Fast}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, SuperPowers: in.SuperPowers, Anvil: in.Anvil, Fast: in.Fast}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

@@ -52,15 +52,17 @@ export function structureCards(state, rules, faction, side) {
   const bases = own.filter((s) => base(structureDef(rules, s) ?? { role: s.role })).length;
   const runs = new Set(own.filter((s) => s.role === "fence").map((s) => s.run)).size;
   return Object.keys(all)
-    .filter((id) => all[id].role !== "hq")
+    .filter((id) => all[id].role !== "hq" && !(all[id].role === "superweapon" && state?.superPowers?.limit === 0))
     .map((id) => {
       const def = all[id];
       const card = { id, def, unlocks: def.unlocks, state: "ready", progress: 0, needs: null, have: 0 };
       const up = own.filter((s) => s.kind === id && s.faction === faction);
       card.have = def.role === "fence" ? new Set(up.map((s) => s.run)).size : up.length;
       const going = up.find((s) => s.building < 1);
-      const missing = def.requires.find((role) => !stands(state, side, role));
+      const skipReq = def.role === "superweapon" && Boolean(state?.superPowers?.fast);
+      const missing = skipReq ? null : def.requires.find((role) => !stands(state, side, role));
       if (going) Object.assign(card, { state: "rising", progress: going.building });
+      else if (def.role === "superweapon" && count("superweapon") >= 1) card.state = "full";
       else if (def.role === "power" && count("power") >= (rules.match.powerStructures ?? Infinity)) card.state = "full";
       else if (missing) Object.assign(card, { state: "needs", needs: ofRole(rules, faction, missing) });
       // Nothing that uses power is started on power the side does not have.

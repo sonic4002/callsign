@@ -132,6 +132,9 @@ func (s *Sim) deploy() {
 				continue // waiting behind the one being made
 			}
 			busy[sq.From] = true
+			if st.disabledUntil > s.Tick {
+				continue // Cyber Blackout / EMP disables production at this structure
+			}
 		}
 		if !s.power[sq.Side].works {
 			continue // the side is short of power: this tick the line stands still (power.go)

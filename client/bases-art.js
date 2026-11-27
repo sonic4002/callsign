@@ -145,6 +145,38 @@ export const fallbacks = {
       disc(ctx, p.dark, 20, -7, 2.2, 2.2);
     }
   },
+  superweapon(ctx, p, time) {
+    // Strategic Command / Black-Site Silo: armoured octagonal bunker, hazard blast doors,
+    // rotating orbital uplink array and pulsing strategic beacon.
+    const t = time ?? 0;
+    shadow(ctx, 44, 19, 0.36);
+    isoBox(ctx, 0, 4, 68, 52, 12, p.side, p.dark, p.wall);
+    box(ctx, p, 0, -8, 54, 40, 14, p.roof);
+    // Reinforced armoured blast silo hatch with glowing core seam.
+    disc(ctx, "#1a1f24", 0, -18, 17, 9);
+    const glow = 0.55 + 0.45 * Math.sin(t * 3.2);
+    ctx.strokeStyle = p.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -18, 15, 7.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // Pulsing strategic core lamp & orbital uplink spire.
+    line(ctx, p.metal, 3.5, -18, -16, -18, -50);
+    line(ctx, p.metal, 3.5, 18, -16, 18, -44);
+    const sweep = Math.cos(t * 1.4);
+    ctx.fillStyle = p.trim;
+    ctx.beginPath();
+    ctx.ellipse(-18, -52, 5 + 8 * Math.abs(sweep), 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,95,70,${glow})`;
+    ctx.beginPath();
+    ctx.arc(18, -46, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(124,232,255,${glow * 0.85})`;
+    ctx.beginPath();
+    ctx.ellipse(0, -18, 6 * glow, 3 * glow, 0, 0, Math.PI * 2);
+    ctx.fill();
+  },
 };
 
 function rubble(ctx, p) {

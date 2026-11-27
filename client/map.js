@@ -10,6 +10,7 @@ import { tint, tintKey } from "./placement.js";
 import { Fog } from "./fog.js";
 import { Finale, damageState, fallen } from "./finale.js";
 import { Fx } from "./fx.js";
+import { SuperPowerFx } from "./superpowers-fx.js";
 import { crusherNear, drawBuilt, drawCharge, drawFlat, heroPose } from "./heroes.js";
 import { clearOf } from "./places.js";
 import { drawRank } from "./marks.js";
@@ -78,6 +79,9 @@ export class Scene {
     this.groups = new Map(); // squad id → what is drawn for it
     this.effects = [];
     this.fx = new Fx(); // blasts, smoke, spray and scorch marks
+    this.superFx = new SuperPowerFx(); // super-power animations, craters, hazards & targeting cursors
+    this.aiming = null; // { id, def, start, targets } while aiming a super power
+    this.pace = 1; // match pace multiplier for smooth sub-tick super-power interpolation
     this.sfx = null; // battle sounds; the page sets it once it has a volume to follow
     this.gushAt = {}; // gusher id → when it may next be heard
     this.hqSeen = null; // headquarters health as of the last state, to notice hits
@@ -101,6 +105,7 @@ export class Scene {
     this.groups.clear();
     this.effects = [];
     this.fx.reset((x, y) => isWater(rules, x, y, (id) => this.bridges.get(id)?.standing ?? true));
+    this.superFx.reset();
     this.lands = new Map(); // landmark id → its state when it differs from the map's
     this.bridges = new Map(); // bridge id → { hp, standing } as last seen
     this.hover = null; // { x, y } of the pointer over the view, in CSS pixels
@@ -766,6 +771,11 @@ export class Scene {
     for (const b of rules.map.bridges ?? []) {
       if (!this.paintedBridge(ctx, b, S, z)) drawBridge(ctx, b, S, z, this.bridges.get(b.id), rules.bridgeRules?.dangerShare);
     }
+    // Permanent scorched craters and flat super-power ground beds/telegraphs lie on the ground.
+    const reduced = this.fx.reducedMotion();
+    this.superFx.syncClock(state, rules, now, this.pace || 1);
+    this.superFx.drawCraters(ctx, cam, state, rules, now, reduced);
+    this.superFx.drawGround(ctx, cam, state, rules, now, unitScale, reduced);
 
     // Ground markings: capture rings, order lines, team rings.
     const [rx, ry] = groundEllipse(rules.match.captureRadius);
@@ -929,10 +939,11 @@ export class Scene {
     }
     // Smoke and fire stand among the troops and buildings, not over all of them.
     for (const { depth, p } of this.fx.standing(cam, unitScale, now)) things.push({ depth, raw: true, draw: () => this.fx.drawOne(ctx, p, unitScale, now) });
+    for (const item of this.superFx.standing(cam, state, rules, now, unitScale, this.fx, this.sfx, reduced)) things.push(item);
     things.sort((a, b) => a.depth - b.depth);
     for (const th of things) {
       if (th.raw) {
-        th.draw(); // already in screen space
+        th.draw(ctx); // already in screen space
         continue;
       }
       const [sx, sy] = S(th.x, th.y);
@@ -1016,12 +1027,15 @@ export class Scene {
       }
     }
 
-    // Fog of war over everything on the ground; the labels stay readable above it.
+    // Fog of war over everything on the ground; sky super-weapons & labels stay readable above it.
     this.fog.render(state.fog, this.eyes());
     this.fog.draw(ctx, cam);
+    this.superFx.drawSky(ctx, cam, state, rules, now, unitScale, reduced);
     this.drawGhost(ctx, S, buildScale, time);
+    this.superFx.drawCursor(ctx, cam, this.aiming, this.hover, now, this.lang(), rules, reduced);
 
     this.labels(buildScale, unitScale);
+    this.superFx.drawScreenFlash(ctx, cam.w, cam.h, now, reduced);
     this.drawRadar();
   }
 
@@ -1549,6 +1563,14 @@ export class Scene {
         g.lineTo(v.x * k + r, v.y * k + r);
         g.lineTo(v.x * k - r, v.y * k + r);
         g.fill();
+      }
+    }
+    // Holographic Phantom Signal decoys appear as enemy radar blips!
+    for (const h of state.hazards ?? []) {
+      if (h.kind !== "spoof" || !h.decoys?.length) continue;
+      if (this.fx.reducedMotion() || Math.floor(performance.now() / 220) % 2 === 0) {
+        g.fillStyle = sideColor[h.side];
+        for (const d of h.decoys) g.fillRect(d.x * k - 1.5 * this.dpr, d.y * k - 1.5 * this.dpr, 3 * this.dpr, 3 * this.dpr);
       }
     }
     // What the main view is looking at.

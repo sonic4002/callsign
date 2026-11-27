@@ -17,6 +17,7 @@ export function structureLines(rules, faction) {
       if (s.requires.length) facts.push(`needs a ${s.requires.map(ofRole).join(" and a ")}`);
       if (s.unlocks.length) facts.push(`lets you buy ${names(s.unlocks, f.units)}`);
       if (s.role === "refinery") facts.push("where haulers unload gold");
+      if (s.role === "superweapon") facts.push("arms and charges your chosen super powers");
       if (s.role === "defence") {
         const only = s.vs && Object.values(s.vs).filter((v) => v === 0).length >= 3;
         facts.push(only ? `fires on aircraft only, out to ${s.range}` : `fires on its own at enemies within ${s.range}`);
@@ -71,6 +72,7 @@ const roleWords = {
   fence: /\b(fence|wall|wire|barrier)\b|גדר|חומ/,
   power: powerWords,
   radar: radarWords,
+  superweapon: /\b(strategic command|black[- ]?site|silo|super ?weapon|uplink)\b|פיקוד אסטרטגי|הסילו הסודי|סילו סודי|סילו|נשק[- ]?על|אסטרטגי/,
 };
 const antiAir = /\b(anti[- ]?air(craft)?|flak|aa|rocket nest)\b|נ"מ|נ״מ|נגד מטוסים|קן טילים/;
 const defence = /\b(gun|guns|turret|sentry|nest|defen[cs]e|tower)\b|תותח|מקלע|עמדה|עמדת|מגדל/;

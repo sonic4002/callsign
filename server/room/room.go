@@ -37,8 +37,9 @@ type Config struct {
 	Factions      [2]string
 	LengthSeconds int       // 0 uses the rules default
 	Map           string    // the map to play on, "" for the default
-	StartGold     int       // gold each side starts with, 0 for the rules default
-	Bots          [2]string // scripted player style per side, "" for none
+	StartGold   int       // gold each side starts with, 0 for the rules default
+	SuperPowers string    // "0", "1".."4", "all" ("" defaults to "2")
+	Bots        [2]string // scripted player style per side, "" for none
 	AutoStart     bool      // start the clock at once instead of when the first Hammer joins
 	FullBase      bool      // both sides start with every base structure standing
 	Base          []string  // both sides start with these base structures, by role (tests)
@@ -165,7 +166,7 @@ func New(r *shared.Rules, cfg Config) (*Room, error) {
 func (rm *Room) reset() error {
 	s, err := sim.New(rm.r, sim.Config{
 		Seed: rm.cfg.Seed + uint64(rm.match), Factions: rm.cfg.Factions, LengthSeconds: rm.cfg.LengthSeconds,
-		FullBase: rm.cfg.FullBase, Base: rm.cfg.Base, StartGold: rm.cfg.StartGold,
+		FullBase: rm.cfg.FullBase, Base: rm.cfg.Base, StartGold: rm.cfg.StartGold, SuperPowers: rm.cfg.SuperPowers,
 	})
 	if err != nil {
 		return err

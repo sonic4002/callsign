@@ -260,6 +260,9 @@ func (s *Sim) sorties() {
 		}
 		switch a.State {
 		case SortieRearming:
+			if home != nil && home.disabledUntil > s.Tick {
+				break
+			}
 			if a.rearm--; a.rearm <= 0 {
 				a.State, a.Bombs = SortieParked, sq.unit.Bombs
 				s.emit(Event{Side: sq.Side, Kind: EvRearmed, Squad: sq.ID, Point: s.nearestPoint(home.X, home.Y)})

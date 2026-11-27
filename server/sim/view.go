@@ -19,8 +19,9 @@ type TeamView struct {
 	Action  string  `json:"action,omitempty"` // own teams only
 	// Cover is the multiplier on hits the team takes from the cover it is in, when it
 	// is in any (own teams only). In is the building it is inside.
-	Cover float64 `json:"cover,omitempty"`
-	In    string  `json:"in,omitempty"`
+	Cover   float64 `json:"cover,omitempty"`
+	In      string  `json:"in,omitempty"`
+	Stunned bool    `json:"stunned,omitempty"`
 }
 
 type OrderView struct {
@@ -159,8 +160,12 @@ type Snapshot struct {
 	ForeignUnits []string        `json:"foreignUnits,omitempty"`
 	Fields       []FieldView     `json:"fields"`  // every gold field; out of sight, as last seen
 	Haulers      []HaulerView    `json:"haulers"` // own haulers, then enemy ones as last seen
-	Charges      []ChargeView    `json:"charges"` // demolition charges burning down: own, and enemy ones in sight
-	Blasts       []BlastView     `json:"blasts"`  // bombs that have just gone off: own, and enemy ones in sight
+	Charges      []ChargeView      `json:"charges"` // demolition charges burning down: own, and enemy ones in sight
+	Blasts       []BlastView       `json:"blasts"`  // bombs that have just gone off: own, and enemy ones in sight
+	SuperPowers  *SuperPowerView   `json:"superPowers,omitempty"`
+	SuperStrikes []SuperStrikeView `json:"superStrikes,omitempty"`
+	Craters      []Crater          `json:"craters,omitempty"`
+	Hazards      []Hazard          `json:"hazards,omitempty"`
 	// Taken counts this side's squads an enemy hero holds for now. They are not in Squads,
 	// and they still count toward the cap, because they come back.
 	Taken  int    `json:"taken,omitempty"`
@@ -247,6 +252,7 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	s.snapHaul(&snap, side)
 	s.snapCharges(&snap, side)
 	s.snapBlasts(&snap, side)
+	s.snapSuperPowers(&snap, side)
 	return snap
 }
 
@@ -266,7 +272,7 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 	}
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 {
-			tv := TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, Nerve: s.Nerve(t), Action: t.Action, In: t.In}
+			tv := TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, Nerve: s.Nerve(t), Action: t.Action, In: t.In, Stunned: s.Tick < t.stunUntil}
 			if t.Cover > 0 && t.Cover < 1 {
 				tv.Cover = t.Cover
 			}
@@ -282,7 +288,7 @@ func (s *Sim) contactView(sq *Squad) ContactView {
 	var x, y float64
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 && t.Spotted {
-			v.Teams = append(v.Teams, TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, In: t.In})
+			v.Teams = append(v.Teams, TeamView{X: round1(t.X), Y: round1(t.Y), Members: t.Members, In: t.In, Stunned: s.Tick < t.stunUntil})
 			x, y = x+t.X, y+t.Y
 		}
 	}
@@ -368,6 +374,8 @@ func (s *Sim) Hash() uint64 {
 			put(uint64(t.yield))
 			put(uint64(t.detour))
 			put(uint64(t.held))
+			put(uint64(int64(t.stunUntil)))
+			put(uint64(int64(t.revealedUntil)))
 		}
 	}
 	s.hashStructures(put, f)
@@ -376,6 +384,7 @@ func (s *Sim) Hash() uint64 {
 	s.hashHaul(put, f)
 	s.hashHeroes(put, f)
 	s.hashSorties(put)
+	s.hashSuperPowers(h, put, f)
 	return h.Sum64()
 }
 

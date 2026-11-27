@@ -51,6 +51,16 @@ export const kinds = {
   boomS: { pri: 3, gap: 90, seconds: 1.3 },
   boomM: { pri: 4, gap: 150, seconds: 3.0 },
   boomL: { pri: 5, gap: 400, seconds: 5.5 },
+  superAlarm: { pri: 5, gap: 350, seconds: 2.2 },
+  superKinetic: { pri: 5, gap: 300, seconds: 4.2 },
+  superNuke: { pri: 5, gap: 400, seconds: 6.2 },
+  superZap: { pri: 4, gap: 110, seconds: 1.4 },
+  superLaser: { pri: 5, gap: 300, seconds: 3.8 },
+  superGas: { pri: 4, gap: 250, seconds: 2.4 },
+  superJet: { pri: 4, gap: 250, seconds: 2.6 },
+  superQuake: { pri: 5, gap: 300, seconds: 3.6 },
+  superNapalm: { pri: 5, gap: 250, seconds: 2.8 },
+  superScud: { pri: 5, gap: 160, seconds: 2.0 },
 };
 
 // hearing places a sound by where it is on screen: `pan` -1..1, `gain` 0..1 and a
@@ -273,6 +283,83 @@ const recipes = {
     burst(ctx, out, at, 0.85, { f0: 2300, f1: 520, q: 0.5, gain: 0.65, attack: 0.05 });
     burst(ctx, out, at + 0.25, 0.7, { f0: 1800, q: 0.4, gain: 0.1, attack: 0.15 });
   },
+  // Super-weapon launch alarm / tactical siren.
+  superAlarm(ctx, out, at) {
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(520, at + i * 0.55);
+      osc.frequency.exponentialRampToValueAtTime(880, at + i * 0.55 + 0.32);
+      g.gain.setValueAtTime(0.001, at + i * 0.55);
+      g.gain.linearRampToValueAtTime(0.18, at + i * 0.55 + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, at + i * 0.55 + 0.48);
+      osc.connect(g).connect(out);
+      osc.start(at + i * 0.55);
+      osc.stop(at + i * 0.55 + 0.5);
+    }
+  },
+  // Kinetic Rod of God / MOAB cataclysmic impact.
+  superKinetic(ctx, out, at) {
+    thump(ctx, out, at, 1.4, 140, 24, 1.25);
+    burst(ctx, out, at, 0.3, { type: "highpass", f0: 2200, gain: 0.9 });
+    burst(ctx, out, at + 0.06, 3.6, { type: "lowpass", f0: 1400, f1: 110, q: 0.7, gain: 1.0, attack: 0.03 });
+  },
+  // Tactical Nuke massive rolling low-end roar.
+  superNuke(ctx, out, at) {
+    thump(ctx, out, at, 2.2, 110, 18, 1.4);
+    burst(ctx, out, at, 0.45, { type: "highpass", f0: 1600, gain: 1.0 });
+    burst(ctx, out, at + 0.1, 5.4, { type: "lowpass", f0: 950, f1: 75, q: 0.6, gain: 1.15, attack: 0.05 });
+  },
+  // Lightning bolt / EMP / Cyber zap crackle.
+  superZap(ctx, out, at) {
+    burst(ctx, out, at, 0.14, { type: "highpass", f0: 3200, gain: 0.95 });
+    thump(ctx, out, at + 0.02, 0.55, 220, 42, 0.75);
+    burst(ctx, out, at + 0.05, 1.1, { f0: 1800, f1: 240, q: 1.4, gain: 0.55 });
+  },
+  // Orbital Laser continuous plasma hum + sizzle.
+  superLaser(ctx, out, at) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(160, at);
+    osc.frequency.linearRampToValueAtTime(240, at + 2.8);
+    osc.frequency.exponentialRampToValueAtTime(80, at + 3.6);
+    g.gain.setValueAtTime(0.001, at);
+    g.gain.linearRampToValueAtTime(0.24, at + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.001, at + 3.6);
+    osc.connect(g).connect(out);
+    osc.start(at);
+    osc.stop(at + 3.7);
+    burst(ctx, out, at, 3.4, { f0: 2600, f1: 1200, q: 0.9, gain: 0.35, attack: 0.1 });
+  },
+  // Chemical hiss / vapor dispersion.
+  superGas(ctx, out, at) {
+    thump(ctx, out, at, 0.18, 150, 60, 0.45);
+    burst(ctx, out, at + 0.05, 2.2, { type: "bandpass", f0: 2400, f1: 900, q: 0.8, gain: 0.5, attack: 0.12 });
+  },
+  // Twin low-pass jet roar / missile flyover.
+  superJet(ctx, out, at) {
+    burst(ctx, out, at, 2.4, { type: "bandpass", f0: 420, f1: 1800, q: 1.1, gain: 0.6, attack: 0.45 });
+    burst(ctx, out, at + 0.9, 1.5, { type: "lowpass", f0: 1100, f1: 220, q: 0.7, gain: 0.5, attack: 0.1 });
+  },
+  // Subterranean earthquake rumble & eruption.
+  superQuake(ctx, out, at) {
+    thump(ctx, out, at, 2.8, 72, 26, 1.1);
+    burst(ctx, out, at, 3.2, { type: "lowpass", f0: 360, f1: 95, q: 0.9, gain: 0.85, attack: 0.35 });
+  },
+  // Incendiary napalm ignition whoosh & roar (single pass, no delayed collapse echoes).
+  superNapalm(ctx, out, at) {
+    thump(ctx, out, at, 0.75, 92, 28, 1.1);
+    burst(ctx, out, at, 2.4, { type: "bandpass", f0: 950, f1: 260, q: 0.65, gain: 0.9, attack: 0.06 });
+    crackle(ctx, out, at + 0.1, 1.8, 14, 0.22);
+  },
+  // Heavy single ballistic warhead impact (clean tail for multi-missile salvos).
+  superScud(ctx, out, at) {
+    thump(ctx, out, at, 1.0, 78, 22, 1.35);
+    burst(ctx, out, at, 1.1, { type: "lowpass", f0: 2400, f1: 95, q: 0.55, gain: 1.15 });
+    burst(ctx, out, at + 0.08, 1.7, { type: "lowpass", f0: 340, f1: 85, q: 0.45, gain: 0.38, attack: 0.05 });
+  },
 };
 
 // synth schedules one sound into `out`. Exported so sounds can be rendered offline.
@@ -356,5 +443,59 @@ export class Sfx {
     synth(ctx, level, kind, ctx.currentTime + delay / 1000 + 0.005);
     setTimeout(() => tail.disconnect(), delay + kinds[kind].seconds * 1000 + 300);
     return true;
+  }
+
+  // playSuper plays synthesized super-weapon audio with strategic spatialization across the view.
+  playSuper(power, phase, view = null, x = 0, y = 0) {
+    const map = {
+      launch: {
+        tacticalNuke: "superAlarm",
+        rodOfGod: "superAlarm",
+        thermobaricMoab: "superJet",
+        napalmRun: "superJet",
+        tunnelAmbush: "superQuake",
+        cruiseMissiles: "superJet",
+      },
+      impact: {
+        rodOfGod: "superKinetic",
+        tacticalNuke: "superNuke",
+        thermobaricMoab: "superKinetic",
+        chemicalStrike: "superGas",
+        empPulse: "superZap",
+        cyberBlackout: "superZap",
+        orbitalLaser: "superLaser",
+        napalmRun: "superNapalm",
+        scudSalvo: "superScud",
+        tunnelAmbush: "superKinetic",
+        radioSpoof: "superZap",
+        cruiseMissiles: "superScud",
+      },
+      bolt: { lightningStorm: "superZap" },
+      pop: { droneSwarm: "boomS" },
+      shell: { artilleryFirestorm: "boomM" },
+      intercept: { cruiseMissiles: "boomM" },
+    };
+    const kind = map[phase]?.[power];
+    if (!kind) return false;
+    let where = { pan: 0, gain: 0.9, cutoff: 14000 };
+    if (view?.screen && view.w > 0 && view.h > 0 && Number.isFinite(x) && Number.isFinite(y)) {
+      const [sx, sy] = view.screen(x, y);
+      const dx = (sx - view.w / 2) / (view.w / 2);
+      const dy = (sy - view.h / 2) / (view.h / 2);
+      const d = Math.hypot(dx, dy);
+      if (kind === "superAlarm") {
+        where = { pan: clamp(dx * 0.4, -1, 1), gain: 0.88, cutoff: 14000 };
+      } else if (!Number.isFinite(d) || d > 5.6) {
+        return false;
+      } else {
+        const far = Math.max(0, d - 0.8);
+        where = {
+          pan: clamp(dx * 0.78, -1, 1),
+          gain: clamp(0.95 / (1 + (d / 1.85) ** 2), 0.06, 0.95),
+          cutoff: Math.max(950, 15000 / (1 + (far * 1.45) ** 2)),
+        };
+      }
+    }
+    return this.play(kind, where, 0);
   }
 }

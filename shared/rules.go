@@ -384,6 +384,8 @@ type Rules struct {
 	Factions map[string]Faction `json:"factions"`
 	// TechBuildings are the kinds of building that belong to no army (see RoleTech).
 	TechBuildings map[string]Structure `json:"techBuildings"`
+	// SuperPowers are the strategic and tactical super weapons players can choose from.
+	SuperPowers []SuperPower `json:"superPowers,omitempty"`
 	Radio         struct {
 		Marker  Text            `json:"marker"`
 		Over    Text            `json:"over"`
@@ -628,6 +630,9 @@ func (r *Rules) check() error {
 		if err := r.checkStructures(name, &f); err != nil {
 			return err
 		}
+	}
+	if err := r.checkSuperPowers(); err != nil {
+		return err
 	}
 	return nil
 }

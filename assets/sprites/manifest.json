@@ -3307,6 +3307,194 @@
         0.8
       ],
       "height": 68
+    },
+    "strategicCommand": {
+      "image": "buildings/strategicCommand.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78,
+      "lamp": [
+        0.72,
+        0.56
+      ],
+      "stages": [
+        "strategicCommand_stage1",
+        "strategicCommand_stage2",
+        "strategicCommand_stage3",
+        "strategicCommand_stage4"
+      ]
+    },
+    "strategicCommand_ruin": {
+      "image": "buildings/strategicCommand_ruin.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78
+    },
+    "strategicCommand_stage1": {
+      "image": "buildings/strategicCommand_stage1.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78
+    },
+    "strategicCommand_stage2": {
+      "image": "buildings/strategicCommand_stage2.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78
+    },
+    "strategicCommand_stage3": {
+      "image": "buildings/strategicCommand_stage3.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78
+    },
+    "strategicCommand_stage4": {
+      "image": "buildings/strategicCommand_stage4.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78
+    },
+    "strategicCommand_site": {
+      "image": "buildings/strategicCommand_stage1.png",
+      "size": [
+        370,
+        371
+      ],
+      "anchor": [
+        0.5,
+        0.7623
+      ],
+      "height": 78
+    },
+    "blackSite": {
+      "image": "buildings/blackSite.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78,
+      "lamp": [
+        0.42,
+        0.14
+      ],
+      "stages": [
+        "blackSite_stage1",
+        "blackSite_stage2",
+        "blackSite_stage3",
+        "blackSite_stage4"
+      ]
+    },
+    "blackSite_ruin": {
+      "image": "buildings/blackSite_ruin.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78
+    },
+    "blackSite_stage1": {
+      "image": "buildings/blackSite_stage1.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78
+    },
+    "blackSite_stage2": {
+      "image": "buildings/blackSite_stage2.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78
+    },
+    "blackSite_stage3": {
+      "image": "buildings/blackSite_stage3.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78
+    },
+    "blackSite_stage4": {
+      "image": "buildings/blackSite_stage4.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78
+    },
+    "blackSite_site": {
+      "image": "buildings/blackSite_stage1.png",
+      "size": [
+        458,
+        355
+      ],
+      "anchor": [
+        0.5,
+        0.6727
+      ],
+      "height": 78
     }
   },
   "landmarks": {
@@ -4101,6 +4289,20 @@
     },
     "tech_garage": {
       "image": "icons/tech_garage.png",
+      "size": [
+        144,
+        96
+      ]
+    },
+    "strategicCommand": {
+      "image": "icons/strategicCommand.png",
+      "size": [
+        144,
+        96
+      ]
+    },
+    "blackSite": {
+      "image": "icons/blackSite.png",
       "size": [
         144,
         96

@@ -159,7 +159,7 @@ test("manifest: every structure has its stages in its own frame, and producers h
   const b = manifest.buildings;
   // Manifest keys are the rules ids (art/rename_keys.py): every structure is the key with stages.
   const structures = Object.keys(b).filter((k) => b[k].stages);
-  assert.equal(structures.length, 18, "seven a side, and a power and a radar structure each");
+  assert.equal(structures.length, 20, "ten a side: seven core, plus power, radar and superweapon");
   for (const key of structures) {
     const entry = b[key];
     assert.ok(entry.stages?.length >= 3, `${key} goes up in at least three stages before it is finished`);

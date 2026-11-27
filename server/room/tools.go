@@ -64,8 +64,15 @@ type toolArgs struct {
 	Run       string `json:"run"`
 	Field     string `json:"field"`  // haul: a gold field by its point ("Kilo", "K", "the airfield"), or "auto"
 	Hauler    int    `json:"hauler"` // haul: one hauler's id, or 0 for all of them
-	Squad     int    `json:"squad"`  // a direct order from the commander's page: the squad's id
-	Order     string `json:"order"`  // and the order: move, hold or attack
+	Squad   int            `json:"squad"`   // a direct order from the commander's page: the squad's id
+	Order   string         `json:"order"`   // and the order: move, hold or attack
+	Powers  []string       `json:"powers"`  // super powers chosen when creating/configuring the super weapons complex
+	Power   string         `json:"power"`   // super power id to launch
+	X       float64        `json:"x"`       // target x (map units)
+	Y       float64        `json:"y"`       // target y (map units)
+	X2      float64        `json:"x2"`      // drag end x for line/strip super powers
+	Y2      float64        `json:"y2"`      // drag end y for line/strip super powers
+	Targets []sim.TargetXY `json:"targets"` // 3 targets for Naval Cruise Salvo
 }
 
 // Tool runs one game tool for a client and returns its result.
