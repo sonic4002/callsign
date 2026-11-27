@@ -11,10 +11,10 @@
 // in caches of its own named callsign-voice-…; those are left alone here, so that a new
 // version of the page does not make a phone download 70 MB of speech model again).
 
-const CACHE = "callsign-14";
+const CACHE = "callsign-17";
 const VOICE = /^callsign-voice-/; // the speech worker's own caches (client/voice/worker.js)
 const NEVER = [/^\/ws\b/, /^\/tts\//, /^\/relay\//, /^\/mcp\b/, /^\/assets\/models\//, /^\/assets\/voice-cache\//, /^\/vendor\//];
-const PICTURES = [/^\/assets\/sprites\//, /^\/assets\/audio\//];
+const PICTURES = [/^\/assets\/sprites\/.+\.(?:png|webp|jpg)$/i, /^\/assets\/audio\//];
 const kept = (url) => url.origin === self.location.origin && !NEVER.some((re) => re.test(url.pathname));
 
 self.addEventListener("install", (event) => {
@@ -69,8 +69,15 @@ self.addEventListener("fetch", (event) => {
 async function keptFirst(request) {
   const cache = await caches.open(CACHE);
   const hit = await cache.match(request);
-  const fresh = save(cache, request);
-  if (!hit) return fresh;
+  const fresh = save(cache, new Request(request, { cache: "no-cache" }), request);
+  if (!hit) {
+    // A sheet's address carries its version (client/art.js): the copies of older versions go.
+    fresh
+      .then(() => cache.keys(request, { ignoreSearch: true }))
+      .then((old) => Promise.all(old.filter((k) => k.url !== request.url).map((k) => cache.delete(k))))
+      .catch(() => {});
+    return fresh;
+  }
   fresh.catch(() => {}); // offline: the kept copy is all there is
   return hit;
 }

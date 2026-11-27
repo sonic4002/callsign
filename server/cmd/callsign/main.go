@@ -75,7 +75,14 @@ func main() {
 		}
 		w.Write(b)
 	})
-	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*assets))))
+	assetFiles := http.StripPrefix("/assets/", http.FileServer(http.Dir(*assets)))
+	mux.Handle("/assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/assets/sprites/") {
+			// Always revalidate sprites & manifest via If-Modified-Since so updated art never sticks in HTTP disk cache.
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		assetFiles.ServeHTTP(w, r)
+	}))
 	if *tts != "" {
 		// The speech service gives the squads their voices in testing. The page reaches it
 		// through here so that it talks to one origin; when the service is down the page

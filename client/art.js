@@ -39,10 +39,15 @@ export async function loadSprites(base = "/assets/sprites/") {
     return sprites;
   }
   const jobs = [];
+  // A sheet is cut into frames by the numbers in the manifest, so the two must be of one
+  // version: a kept copy of an older sheet cut by new numbers shows half soldiers. The
+  // sheet's address therefore carries the manifest's stamp and the frame size, and a new
+  // render is a new address that no cache can answer with the old picture.
+  const sheet = (part) => base + part.image + "?v=" + [manifest.stamp, part.frame?.join("x")].filter(Boolean).join("-");
   for (const group of ["units", "buildings", "landmarks", "props"]) {
     for (const [id, entry] of Object.entries(manifest[group] ?? {})) {
       // A unit with a weapon that turns on its own has a second sheet for it; both must load.
-      const images = [entry.image, entry.turret?.image].filter(Boolean).map((path) => loadImage(base + path));
+      const images = [entry, entry.turret].filter((part) => part?.image).map((part) => loadImage(sheet(part)));
       jobs.push(
         Promise.all(images).then(([img, top]) => {
           if (!img || (entry.turret && !top)) return;

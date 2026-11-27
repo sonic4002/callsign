@@ -81,8 +81,9 @@ if ("serviceWorker" in navigator) {
     // once, so every file comes from the same version.
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (sessionStorage.getItem("callsign.swReload")) return;
-        sessionStorage.setItem("callsign.swReload", "1");
+        const last = Number(sessionStorage.getItem("callsign.swReload") || 0);
+        if (Date.now() - last < 5000) return;
+        sessionStorage.setItem("callsign.swReload", String(Date.now()));
         location.reload();
       });
     }
