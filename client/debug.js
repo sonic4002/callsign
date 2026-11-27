@@ -28,7 +28,7 @@ import { Coach, seen as lessonSeen } from "./tutorial.js";
 import { tidy } from "./voice/normalize.js";
 import { hintCalls, hintPhrases } from "./voice/hints.js";
 import { Voice } from "./voice/voice.js";
-import { sortieText } from "./aircraft.js";
+import { sortieText, padsLock } from "./aircraft.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -880,7 +880,7 @@ function renderSidebar() {
   for (const sq of mine) if (sq.hero) syncHero($("roster").querySelector(`li[data-squad="${sq.id}"]`) ?? document.createElement("li"), sq, t);
   // The faction's own units, and any a captured structure lets this side build.
   const units = [...Object.entries(rules.factions[faction]?.units ?? {}), ...(state.foreignUnits ?? []).map((id) => [id, unitDef(rules, id)])];
-  const locks = units.map(([id]) => unitLock(state, rules, faction, side, id) ?? heroLock(state, rules, faction, side, id));
+  const locks = units.map(([id]) => unitLock(state, rules, faction, side, id) ?? heroLock(state, rules, faction, side, id) ?? padsLock(state, rules, faction, side, id));
   const room = (u) => (u.class === "hauler" ? haulerCount < rules.match.haulerCap : pop < cap);
   // A structure pressed on the map narrows the bar to what it makes, while it stands.
   if (madeBy && !(state.structures ?? []).some((st) => st.id === madeBy.id && st.side === side && !st.ruin)) madeBy = null;
@@ -1057,7 +1057,7 @@ function buildButton(id, unit, enabled, lock) {
   button.disabled = !enabled;
   button.dataset.unit = id;
   // What has to be built first, when the structure this unit comes from does not stand.
-  const why = lock ? (lock.text ? t("hero.one") : t("structure.needs", { structure: lock.def.name[lang] })) : "";
+  const why = lock ? (lock.text === "lock.pads" ? t("lock.pads") : lock.text ? t("hero.one") : t("structure.needs", { structure: lock.def.name[lang] })) : "";
   if (lock) button.title = why;
   const icon = el("canvas");
   const dpr = devicePixelRatio || 1;

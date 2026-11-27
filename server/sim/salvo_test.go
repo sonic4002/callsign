@@ -209,3 +209,22 @@ func dist2(sq *sim.Squad, point string) float64 {
 	x, y := sq.Center()
 	return math.Hypot(x-p.X, y-p.Y)
 }
+
+// A strike squad sent home to another airbase goes only where its planes have pads.
+func TestAStrikeSquadIsNotSentToAFullAirbase(t *testing.T) {
+	s := newSim(t, 1)
+	first := own(s, 0, shared.RoleAirbase)
+	buyFielded(t, s, 0, "strikeJet")
+	buyFielded(t, s, 0, "strikeJet")
+	def := rules.Factions["aegis"].Structures["airbase"]
+	wealth(s, 0, def.Cost)
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "airbase"})
+	run(s, def.BuildSeconds+2)
+	third := buyFielded(t, s, 0, "strikeJet")
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdMove, Squad: third.ID, Place: first.ID}); !errors.Is(err, sim.ErrAirbaseFull) {
+		t.Fatalf("a third squad sent home to a full airbase: %v, want ErrAirbaseFull", err)
+	}
+	if home := sortieOf(t, s, third).Home; home == first.ID {
+		t.Fatal("the squad now flies from the full airbase")
+	}
+}

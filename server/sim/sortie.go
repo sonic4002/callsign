@@ -252,8 +252,11 @@ func (s *Sim) sortieOrder(c Command, sq *Squad) (*Squad, error) {
 		case c.Kind != CmdAttack && home:
 			// Home: to the airbase named, when one was, and from now on it flies from there.
 			o.Kind = OrderReturn
-			if pl.Structure != nil && pl.Structure.Standing() {
-				sq.sortie.Home = pl.Structure.ID
+			if st := pl.Structure; st != nil && st.Standing() && st.ID != sq.sortie.Home {
+				if s.padsFree(st, sq) < sq.planes() {
+					return nil, fmt.Errorf("%w: %s has no pads free", ErrAirbaseFull, st.PlaceID())
+				}
+				sq.sortie.Home = st.ID
 			}
 		case c.Kind == CmdHold:
 			return nil, ErrNoLoiter

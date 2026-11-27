@@ -539,6 +539,7 @@
   "act.plant": "הנח מטען",
   "act.seize": "השתלט",
   "act.salvo": "חלת דבש",
+  "lock.pads": "בסיס האוויר מלא: בנו עוד אחד",
   "salvo.wait": "{weapon} {time}",
   "placer.salvo": "{squad}: {weapon}",
   "placer.salvoHint": "הקישו איפה ייפלו הטילים. הטבעת היא השטח שהם מכסים.",
