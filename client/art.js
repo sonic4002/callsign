@@ -55,7 +55,7 @@ export async function loadSprites(base = "/assets/sprites/") {
           // A structure's door is two small patches drawn over it: open, and open with the
           // light on. A patch that fails to load is simply never drawn.
           for (const patch of Object.values(entry.door?.frames ?? {})) {
-            loadImage(base + patch.image).then((pic) => pic && (sprites[group][id].door.frames[patch.name].img = pic));
+            loadImage(sheet(patch)).then((pic) => pic && (sprites[group][id].door.frames[patch.name].img = pic));
           }
         }),
       );
@@ -811,7 +811,7 @@ export function drawStructurePicture(ctx, kind, { progress = 1, door = "closed",
   const body = (base.spin?.body && sprites.props[base.spin.prop]?.img && sprites.buildings[base.spin.body]) || base;
   const entry = (ruin ? sprites.buildings[`${kind}_ruin`] : stage < stages.length ? sprites.buildings[stages[stage]] : body) ?? base;
   const dark = done && !powered;
-  shadow(ctx, 30, 13, 0.3);
+  if (!base.door?.lift) shadow(ctx, 30, 13, 0.3); // an airfield is a slab on the ground: nothing in its middle to cast one
   drawSprite(ctx, dark ? dimmed(entry) : entry, height, 0);
   const patch = done && base.door?.frames?.[door];
   if (patch?.img) {

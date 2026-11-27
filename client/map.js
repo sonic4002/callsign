@@ -806,6 +806,8 @@ export class Scene {
         advance(v, dt, kind, Math.atan2(iy, ix));
         // A strike aircraft climbs off its pad when it leaves and comes down onto it again.
         if (group.strike) v.alt = Math.max(0, Math.min(1, (v.alt ?? (group.parked ? 0 : 1)) + (group.parked ? -dt : dt) / 1.1));
+        // Down on its pad a plane stands along the runway, nose toward the enemy's side.
+        if (group.strike && group.parked && v.alt === 0 && !v.moving) v.turn = group.side === 0 ? Math.atan2(0.5, 1) : Math.atan2(-0.5, -1);
       }
       // Men on foot are drawn far larger than life, so their teams are shown standing
       // further apart than they are, or a squad would be one heap of soldiers.
@@ -914,7 +916,8 @@ export class Scene {
       const def = structureDef(rules, st);
       if (!def) continue;
       if (st.role === "fence") things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: z, draw: () => drawFence(ctx, st, sideColor[st.side]) });
-      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: buildScale, draw: () => drawStructure(ctx, { ...st, door: this.doorOf(st, now) }, def, sideColor[st.side], time) });
+      // An airfield is drawn to the ground's own scale at every zoom: planes stand on its pads.
+      else things.push({ depth: st.x + st.y, x: st.x, y: st.y, scale: st.role === "airbase" ? z * 1.8 : buildScale, draw: () => drawStructure(ctx, { ...st, door: this.doorOf(st, now) }, def, sideColor[st.side], time) });
     }
     // Where new units gather, when a place was chosen: a flag in the side's colour.
     const flags = new Map();
@@ -967,7 +970,9 @@ export class Scene {
           depth: v.px + v.py + (group.air ? 90 : 0), // what flies is drawn over what stands under it
           x: v.px,
           y: v.y,
-          scale: unitScale,
+          // A plane on the ground is drawn to the size of its pad (four fit an apron), and
+          // grows to its flying size as it climbs: seen from above, what is higher is nearer.
+          scale: unitScale * (group.strike ? 0.5 + 0.5 * (v.alt ?? 1) : 1),
           draw: () => {
             // Just out of its structure: it shows and grows as it clears the doorway.
             const age = v.bornAt ? (now - v.bornAt) / 900 : 1;
