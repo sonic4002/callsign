@@ -94,7 +94,7 @@ export class Scene {
     this.blasts = new Set(); // the bombs already shown (bombs)
     this.rocketsSeen = new Set(); // the salvo missiles already shown (rockets)
     this.pace = 1; // match seconds per real second (the page sets it from the lobby)
-    this.aiming = null; // { radius }: a salvo being aimed, its ring drawn under the pointer
+    this.salvoAim = null; // { radius }: a salvo being aimed, its ring drawn under the pointer
     this.last = performance.now();
     this.waves = [];
   }
@@ -374,7 +374,7 @@ export class Scene {
   // drawAim draws the ring of a salvo being aimed: the ground its missiles will fall on,
   // under the pointer, with a cross at its middle.
   drawAim(ctx) {
-    const a = this.aiming;
+    const a = this.salvoAim;
     if (!a || !this.hover) return;
     const [rx, ry] = groundEllipse(a.radius).map((v) => v * this.cam.zoom);
     const { x, y } = this.hover;

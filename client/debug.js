@@ -1327,7 +1327,7 @@ function renderPlacer() {
 function stopPlacing() {
   placing = null;
   scene.placing = null;
-  scene.aiming = null;
+  scene.salvoAim = null;
   renderPlacer();
 }
 
@@ -1398,7 +1398,7 @@ function startSalvo(squad) {
   if (scene.selected !== squad.id) select(squad);
   scene.placing = null;
   placing = { mode: "salvo", squad };
-  scene.aiming = { radius: unitDef(rules, squad.unit)?.salvo?.spread ?? 0 };
+  scene.salvoAim = { radius: unitDef(rules, squad.unit)?.salvo?.spread ?? 0 };
   renderPlacer();
 }
 function placeSalvo(wx, wy) {
@@ -2062,20 +2062,20 @@ function chosenGold() {
 
 // The most squads a side may field: the usual number, raised by the arrows as far as the
 // chosen map allows (a bigger map has room for more). 0 leaves it to the server.
-let units = Number(localStorage.getItem("callsign.units")) || 0;
+let squadCap = Number(localStorage.getItem("callsign.units")) || 0;
 const unitRange = () => offer?.maps?.find((m) => m.id === chosen("map"))?.units ?? null;
 function renderUnits() {
   const range = unitRange();
   $("lobby-units-row").hidden = !range; // an older server has one cap only
   if (!range) return;
   const [low, top] = range;
-  units = Math.max(low, Math.min(top, units || low));
-  $("lobby-units").textContent = String(units);
-  $("lobby-units-down").disabled = units <= low;
-  $("lobby-units-up").disabled = units >= top;
+  squadCap = Math.max(low, Math.min(top, squadCap || low));
+  $("lobby-units").textContent = String(squadCap);
+  $("lobby-units-down").disabled = squadCap <= low;
+  $("lobby-units-up").disabled = squadCap >= top;
   $("lobby-units-about").textContent = t("lobby.unitsRange", { min: low, max: top });
 }
-const chosenUnits = () => (unitRange() ? units : 0);
+const chosenUnits = () => (unitRange() ? squadCap : 0);
 
 // Only the host makes matches on a locked server; a browser that has done so once is remembered.
 $("lobby-host").hidden = !offer?.locked || Boolean(localStorage.getItem("callsign.hostkey"));
@@ -2118,9 +2118,9 @@ fitLength();
 $("lobby-map-cards").addEventListener("change", renderUnits);
 for (const [id, step] of [["lobby-units-down", -1], ["lobby-units-up", 1]]) {
   $(id).addEventListener("click", () => {
-    units = (units || unitRange()?.[0] || 0) + step;
+    squadCap = (squadCap || unitRange()?.[0] || 0) + step;
     renderUnits();
-    localStorage.setItem("callsign.units", String(units));
+    localStorage.setItem("callsign.units", String(squadCap));
   });
 }
 renderUnits();
