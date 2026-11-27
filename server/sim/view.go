@@ -89,6 +89,8 @@ type SquadView struct {
 	Dug int     `json:"dug,omitempty"`
 	// Sortie is set for a strike aircraft: where it is in its sortie and what it carries.
 	Sortie *SortieView `json:"sortie,omitempty"`
+	// Salvo is set for a unit with a missile salvo: how far its pods are loaded.
+	Salvo *SalvoView `json:"salvo,omitempty"`
 }
 
 // ContactView is an enemy squad as the other side sees it: only the teams in sight.
@@ -161,6 +163,7 @@ type Snapshot struct {
 	Haulers      []HaulerView    `json:"haulers"` // own haulers, then enemy ones as last seen
 	Charges      []ChargeView    `json:"charges"` // demolition charges burning down: own, and enemy ones in sight
 	Blasts       []BlastView     `json:"blasts"`  // bombs that have just gone off: own, and enemy ones in sight
+	Rockets      []RocketView    `json:"rockets"` // missiles of a salvo in flight: own, and enemy ones in sight
 	// Taken counts this side's squads an enemy hero holds for now. They are not in Squads,
 	// and they still count toward the cap, because they come back.
 	Taken  int    `json:"taken,omitempty"`
@@ -247,6 +250,7 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	s.snapHaul(&snap, side)
 	s.snapCharges(&snap, side)
 	s.snapBlasts(&snap, side)
+	s.snapRockets(&snap, side)
 	return snap
 }
 
@@ -263,6 +267,9 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 	s.viewExtras(sq, &v)
 	if sq.sortie != nil {
 		v.Sortie = s.sortieView(sq)
+	}
+	if sq.unit.Salvo != nil {
+		v.Salvo = s.salvoView(sq)
 	}
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 {
@@ -376,6 +383,7 @@ func (s *Sim) Hash() uint64 {
 	s.hashHaul(put, f)
 	s.hashHeroes(put, f)
 	s.hashSorties(put)
+	s.hashSalvos(put, f)
 	return h.Sum64()
 }
 

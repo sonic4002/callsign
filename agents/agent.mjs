@@ -13,7 +13,7 @@ import { eventLine as powerEventLine } from "./power.mjs";
 import { describeHeroEvent, heroLeaderEvents, heroOperatorEvents, unitAnywhere } from "./heroes.mjs";
 import { describeStrikeEvent, strikeLeaderEvents } from "./aircraft.mjs";
 
-const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned", ...heroLeaderEvents, ...strikeLeaderEvents]);
+const leaderEvents = new Set(["contact", "pinned", "losses", "arrived", "garrisoned", "salvo", ...heroLeaderEvents, ...strikeLeaderEvents]);
 const operatorEvents = new Set(["squad_lost", "point_lost", "hq_under_attack", "structure_lost", "structure_captured", "structure_attacked", "structure_built", "hauler_attacked", "hauler_lost", "bridge_under_attack", "bridge_fell", "bridge_repaired", "building_fell", "low_power", "power_restored", "structure_repaired", "repair_stopped", ...heroOperatorEvents]);
 const standBy = { en: "Stand by", he: "המתן" };
 
@@ -430,6 +430,8 @@ function eventLine(item, e, who) {
       return `Your squad lost a fireteam near ${e.point}; ${e.count} fireteams left.`;
     case "arrived":
       return `Your squad arrived at ${item.place ?? (e.structure ? `the ${e.unit} (${e.structure}) near ${e.point}` : e.point)}.`;
+    case "salvo":
+      return `Your squad fired its missile salvo, ${e.count} missiles, over ${e.place || e.point}. The pods are empty until they are loaded again; you hold where you fired.`;
     case "squad_lost":
       return `${who} was destroyed near ${e.point}.`;
     case "point_lost":

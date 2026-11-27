@@ -165,6 +165,14 @@ export function formation(members, heading, go = 0, seed = 0) {
 const cycle = (count, per, o, offset = 0) =>
   o.stride === undefined ? null : (((Math.floor((o.stride / per) * count + offset) % count) + count) % count);
 
+// gunHeight is how far above its place on the ground a unit's weapon is, in the unit's own
+// pixels: what flies fires from where it is drawn, a little under its body, not from the
+// ground beneath it. A shot at it ends at the same height.
+export const gunHeight = (unit) => {
+  const up = sprites.units[unit]?.altitude ?? 0;
+  return up ? Math.max(12, up * METRE - 5) : 12;
+};
+
 // lift raises what flies to its height above its place on the ground, with a slow bob.
 // The shadow is drawn before this, so it stays on the ground.
 function lift(ctx, entry, o, i = 0) {

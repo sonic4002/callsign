@@ -27,7 +27,7 @@ var ErrWhichPlace = errors.New("which one")
 
 // allowed lists the tools each role may call. Hammer and spectators have none.
 var allowed = map[string][]string{
-	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair, ToolFortify, ToolPlant, ToolSeize},
+	RoleSquad: {ToolRadio, ToolReport, ToolMove, ToolHold, ToolAttack, ToolCapture, ToolRepair, ToolFortify, ToolPlant, ToolSeize, ToolSalvo},
 	RoleAnvil: {ToolRadio, ToolReport, ToolBuy, ToolCommand, ToolBuild, ToolHaul, ToolCancel, ToolRally, ToolSell, ToolRepair},
 }
 
@@ -135,7 +135,7 @@ func (rm *Room) orderSquad(side, squad int, name string, a toolArgs) (any, error
 		if sq := rm.sim.Squad(squad); sq != nil {
 			x, y = sq.Center()
 		}
-		place, err := rm.place(side, where, name == ToolAttack || name == ToolPlant, x, y)
+		place, err := rm.place(side, where, name == ToolAttack || name == ToolPlant || name == ToolSalvo, x, y)
 		switch {
 		case errors.Is(err, ErrWhichPlace):
 			return nil, err

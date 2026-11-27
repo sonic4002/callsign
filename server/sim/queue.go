@@ -62,7 +62,8 @@ func (s *Sim) line(id int) []*Squad {
 }
 
 // producer chooses the structure that makes a unit: the one with the shortest line, of
-// those the nearest to the headquarters, of those the oldest. nil when none can.
+// those the nearest to the headquarters, of those the oldest. nil when none can. A strike
+// aircraft is made only where it will stand: at an airbase with pads free for its planes.
 func (s *Sim) producer(side int, unitID string, u *shared.Unit) *Structure {
 	hq := s.R.HQPoint(side)
 	var best *Structure
@@ -70,6 +71,9 @@ func (s *Sim) producer(side int, unitID string, u *shared.Unit) *Structure {
 	for _, st := range s.Structures {
 		if !s.makes(st, side, unitID, u) {
 			continue
+		}
+		if u.Strike() && s.padsFree(st, nil) < u.Teams {
+			continue // an airbase with no pads left for the squad's planes
 		}
 		n, d := len(s.line(st.ID)), dist(st.X, st.Y, hq.X, hq.Y)
 		if best == nil || n < bn || (n == bn && d < bd) {

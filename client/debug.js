@@ -446,7 +446,7 @@ function drawLog(log, lines, withStrip) {
       if (e.kind === "event") {
         const ev = e.event;
         time.textContent = clock(ev.tick);
-        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", unit: unitDef(rules, ev.unit ?? "")?.name[lang] ?? "", gold: ev.count, count, ...eventNames(rules, ev, lang) };
+        const vars = { point: pointName(ev.point), place: ev.place ? placeName(ev.place) : "", squad: e.callsign?.[lang] ?? "", tier: ev.count, seconds: ev.count, name: tierName(ev.count), structure: ev.unit ? kindName(ev.unit) : "", unit: unitDef(rules, ev.unit ?? "")?.name[lang] ?? "", gold: ev.count, missiles: ev.count, count, ...eventNames(rules, ev, lang) };
         text.textContent = count > 1 && `eventMany.${ev.kind}` in strings.en ? t(`eventMany.${ev.kind}`, vars) : times(t(`event.${ev.kind}`, vars));
       } else {
         time.textContent = clock(e.tick);
@@ -670,9 +670,12 @@ function acted(frame) {
   }, 4000);
 }
 
-// send gives a squad one of the three plain orders by hand: the game applies it at once
-// and the squad answers "Wilco, out" by itself. Anything else a squad is told is a call.
-const BY_HAND = ["move", "hold", "attack"];
+// send gives a squad one of the plain orders by hand (move, hold, attack, or a helicopter's
+// missile salvo): the game applies it at once and the squad answers "Wilco, out" by
+// itself. Anything else a squad is told is a call.
+const BY_HAND = ["move", "hold", "attack", "salvo"];
+// withSalvo adds the missile salvo to a menu's orders for a squad whose pods are loaded.
+const withSalvo = (squad, actions) => ((squad?.salvo?.ready ?? 0) >= 1 ? [...actions, "salvo"] : actions);
 function send(squad, action, where) {
   hideOrders();
   act("order", { squad: squad.id, order: action, ...where });
@@ -858,13 +861,14 @@ function renderSidebar() {
   $("command-switch").textContent = fight ? t("command.take") : t("command.give");
   $("command-switch").disabled = !canAct;
   // The match's pace beside the clock, when it is not the usual one.
+  scene.pace = lobby?.pace || 1; // what is drawn between snapshots keeps the match's time
   $("pace").hidden = !lobby || lobby.pace === 1 || !lobby.pace;
   $("pace").textContent = lobby?.pace ? ` ×${lobby.pace}` : "";
 
   // The lists are rebuilt only when what they show changes, so buttons stay clickable.
   // Progress bars are then moved in place on every frame.
   const afford = rules.tiers.map((tier) => state.gold >= tier.upgradeCost);
-  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order, sq.rank, sq.hero?.charges, sq.hero?.seized, Math.round((sq.dig ?? 0) * 10), sq.sortie?.state, Math.round((sq.sortie?.rearm ?? 0) * 10)]), deploying.map((d) => [d.id, d.line ?? 0]), live(upgrading), live(promoted)]);
+  const rosterKey = JSON.stringify([lang, scene.selected, canAct, afford, mine.map((sq) => [sq.id, sq.alive, sq.tier, sq.order, sq.rank, sq.hero?.charges, sq.hero?.seized, Math.round((sq.dig ?? 0) * 10), sq.sortie?.state, Math.round((sq.sortie?.rearm ?? 0) * 10), sq.salvo?.wait]), deploying.map((d) => [d.id, d.line ?? 0]), live(upgrading), live(promoted)]);
   if (rosterKey !== drawn.roster) {
     drawn.roster = rosterKey;
     const rows = [...mine.map((sq) => rosterRow(sq, canAct)), ...deploying.map(deployRow)];
@@ -990,6 +994,7 @@ function orderText(sq) {
   if (sortie) return sortie;
   if (sq.order.kind === "fortify") return t("order.fortify", { percent: Math.round((digProgress(sq) ?? 0) * 100) });
   if (sq.order.kind === "plant") return t("order.plant");
+  if (sq.order.kind === "salvo") return t("order.salvo", { point: sq.order.place ? placeName(sq.order.place) : pointName(sq.order.point) });
   if (sq.order.kind === "seize") return t("order.seize");
   if (sq.order.contact) return t("order.contact");
   if (sq.order.kind === "capture") return t("order.capture", { percent: Math.round((sq.order.capture ?? 0) * 100) });
@@ -1029,6 +1034,19 @@ function rosterRow(sq, canAct) {
   }
   li.append(name, pips, el("span", "order", orderText(sq)), tier);
   if (unit.hero) heroRow(li, sq, unit, { t, name: (id) => state.squads.find((s) => s.id === id)?.callsign[lang] ?? "" });
+  if (unit.salvo && sq.salvo) {
+    // Its missile salvo: fired from here when the pods are loaded, else the time to go.
+    const ready = sq.salvo.ready >= 1;
+    const wait = sq.salvo.wait ?? 0;
+    const fire = el("button", "salvo", ready ? unit.salvo.name[lang] : t("salvo.wait", { weapon: unit.salvo.name[lang], time: `${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, "0")}` }));
+    fire.type = "button";
+    fire.disabled = !ready || !canAct;
+    fire.addEventListener("click", (ev) => {
+      ev.stopPropagation(); // the row's own press selects and unselects
+      startSalvo(sq);
+    });
+    li.append(fire);
+  }
   li.addEventListener("click", () => (scene.selected === sq.id ? unselect() : select(sq)));
   return li;
 }
@@ -1309,6 +1327,7 @@ function renderPlacer() {
 function stopPlacing() {
   placing = null;
   scene.placing = null;
+  scene.aiming = null;
   renderPlacer();
 }
 
@@ -1350,18 +1369,50 @@ addEventListener("pointerdown", (ev) => {
 });
 
 // placeRally sets the rally point to what is under a tap: a named point, a tech building
-// or a landmark. A tap on open ground asks for nothing.
+// or a landmark, and on open ground the spot itself, said off the nearest point.
 function placeRally(wx, wy) {
   const [sx, sy] = scene.cam.screen(wx, wy);
   const hit = scene.pick(sx, sy, side);
   const near = rules.map.points.find((p) => Math.hypot(p.x - wx, p.y - wy) <= rules.match.captureRadius * 1.15);
   const tech = hit.structure?.role === "tech" ? hit.structure : null;
   const mark = hit.landmark ?? hit.bridge;
-  const where = tech?.id ?? mark?.id ?? (hit.point ?? near)?.id;
-  if (!where) return;
+  let where = tech?.id ?? mark?.id ?? (hit.point ?? near)?.id;
+  if (!where) {
+    if (hit.structure || hit.squad || hit.contact) return; // not a place to gather on
+    const spot = spotAt(rules, wx, wy);
+    if (spot.x < 0 || spot.y < 0 || spot.x > rules.map.width || spot.y > rules.map.height) return;
+    where = spotForm(spot);
+  }
   const from = placing?.structure;
   stopPlacing();
   act("rally", { place: where, structure: from?.id ?? "" });
+}
+
+// ---- the missile salvo (a helicopter's honeycomb pods) ----
+//
+// The button on the squad's row asks where: a ring the size of the ground the missiles
+// fall on follows the pointer over the map, and a press fires there. An enemy or a
+// structure under the press is aimed at by name; anywhere else it is the spot itself.
+function startSalvo(squad) {
+  hideOrders();
+  if (scene.selected !== squad.id) select(squad);
+  scene.placing = null;
+  placing = { mode: "salvo", squad };
+  scene.aiming = { radius: unitDef(rules, squad.unit)?.salvo?.spread ?? 0 };
+  renderPlacer();
+}
+function placeSalvo(wx, wy) {
+  const squad = state.squads.find((sq) => sq.id === placing.squad.id);
+  const [sx, sy] = scene.cam.screen(wx, wy);
+  const hit = scene.pick(sx, sy, side);
+  stopPlacing();
+  if (!squad || hit.squad) return;
+  if (hit.contact) return send(squad, "salvo", { contact: hit.contact.id });
+  if (hit.structure) return hit.structure.side === side ? undefined : send(squad, "salvo", { place: hit.structure.id });
+  const spot = spotAt(rules, wx, wy);
+  if (spot.x < 0 || spot.y < 0 || spot.x > rules.map.width || spot.y > rules.map.height) return;
+  scene.ping(spot.x, spot.y);
+  send(squad, "salvo", { place: spot.east || spot.south ? spotForm(spot) : spot.point });
 }
 
 // renderRally says where new squads gather now, as the side's structures have it.
@@ -1484,7 +1535,7 @@ function mapClick(ev) {
     const mine = state.squads.find((sq) => sq.id === scene.selected);
     if (!mine) return draft($("text").value + name);
     // With a squad picked, an enemy offers one action: attack it. A hero may seize a vehicle.
-    const acts = heroOrders(rules, mine, { kind: "contact", cls: hit.contact.class }, ["attack"]);
+    const acts = withSalvo(mine, heroOrders(rules, mine, { kind: "contact", cls: hit.contact.class }, ["attack"]));
     return offerOrders({ title: `${mine.callsign[lang]} → ${name}`, actions: acts, say: byHand(mine, { contact: hit.contact.id }, (action) => call(action, { to: mine.callsign[lang], point: name })) }, box, sx, sy);
   }
   if (hit.structure) {
@@ -1497,7 +1548,7 @@ function mapClick(ev) {
     const actions = heroOrders(rules, mine, { kind: "structure" }, unitDef(rules, mine.unit)?.captureSeconds && structureDef(rules, st)?.capturable ? ["capture", "attack"] : ["attack"]);
     const tech = st.role === "tech"; // not "the enemy's": it may be nobody's
     const say = (action) => (action === "plant" ? call("plantStructure", { to: mine.callsign[lang], structure: structureName(st) }) : call(`${action === "capture" ? "capture" : "attackStructure"}${tech ? "Tech" : ""}`, { to: mine.callsign[lang], structure: structureName(st) }));
-    return offerOrders({ title: `${mine.callsign[lang]} → ${structureName(st)}`, actions, say: byHand(mine, { place: st.id }, say) }, box, sx, sy);
+    return offerOrders({ title: `${mine.callsign[lang]} → ${structureName(st)}`, actions: withSalvo(mine, actions), say: byHand(mine, { place: st.id }, say) }, box, sx, sy);
   }
   const squad = state.squads.find((sq) => sq.id === scene.selected);
   if (hit.gusher && !hit.landmark && !hit.bridge) {
@@ -1524,7 +1575,7 @@ function mapClick(ev) {
   if (!squad) return draft($("text").value + name);
   const said = kind === "point" ? name : placeName(place.id);
   const target = kind === "point" && place.kind === "hq" && place.owner !== side ? "enemyHQ" : kind;
-  offerOrders({ title: `${squad.callsign[lang]} → ${name}`, actions: heroOrders(rules, squad, { kind: target }, ordersFor(kind)), say: byHand(squad, { place: place.id }, (action) => call(action, { to: squad.callsign[lang], point: said })) }, box, sx, sy);
+  offerOrders({ title: `${squad.callsign[lang]} → ${name}`, actions: withSalvo(squad, heroOrders(rules, squad, { kind: target }, ordersFor(kind))), say: byHand(squad, { place: place.id }, (action) => call(action, { to: squad.callsign[lang], point: said })) }, box, sx, sy);
 }
 
 // offerOrders opens the one small menu of the map: the orders for a squad at a place, an

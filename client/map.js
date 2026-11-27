@@ -1,7 +1,7 @@
 // The battlefield: terrain baked once, then every frame the points, buildings, fireteams,
 // gunfire and labels, sorted by depth. It draws only what the server sent this side.
 
-import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawScatter, drawSegment, drawUnit, hasAnimation, sprites } from "./art.js";
+import { casualtySeconds, drawBuilding, drawCasualty, drawLandmark, drawScatter, drawSegment, drawUnit, gunHeight, hasAnimation, sprites } from "./art.js";
 import { drawFence, drawStructure } from "./bases-art.js";
 import { structureAt, structureDef } from "./bases.js";
 import { drawRadarOff } from "./power.js";
@@ -92,6 +92,9 @@ export class Scene {
     this.sites = new Map(); // structure id → when its building site next throws dust and rings
     this.doors = new Map(); // structure id → until when its door stands open behind a unit
     this.blasts = new Set(); // the bombs already shown (bombs)
+    this.rocketsSeen = new Set(); // the salvo missiles already shown (rockets)
+    this.pace = 1; // match seconds per real second (the page sets it from the lobby)
+    this.aiming = null; // { radius }: a salvo being aimed, its ring drawn under the pointer
     this.last = performance.now();
     this.waves = [];
   }
@@ -235,6 +238,7 @@ export class Scene {
     }
     if (this.selected && !state.squads.some((s) => s.id === this.selected)) this.selected = 0;
     this.bombs(state);
+    this.rockets(state);
     this.hqWatch(state);
   }
 
@@ -250,12 +254,36 @@ export class Scene {
       if (this.blasts.has(key)) continue;
       this.blasts.add(key);
       if (b.age > 6) continue; // gone off before this page was looking
+      if (b.kind === "missile") {
+        // One missile of a salvo: a small blast where it lands, no fall to wait for.
+        this.fx.blast(b.x, b.y, now, 0.75, { shake: 0.9 });
+        this.sound(this.fx.onWater(b.x, b.y) ? "splash" : "boomS", b.x, b.y);
+        continue;
+      }
       const fall = 320 + 110 * n++;
       this.effects.push({ kind: "bomb", x: b.x, y: b.y, t0: now, ttl: fall });
       this.fx.blast(b.x, b.y, now + fall, 1.7, { shake: 3.2 });
       this.sound(this.fx.onWater(b.x, b.y) ? "splash" : "boomM", b.x, b.y, fall);
     }
     for (const key of this.blasts) if (!live.has(key)) this.blasts.delete(key);
+  }
+
+  // rockets shows the missiles of a salvo on their way (state.rockets): each leaves the
+  // aircraft that fired it at the height it flies, trails smoke and comes down where the
+  // snapshot says. The blast where it lands is one of state.blasts.
+  rockets(state) {
+    const now = performance.now();
+    const ms = 1000 / this.rules.tickRate / (this.pace || 1); // a tick in real time, at the match's pace
+    const live = new Set();
+    for (const r of state.rockets ?? []) {
+      const key = `${r.x0}:${r.y0}:${r.x}:${r.y}:${state.tick - r.age}`;
+      live.add(key);
+      if (this.rocketsSeen.has(key)) continue;
+      this.rocketsSeen.add(key);
+      this.effects.push({ kind: "rocket", x1: r.x0, y1: r.y0, x2: r.x, y2: r.y, h1: gunHeight(r.unit), h2: 0, arc: 0.12, thin: true, t0: now - r.age * ms, ttl: r.flight * ms + 400, flight: r.flight * ms });
+      if (r.age <= 1 && this.rocketsSeen.size % 2 === 0) this.sound("cannon", r.x0, r.y0);
+    }
+    for (const key of this.rocketsSeen) if (!live.has(key)) this.rocketsSeen.delete(key);
   }
 
   // makerOf is the standing structure of a unit's own side that it appeared beside, if any.
@@ -343,6 +371,33 @@ export class Scene {
 
   // drawGhost draws the structure being placed where the pointer put it: its footprint on
   // the ground, green or red, and the building itself seen through.
+  // drawAim draws the ring of a salvo being aimed: the ground its missiles will fall on,
+  // under the pointer, with a cross at its middle.
+  drawAim(ctx) {
+    const a = this.aiming;
+    if (!a || !this.hover) return;
+    const [rx, ry] = groundEllipse(a.radius).map((v) => v * this.cam.zoom);
+    const { x, y } = this.hover;
+    ctx.save();
+    ctx.fillStyle = "rgba(255,186,70,0.13)";
+    ctx.strokeStyle = "#ffcf5a";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([9, 6]);
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const [dx, dy] of [[rx * 0.28, 0], [0, ry * 0.28]]) {
+      ctx.moveTo(x - dx, y - dy);
+      ctx.lineTo(x + dx, y + dy);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   drawGhost(ctx, S, buildScale, time) {
     const p = this.placing;
     if (!p?.spot) return;
@@ -540,15 +595,17 @@ export class Scene {
   }
 
   // shoot shows and sounds one burst from a team's weapon at a target.
-  shoot(group, v, target, now) {
+  //   aimed: the unit shot at, when it is one (a shot at an aircraft ends up where it flies).
+  shoot(group, v, target, now, aimed = null) {
     const w = weaponOf(group.unit, group.cls);
     const miss = () => (Math.random() - 0.5) * 16;
+    const [h1, h2] = [gunHeight(group.unit), aimed ? gunHeight(aimed) : 0];
     for (let i = 0; i < w.rounds; i++) {
       const t0 = now + i * w.gap;
       const x2 = target.x + miss();
       const y2 = target.y + miss();
-      if (w.rocket) this.effects.push({ kind: "rocket", x1: v.px, y1: v.py, x2, y2, arc: w.rocket, t0, ttl: w.travel + 500, flight: w.travel });
-      else this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
+      if (w.rocket) this.effects.push({ kind: "rocket", x1: v.px, y1: v.py, x2, y2, h1, h2, arc: w.rocket, t0, ttl: w.travel + 500, flight: w.travel });
+      else this.effects.push({ kind: "tracer", x1: v.px, y1: v.py, x2, y2, h1, h2: aimed ? h2 : 12, turn: v.turn, heavy: Boolean(w.heavy), flash: i === 0 && !hasAnimation(group.unit), t0, ttl: w.heavy ? 240 : 160 });
       const at = t0 + w.travel;
       if (w.impact === "shell") this.fx.shell(x2, y2, at, 1.25);
       else if (w.impact === "pop") this.fx.pop(x2, y2, at);
@@ -952,7 +1009,7 @@ export class Scene {
         const [ax, ay] = S(e.x1, e.y1);
         const [bx, by] = S(e.x2, e.y2);
         const span = Math.hypot(bx - ax, by - ay);
-        const at = (k) => [ax + (bx - ax) * k, ay + (by - ay) * k - 12 * unitScale * (1 - k) - Math.sin(Math.PI * k) * span * 0.45 * e.arc];
+        const at = (k) => [ax + (bx - ax) * k, ay + (by - ay) * k - ((e.h1 ?? 12) * (1 - k) + (e.h2 ?? 0) * k) * unitScale - Math.sin(Math.PI * k) * span * 0.45 * e.arc];
         const k = Math.min(1, (now - e.t0) / e.flight);
         const fade = Math.max(0, 1 - Math.max(0, now - e.t0 - e.flight) / 500);
         ctx.lineCap = "round";
@@ -964,7 +1021,7 @@ export class Scene {
           const [x1, y1] = at(k1);
           const age = (i + 1) / steps; // 1 at the rocket, 0 at the launcher
           ctx.strokeStyle = `rgba(214,214,206,${0.5 * fade * (0.25 + 0.75 * age)})`;
-          ctx.lineWidth = (2 + 3.5 * (1 - age)) * unitScale;
+          ctx.lineWidth = (2 + 3.5 * (1 - age)) * unitScale * (e.thin ? 0.55 : 1); // a salvo's missiles are small
           ctx.beginPath();
           ctx.moveTo(x0, y0);
           ctx.lineTo(x1, y1);
@@ -998,14 +1055,17 @@ export class Scene {
       if (e.kind === "tracer" && life >= 0) {
         const [ax, ay] = S(e.x1, e.y1);
         const [bx, by] = S(e.x2, e.y2);
-        const lift = 12 * unitScale;
+        // From the height of the gun to the height of what is shot at: an aircraft fires
+        // from where it flies, and is hit there.
+        const lift = (e.h1 ?? 12) * unitScale;
+        const fall = ((e.h2 ?? 12) - (e.h1 ?? 12)) * unitScale;
         const head = Math.min(1, life * 1.6);
         const tail = Math.max(0, head - 0.35);
         ctx.strokeStyle = `rgba(255,236,150,${1 - life})`;
         ctx.lineWidth = e.heavy ? 2.6 : 1.5;
         ctx.beginPath();
-        ctx.moveTo(ax + (bx - ax) * tail, ay - lift + (by - ay) * tail);
-        ctx.lineTo(ax + (bx - ax) * head, ay - lift + (by - ay) * head);
+        ctx.moveTo(ax + (bx - ax) * tail, ay - lift + (by - ay - fall) * tail);
+        ctx.lineTo(ax + (bx - ax) * head, ay - lift + (by - ay - fall) * head);
         ctx.stroke();
         if (e.flash && life < 0.35) {
           ctx.fillStyle = `rgba(255,214,110,${0.9 - life * 2})`;
@@ -1020,6 +1080,7 @@ export class Scene {
     this.fog.render(state.fog, this.eyes());
     this.fog.draw(ctx, cam);
     this.drawGhost(ctx, S, buildScale, time);
+    this.drawAim(ctx);
 
     this.labels(buildScale, unitScale);
     this.drawRadar();
@@ -1098,12 +1159,13 @@ export class Scene {
       const def = rules.factions[st.faction]?.structures[st.kind];
       if (!def?.range) continue;
       let target = null;
+      let aimed = null;
       let bd = def.range;
       for (const other of all) {
         if (other.side === st.side || (def.vs?.[other.cls] ?? 1) === 0) continue;
         for (const o of other.visuals) {
           const d = Math.hypot(o.x - st.x, o.y - st.y);
-          if (d < bd) [target, bd] = [o, d];
+          if (d < bd) [target, bd, aimed] = [o, d, other.unit];
         }
       }
       if (!target) continue;
@@ -1113,7 +1175,7 @@ export class Scene {
       gun.nextShot = now + (def.cooldownTicks / rules.tickRate) * 1000 * (0.8 + Math.random() * 0.4);
       target.hitAt = now;
       const turn = Math.atan2(...toIso(target.x - st.x, target.y - st.y).reverse());
-      this.shoot({ unit: st.kind, cls: "vehicle" }, { px: st.x, py: st.y - 6, turn }, target, now);
+      this.shoot({ unit: st.kind, cls: "vehicle" }, { px: st.x, py: st.y - 6, turn }, target, now, aimed);
     }
   }
 
@@ -1127,12 +1189,13 @@ export class Scene {
       for (const v of group.visuals) {
         if (group.own && v.action !== "fire") continue;
         let target = null;
+        let aimed = null; // the unit shot at
         let bd = stats.range * 1.05;
         for (const other of all) {
           if (other.side === group.side) continue;
           for (const o of other.visuals) {
             const d = Math.hypot(o.x - v.x, o.y - v.y);
-            if (d < bd) [target, bd] = [o, d];
+            if (d < bd) [target, bd, aimed] = [o, d, other.unit];
           }
         }
         // With no enemy team in reach, one of ours that fires is shooting at what it was
@@ -1153,7 +1216,7 @@ export class Scene {
         target.hitAt = now;
         v.nextShot = now + (stats.cooldownTicks / this.rules.tickRate) * 1000 * (0.75 + Math.random() * 0.5);
         v.flashUntil = now + 110;
-        this.shoot(group, v, target, now);
+        this.shoot(group, v, target, now, target.members === undefined ? null : aimed);
       }
     }
   }

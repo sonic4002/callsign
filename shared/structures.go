@@ -57,6 +57,11 @@ type Structure struct {
 	// stands. A side that uses more than it supplies is on low power.
 	Power float64 `json:"power,omitempty"`
 
+	// An airbase holds so many strike aircraft (Planes), each on a spot of its apron
+	// (Pads: east and south of its middle). A squad's planes each take one.
+	Planes int          `json:"planes,omitempty"`
+	Pads   [][2]float64 `json:"pads,omitempty"`
+
 	// Defences fire like a unit's weapon.
 	Range         float64            `json:"range,omitempty"`
 	Damage        float64            `json:"damage,omitempty"`

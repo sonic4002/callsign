@@ -195,6 +195,8 @@ type Squad struct {
 	dig   int        // ticks spent digging the position it was told to build
 	told  int        // tick its side was last told a vehicle is running its men down
 	hero  *heroState // set for a hero (hero.go)
+	// salvoAt is the tick a squad's missile pods are loaded again, 0 when they are (salvo.go).
+	salvoAt int
 	// sortie is set for a strike aircraft, which flies from an airbase and back (sortie.go).
 	sortie *sortie
 
@@ -214,9 +216,9 @@ type PointState struct {
 
 type Sim struct {
 	stagedPower [2]float64 // power to spare that a staged base starts with (initStructures)
-	R     *shared.Rules
-	Tick  int
-	Sides [2]Side
+	R           *shared.Rules
+	Tick        int
+	Sides       [2]Side
 	// Squads is every squad and hauler ever raised, in the order they were raised; dead
 	// ones stay with Alive false. A squad's id is not its place in this list: use SquadAny.
 	Squads []*Squad
@@ -235,9 +237,11 @@ type Sim struct {
 	seized  []seizure
 	// Blasts are the bombs that have just gone off (sortie.go).
 	Blasts []Blast
-	Over   bool
-	Winner int
-	Reason string
+	// Rockets are the missiles of salvos on their way down (salvo.go).
+	Rockets []Rocket
+	Over    bool
+	Winner  int
+	Reason  string
 
 	squadN, haulerN int // squads and haulers raised so far; ids are counted apart
 	nav             *nav
@@ -605,6 +609,7 @@ func (s *Sim) Step() []Event {
 	s.defencesFire(live)
 	s.heroes(live)
 	s.strikes(live)
+	s.salvos(live)
 	s.resolveSandbags()
 	s.resolveDamage(live)
 	s.resolveStructures()

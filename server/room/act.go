@@ -16,7 +16,8 @@ import (
 // build tree, placement, power, caps, the line).
 //
 // A squad can be sent somewhere by hand too (owner, 2026-11-26): the commander selects it
-// and taps the map, and the order (move, hold or attack) is the squad's in the same tick.
+// and taps the map, and the order (move, hold, attack, or a helicopter's missile salvo) is
+// the squad's in the same tick.
 // The squad answers "Wilco, out" on the net by code, with no thought of its leader's, and
 // counts as ordered by Hammer by name. Everything else a squad can be told is a radio call.
 //
@@ -113,8 +114,8 @@ func (rm *Room) directOrder(side int, a toolArgs) (any, error) {
 	if sq == nil || !sq.Alive || sq.Side != side {
 		return nil, sim.ErrNoSquad
 	}
-	if a.Order != ToolMove && a.Order != ToolHold && a.Order != ToolAttack {
-		return nil, fmt.Errorf("a squad is sent by hand to move, hold or attack; %q is asked on the radio", a.Order)
+	if a.Order != ToolMove && a.Order != ToolHold && a.Order != ToolAttack && a.Order != ToolSalvo {
+		return nil, fmt.Errorf("a squad is sent by hand to move, hold, attack or fire its salvo; %q is asked on the radio", a.Order)
 	}
 	res, err := rm.orderSquad(side, sq.ID, a.Order, a)
 	if err != nil {

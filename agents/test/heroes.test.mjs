@@ -177,3 +177,26 @@ test("the new events are told to an agent in words, and a status carries rank an
   assert.equal(got.you.positionsBuilt, 1);
   assert.equal(got.contacts[0].hero, true);
 });
+
+test("a helicopter's leader fires the honeycomb salvo when told to, in both languages, and no other squad does", async () => {
+  const brain = ruleBrain();
+  const hawk = { role: "squad", side: 0, squad: 5, tier: 1, station: { key: "air-1", en: "Hawk 1", he: "בז 1" }, lang: "en", unit: aegis.units.helicopter };
+  assert.ok(names(aegis.units.helicopter).includes("salvo"), "the helicopter's leader has the salvo tool");
+  assert.ok(!names(aegis.units.tank).includes("salvo") && !names(aegis.units.strikeJet).includes("salvo"), "nobody else has it");
+  assert.match(leaderPrompt({ rules, side: 0, faction: "aegis", station: hawk.station, unit: hawk.unit }), /or salvo, when told to fire your honeycomb missiles/);
+  assert.deepEqual(await think(brain, { agent: hawk, wake: wake(call("Fire the honeycomb on Foxtrot", { points: ["F"] })) }), [
+    ["salvo", { place: "F", contact: 0 }],
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: hawk, wake: wake(call("שגר מטח טילים על פסל", { lang: "he", points: ["F"] })) }), [
+    ["salvo", { place: "F", contact: 0 }],
+    ["radio", { to: ["Hammer"], body: "רות, יבוצע", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: hawk, wake: wake(call("Missiles on Target 7"), { contacts: [{ id: 7, class: "infantry", x: 0, y: 0 }] }) }), [
+    ["salvo", { place: "", contact: 7 }],
+    ["radio", { to: ["Hammer"], body: "Wilco", end: "out" }],
+  ]);
+  assert.deepEqual(await think(brain, { agent: hawk, wake: wake(call("Fire the missiles")) }), [["radio", { to: ["Hammer"], body: "Say again: fire the missiles where?", end: "over" }]]);
+  // An attack on a point is still an attack.
+  assert.deepEqual((await think(brain, { agent: hawk, wake: wake(call("Attack Foxtrot", { points: ["F"] })) }))[0], ["attack", { place: "F", contact: 0 }]);
+});

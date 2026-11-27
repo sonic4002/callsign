@@ -170,6 +170,7 @@ export function leaderEvent(ctx, mem) {
     fortified: () => say("fortified", { place: pointName(rules, e.point, lang) }),
     charge_planted: () => say("planted", { place: pointName(rules, e.point, lang), count: e.count }),
     crushed: () => say("crushed", { place: pointName(rules, e.point, lang) }),
+    salvo: () => say("salvoFired", { place: where, count: e.count }),
     ...strikeEventLines(e, say, where, status),
   }[e.kind];
   if (!line) return [];
