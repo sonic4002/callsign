@@ -1284,8 +1284,9 @@ function renderPlacer() {
   $("placer").hidden = !placing;
   if (!placing) return;
   const build = placing.mode === "build";
+  const salvo = placing.mode === "salvo";
   const from = placing.structure ? saidStructure(placing.structure) : "";
-  $("placer-title").textContent = build ? t("placer.title", { structure: placing.def.name[lang] }) : from ? t("placer.rallyFrom", { structure: from }) : t("placer.rally");
+  $("placer-title").textContent = build ? t("placer.title", { structure: placing.def.name[lang] }) : salvo ? t("placer.salvo", { squad: placing.squad.callsign[lang], weapon: unitDef(rules, placing.squad.unit)?.salvo?.name[lang] ?? "" }) : from ? t("placer.rallyFrom", { structure: from }) : t("placer.rally");
   // It may be placed all the same; the panel says what it will do to the base's power.
   $("placer-warn").hidden = !(build && wouldRunShort(state, placing.def));
   const why = $("placer-why");
@@ -1299,10 +1300,10 @@ function renderPlacer() {
   $("placer-run").hidden = !fence;
   if (fence) $("placer-run").textContent = t("placer.run", { run: t(`run.${placing.run}`) });
   why.classList.toggle("bad", build && Boolean(placing.why));
-  $("placer-hint").textContent = !build ? t("placer.rallyHint") : t(placing.touch ? "placer.hintTouch" : "placer.hint");
+  $("placer-hint").textContent = salvo ? t("placer.salvoHint") : !build ? t("placer.rallyHint") : t(placing.touch ? "placer.hintTouch" : "placer.hint");
   $("placer-ok").hidden = !build;
   $("placer-ok").disabled = !build || !placing.spot || Boolean(placing.why);
-  $("placer-home").hidden = build;
+  $("placer-home").hidden = build || salvo;
 }
 
 function stopPlacing() {
@@ -1464,8 +1465,12 @@ function mapClick(ev) {
     return;
   }
   if (placing?.mode === "rally") return placeRally(...scene.cam.world(sx, sy));
+  if (placing?.mode === "salvo") return placeSalvo(...scene.cam.world(sx, sy));
   const hit = scene.pick(sx, sy, side);
   if (!(hit.structure?.side === side)) showMadeBy(null); // the bar follows what was pressed
+  // The player's own headquarters, pressed on the building or on its point: what is
+  // built from it is the structures, so the bar shows those.
+  if ((hit.structure?.role === "hq" && hit.structure.side === side) || (hit.point?.kind === "hq" && hit.point.owner === side)) showBuildTab("structures");
   if (hit.squad) {
     // The squad already picked, tapped again: what it can do where it stands.
     if (hit.squad.id === scene.selected && canDigIn(unitDef(rules, hit.squad.unit))) {

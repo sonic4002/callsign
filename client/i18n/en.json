@@ -477,7 +477,7 @@
   "placer.why.room": "Something is in the way",
   "placer.why.edge": "Too close to the edge of the map",
   "placer.rally": "Where do new squads gather?",
-  "placer.rallyHint": "Tap a named point on the map.",
+  "placer.rallyHint": "Tap a point or any spot on the map.",
   "placer.rallyHome": "Beside their structure",
   "rally.label": "New squads gather:",
   "rally.home": "beside their structure",
