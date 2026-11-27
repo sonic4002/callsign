@@ -1,6 +1,6 @@
 ---
 title: Power
-description: "Every structure either supplies power or uses it, and a side that uses more than it supplies is on low power."
+description: "Structures supply or use power; nothing that uses power is started without it, and a side short of power makes no units and loses its defences and radar."
 type: concept
 status: current
 tags:
@@ -13,7 +13,7 @@ tags:
   - topic/power
   - topic/structures
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -34,11 +34,12 @@ paths:
   - shared/rules.json
   - client/power.js
   - agents/power.mjs
+  - server/bot/base.go
 ---
 
 # Power
 
-Every structure either supplies power or uses it, and a side that uses more than it supplies is on low power. Low power halves the speed of building and deploying, silences defences and turns the radar off.
+Every structure either supplies power or uses it. Nothing that uses power can be started on power the side does not have, and a side that falls short (it lost a power structure) is on low power: it makes no units, what is already in the line comes out at half speed, its defences fall silent and its radar goes off.
 
 ## Supply and use
 
@@ -46,7 +47,7 @@ Every structure either supplies power or uses it, and a side that uses more than
 
 | Structure role | Aegis | Ashfall |
 |---|---|---|
-| headquarters | +30 | +30 |
+| headquarters | 0 | 0 |
 | power | +100 (Power Plant, cost 140) | +100 (Generator Yard, cost 130) |
 | barracks | -10 | -10 |
 | refinery | -15 | -15 |
@@ -58,6 +59,23 @@ Every structure either supplies power or uses it, and a side that uses more than
 | fence | 0 | 0 |
 
 A structure counts only while it stands (built and not destroyed). A side may have 3 power structures (`match.powerStructures`).
+
+> [!note] Changed 2026-11-27
+> The headquarters used to supply 30, which let a barracks and a refinery go up with no power structure at all. The owner asked for power to gate building ("when power is 0 or we ran out of power, I should not be able to create new buildings"). The headquarters now supplies nothing.
+
+## No power, no building
+
+| Rule | Code |
+|---|---|
+| A structure that uses power is refused when the side's standing supply, less what stands and what is going up, does not cover it (`ErrNoPower`, "build a Power Plant first") | `build` in `server/sim/structures.go` |
+| A side that uses more than it supplies buys no unit (`ErrNoPower`) | `mayBuy` |
+| A power structure, and anything that uses none (a fence), can always be built | same |
+| The page locks the card with "needs: Power Plant" | `structureCards`, `unitLock` in `client/bases.js` |
+| The scripted player builds power first, waits for one that is going up, or does without when it has its three | `raise` in `server/bot/base.go` |
+
+So the first thing every base builds is a power structure: 100 covers a refinery, a barracks, a works, a radar, an airbase and a dockyard exactly, and the first defence needs a second one.
+
+A base staged for a test or a practice match (`-base`, `-full-base`) that includes power starts with 30 to spare while a power structure stands (`stagedSpare`); a real match has none.
 
 ## What low power does
 

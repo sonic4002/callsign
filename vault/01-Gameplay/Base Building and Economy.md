@@ -26,6 +26,8 @@ paths:
   - docs/specs/2026-11-24-bases-harvest-maps.md
   - docs/research/2026-11-24-classic-rts-play.md
   - shared/rules.json
+  - server/sim/structures.go
+  - server/bot/base.go
 ---
 
 # Base Building and Economy
@@ -42,7 +44,7 @@ Adopted from classic base-building RTS design (documented in `docs/specs/2026-11
 - **Safety Net & Naval Income**: HQ provides a `10 gold/s` trickle so a raided player can recover; capturing the **Sea Rig (Sierra)** pays a passive `30 gold/s`.
 
 ## Power & Tech Tree
-Every structure produces or consumes power (`HQ: +30`, `Power Plant / Generator Yard: +100`, production & defence structures: `-10` to `-20`).
+Every structure produces or consumes power (`HQ: 0` (changed 2026-11-27; it was `+30`), `Power Plant / Generator Yard: +100`, production & defence structures: `-10` to `-20`).
 - **Low Power Penalty** (`lowPowerFactor: 0.5`): Construction and unit queues run at **half speed**, powered defences stop firing, and the **Radar minimap goes dark**.
 - **Placement Rules**: Placed freely on valid terrain within `baseRadius: 300` of HQ or `baseReach: 180` of any finished own structure (`buildRadius: 340` for defences/fences).
 - **Production Queues & Rally Points**: Up to `5` units queued per role; building a second structure of a role adds a parallel production line. Units emerge visibly from the structure's animated bay/door and march to its **rally point** (settable by radio).
