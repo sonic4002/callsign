@@ -12,7 +12,7 @@ tags:
   - topic/client
   - topic/lobby
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -59,6 +59,7 @@ Against the scripted enemy nobody else has to agree: `readyUp()` sends `{type:"r
 | Enemy level | `bot` | `easy`, `normal`, `standard`; from the server's `levels` | `callsign.level` |
 | Side | `side` | `0`, `1`, `-1` (random); labels show the faction | no |
 | Map | `map` | One card per map with a `drawMiniMap` picture, name, size and point count | `callsign.map` |
+| Most squads a side | `units` | Two arrow buttons beside the number, between the map's limits (`maps[].units` from `/api/server`: 12 to 16, 22 or 30 by the map's points); shown under the map cards and clamped again when another map is picked | `callsign.units` |
 | Starting gold | `startGold` | The server's presets (`startGolds`) or "other" typed, clamped to `goldLimits` | `callsign.startGold` |
 | Length | `length` | 5, 10, 15, 20, 25, 30 minutes plus the server's usual; picking a map sets that map's own `lengthSeconds` | no |
 | Pace | `speed` | `relaxed`, `normal`, `fast` (from the server's `speeds`) | `callsign.speed` |

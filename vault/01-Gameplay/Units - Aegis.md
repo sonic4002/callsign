@@ -13,7 +13,7 @@ tags:
   - topic/units
   - topic/aegis
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -97,6 +97,7 @@ Every unit the Aegis Directorate (מנהלת אגיס) can field, with the numbe
 - `capacity`, `loadSeconds`, `unloadSeconds`: a hauler. See [[Economy]].
 - `hero`, `startTier`, `stealth`, `charges`, `chargeDamage`, `chargeVsHQ`, `fuseSeconds`, `plantSeconds`, `disguise`, `seizeRadius`, `seizeSeconds`, `dread`, `dreadRadius`: the hero. See [[Heroes]].
 - `bombs`, `blastRadius`, `rearmSeconds`, `evade`: a strike aircraft. See [[Strike Aircraft]].
+- `salvo`: a second weapon fired on an order of its own; the helicopter's honeycomb missiles. See [[Honeycomb Salvo]].
 - `crushes`: a heavy vehicle that runs infantry down in the open (`server/sim/crush.go`).
 - `callsign`: the callsign class when it is not the unit class (heroes and strike aircraft). See [[Callsigns]].
 
