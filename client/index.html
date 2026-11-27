@@ -208,6 +208,15 @@
       <fieldset id="lobby-maps">
         <legend data-i18n="lobby.map"></legend>
         <div id="lobby-map-cards"></div>
+        <div id="lobby-units-row">
+          <span id="lobby-units-label" data-i18n="lobby.units"></span>
+          <span class="stepper" role="group" aria-labelledby="lobby-units-label">
+            <button type="button" id="lobby-units-down" data-i18n-aria="lobby.unitsLess">▼</button>
+            <output id="lobby-units" dir="ltr"></output>
+            <button type="button" id="lobby-units-up" data-i18n-aria="lobby.unitsMore">▲</button>
+          </span>
+          <small id="lobby-units-about"></small>
+        </div>
       </fieldset>
       <!-- The less often changed choices fold away, with what they are set to in one line. -->
       <details id="lobby-more">

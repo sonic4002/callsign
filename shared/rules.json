@@ -5,6 +5,7 @@
     "lengthSeconds": 600,
     "startGold": 1000,
     "populationCap": 12,
+    "populationCaps": [{"points": 0, "max": 16}, {"points": 15, "max": 22}, {"points": 16, "max": 30}],
     "captureSeconds": 10,
     "captureRadius": 70,
     "holdRadius": 45,

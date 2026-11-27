@@ -209,7 +209,16 @@ func (r *Rules) checkStructures(name string, f *Faction) error {
 			return fmt.Errorf("structure %s has a bad stat", id)
 		}
 		switch st.Role {
-		case RoleHQ, RoleBarracks, RoleWorks, RoleAirbase, RoleDockyard, RoleRefinery, RoleRadar:
+		case RoleHQ, RoleBarracks, RoleWorks, RoleDockyard, RoleRefinery, RoleRadar:
+		case RoleAirbase:
+			if st.Planes <= 0 || len(st.Pads) < st.Planes {
+				return fmt.Errorf("airbase %s needs how many planes it holds and a pad for each", id)
+			}
+			for _, uid := range st.Unlocks {
+				if u, ok := f.Units[uid]; ok && u.Strike() && u.Teams > st.Planes {
+					return fmt.Errorf("airbase %s cannot hold one squad of %s", id, uid)
+				}
+			}
 		case RolePower:
 			if st.Power <= 0 {
 				return fmt.Errorf("power structure %s supplies no power", id)

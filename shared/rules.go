@@ -284,9 +284,15 @@ type Rules struct {
 	Version  int `json:"version"`
 	TickRate int `json:"tickRate"`
 	Match    struct {
-		LengthSeconds  int     `json:"lengthSeconds"`
-		StartGold      int     `json:"startGold"`
-		PopulationCap  int     `json:"populationCap"`
+		LengthSeconds int `json:"lengthSeconds"`
+		StartGold     int `json:"startGold"`
+		PopulationCap int `json:"populationCap"`
+		// PopulationCaps is how far a match's maker may raise the cap: the highest it goes
+		// on a map with at least so many points (the last step that fits a map is its limit).
+		PopulationCaps []struct {
+			Points int `json:"points"`
+			Max    int `json:"max"`
+		} `json:"populationCaps"`
 		CaptureSeconds float64 `json:"captureSeconds"`
 		CaptureRadius  float64 `json:"captureRadius"`
 		HoldRadius     float64 `json:"holdRadius"`
@@ -458,6 +464,18 @@ func (r *Rules) ForMap(id string) (*Rules, error) {
 	c := *r
 	c.Map = *m
 	return &c, nil
+}
+
+// PopulationCapMax is the most squads a side a match's maker may allow on a map: more on a
+// map with more points. Never below the usual cap.
+func (r *Rules) PopulationCapMax(m *Map) int {
+	top := r.Match.PopulationCap
+	for _, step := range r.Match.PopulationCaps {
+		if len(m.Points) >= step.Points && step.Max > top {
+			top = step.Max
+		}
+	}
+	return top
 }
 
 // MapIDs lists the maps, smallest first.

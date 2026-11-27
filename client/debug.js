@@ -1730,6 +1730,7 @@ function renderChoices() {
     card.querySelector("strong").textContent = map.name[lang];
     card.querySelector("small").textContent = t("lobby.mapSize", { width: map.width, height: map.height, points: map.points.length });
   }
+  if (offer) renderUnits(); // its words are in the page's language
 }
 
 // renderSeats shows a match between two people while it waits: its code, the link to
@@ -1758,7 +1759,7 @@ function renderSeats(view) {
     const g = $("lobby-match-map").getContext("2d");
     g.clearRect(0, 0, 160, 100);
     drawMiniMap(g, baseRules, chosenMap, 160, 100, { points: true, sides: [sideColor[0], sideColor[1]] });
-    $("lobby-options").textContent = t("lobby.options", { map: chosenMap.name[lang], gold: view.startGold, minutes: Math.round(view.length / 60) });
+    $("lobby-options").textContent = t("lobby.options", { map: chosenMap.name[lang], gold: view.startGold, minutes: Math.round(view.length / 60), units: view.units ?? baseRules?.match.populationCap ?? "" });
   }
   const both = view.seats.every((s) => s.taken);
   const full = !inRoom() && found && !freeSeat(found.lobby);
@@ -1870,7 +1871,7 @@ $("start").addEventListener("click", () => {
       opponent: chosen("opponent"), side: Number(chosen("side")), length: Number(chosen("length")), watch: chosen("watch") === "on" && friend, bot: friend ? "" : chosen("bot"),
       speed: chosen("speed"), purse: chosen("purse") === "on",
       anvil: Number(chosen("anvil")) || 3, fast: chosen("fast") === "on",
-      map: chosen("map") ?? "", startGold: chosenGold(),
+      map: chosen("map") ?? "", startGold: chosenGold(), units: chosenUnits(),
     });
   }
   if (inRoom()) return me && open() && ws.send(JSON.stringify({ type: "ready", ready: !lobby.seats[side].ready }));
@@ -2003,6 +2004,23 @@ function chosenGold() {
   return gold;
 }
 
+// The most squads a side may field: the usual number, raised by the arrows as far as the
+// chosen map allows (a bigger map has room for more). 0 leaves it to the server.
+let units = Number(localStorage.getItem("callsign.units")) || 0;
+const unitRange = () => offer?.maps?.find((m) => m.id === chosen("map"))?.units ?? null;
+function renderUnits() {
+  const range = unitRange();
+  $("lobby-units-row").hidden = !range; // an older server has one cap only
+  if (!range) return;
+  const [low, top] = range;
+  units = Math.max(low, Math.min(top, units || low));
+  $("lobby-units").textContent = String(units);
+  $("lobby-units-down").disabled = units <= low;
+  $("lobby-units-up").disabled = units >= top;
+  $("lobby-units-about").textContent = t("lobby.unitsRange", { min: low, max: top });
+}
+const chosenUnits = () => (unitRange() ? units : 0);
+
 // Only the host makes matches on a locked server; a browser that has done so once is remembered.
 $("lobby-host").hidden = !offer?.locked || Boolean(localStorage.getItem("callsign.hostkey"));
 const usual = offer?.length ?? baseRules?.match.lengthSeconds ?? 600;
@@ -2041,6 +2059,15 @@ const fitLength = () => {
 };
 $("lobby-map-cards").addEventListener("change", fitLength);
 fitLength();
+$("lobby-map-cards").addEventListener("change", renderUnits);
+for (const [id, step] of [["lobby-units-down", -1], ["lobby-units-up", 1]]) {
+  $(id).addEventListener("click", () => {
+    units = (units || unitRange()?.[0] || 0) + step;
+    renderUnits();
+    localStorage.setItem("callsign.units", String(units));
+  });
+}
+renderUnits();
 // The level the player chose last time, or the server's usual one.
 const levels = offer?.levels ?? ["easy", "normal", "standard"];
 $("lobby-level").value = [localStorage.getItem("callsign.level"), offer?.level, "easy"].find((level) => levels.includes(level));
@@ -2056,7 +2083,7 @@ if (room && seat && role !== "spectator" && seat.side !== side) {
   // For tests and screenshots: skip the lobby. A commander gets a match against the
   // scripted enemy on the side in the address; a spectator watches the open room.
   if (role === "spectator") begin();
-  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "", fast: query.has("fast"), anvil: Number(query.get("anvil")) || 0 });
+  else makeMatch({ opponent: "bot", side, length: 0, watch: true, map: query.get("map") ?? "", startGold: Number(query.get("gold")) || 0, units: Number(query.get("units")) || 0, speed: query.get("speed") ?? "", bot: query.get("bot") ?? "", fast: query.has("fast"), anvil: Number(query.get("anvil")) || 0 });
 } else if (query.has("learn") && role !== "spectator") {
   startLesson(); // ?learn goes straight into the first lesson
 }

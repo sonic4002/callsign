@@ -869,3 +869,47 @@ func TestTheLobbySetsTheStartingGold(t *testing.T) {
 		}
 	}
 }
+
+func TestTheLobbySetsTheMostSquads(t *testing.T) {
+	h := newHub(t, HubConfig{AgentKey: "agents"})
+	usual := rules.Match.PopulationCap
+	// Each map lets the cap be raised as far as its number of points allows, never lowered.
+	for id, m := range rules.Maps {
+		top := rules.PopulationCapMax(m)
+		if want := map[bool]int{true: 16, false: 22}[len(m.Points) < 15]; len(m.Points) <= 15 && top != want {
+			t.Errorf("%s (%d points) allows up to %d squads, want %d", id, len(m.Points), top, want)
+		}
+		if len(m.Points) >= 16 && top != 30 {
+			t.Errorf("%s (%d points) allows up to %d squads, want 30", id, len(m.Points), top)
+		}
+		rm, _, _, err := h.Create(Options{Opponent: OpponentBot, Map: id, Units: top})
+		if err != nil {
+			t.Fatalf("%s: %d squads refused: %v", id, top, err)
+		}
+		if got := rm.Lobby().Units; got != top {
+			t.Errorf("%s: the lobby shows %d squads, want %d", id, got, top)
+		}
+		// The pages and the agents read the cap from the rules the room sends them.
+		var sent struct {
+			Match struct {
+				PopulationCap int `json:"populationCap"`
+			} `json:"match"`
+		}
+		if err := json.Unmarshal(rm.rulesJSON, &sent); err != nil || sent.Match.PopulationCap != top {
+			t.Errorf("%s: the room's rules say %d squads (%v), want %d", id, sent.Match.PopulationCap, err, top)
+		}
+		for _, bad := range []int{usual - 1, top + 1} {
+			if _, _, _, err := h.Create(Options{Opponent: OpponentBot, Map: id, Units: bad}); err == nil {
+				t.Errorf("%s: %d squads were accepted", id, bad)
+			}
+		}
+	}
+	// One room's cap is its own: the next room, and the rules they came from, keep the usual.
+	rm, _, _, err := h.Create(Options{Opponent: OpponentBot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rm.Lobby().Units; got != usual || rules.Match.PopulationCap != usual {
+		t.Fatalf("with nothing chosen the lobby shows %d squads (rules %d), want %d", got, rules.Match.PopulationCap, usual)
+	}
+}

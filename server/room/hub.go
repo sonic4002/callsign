@@ -129,6 +129,7 @@ type Options struct {
 	Purse         bool   // the operators may buy on their own from the start
 	Map           string // the map id, "" for the default
 	StartGold     int    // gold each side starts with, 0 for the rules default
+	Units         int    // the most squads a side may field, 0 for the rules default
 	Anvil         int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
 	Fast          *bool  // squads take orders through the fast decision model; nil for the server's usual
 }
@@ -231,6 +232,15 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
 		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
 	}
+	if o.Units != 0 {
+		m := h.r.Maps[o.Map]
+		if m == nil {
+			m = h.r.Maps[shared.DefaultMap]
+		}
+		if low, top := h.r.Match.PopulationCap, h.r.PopulationCapMax(m); o.Units < low || o.Units > top {
+			return nil, 0, "", fmt.Errorf("a side fields %d to %d squads on this map", low, top)
+		}
+	}
 	if o.Anvil < 0 || o.Anvil > 3 {
 		return nil, 0, "", errors.New("the operator's initiative is 1, 2 or 3")
 	}
@@ -255,10 +265,11 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if lesson {
 		length, o.Watch = lessonSeconds, false // nobody is hurried, and nobody watches
 		o.Map = ""                             // the lesson is written for the small map
+		o.Units = 0
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase, Base: h.cfg.Base,
-		Map: o.Map, StartGold: o.StartGold,
+		Map: o.Map, StartGold: o.StartGold, Units: o.Units,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
 		Anvil: o.Anvil, Fast: fast && !lesson, // a lesson spends nothing
 	}
@@ -468,7 +479,8 @@ func (h *Hub) mapList() []map[string]any {
 	out := []map[string]any{}
 	for _, id := range h.r.MapIDs() {
 		m := h.r.Maps[id]
-		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points), "length": m.LengthSeconds})
+		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points), "length": m.LengthSeconds,
+			"units": []int{h.r.Match.PopulationCap, h.r.PopulationCapMax(m)}}) // the squads a side may field: the usual cap, and how far it can be raised here
 	}
 	return out
 }
@@ -509,6 +521,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		Purse     bool   `json:"purse"`
 		Map       string `json:"map"`
 		StartGold int    `json:"startGold"`
+		Units     int    `json:"units"`
 		Anvil     int    `json:"anvil"`
 		Fast      *bool  `json:"fast"`
 	}
@@ -523,7 +536,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, Anvil: in.Anvil, Fast: in.Fast}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, Units: in.Units, Anvil: in.Anvil, Fast: in.Fast}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}
