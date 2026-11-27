@@ -7,7 +7,7 @@ import { hintCalls, hintWords } from "../../client/voice/hints.js";
 
 const root = new URL("../../", import.meta.url);
 const rules = JSON.parse(readFileSync(new URL("shared/rules.json", root)));
-rules.map = rules.maps.large; // the map with the most points
+rules.map = rules.maps.large; // fifteen points: the recordings name none of the six that only the huge map has
 const out = { list: {}, calls: {} };
 for (const lang of ["he", "en"]) {
   out.list[lang] = hintWords(rules, lang).join(", ");

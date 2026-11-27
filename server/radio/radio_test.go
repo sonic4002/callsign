@@ -229,20 +229,84 @@ func TestResolveAndName(t *testing.T) {
 	}
 }
 
-// No callsign may sound like a map point, and no point may use ר: "רות" means Roger.
+// No callsign may sound like a map point, and no point may use ר: "רות" means Roger. On
+// every map, each point is found by its callsign in either language and by nothing else.
 func TestCallsignsAndPointsDoNotCollide(t *testing.T) {
-	r := shared.MustLoad()
-	for _, p := range r.Map.Points {
-		for _, name := range []string{p.Callsign.En, p.Callsign.He} {
-			if _, ok := net.Resolve(name + " 1"); ok {
-				t.Errorf("point %s (%s) is also a callsign", p.ID, name)
+	all := shared.MustLoad()
+	for _, id := range all.MapIDs() {
+		r, err := all.ForMap(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		net := NewNet(r)
+		for _, p := range r.Map.Points {
+			for _, name := range []string{p.Callsign.En, p.Callsign.He} {
+				if _, ok := net.Resolve(name + " 1"); ok {
+					t.Errorf("%s: point %s (%s) is also a callsign", id, p.ID, name)
+				}
+				if pro := net.prowords(lower(name)); len(pro) > 0 {
+					t.Errorf("%s: point %s (%s) reads as procedure word %v", id, p.ID, name, pro)
+				}
 			}
-			if pro := net.prowords(lower(name)); len(pro) > 0 {
-				t.Errorf("point %s (%s) reads as procedure word %v", p.ID, name, pro)
+			for _, name := range append([]string{p.Callsign.En, p.Callsign.He, p.Name.En, p.Name.He}, p.Aliases...) {
+				if got := net.FindPoints(name); len(got) != 1 || got[0] != p.ID {
+					t.Errorf("%s: %q names %v, want %s alone", id, name, got, p.ID)
+				}
+			}
+			if []rune(p.Callsign.He)[0] == 'ר' {
+				t.Errorf("%s: point %s uses ר", id, p.ID)
 			}
 		}
-		if []rune(p.Callsign.He)[0] == 'ר' {
-			t.Errorf("point %s uses ר", p.ID)
+		// The fixed lines of the net name no point by accident.
+		for name, cue := range r.Radio.Cues {
+			for _, line := range []string{cue.Line.En, cue.Line.He} {
+				if got := net.FindPoints(line); len(got) > 0 {
+					t.Errorf("%s: the cue %s (%q) names %v", id, name, line, got)
+				}
+			}
+		}
+		for name, w := range r.Radio.Brain {
+			for _, line := range append(append([]string{}, w.En...), w.He...) {
+				if got := net.FindPoints(line); len(got) > 0 {
+					t.Errorf("%s: the brain line %s (%q) names %v", id, name, line, got)
+				}
+			}
+		}
+	}
+}
+
+// The six letters only the huge map uses, as they are said and as a recogniser writes them.
+func TestThePointsOfTheHugeMap(t *testing.T) {
+	r, err := shared.MustLoad().ForMap("huge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	net := NewNet(r)
+	for text, want := range map[string][]string{
+		"Viper 1, this is Hammer. Move to Quebec. Over.": {"Q"},
+		"Hold Charlie, then Oscar":                       {"C", "O"},
+		"Contact east of Echo":                           {"E"},
+		"Attack Whiskey":                                 {"W"},
+		"Fall back to X-ray":                             {"X"},
+		"fall back to x ray":                             {"X"},
+		"fall back to xray":                              {"X"},
+		"the east gate is ours":                          {"X"},
+		"נועו לקורח":                                     {"Q"},
+		"תחזיקו את צפורה ואת עין":                        {"C", "O"},
+		"מגע ממזרח לחוה":                                 {"E"},
+		"תקפו את שמיר":                                   {"W"},
+		"נסוגים לטיח":                                    {"X"},
+		"השער המערבי בידינו":                             {"W"},
+		"the echoes of the x-rays, whiskeys and oscars":  nil, // whole words only
+		"שמרו על הגשר, הטווח קצר, הקרח דק":               nil, // guard, range and ice are not Whiskey, X-ray and Quebec
+	} {
+		if got := net.FindPoints(text); !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Errorf("%q: points = %v, want %v", text, got, want)
+		}
+	}
+	for he, want := range map[string]string{"נעים לקוויבק": "נעים לקורח", "מחזיקים בצ'רלי": "מחזיקים בצפורה", "אוסקר נקי": "עין נקי", "מגע באקו": "מגע בחוה", "ויסקי שלנו": "שמיר שלנו", "נסוגים לאקס-ריי": "נסוגים לטיח", "Whiskey ו-X-ray": "שמיר ו-טיח"} {
+		if got := net.Localize(he, "he"); got != want {
+			t.Errorf("Localize(%q) = %q, want %q", he, got, want)
 		}
 	}
 }

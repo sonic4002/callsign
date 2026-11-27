@@ -83,7 +83,7 @@ test("a tap finds the landmark or bridge under it", () => {
   assert.equal(coverPercent(undefined), 0);
 });
 
-test("the ground, the scenery, the bridges and the small map draw on all three maps", () => {
+test("the ground, the scenery, the bridges and the small map draw on every map", () => {
   for (const id of Object.keys(rules.maps)) {
     const r = on(id);
     const g = fakeContext();

@@ -48,6 +48,7 @@ var crossings = map[string][]string{
 	"small":  {"bridge-west", "bridge-south", "G"},
 	"medium": {"bridge-north-west", "bridge-west", "N"},
 	"large":  {"N", "G", "F", "bridge-far-west"},
+	"huge":   {"bridge-west", "G", "N", "bridge-far-west"},
 }
 
 var armies = map[string][]string{

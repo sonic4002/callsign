@@ -24,7 +24,7 @@ const voice = new URL("client/voice/", root);
 const models = new URL(arg("--models", "assets/models") + "/", root);
 const manifest = JSON.parse(readFileSync(new URL("models.json", voice)));
 const rules = JSON.parse(readFileSync(new URL("shared/rules.json", root)));
-rules.map = rules.maps.large; // the map with the most points
+rules.map = rules.maps.large; // fifteen points: the recordings name none of the six that only the huge map has
 const index = JSON.parse(readFileSync(new URL("index.json", data)));
 
 const ort = await import(new URL("client/vendor/ort/ort.wasm.min.mjs", root));

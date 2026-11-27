@@ -365,7 +365,7 @@ footer.panel label { display: block; margin-block-end: .3rem; }
 }
 
 /* ---- lobby: maps, gold, and seats coloured by state ---- */
-#lobby-map-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .5rem; }
+#lobby-map-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
 #lobby-units-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-block-start: .4rem; }
 #lobby-units-row small { color: var(--muted); font-size: .78rem; }
 .stepper { display: inline-flex; align-items: center; gap: .3rem; }

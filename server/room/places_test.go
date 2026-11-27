@@ -43,7 +43,7 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 	if err := json.Unmarshal(<-c.Out, &hello); err != nil {
 		t.Fatal(err)
 	}
-	if hello.Rules.Map.ID != "medium" || hello.Rules.Map.Width != 4000 || len(hello.Rules.Map.Points) != 15 || len(hello.Rules.Maps) != 3 {
+	if hello.Rules.Map.ID != "medium" || hello.Rules.Map.Width != 4000 || len(hello.Rules.Map.Points) != 15 || len(hello.Rules.Maps) != 4 {
 		t.Fatalf("the greeting's rules play on %+v, with %d maps", hello.Rules.Map, len(hello.Rules.Maps))
 	}
 	// A rematch keeps the choices.
@@ -63,7 +63,7 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 		t.Fatalf("the default lobby shows %q and %d gold", l.Map, l.StartGold)
 	}
 	for _, o := range []Options{
-		{Opponent: OpponentBot, Side: 0, Map: "huge"},
+		{Opponent: OpponentBot, Side: 0, Map: "nowhere"},
 		{Opponent: OpponentBot, Side: 0, StartGold: MinStartGold - 1},
 		{Opponent: OpponentBot, Side: 0, StartGold: MaxStartGold + 1},
 		{Opponent: OpponentBot, Side: 0, LengthSeconds: 3600},
@@ -74,7 +74,7 @@ func TestTheLobbyChoosesTheMapAndTheStartingGold(t *testing.T) {
 	}
 	// What the lobby offers, before any room exists.
 	maps := h.mapList()
-	if len(maps) != 3 || maps[0]["id"] != "small" || maps[1]["id"] != "medium" || maps[2]["id"] != "large" {
+	if len(maps) != 4 || maps[0]["id"] != "small" || maps[1]["id"] != "medium" || maps[2]["id"] != "large" || maps[3]["id"] != "huge" {
 		t.Fatalf("the maps on offer: %v", maps)
 	}
 }

@@ -111,7 +111,7 @@ func TestACrowdNeverOverlapsAndIsTheSameEveryTime(t *testing.T) {
 // file, and into place around the point. It must all be there in not much more than the
 // time the slowest of it needs to walk the way alone.
 func TestAFullArmyLeavesItsBaseAndCrossesEveryMap(t *testing.T) {
-	for _, id := range []string{"small", "medium", "large"} {
+	for _, id := range []string{"small", "medium", "large", "huge"} {
 		r, err := shared.MustLoad().ForMap(id)
 		if err != nil {
 			t.Fatal(err)
