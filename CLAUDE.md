@@ -40,4 +40,5 @@ client/   TypeScript + Phaser web app
 agents/   agent runtime (Web Worker) and prompts
 assets/   generated art and audio
 docs/     PLAN.html and notes
+vault/    Obsidian vault documenting the game; its own CLAUDE.md is the contract, start at vault/00-Meta/Index.md
 ```
