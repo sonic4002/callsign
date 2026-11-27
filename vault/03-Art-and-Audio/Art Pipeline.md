@@ -12,7 +12,7 @@ tags:
   - topic/art
   - topic/pipeline
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -107,6 +107,8 @@ Shipped sheets and their animations (`assets/sprites/manifest.json`):
 | `patrolBoat`, `speedboat` | 16 | `idle`, `sink`, `move`; separate `_turret` sheets |
 | `helicopter` | 8 | `idle`, `wreck`, `move`, `bankLeft`, `bankRight`; `_turret` sheet |
 | `strikeJet`, `propBomber` | 16 | `idle`, `wreck`, `move`, `bankLeft`, `bankRight`; no turret sheet |
+
+The page does not show a strike aircraft's `bankLeft` / `bankRight` frames (`animatedVehicle` in `client/art.js`, since 2026-11-27): the aircraft reverses for home in about half a second, and at the camera's angle a rolled wing reads as a broken picture. Its sixteen headings carry the turn. The frames stay in the sheets; the helicopter still banks.
 
 **`art/paint.py`** paints the plain sheets in the buildings' style (commit a8b3e75). The render goes in as the picture to start from and the model keeps three of its four steps (`START = 1`), so the output has the same shape in the same place. Then:
 

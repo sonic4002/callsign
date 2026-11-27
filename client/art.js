@@ -265,7 +265,10 @@ function animatedVehicle(ctx, entry, o) {
   // boat's bow up, an aircraft nose down or banked into its turn.
   let anim = "idle";
   if ((go > 0.15 || (o.alt ?? 0) > 0.05) && entry.anims.move) anim = "move"; // a plane in the air is never at rest
-  if (entry.altitude && go > 0.15 && Math.abs(o.turnRate ?? 0) > 0.7 && entry.anims.bankLeft) anim = o.turnRate < 0 ? "bankLeft" : "bankRight";
+  // A helicopter leans into its turn. A strike aircraft does not show its banked frames: it
+  // turns for home in half a second, and a wing rolled toward the eye or away from it for
+  // that long reads as a broken picture; its sixteen headings carry the turn.
+  if (entry.altitude && o.alt === undefined && go > 0.15 && Math.abs(o.turnRate ?? 0) > 0.7 && entry.anims.bankLeft) anim = o.turnRate < 0 ? "bankLeft" : "bankRight";
   const count = entry.anims[anim][1];
   const spun = Math.floor(o.time * (entry.fps?.[anim] ?? 12)) % count; // rotors turn by the clock
   const index = count < 2 ? 0 : anim === "move" && !entry.altitude ? (cycle(count, naval ? 60 : 9, o) ?? spun) : spun;
