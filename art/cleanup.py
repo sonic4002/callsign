@@ -23,7 +23,11 @@ art/sprites.json as fractions of the building's picture.
 
 Sprites without `keep` are left out of the manifest, and the page draws its own stand-in.
 A kept sprite whose raw image is not on this machine (assets/raw is not in git) keeps the
-picture and the manifest entry it already has.
+picture and the manifest entry it already has, under the name art/rename_keys.py gave it.
+
+A sprite with `plan` is a site painted over a block-out (art/plan.py): its size and the
+point it stands on are worked out from the plan, not given in art/sprites.json, so a world
+unit of the plan is a world unit on the page.
 
     python art/cleanup.py [--sheet contact.png] [id ...]
 
@@ -34,9 +38,13 @@ import argparse
 import json
 import pathlib
 import re
+import time
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+
+import plan
+import rename_keys
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -46,6 +54,7 @@ OUT = ROOT / "assets" / "sprites"
 FOLDER = {"building": "buildings", "landmark": "landmarks", "terrain": "terrain", "portrait": "portraits"}
 ANCHOR = {"building": [0.5, 0.8], "scenery": [0.5, 0.9]}  # by style: where the thing stands in its picture
 DRAWN = 2.6  # a sprite is stored this many times the height the page draws it at, for zooming in
+PAGE = 1.8  # the page draws a structure this many times its `height` at zoom 1 (buildScale in client/map.js)
 
 MODEL_NOTE = """## Units
 
@@ -140,6 +149,10 @@ Every sprite below was generated on this machine by `make art` and reviewed by e
 - A construction stage is made the same way from the finished building, so every stage
   stands in the building's own frame; a door is the same redraw with the door open, of which
   only a patch around the door is kept and laid over the building
+- The two airfields (`buildings/airbase*.png`, `buildings/launchYard*.png`) are sites with a fixed
+  layout: the same redraw, started from a block-out of plain boxes drawn by code (art/plan.py)
+  in place of a kept image, so runway, apron, hangars and helicopter pad lie where the game
+  parks and lands aircraft. The letter H on the pad is the one piece of lettering in the set
 - Terrain tiles are made to repeat by cross-fading each edge into the far side of the picture;
   ice and rock are also evened out (their large light and dark patches are flattened), so the
   eye finds no landmark that repeats
@@ -311,6 +324,12 @@ def main():
     credits = ["# Sprite credits", "", MODEL_NOTE, "| Sprite | Seed | Prompt |", "|---|---|---|"]
     sheet = []
     boxes = {}  # sprite id → the box its picture was trimmed to
+    made = 0  # pictures written in this run
+
+    def home(key):
+        """The name a structure's picture goes by once art/rename_keys.py has run: a picture
+        that is not made again in this run is found, and kept, under that name."""
+        return rename_keys.renamed(key, rename_keys.KEYS["buildings"])
 
     def raw_image(sprite):
         raw = RAW / f"{sprite['id']}__{sprite['keep']}.png"
@@ -330,6 +349,18 @@ def main():
             session = new_session("birefnet-general")
         return session
 
+    def site_frame(sprite, box):
+        """A site painted over a plan (art/plan.py) is not sized by eye: its picture is scaled
+        so that one world unit of the plan is one world unit on the page, and it stands on
+        the plan's own middle. Returns the stored height and the anchor of the picture cut
+        to `box`, or None for an ordinary building. Its other states share both."""
+        owner = by_id.get(sprite.get("from"), sprite)
+        if not owner.get("plan"):
+            return None
+        height = round((box[3] - box[1]) / plan.PPU * DRAWN / PAGE)
+        anchor = [round((plan.CENTRE[0] - box[0]) / (box[2] - box[0]), 4), round((plan.CENTRE[1] - box[1]) / (box[3] - box[1]), 4)]
+        return height, anchor
+
     def box_of(source_id):
         """The box a sprite's picture was trimmed to. When that sprite is not being made
         again in this run, its raw image is cut out once more just to learn its box."""
@@ -342,7 +373,7 @@ def main():
         group = FOLDER[kind]
         rel = f"{group}/{sprite['id']}.png"
         (OUT / group).mkdir(parents=True, exist_ok=True)
-        door = re.fullmatch(r"(.+)_(open)", sprite["id"]) if sprite["style"] == "door" else None
+        door = re.fullmatch(r"(.+)_(open)", sprite["id"]) if sprite["style"].endswith("door") else None
         skip = (args.ids and sprite["id"] not in args.ids) or not (RAW / f"{sprite['id']}__{sprite['keep']}.png").exists()
         if door:
             # A door belongs to its building's entry, which is made before it.
@@ -351,30 +382,34 @@ def main():
             if owner is None or spot is None:
                 print(f"{rel}  left out: {door[1]} has no door box in sprites.json")
                 continue
-            was = old.get("buildings", {}).get(door[1], {}).get("door", {}).get("frames", {})
+            was = old.get("buildings", {}).get(home(door[1]), {}).get("door", {}).get("frames", {})
             owner.setdefault("door", {"frames": {}, **{k: spot[k] for k in ("exit", "rally", "faces", "lift") if k in spot}})
             lit_rel = rel.replace("_open.png", "_lit.png")
-            if skip and was.get("open") and (OUT / rel).exists() and (OUT / lit_rel).exists():
+            if skip and was.get("open") and all((OUT / was[name]["image"]).exists() for name in ("open", "lit")):
                 owner["door"]["frames"].update(was)
                 credit(rel, sprite)
                 print(f"{rel}  kept as it is")
                 continue
-            cut, _ = cut_out(raw_image(sprite), need_session(), box_of(sprite["from"]))
-            patch, at = door_patch(scale_to_height(cut, sprite["height"]), spot["box"], 0.03)
+            cut, box = cut_out(raw_image(sprite), need_session(), box_of(sprite["from"]))
+            site = site_frame(sprite, box)
+            patch, at = door_patch(scale_to_height(cut, site[0] if site else sprite["height"]), spot["box"], 0.03)
             patch.save(OUT / rel, optimize=True)
             lit_door(patch).save(OUT / lit_rel, optimize=True)
             for name, path in (("open", rel), ("lit", lit_rel)):
                 owner["door"]["frames"][name] = {"name": name, "image": path, "at": at, "size": [patch.width, patch.height]}
+            made += 1
             credit(rel, sprite)
             print(f"{rel}  {patch.width}x{patch.height} at {at}, and {lit_rel}")
             continue
         key = sprite["id"].removeprefix("portrait_") if kind == "portrait" else sprite["id"]
-        if skip and (OUT / rel).exists() and key in old.get(group, {}):
+        was_key = home(key) if group == "buildings" else key
+        was_rel = f"{group}/{was_key}.png" if group == "buildings" else rel
+        if skip and (OUT / was_rel).exists() and was_key in old.get(group, {}):
             # Not asked for, or made on another machine: the picture stands as it is.
-            manifest[group][key] = old[group][key]
+            manifest[group][key] = old[group][was_key]
             credit(rel, sprite)
-            sheet.append((sprite["id"], Image.open(OUT / rel)))
-            print(f"{rel}  kept as it is")
+            sheet.append((sprite["id"], Image.open(OUT / was_rel)))
+            print(f"{was_rel}  kept as it is")
             continue
         image = raw_image(sprite)
         if kind == "terrain":
@@ -391,15 +426,17 @@ def main():
         else:
             need_session()
             cut, boxes[sprite["id"]] = cut_out(image, session, box_of(sprite["from"]) if "from" in sprite else None)
-            result = scale_to_height(cut, sprite["height"])
-            if sprite["style"] in ("stage", "site"):
+            site = site_frame(sprite, boxes[sprite["id"]])
+            result = scale_to_height(cut, site[0] if site else sprite["height"])
+            if sprite["style"].endswith(("stage", "site")):
                 result = soften_frame(result)
             manifest[group][sprite["id"]] = {
                 "image": rel, "size": [result.width, result.height],
-                "anchor": sprite.get("anchor", ANCHOR.get(sprite["style"], ANCHOR["building"])),
-                "height": sprite.get("draw", round(sprite["height"] / DRAWN)),
+                "anchor": site[1] if site else sprite.get("anchor", ANCHOR.get(sprite["style"], ANCHOR["building"])),
+                "height": round(site[0] / DRAWN) if site else sprite.get("draw", round(sprite["height"] / DRAWN)),
             }
         result.save(OUT / rel, optimize=True)
+        made += 1
         credit(rel, sprite)
         sheet.append((sprite["id"], result))
         print(f"{rel}  {result.width}x{result.height}")
@@ -440,6 +477,9 @@ def main():
             continue
         source = OUT / FOLDER[sprite["kind"]] / f"{sprite['id']}.png"
         if not source.exists():
+            # Its picture was not made again in this run: the button keeps the one it has.
+            if home(sprite["id"]) in old.get("icons", {}):
+                manifest["icons"][sprite["id"]] = old["icons"][home(sprite["id"])]
             continue
         rel = f"icons/{sprite['id']}.png"
         icon = fit_icon(Image.open(source).convert("RGBA"))
@@ -450,6 +490,10 @@ def main():
         entry = manifest[FOLDER[sprite["kind"]]].get(sprite["id"])
         if isinstance(entry, dict) and "height" not in entry:
             entry["height"] = sprite.get("draw", round(sprite["height"] / DRAWN))
+    # The page asks for a picture by its address and the stamp (client/art.js): new pictures
+    # at old addresses need a new stamp, or a kept copy of the old one is shown in their frame.
+    if made or "stamp" in old:
+        manifest["stamp"] = int(time.time()) if made else old["stamp"]
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (OUT / "CREDITS.md").write_text("\n".join(credits) + "\n")
     if args.sheet:

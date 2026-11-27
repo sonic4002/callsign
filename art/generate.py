@@ -9,7 +9,9 @@ assets/raw/<id>__<seed>.png. Images that already exist are skipped.
     python art/generate.py --seeds 5 6 tank    other seeds, to look for a better candidate
 
 A sprite with `from` is a second state of another sprite (a headquarters in ruins): the
-model redraws that sprite's kept image as the prompt asks, so the two match.
+model redraws that sprite's kept image as the prompt asks, so the two match. A sprite with
+`plan` is a site whose layout the game depends on (an airfield): the model redraws its
+block-out, drawn by art/plan.py, the same way.
 """
 
 import argparse
@@ -21,6 +23,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+import plan
 
 HERE = pathlib.Path(__file__).resolve().parent
 RAW = HERE.parent / "assets" / "raw"
@@ -144,6 +148,11 @@ def main():
                 source = by_id[sprite["from"]]
                 reference = f"{source['id']}__{source['keep']}.png"
                 shutil.copy(RAW / reference, WORK / "input" / reference)
+                flow = edit_workflow(prompt, seed, reference)
+            elif sprite.get("plan"):
+                # A site with a fixed layout is painted over its block-out (art/plan.py).
+                reference = f"{sprite['id']}_plan.png"
+                plan.draw_plan(sprite["id"]).save(WORK / "input" / reference)
                 flow = edit_workflow(prompt, seed, reference)
             else:
                 flow = workflow(prompt, seed, *sprite.get("size", [1024, 1024]))
