@@ -1470,48 +1470,48 @@
     "airbase": {
       "image": "buildings/airbase.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65,
+      "height": 97,
       "door": {
         "frames": {
           "open": {
             "name": "open",
             "image": "buildings/airbase_open.png",
             "at": [
-              59,
+              183,
               89
             ],
             "size": [
-              43,
-              47
+              76,
+              79
             ]
           },
           "lit": {
             "name": "lit",
             "image": "buildings/airbase_lit.png",
             "at": [
-              59,
+              183,
               89
             ],
             "size": [
-              43,
-              47
+              76,
+              79
             ]
           }
         },
         "exit": [
-          0.59,
-          0.27
+          0.882,
+          0.658
         ],
         "rally": [
-          0.59,
-          0.27
+          0.882,
+          0.658
         ],
         "faces": "SW",
         "lift": true
@@ -1521,67 +1521,71 @@
         "airbase_stage2",
         "airbase_stage3",
         "airbase_stage4"
+      ],
+      "lamp": [
+        0.424,
+        0.045
       ]
     },
     "airbase_ruin": {
       "image": "buildings/airbase_ruin.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65
+      "height": 97
     },
     "airbase_stage1": {
       "image": "buildings/airbase_stage1.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65
+      "height": 97
     },
     "airbase_stage2": {
       "image": "buildings/airbase_stage2.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65
+      "height": 97
     },
     "airbase_stage3": {
       "image": "buildings/airbase_stage3.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65
+      "height": 97
     },
     "airbase_stage4": {
       "image": "buildings/airbase_stage4.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65
+      "height": 97
     },
     "dockyard": {
       "image": "buildings/dockyard.png",
@@ -2046,48 +2050,48 @@
     "launchYard": {
       "image": "buildings/launchYard.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58,
+      "height": 90,
       "door": {
         "frames": {
           "open": {
             "name": "open",
             "image": "buildings/launchYard_open.png",
             "at": [
-              37,
-              68
+              184,
+              72
             ],
             "size": [
-              38,
-              42
+              76,
+              78
             ]
           },
           "lit": {
             "name": "lit",
             "image": "buildings/launchYard_lit.png",
             "at": [
-              37,
-              68
+              184,
+              72
             ],
             "size": [
-              38,
-              42
+              76,
+              78
             ]
           }
         },
         "exit": [
-          0.5,
-          0.27
+          0.878,
+          0.628
         ],
         "rally": [
-          0.5,
-          0.27
+          0.878,
+          0.628
         ],
         "faces": "SW",
         "lift": true
@@ -2097,67 +2101,71 @@
         "launchYard_stage2",
         "launchYard_stage3",
         "launchYard_stage4"
+      ],
+      "lamp": [
+        0.423,
+        0.06
       ]
     },
     "launchYard_ruin": {
       "image": "buildings/launchYard_ruin.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58
+      "height": 90
     },
     "launchYard_stage1": {
       "image": "buildings/launchYard_stage1.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58
+      "height": 90
     },
     "launchYard_stage2": {
       "image": "buildings/launchYard_stage2.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58
+      "height": 90
     },
     "launchYard_stage3": {
       "image": "buildings/launchYard_stage3.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58
+      "height": 90
     },
     "launchYard_stage4": {
       "image": "buildings/launchYard_stage4.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58
+      "height": 90
     },
     "boatShed": {
       "image": "buildings/boatShed.png",
@@ -3119,14 +3127,14 @@
     "airbase_site": {
       "image": "buildings/airbase_stage1.png",
       "size": [
-        218,
-        168
+        341,
+        251
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.5007,
+        0.6463
       ],
-      "height": 65
+      "height": 97
     },
     "dockyard_site": {
       "image": "buildings/dockyard_stage1.png",
@@ -3179,14 +3187,14 @@
     "launchYard_site": {
       "image": "buildings/launchYard_stage1.png",
       "size": [
-        174,
-        150
+        343,
+        234
       ],
       "anchor": [
-        0.5,
-        0.8
+        0.4993,
+        0.6158
       ],
-      "height": 58
+      "height": 90
     },
     "boatShed_site": {
       "image": "buildings/boatShed_stage1.png",
@@ -4017,11 +4025,6 @@
       "mountain_1",
       "mountain_2"
     ],
-    "gold_field": [
-      "gold_field_1",
-      "gold_field_2",
-      "gold_field_3"
-    ],
     "tree": [
       "tree_1",
       "tree_2",
@@ -4038,6 +4041,11 @@
       "crag_1",
       "crag_2",
       "crag_3"
+    ],
+    "gold_field": [
+      "gold_field_1",
+      "gold_field_2",
+      "gold_field_3"
     ]
   },
   "portraits": {
@@ -4107,5 +4115,5 @@
       ]
     }
   },
-  "stamp": 1795776494
+  "stamp": 1795793566
 }
