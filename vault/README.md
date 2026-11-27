@@ -8,8 +8,8 @@ Obsidian -> "Open folder as vault" -> this folder (`vault/`). No plugins are nee
 
 ## How it is organised
 
-- `00-Overview` to `04-Operations`: broad overview notes, for a first read.
-- `10-Game-Design` to `21-Glossary`: focused notes, one subject each, written from the code. `00-Meta/Reference Map.md` is their map.
+- `00-Overview` to `04-Operations`: each has overview notes for a first read (listed in `Home.md`) and focused notes, one subject each, that the overviews link to under "In detail".
+- `05-Decisions`: one note per locked decision. `06-Status-and-Reference`: known flaws, backlog, history, glossary.
 - `00-Meta`: the contract (`Conventions.md`), the agent's starting note (`Agent Handoff.md`) and the generated `Index.md`.
 
 ## Keep it current

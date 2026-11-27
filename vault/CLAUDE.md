@@ -5,7 +5,7 @@ Obsidian vault documenting Callsign (אות קריאה), the game in this reposi
 - `00-Meta/Agent Handoff.md` - read first: where to start and which notes to load per area.
 - `00-Meta/Conventions.md` - folders, note names, the frontmatter schema (every key, every enum), tag families, writing and maintenance rules.
 - `00-Meta/Index.md` - generated table of every note (type, description). **Start navigation here**, then open only the notes you need.
-- `18-Decisions/Decisions.md` - one note per locked decision. The repository's `CLAUDE.md` holds the decisions themselves and wins over the vault.
+- `00-Overview/Locked Decisions.md` - the locked decisions, with one note each in `05-Decisions/`. The repository's `CLAUDE.md` holds the decisions themselves and wins over the vault.
 
 ## Frontmatter validation (enforced)
 

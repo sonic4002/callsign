@@ -19,8 +19,7 @@ related:
   - "[[Conventions]]"
   - "[[Index]]"
   - "[[Home]]"
-  - "[[Reference Map]]"
-  - "[[Decisions]]"
+  - "[[Locked Decisions]]"
   - "[[Known Flaws]]"
   - "[[Open Questions]]"
   - "[[Plan versus Code]]"
@@ -36,22 +35,22 @@ Read this first. It tells an agent how to use the vault without loading all of i
 ## Where to start
 
 1. [[Index]]: one line per note with its type and description. Open only the notes the task needs.
-2. [[Home]] for the overview notes, [[Reference Map]] for the focused ones.
+2. [[Home]]: the overview note of each area; each ends with an "In detail" list of its focused notes.
 3. [[Conventions]] before creating or restructuring a note.
 
 ## Which notes to load
 
 | Working on | Load |
 |---|---|
-| Units, structures, numbers, balance | [[Game Design]], then [[Units - Aegis]], [[Units - Ashfall]], [[Structures and Build Tree]], [[Balance]] |
-| The radio net, what the player hears | [[Radio Net]], [[Traffic Levels]], [[Command Net and Squad Net]], [[Radio versus Direct Acts]] |
-| Agents, brains, keys | [[Brains and Agents]], [[Agent Tools]], [[Rule Brain]], [[Model Relay]], [[Private Machine Guard]] |
+| Units, structures, numbers, balance | [[Game Overview]], then [[Units - Aegis]], [[Units - Ashfall]], [[Structures and Build Tree]], [[Balance]] |
+| The radio net, what the player hears | [[Radio Net and Bilingual Procedure]], [[Traffic Levels]], [[Command Net and Squad Net]], [[Radio versus Direct Acts]] |
+| Agents, brains, keys | [[AI Brains and Model Relay]], [[Agent Tools]], [[Rule Brain]], [[Model Relay]], [[Private Machine Guard]] |
 | The page | [[Client]], [[Selection and Map Orders]], [[Build Bar]], [[Mobile Layout]] |
-| Voice in or out | [[Speech]], [[In-Browser Recognition]], [[Pronunciation Table]] |
+| Voice in or out | [[Voice Pipeline (STT and TTS)]], [[In-Browser Recognition]], [[Pronunciation Table]] |
 | The server | [[Server Architecture]], [[WebSocket Frames]], [[Direct Acts]], [[Tests and Headless Matches]] |
-| Running and releasing | [[Operations]], [[Make Targets]], [[Environment Variables]], [[Staging and Releasing]] |
-| Art | [[Art and Assets]], [[Art Pipeline]], [[Licences and Credits]] |
-| Changing a rule of the project | [[Decisions]] and the decision's own note; ask the owner before changing a locked decision |
+| Running and releasing | [[Running, Deploying and Testing]], [[Make Targets]], [[Environment Variables]], [[Staging and Releasing]] |
+| Art | [[Art Direction and Sprite Pipeline]], [[Art Pipeline]], [[Licences and Credits]] |
+| Changing a rule of the project | [[Locked Decisions]] and the decision's own note; ask the owner before changing a locked decision |
 | What is broken or undecided | [[Known Flaws]], [[Backlog]], [[Open Questions]], [[Plan versus Code]] |
 
 ## Ground rules

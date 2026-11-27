@@ -11,7 +11,7 @@ tags:
   - area/overview
   - topic/design
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: AGY
 origin: docs
 confidence: medium
@@ -28,6 +28,9 @@ paths:
   - CLAUDE.md
   - docs/PLAN.html
   - docs/specs/2026-11-24-bases-harvest-maps.md
+  - shared/rules.json
+  - shared/rules.go
+  - server/sim
 ---
 
 # Game Overview
@@ -64,3 +67,55 @@ paths:
 - [[Locked Decisions]]
 - [[Roadmap and Status]]
 - [[Factions and Units]]
+
+---
+
+## In detail
+
+This hub lists every note about what the game is and how it plays: factions, units, bases, gold, maps and how a match is won. All numbers come from `shared/rules.json`, the one rules file the server and the page both read.
+
+### Start here
+
+- [[The Idea]]: what Callsign is in one page.
+- [[Match Rules and Winning]]: how a match starts, runs and ends.
+- [[First Lesson]]: the interactive tutorial match.
+
+### Armies
+
+- [[Factions]]: Aegis Directorate and Ashfall Network.
+- [[Units - Aegis]] and [[Units - Ashfall]]: one table per faction, real numbers.
+- [[Strike Aircraft]]: the strike jet and the prop bomber, added 2026-11-26.
+- [[Heroes]]: the Sentinel and the Oracle.
+- [[Fireteams and Nerve]]: the utility AI on the server and the one nerve value.
+- [[Ranks and Brain Tiers]]: earned ranks, and the bought brain tiers.
+
+### Bases and gold
+
+- [[Structures and Build Tree]]: what each structure costs, needs and unlocks.
+- [[Placement and Production Queues]]: where structures may stand, production lines, rally points.
+- [[Economy]]: gold, gushers, fields, haulers, refinery, the sea rig.
+- [[Power]]: supply, use and what low power does.
+- [[Radar and Fog of War]]: what a side sees, remembers and when the mini map is on.
+- [[Tech Buildings]]: the three buildings of no army that engineers take.
+- [[Superpowers]]: planned, not in the code.
+
+### Battlefields
+
+- [[Maps]]: the three maps side by side.
+- [[Map - Small]], [[Map - Medium]], [[Map - Large]]: points, gushers, bridges, tech buildings.
+- [[Terrain, Cover and Bridges]]: terrain kinds, landmarks, garrisons, sandbags, bridges.
+
+### Opponents and tuning
+
+- [[Enemy Bot]]: the scripted enemy and its levels.
+- [[Balance]]: the balance numbers and how they are measured.
+
+### Related
+
+- [[Home]]
+- [[Radio Net and Bilingual Procedure]]
+- [[AI Brains and Model Relay]]
+- [[Server Architecture]]
+- [[Locked Decisions]]
+- [[Plan versus Code]]
+- [[Glossary]]

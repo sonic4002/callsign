@@ -64,12 +64,16 @@ Open this folder (`callsign/vault`) as an Obsidian vault to browse the game's de
 - [[Running, Deploying and Testing]] — Docker-only workflow (`make play`, `make play-lan`, `make play-public`, `make test`, balance & cost benchmarks).
 - [[Friend Matches and Security Model]] — Join codes, seat tokens, LAN vs HTTPS/Cloudflare Tunnel hosting, and threat boundaries.
 
-## Going deeper
-- [[Reference Map]] — Map of the focused notes: one subject per note, written from the code (game design, radio net, brains and agents, client, speech, server, operations, art).
-- [[Decisions]] — One note per locked decision, with its date, reason and how the code stands; and [[Open Questions]].
+## 05 · Decisions
+- [[Locked Decisions]] — Every locked decision, with one note per decision giving its date, the owner's reason and how the code stands.
+- [[Open Questions]] — What the documents and the commits leave undecided.
+
+## 06 · Status & Reference
 - [[Known Flaws]], [[Backlog]] and [[Plan versus Code]] — What is broken, what is waiting, and where the documents and the code differ.
 - [[Project Log]] — Dated history of the project.
 - [[Glossary]] — Every project term, callsign and Hebrew/English pair.
+
+Each note above ends with an **In detail** section that links to the focused notes on its subject.
 
 ## About this vault
 - [[Index]] — Generated table of every note with a one-line description.

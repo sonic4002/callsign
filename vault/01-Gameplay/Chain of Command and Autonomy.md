@@ -13,7 +13,7 @@ tags:
   - topic/autonomy
   - topic/mission-command
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: AGY
 origin: code
 confidence: medium
@@ -65,3 +65,17 @@ Separate from bought **Brain Tiers** (which improve decision intelligence via mo
 - [[Radio Net and Bilingual Procedure]]
 - [[AI Brains and Model Relay]]
 - [[Factions and Units]]
+
+---
+
+## In detail
+
+One focused note per subject, written from the code:
+
+- [[Operator - Anvil]] — Anvil (סדן) is the operator: the player's staff officer on the net.
+- [[Squad Leaders]] — Each squad has its own leader agent, started when the squad comes out and stopped when it is lost.
+- [[Initiative - Orders, Fight and Purse]] — Who decides on a side is a rule of the game held by the room, not a habit of a model.
+- [[Radio versus Direct Acts]] — Most of the game is commanded by voice or text on the radio, but some things the commander does by hand, at once, with no agent in between: building, buying, cancelling, selling, repairing, ...
+- [[Fireteams and Nerve]] — A squad is made of fireteams, and every fireteam is moved and fought by plain utility AI on the server, with no language model.
+- [[Ranks and Brain Tiers]] — A squad has two separate standings.
+- [[Enemy Bot]] — The scripted enemy is plain Go code in server/bot that plays a side with no agents and no model: it reads the same fogged snapshot a human gets and returns simulation commands.

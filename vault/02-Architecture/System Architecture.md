@@ -13,7 +13,7 @@ tags:
   - topic/go
   - topic/docker
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: AGY
 origin: code
 confidence: medium
@@ -82,3 +82,23 @@ flowchart LR
 - [[AI Brains and Model Relay]]
 - [[Voice Pipeline (STT and TTS)]]
 - [[Running, Deploying and Testing]]
+
+---
+
+## In detail
+
+One focused note per subject, written from the code:
+
+- [[Server Architecture]] — The game server is one Go program (server/cmd/callsign) that holds a hub of rooms, each room one match with its own deterministic simulation, radio nets and connected clients.
+- [[Sim Loop and Determinism]] — A match is one sim.Sim, advanced one tick at a time by Sim.Step() at 10 ticks per match second (tickRate in shared/rules.json).
+- [[Rooms, Hub and Lobby]] — The room.Hub holds every match on the server; each room.Room is one match with its own seed, clock, radio nets and seats.
+- [[WebSocket Frames]] — Everything live between the server and a client is a JSON text frame on one WebSocket at /ws, each frame an object with a type.
+- [[HTTP API]] — The game server answers a small set of HTTP routes from one mux: the lobby's JSON API, two internal routes for its own services, static files, and reverse proxies that put the speech, listening ...
+- [[Direct Acts]] — A direct act is something the commander does with their own hand from the page: an act frame that the room carries out in the same tick, with no radio call and no agent in between.
+- [[Seats, Tokens and Trust]] — There are no accounts: a commander is whoever holds the random token of a seat, and the server's own services prove themselves with one shared secret, the agent key.
+- [[Client]] — The client is one web page (client/index.html) that shows the battlefield, the radio and the base, and sends the commander's calls and direct acts to the game server over one WebSocket.
+- [[Page Layout]] — On a desktop the page is a stage (map, build bar, radio console) beside a sidebar of instruments (header, treasury, squads).
+- [[Map Rendering]] — The battlefield is drawn by Scene in client/map.js on a 2D canvas, every animation frame, from the last state the server sent this side.
+- [[Where Agents Run]] — A side's agents run in one of two places: a Node process on the machine that runs the game (the agents service), or Web Workers in the commander's own browser.
+- [[Model Relay]] — The model relay (relay/, Go) is the one place an AI key is used.
+- [[Tests and Headless Matches]] — The server is tested by running the simulation with no network and no clock: a test builds a sim.Sim, lets two scripted players act once a match second, and calls Step() until the match is over, ...

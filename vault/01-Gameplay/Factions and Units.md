@@ -14,7 +14,7 @@ tags:
   - topic/units
   - topic/balance
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: AGY
 origin: mixed
 confidence: medium
@@ -80,3 +80,18 @@ Callsign ships with two asymmetric launch factions defined in `shared/rules.json
 - [[Base Building and Economy]]
 - [[Art Direction and Sprite Pipeline]]
 - [[Unit Asset Redesign Log]]
+
+---
+
+## In detail
+
+One focused note per subject, written from the code:
+
+- [[Factions]] — The game has two factions, Aegis Directorate and Ashfall Network, defined under factions in shared/rules.json.
+- [[Units - Aegis]] — Every unit the Aegis Directorate (מנהלת אגיס) can field, with the numbers in shared/rules.json (factions.aegis.units) as they are now.
+- [[Units - Ashfall]] — Every unit the Ashfall Network (רשת אפר) can field, with the numbers in shared/rules.json (factions.ashfall.units) as they are now.
+- [[Heroes]] — Each faction has one hero: a squad of a single exceptional soldier, of which only one may be alive at a time.
+- [[Strike Aircraft]] — Strike aircraft are squads of planes that stand at an airbase, fly a sortie to bomb a target or look at a place, and come home to be armed again.
+- [[Ranks and Brain Tiers]] — A squad has two separate standings.
+- [[Fireteams and Nerve]] — A squad is made of fireteams, and every fireteam is moved and fought by plain utility AI on the server, with no language model.
+- [[Balance]] — Balance between the two factions is measured by playing whole scripted matches headless: the scripted enemy on both sides, each pairing from both ends of the map, over many seeds.

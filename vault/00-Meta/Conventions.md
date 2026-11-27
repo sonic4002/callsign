@@ -19,7 +19,6 @@ related:
   - "[[Agent Handoff]]"
   - "[[Index]]"
   - "[[Home]]"
-  - "[[Reference Map]]"
 paths:
   - vault/_tools/validate_frontmatter.py
   - vault/_tools/gen_index.py
@@ -35,16 +34,17 @@ This is the contract every note in the vault follows. `_tools/validate_frontmatt
 | Folder | Holds |
 |---|---|
 | (root) | `Home.md`, the map of content; `CLAUDE.md` and `README.md`, which are not notes |
-| `00-Meta` | this contract, [[Agent Handoff]], the generated [[Index]], and [[Reference Map]], the map of the focused notes |
-| `00-Overview` to `04-Operations` | overview notes: one broad note per subject, for a first read |
-| `10-Game-Design` to `17-Art-and-Assets` | focused notes: one subject each, written from the code |
-| `18-Decisions` | one note per locked decision, and [[Open Questions]] |
-| `19-Known-Flaws-and-Backlog` | [[Known Flaws]], [[Backlog]], [[Plan versus Code]] |
-| `20-History` | the dated [[Project Log]] |
-| `21-Glossary` | the [[Glossary]] |
+| `00-Meta` | this contract, [[Agent Handoff]] and the generated [[Index]] |
+| `00-Overview` | the idea, [[Locked Decisions]], [[Roadmap and Status]] |
+| `01-Gameplay` | game design: factions, units, structures, economy, maps; `Radio-Net/` holds the radio net |
+| `02-Architecture` | how the software works, in `Brains-and-Agents/`, `Client/`, `Server/` and `Speech/` |
+| `03-Art-and-Audio` | art style, the sprite pipeline, licences and credits |
+| `04-Operations` | running, releasing, environment, playing on a LAN and in public |
+| `05-Decisions` | one note per locked decision, and [[Open Questions]] |
+| `06-Status-and-Reference` | [[Known Flaws]], [[Backlog]], [[Plan versus Code]], [[Project Log]], [[Glossary]] |
 | `_tools` | the validator and the index generator (not notes) |
 
-An overview note and the focused notes on the same subject both stay: the overview is the summary, the focused notes are the detail. When they disagree, the focused note and the code win, and the overview is corrected.
+Each folder has one or more **overview** notes (a broad first read; [[Home]] lists them) and **focused** notes (one subject each). An overview ends with an "In detail" section linking to its focused notes. When the two disagree, the focused note and the code win, and the overview is corrected.
 
 ## Note names
 
@@ -94,7 +94,7 @@ The block starts on line 1. It is a small, regular subset of YAML that the tools
 Tags are `family/value`, lowercase (agent codes stay uppercase). Six families:
 
 - `type/`, `status/`, `agent/`, `origin/` mirror the fields of the same name exactly. Change the field and its tag together.
-- `area/<folder>`: the folder's name without its number, lowercase (`area/radio-net`).
+- `area/<folder>`: the top-level folder's name without its number, lowercase (`area/gameplay`).
 - `topic/<kebab-case>`: the subject (`topic/economy`). Reuse a spelling that exists before making a new one.
 
 ## Writing rules

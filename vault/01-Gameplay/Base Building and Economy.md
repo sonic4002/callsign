@@ -13,7 +13,7 @@ tags:
   - topic/economy
   - topic/bases
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: AGY
 origin: mixed
 confidence: medium
@@ -73,3 +73,17 @@ Every structure produces or consumes power (`HQ: +30`, `Power Plant / Generator 
 - [[Factions and Units]]
 - [[Maps, Terrain and Places]]
 - [[Locked Decisions]]
+
+---
+
+## In detail
+
+One focused note per subject, written from the code:
+
+- [[Economy]] — There is one resource, gold. Haulers collect it from fields that gushers feed and unload it at a refinery; the headquarters adds a small trickle, the sea rig pays whoever holds it, and an Assay ...
+- [[Structures and Build Tree]] — Structures are what a side builds: base structures that unlock units, defences that fire on their own, and fences that stop ground units.
+- [[Power]] — Every structure either supplies power or uses it, and a side that uses more than it supplies is on low power.
+- [[Placement and Production Queues]] — A structure stands on a chosen spot that the server checks, and units are made one at a time in a line at the structure that makes them, then walk out of its door to a rally point.
+- [[Tech Buildings]] — Tech buildings belong to no army and stand on the map from the start; whichever side's engineers take one gets what it gives.
+- [[Radar and Fog of War]] — The server keeps, for each side, the ground it has ever seen and what it last knew of points, landmarks, bridges, structures, fields and enemy haulers; a side is only ever sent that.
+- [[Superpowers]] — Superpowers are planned and locked as a principle, but nothing of them is in the code.

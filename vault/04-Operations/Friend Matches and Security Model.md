@@ -13,7 +13,7 @@ tags:
   - topic/security
   - topic/multiplayer
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: AGY
 origin: docs
 confidence: medium
@@ -61,3 +61,15 @@ Reference: `docs/FRIEND-MATCH.md`. Two players can play head-to-head via LAN (`m
 - [[Locked Decisions]]
 - [[AI Brains and Model Relay]]
 - [[Running, Deploying and Testing]]
+
+---
+
+## In detail
+
+One focused note per subject, written from the code:
+
+- [[Playing on a LAN]] — Two people on the same network can play one match against each other with make play-lan.
+- [[Playing in Public]] — make play-public puts the game on an https address of the owner's own domain, so a friend anywhere can join and the microphone works on phones.
+- [[Seats, Tokens and Trust]] — There are no accounts: a commander is whoever holds the random token of a seat, and the server's own services prove themselves with one shared secret, the agent key.
+- [[Key Handling]] — There are three kinds of secret around the brains: a player's AI key (stored encrypted on the relay), the tokens that say who may use it (player token, seat token), and the server's own secrets ...
+- [[Private Machine Guard]] — CALLSIGNPRIVATE=1 marks the owner's own machine.
