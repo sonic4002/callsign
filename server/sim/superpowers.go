@@ -28,10 +28,11 @@ var (
 )
 
 // ParseSuperPowers parses a lobby/config super-power setting:
-//   "0" / "off" -> 0 (disabled)
-//   "1".."4"    -> 1..4 chosen powers per player (normal cooldowns)
-//   ""          -> default "2"
-//   "all"       -> all powers unlocked automatically with fast test recharge
+//
+//	"0" / "off" -> 0 (disabled)
+//	"1".."4"    -> 1..4 chosen powers per player (normal cooldowns)
+//	""          -> default "2"
+//	"all"       -> all powers unlocked automatically with fast test recharge
 func ParseSuperPowers(raw string, total int) (limit int, fast bool, norm string, ok bool) {
 	switch raw {
 	case "", "2":

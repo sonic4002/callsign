@@ -108,10 +108,10 @@ func wreck(t *testing.T, s *sim.Sim, share float64) []sim.Event {
 }
 
 func TestEveryMapHasEveryKindOfGround(t *testing.T) {
-	if len(rules.Maps) != 3 {
-		t.Fatalf("%d maps, want 3", len(rules.Maps))
+	if len(rules.Maps) != 4 {
+		t.Fatalf("%d maps, want 4", len(rules.Maps))
 	}
-	points := map[string]int{"small": 11, "medium": 15, "large": 15}
+	points := map[string]int{"small": 11, "medium": 15, "large": 15, "huge": 21}
 	for _, id := range rules.MapIDs() {
 		m := rules.Maps[id]
 		kinds := map[rune]int{}
@@ -144,11 +144,118 @@ func TestEveryMapHasEveryKindOfGround(t *testing.T) {
 			}
 			names[l.Name.En], names[l.Name.He] = true, true
 		}
-		// Only letters that exist in both alphabets, and never ר.
+		// Only letters that exist in both alphabets, each with its one word in each, and never ר.
 		for _, p := range m.Points {
-			if !map[string]bool{"A": true, "B": true, "G": true, "D": true, "H": true, "F": true, "K": true, "S": true, "Z": true,
-				"L": true, "M": true, "N": true, "T": true, "Y": true, "V": true}[p.ID] {
+			if want, ok := sharedLetters[p.ID]; !ok {
 				t.Errorf("%s: point %s is not a shared letter", id, p.ID)
+			} else if p.Callsign.En != want[0] || p.Callsign.He != want[1] {
+				t.Errorf("%s: point %s is called %s / %s, want %s / %s", id, p.ID, p.Callsign.En, p.Callsign.He, want[0], want[1])
+			}
+		}
+	}
+	// The biggest map is the one that uses every letter.
+	if huge := rules.Maps["huge"]; len(huge.Points) != len(sharedLetters) {
+		t.Errorf("huge has %d points for %d letters", len(huge.Points), len(sharedLetters))
+	}
+}
+
+// sharedLetters are the letters a map point may have: those with a word in both the NATO
+// and the IDF alphabet, as the English and the Hebrew callsign.
+var sharedLetters = map[string][2]string{
+	"A": {"Alpha", "אלף"}, "B": {"Bravo", "בועז"}, "G": {"Golf", "גימל"}, "D": {"Delta", "דוד"}, "H": {"Hotel", "הגר"},
+	"F": {"Foxtrot", "פסל"}, "K": {"Kilo", "כרמל"}, "S": {"Sierra", "סמך"}, "Z": {"Zulu", "זאב"}, "L": {"Lima", "לאה"},
+	"M": {"Mike", "משה"}, "N": {"November", "נשר"}, "T": {"Tango", "תמר"}, "Y": {"Yankee", "יואב"}, "V": {"Victor", "ואו"},
+	"Q": {"Quebec", "קורח"}, "C": {"Charlie", "צפורה"}, "O": {"Oscar", "עין"}, "E": {"Echo", "חוה"}, "W": {"Whiskey", "שמיר"}, "X": {"X-ray", "טיח"},
+}
+
+// Neither side starts better: whatever stands on a map has its like at the same distance
+// from the other edge, and the two headquarters are each other's mirror image.
+func TestEverythingOnEveryMapIsMirrored(t *testing.T) {
+	for _, id := range rules.MapIDs() {
+		m := rules.Maps[id]
+		type thing struct {
+			kind string
+			x, y float64
+		}
+		var all []thing
+		for _, p := range m.Points {
+			all = append(all, thing{"point " + p.Kind, p.X, p.Y})
+		}
+		for _, g := range m.Gushers {
+			all = append(all, thing{"gusher " + strconv.Itoa(int(g.RatePerSecond)) + "/" + strconv.Itoa(int(g.FieldCap)) + "/" + strconv.Itoa(int(g.StartGold)), g.X, g.Y})
+		}
+		for _, l := range m.Landmarks {
+			all = append(all, thing{"landmark " + l.Kind, l.X, l.Y})
+		}
+		for _, s := range m.TechBuildings {
+			all = append(all, thing{"tech " + s.Kind, s.X, s.Y})
+		}
+		for _, b := range m.Bridges {
+			// A bridge is told by its middle; its mirror image runs the other way.
+			all = append(all, thing{"bridge " + strconv.Itoa(int(b.Width)) + "/" + strconv.Itoa(int(b.HP)), (b.From[0] + b.To[0]) / 2, (b.From[1] + b.To[1]) / 2})
+		}
+		for _, a := range all {
+			twin := false
+			for _, b := range all {
+				twin = twin || (b.kind == a.kind && math.Abs(b.x-(m.Width-a.x)) < 1 && b.y == a.y)
+			}
+			// One grove of the small map stands alone: its twin fell on the edge of a hill
+			// and was left out. It stays, because the small map is the one the lesson and
+			// the placement table are written for.
+			known := id == "small" && a.kind == "landmark grove" && a.x == 1840 && a.y == 620
+			if !twin && !known {
+				t.Errorf("%s: the %s at (%.0f, %.0f) has no mirror image", id, a.kind, a.x, a.y)
+			}
+		}
+		r, err := rules.ForMap(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a, z := r.HQPoint(0), r.HQPoint(1); a.X != m.Width-z.X || a.Y != z.Y || a.X >= m.Width/2 {
+			t.Errorf("%s: the headquarters stand at (%.0f, %.0f) and (%.0f, %.0f)", id, a.X, a.Y, z.X, z.Y)
+		}
+	}
+}
+
+// Every point of every map can be reached, from either base, by each kind of unit that
+// may take it: on foot or on wheels over the ground and the bridges, by boat over the
+// water. Nothing stands in water or on a mountain by mistake.
+func TestEveryPointCanBeReachedByWhatMayTakeItOnEveryMap(t *testing.T) {
+	for _, id := range rules.MapIDs() {
+		s, r := simOn(t, rules, id, sim.Config{Seed: 1, StartGold: 20000})
+		for side := 0; side < 2; side++ {
+			// One squad of each class that takes points, the cheapest the faction has.
+			f := r.Factions[s.Sides[side].Faction]
+			unitOf := map[string]string{}
+			for _, class := range []string{"infantry", "vehicle", "naval"} {
+				for uid, u := range f.Units {
+					if best, ok := unitOf[class]; u.Class == class && !u.Hero && !u.NoCapture && (!ok || u.Cost < f.Units[best].Cost || (u.Cost == f.Units[best].Cost && uid < best)) {
+						unitOf[class] = uid
+					}
+				}
+			}
+			sent := map[string]*sim.Squad{}
+			for class, unit := range unitOf {
+				sent[class] = buyFielded(t, s, side, unit)
+			}
+			if len(sent) != 3 {
+				t.Fatalf("%s: side %d fielded %v", id, side, unitOf)
+			}
+			for _, p := range r.Map.Points {
+				by := r.Rigs[p.Kind].CaptureBy
+				if p.Kind == "hq" {
+					by = []string{"infantry", "vehicle"} // a headquarters is not taken, but it is marched on
+				}
+				for _, class := range by {
+					if sq := sent[class]; sq != nil && !s.Reachable(sq, p.X, p.Y) {
+						t.Errorf("%s: side %d's %s cannot reach %s (%s, %s) at (%.0f, %.0f)", id, side, sq.Unit, p.ID, p.Callsign.En, p.Kind, p.X, p.Y)
+					}
+				}
+			}
+			for _, g := range r.Map.Gushers {
+				if !s.Reachable(sent["vehicle"], g.X, g.Y) {
+					t.Errorf("%s: side %d cannot drive to the %s gold field", id, side, g.ID)
+				}
 			}
 		}
 	}

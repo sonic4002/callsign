@@ -14,6 +14,7 @@ const (
 	ToolFortify = "fortify" // an infantry squad builds a sandbag position where it stands
 	ToolPlant   = "plant"   // a hero sets a demolition charge on an enemy structure, a bridge or the enemy headquarters
 	ToolSeize   = "seize"   // a hero takes over an enemy vehicle squad
+	ToolSalvo   = "salvo"   // a squad with missile pods (the attack helicopter) empties them over a place
 )
 
 // unitNamed finds a unit by id in whichever army has it: a side may hold a squad that is

@@ -142,6 +142,8 @@ func (s *Sim) Apply(c Command) (*Squad, error) {
 		return s.plantOrder(c)
 	case CmdSeize:
 		return s.seizeOrder(c)
+	case CmdSalvo:
+		return s.salvoOrder(c)
 	}
 	return nil, ErrBadCommand
 }
@@ -295,6 +297,9 @@ func (s *Sim) buy(c Command) (*Squad, error) {
 	} else if s.Population(c.Side) >= s.R.Match.PopulationCap {
 		// A squad on its way already holds its place under the cap.
 		return nil, ErrPopCap
+	}
+	if u.Strike() && s.producer(c.Side, c.Unit, &u) == nil {
+		return nil, ErrAirbaseFull // the airbase stands (mayBuy), so its pads are all taken
 	}
 	// The structure that makes it takes one at a time; the rest wait in its line.
 	if err := s.lineRoom(c.Side, c.Unit, &u); err != nil {

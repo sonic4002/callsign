@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { LEVELS, TILE, TileCache, detailLevel, tilesIn } from "./tiles.js";
 
 test("tiles are wanted only when the view is closer than the whole-map picture shows", () => {
-  // The largest map's whole picture has about half a pixel per unit.
+  // The large map's whole picture has about half a pixel per unit.
   assert.equal(detailLevel(0.36, 0.54), 0, "the opening view of a desktop: the whole picture is sharp enough");
   assert.equal(detailLevel(0.56, 0.54), 0, "a hair closer is not worth baking for");
   assert.equal(detailLevel(0.72, 0.54), LEVELS[0], "the opening view of a phone with two pixels to the point");
@@ -20,7 +20,7 @@ test("tiles are wanted only when the view is closer than the whole-map picture s
 });
 
 test("the tiles a view touches, the middle of the view first, never past the picture", () => {
-  const picture = { x: -3290, y: -90, w: 8580, h: 4380 }; // the largest map
+  const picture = { x: -3290, y: -90, w: 8580, h: 4380 }; // the large map
   const level = LEVELS[1];
   const size = TILE / level;
   const view = { x: 0, y: 1000, w: 1000, h: 600 };

@@ -32,6 +32,7 @@ paths:
   - art/paint.json
   - art/units.py
   - art/props.py
+  - art/plan.py
   - art/sheet.py
   - art/rename_keys.py
   - art/sprites.json
@@ -70,11 +71,24 @@ Generation and painting need a GPU (`--device nvidia.com/gpu=all`); unit renderi
 
 `python art/generate.py && python art/cleanup.py && python art/rename_keys.py`
 
-**`art/sprites.json`** holds eight prompt templates (`styles`: `building`, `ruin`, `terrain`, `scenery`, `site`, `stage`, `door`, `portrait`) and 164 sprite entries (128 buildings, 30 landmarks, 4 terrain, 2 portraits). An entry has `id`, `kind`, `style`, `subject` (the words), `seeds` (candidates to try), `height`, `draw`, and optionally `from`, `door`, `keep`.
+**`art/sprites.json`** holds twelve prompt templates (`styles`: `building`, `ruin`, `terrain`, `scenery`, `site`, `stage`, `door`, `portrait`, and `airfield`, `airfield_ruin`, `airfield_stage`, `airfield_door` for the two airfields) and 164 sprite entries (128 buildings, 30 landmarks, 4 terrain, 2 portraits). An entry has `id`, `kind`, `style`, `subject` (the words), `seeds` (candidates to try), `height`, `draw`, and optionally `from`, `plan`, `door`, `lamp`, `keep`.
 
-**The keep mechanism.** `generate.py` starts ComfyUI on the container's loopback and writes one raw candidate per sprite and seed to `assets/raw/<id>__<seed>.png` (existing ones are skipped; `--seeds 5 6 tank` tries other seeds). A person looks at the candidates (`sheet.py candidates`) and sets `"keep": <seed>` on the one that passed review. `cleanup.py` turns only kept sprites into game sprites; a sprite without `keep` is left out of the manifest and the page draws its own stand-in. All 164 entries currently name a `keep`. Because `assets/raw` is not in git, a kept sprite whose raw image is not on the machine keeps the picture and manifest entry it already has.
+**The keep mechanism.** `generate.py` starts ComfyUI on the container's loopback and writes one raw candidate per sprite and seed to `assets/raw/<id>__<seed>.png` (existing ones are skipped; `--seeds 5 6 tank` tries other seeds). A person looks at the candidates (`sheet.py candidates`) and sets `"keep": <seed>` on the one that passed review. `cleanup.py` turns only kept sprites into game sprites; a sprite without `keep` is left out of the manifest and the page draws its own stand-in. All 164 entries currently name a `keep`. Because `assets/raw` is not in git, a kept sprite whose raw image is not on the machine keeps the picture and manifest entry it already has; since 2026-11-27 `cleanup.py` finds that picture under the name `rename_keys.py` gave it, so `python art/cleanup.py <id ...>` remakes only the named sprites on a machine without the other raws. A run that writes a picture also gives the manifest a new `stamp`.
 
 **Second states (`from`).** 107 entries are a second state of another sprite: a ruin, a construction site or stage, or an open door. The model redraws the kept image of the building (the klein image-edit graph with a reference latent), so the result stands exactly where the building does and is trimmed to the same frame.
+
+**Sites painted over a plan (`plan`, since 2026-11-27).** The two airfields (`aegis_airbase`, `ashfall_launchYard`: rules ids `airbase`, `launchYard`) are not one block but a site the game parks aircraft on, so their layout is not left to words. `art/plan.py` draws a block-out in the game's projection (`sx = x - y`, `sy = (x + y) / 2`, 3.2 picture pixels a world unit, on a blue backdrop) and `generate.py` has the model redraw it with the same image-edit graph; the painted picture keeps the block-out's positions to the pixel. `cleanup.py` then sizes the picture so one world unit of the plan is one world unit on the page at zoom 1 (stored at 2.6 times `height`, drawn at 1.8 times `height`, the `buildScale` factor in `client/map.js`) and puts the anchor on the plan's middle. The plan, in world units from the structure's centre, x east and y south:
+
+| Part | Where |
+|---|---|
+| Slab | the square of half-width 70 with its corners cut at `abs(x) + abs(y) = 118` |
+| Runway | x -66 to 66, y 27 to 53 (the near, lower-left edge) |
+| Apron | the open middle; aircraft stand in a row at y 0 |
+| Two hangars, fronts open to the south | x -56 to -18 and x -12 to 26, y -62 to -28, 20 high |
+| Tower (Aegis) or lookout post (Ashfall) | x -68 to -58, y -50 to -40 |
+| Helicopter pad with the H | centre (47, -43), radius 17; the door's `exit` and `rally` are both here, with `lift: true` |
+
+The H is the only lettering in any picture. The door patch covers the front of the east hangar; `lamp` is the tower top. Ruin, stages and door are second states (`from`) with their own `airfield_*` templates, which name the blue backdrop and allow the H.
 
 | Setting (`generate.py`) | Value |
 |---|---|

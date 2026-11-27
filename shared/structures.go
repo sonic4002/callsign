@@ -18,7 +18,7 @@ const (
 	RoleFence    = "fence"
 	// RoleTech is a building of no army that stands on the map from the start: whoever's
 	// engineers take it gets what it gives (gold, healing, repairs).
-	RoleTech  = "tech"
+	RoleTech        = "tech"
 	RolePower       = "power"       // supplies the power the other structures use (sim/power.go)
 	RoleRadar       = "radar"       // turns the mini map on, and is what the airbase needs
 	RoleSuperweapon = "superweapon" // unlocks and charges chosen super powers (sim/superpowers.go)
@@ -57,6 +57,11 @@ type Structure struct {
 	// Power is what the structure supplies (above zero) or uses (below zero) while it
 	// stands. A side that uses more than it supplies is on low power.
 	Power float64 `json:"power,omitempty"`
+
+	// An airbase holds so many strike aircraft (Planes), each on a spot of its apron
+	// (Pads: east and south of its middle). A squad's planes each take one.
+	Planes int          `json:"planes,omitempty"`
+	Pads   [][2]float64 `json:"pads,omitempty"`
 
 	// Defences fire like a unit's weapon.
 	Range         float64            `json:"range,omitempty"`
@@ -210,7 +215,16 @@ func (r *Rules) checkStructures(name string, f *Faction) error {
 			return fmt.Errorf("structure %s has a bad stat", id)
 		}
 		switch st.Role {
-		case RoleHQ, RoleBarracks, RoleWorks, RoleAirbase, RoleDockyard, RoleRefinery, RoleRadar, RoleSuperweapon:
+		case RoleHQ, RoleBarracks, RoleWorks, RoleDockyard, RoleRefinery, RoleRadar, RoleSuperweapon:
+		case RoleAirbase:
+			if st.Planes <= 0 || len(st.Pads) < st.Planes {
+				return fmt.Errorf("airbase %s needs how many planes it holds and a pad for each", id)
+			}
+			for _, uid := range st.Unlocks {
+				if u, ok := f.Units[uid]; ok && u.Strike() && u.Teams > st.Planes {
+					return fmt.Errorf("airbase %s cannot hold one squad of %s", id, uid)
+				}
+			}
 		case RolePower:
 			if st.Power <= 0 {
 				return fmt.Errorf("power structure %s supplies no power", id)

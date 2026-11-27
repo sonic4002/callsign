@@ -13,7 +13,7 @@ tags:
   - topic/plan
   - topic/drift
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -67,7 +67,7 @@ The design plan (`docs/PLAN.html`, v0.6), the locked decisions in `CLAUDE.md`, t
 | Rigs pump gold: HQ well +10, land rig +15, sea rig +30, damaged rig half | haulers harvest fields; HQ trickle 10, sea rig 30, land rig 0; no damaged-rig rule ([[Economy]]) |
 | Every brain is a language model on the player's key | the rule brain is the default; Jev on the game's key ([[Decision - Brains without a Player Key]]) |
 | Matches of 10 to 15 minutes; lengths 10, 15, 20 or until an HQ falls | defaults 15, 20 and 25 minutes by map; always a timer ([[Maps]]) |
-| One map, nine points | three maps, fifteen letters ([[Maps]]) |
+| One map, nine points | four maps, twenty-one letters ([[Maps]]) |
 | Tango = טוב in the alphabet table | Tango = תמר, November = נשר ([[Map Point Letters]]) |
 | Ashfall has no air | Ashfall has the drone swarm and the prop bomber ([[Factions]]) |
 | Unit lists with recon drones, an interceptor dome, tunnels, traps, decoys, amphibious transport | not in the rules ([[Units - Aegis]], [[Units - Ashfall]]) |

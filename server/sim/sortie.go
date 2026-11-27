@@ -46,6 +46,7 @@ const (
 )
 
 var (
+	ErrAirbaseFull  = errors.New("every airbase is full of planes: build another")
 	ErrNoLoiter     = errors.New("a strike aircraft cannot hold ground or wait in the air: give it a target, or send it back to base")
 	ErrNoBombTarget = errors.New("bombs cannot hit that")
 )
@@ -64,6 +65,7 @@ type Blast struct {
 	Side   int // whose bomb it was
 	Tick   int
 	Radius float64
+	Kind   string // "" for a bomb, BlastMissile for one missile of a salvo
 }
 
 // BlastView is a blast as a side may see it.
@@ -73,6 +75,7 @@ type BlastView struct {
 	Side   int     `json:"side"`
 	Age    int     `json:"age"` // ticks since it went off
 	Radius float64 `json:"radius"`
+	Kind   string  `json:"kind,omitempty"` // "missile" for one missile of a salvo; a bomb otherwise
 }
 
 // SortieView is a strike squad's state as its owner sees it.
@@ -87,8 +90,49 @@ type SortieView struct {
 // Grounded reports whether a strike squad stands at its airbase.
 func (a *sortie) grounded() bool { return a.State == SortieParked || a.State == SortieRearming }
 
+// planes is how many of a squad's aircraft take a pad at its airbase: every one of a
+// squad still being made, the living ones of a squad in the field.
+func (sq *Squad) planes() int {
+	if !sq.Alive {
+		return sq.unit.Teams
+	}
+	n := 0
+	for i := range sq.Teams {
+		if sq.Teams[i].Members > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// based lists the strike squads that belong to an airbase, oldest first: the ones that
+// fly from it, and the ones still being made there. `but` is left out.
+func (s *Sim) based(st *Structure, but *Squad) []*Squad {
+	var out []*Squad
+	for _, sq := range s.Squads {
+		if sq == but || sq.sortie == nil || sq.Side != st.Side {
+			continue
+		}
+		if (sq.Alive && sq.sortie.Home == st.ID) || (sq.DeployTicks > 0 && sq.From == st.ID) {
+			out = append(out, sq)
+		}
+	}
+	return out
+}
+
+// padsFree is how many more planes an airbase can take, not counting those of `but`.
+func (s *Sim) padsFree(st *Structure, but *Squad) int {
+	n := st.def.Planes
+	for _, sq := range s.based(st, but) {
+		n -= sq.planes()
+	}
+	return n
+}
+
 // airbaseFor is the airbase a strike squad flies from: its own while that stands and is
-// its side's, else the nearest other one that could have made it. nil when none is left.
+// its side's, else another one that could have made it: the nearest with pads free for
+// it, and when none has room the nearest of all (planes whose base fell are taken in
+// over the number rather than lost). nil when none is left.
 func (s *Sim) airbaseFor(sq *Squad) *Structure {
 	ok := func(st *Structure) bool {
 		return st != nil && st.Standing() && st.Side == sq.Side && st.def.Role == sq.unit.Requires
@@ -98,13 +142,14 @@ func (s *Sim) airbaseFor(sq *Squad) *Structure {
 	}
 	x, y := sq.Center()
 	var best *Structure
-	bd := math.MaxFloat64
+	bd, room := math.MaxFloat64, false
 	for _, st := range s.Structures {
 		if !ok(st) {
 			continue
 		}
-		if d := dist(x, y, st.X, st.Y); d < bd {
-			best, bd = st, d
+		fits := s.padsFree(st, sq) >= sq.planes()
+		if d := dist(x, y, st.X, st.Y); (fits && !room) || (fits == room && d < bd) {
+			best, bd, room = st, d, fits
 		}
 	}
 	return best
@@ -114,14 +159,23 @@ func (s *Sim) airbaseFor(sq *Squad) *Structure {
 // its apron and flies: wings need the room. Over its target it closes up to drop.
 const wingSpace = 2.2
 
-// padSlot is where one plane of a squad stands at its airbase: each squad has a corner
-// of the apron by its number, so that two squads of one base do not stand in a heap.
+// padSlot is where one plane of a squad stands at its airbase: on the apron's pads in
+// turn, the squads that belong to the base in the order they came. Planes taken in over
+// the base's number stand in a second row behind the pads.
 func (s *Sim) padSlot(sq *Squad, st *Structure, slot int) (float64, float64) {
-	const apron = 36
-	k := (sq.Num - 1) % 4
-	cx, cy := st.X+apron*float64(2*(k%2)-1), st.Y+apron*float64(2*(k/2)-1)
-	ox, oy := s.formation(sq.unit, slot, sq.Side)
-	return s.clamp("air", cx+ox*wingSpace, cy+oy*wingSpace)
+	k := slot
+	for _, other := range s.based(st, nil) {
+		if other == sq {
+			break
+		}
+		k += other.unit.Teams // a squad keeps its pads when it loses a plane
+	}
+	pads := st.def.Pads
+	if len(pads) == 0 {
+		return s.clamp("air", st.X, st.Y)
+	}
+	p := pads[k%len(pads)]
+	return s.clamp("air", st.X+p[0], st.Y+p[1]+float64(k/len(pads))*26)
 }
 
 // park stands a strike squad at an airbase, armed and with no order. With no airbase to
@@ -198,8 +252,11 @@ func (s *Sim) sortieOrder(c Command, sq *Squad) (*Squad, error) {
 		case c.Kind != CmdAttack && home:
 			// Home: to the airbase named, when one was, and from now on it flies from there.
 			o.Kind = OrderReturn
-			if pl.Structure != nil && pl.Structure.Standing() {
-				sq.sortie.Home = pl.Structure.ID
+			if st := pl.Structure; st != nil && st.Standing() && st.ID != sq.sortie.Home {
+				if s.padsFree(st, sq) < sq.planes() {
+					return nil, fmt.Errorf("%w: %s has no pads free", ErrAirbaseFull, st.PlaceID())
+				}
+				sq.sortie.Home = st.ID
 			}
 		case c.Kind == CmdHold:
 			return nil, ErrNoLoiter
@@ -417,17 +474,21 @@ func (s *Sim) strikeAgain(sq *Squad) bool {
 // and fences, the headquarters, and the bridge or the building the order named. Cover
 // and walls take off what they take off a shot.
 func (s *Sim) bomb(tr *teamRef, x, y float64, live []*teamRef) {
-	sq, t, u := tr.sq, tr.t, tr.u
-	r := u.BlastRadius
-	power := u.Damage * float64(u.Bombs) * float64(t.Members)
-	share := func(d float64) float64 { return 1 - 0.6*math.Max(0, d)/r }
+	t, u := tr.t, tr.u
 	t.lastFire = s.Tick
-	s.Blasts = append(s.Blasts, Blast{X: x, Y: y, Side: sq.Side, Tick: s.Tick, Radius: r})
+	s.burst(tr.sq, u, x, y, u.BlastRadius, u.Damage*float64(u.Bombs)*float64(t.Members), "", live)
+}
+
+// burst is an explosion of a squad's weapon at (x, y): a bomb, or one missile of a salvo
+// (salvo.go). `power` is what it does at its middle, `r` how far it reaches.
+func (s *Sim) burst(sq *Squad, u *shared.Unit, x, y, r, power float64, kind string, live []*teamRef) {
+	share := func(d float64) float64 { return 1 - 0.6*math.Max(0, d)/r }
+	s.Blasts = append(s.Blasts, Blast{X: x, Y: y, Side: sq.Side, Tick: s.Tick, Radius: r, Kind: kind})
 
 	for _, o := range live {
 		d := dist(x, y, o.t.X, o.t.Y)
-		if o.sq.Side == sq.Side || o.t.Members == 0 || d > r || u.Against(o.u.Class) == 0 {
-			continue
+		if o.sq.Side == sq.Side || o.t.Members == 0 || d > r || u.Against(o.u.Class) == 0 || o.u.Domain == "air" {
+			continue // what flies is above a blast on the ground
 		}
 		dmg := power * share(d) * u.Against(o.u.Class) * (1 - o.u.Armor*(1-u.Pierce))
 		if o.t.In != "" {
@@ -507,7 +568,7 @@ func (s *Sim) snapBlasts(snap *Snapshot, side int) {
 	snap.Blasts = []BlastView{}
 	for _, b := range s.Blasts {
 		if side == Spectator || b.Side == side || s.InSight(side, b.X, b.Y) {
-			snap.Blasts = append(snap.Blasts, BlastView{X: round1(b.X), Y: round1(b.Y), Side: b.Side, Age: s.Tick - b.Tick, Radius: b.Radius})
+			snap.Blasts = append(snap.Blasts, BlastView{X: round1(b.X), Y: round1(b.Y), Side: b.Side, Age: s.Tick - b.Tick, Radius: b.Radius, Kind: b.Kind})
 		}
 	}
 }

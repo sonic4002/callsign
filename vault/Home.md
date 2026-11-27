@@ -50,7 +50,7 @@ Open this folder (`callsign/vault`) as an Obsidian vault to browse the game's de
 - [[Factions and Units]] — Complete roster and stats for **Aegis Directorate** and **Ashfall Network** (including heroes and strike aircraft).
 - [[Base Building and Economy]] — Tech tree, power, production queues, rally points, haulers, gushers, sell/repair, and neutral tech buildings.
 - [[Super Powers]] — All 15 strategic and tactical super weapons, Strategic Command & Black-Site Silo complexes, lobby allowances (`Off / 1..4 / All`), and custom targeting cursors.
-- [[Maps, Terrain and Places]] — The three mirrored maps (*Twin Bridges*, *Frozen Lake*, *Mountain Passes*), terrain rules, cover, garrisons, bridges, and descriptive Places.
+- [[Maps, Terrain and Places]] — The four mirrored maps (*Twin Bridges*, *Frozen Lake*, *Mountain Passes*, *Great Moat*), terrain rules, cover, garrisons, bridges, and descriptive Places.
 
 ## 02 · Architecture & AI
 - [[System Architecture]] — Go game server (10 ticks/s), Go model relay, browser client, Web Worker agents, and MCP Open League.

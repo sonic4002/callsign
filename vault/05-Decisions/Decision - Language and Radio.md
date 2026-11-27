@@ -13,7 +13,7 @@ tags:
   - topic/i18n
   - topic/hebrew
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -73,7 +73,7 @@ From the plan:
 | RTL mirrors, the map never | [[i18n Rules]], [[Map Rendering]] |
 | Procedure words | `radio.prowords`, `marker`, `over`, `out` in `shared/rules.json`; the parser refuses "over and out" (`ErrOverAndOut`) ([[Procedure Words]]) |
 | How strictly the player is held to procedure | a setting with three levels, relaxed by default ([[Radio Routing]], [[Hints and Tidy Step]]) |
-| Shared letters, never ר | fifteen letters in use across the three maps; a test enforces the ר rule ([[Map Point Letters]]) |
+| Shared letters, never ר | twenty-one letters in use across the four maps (fifteen until the huge map of 2026-11-27); a test enforces the ר rule ([[Map Point Letters]]) |
 | Routing by code | `server/radio/radio.go` ([[Radio Routing]]) |
 | The net's language | the whole net speaks the language Hammer last used ([[Net Language]]) |
 

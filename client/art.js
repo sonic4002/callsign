@@ -55,7 +55,7 @@ export async function loadSprites(base = "/assets/sprites/") {
           // A structure's door is two small patches drawn over it: open, and open with the
           // light on. A patch that fails to load is simply never drawn.
           for (const patch of Object.values(entry.door?.frames ?? {})) {
-            loadImage(base + patch.image).then((pic) => pic && (sprites[group][id].door.frames[patch.name].img = pic));
+            loadImage(sheet(patch)).then((pic) => pic && (sprites[group][id].door.frames[patch.name].img = pic));
           }
         }),
       );
@@ -164,6 +164,14 @@ export function formation(members, heading, go = 0, seed = 0) {
 // without it, from the clock.
 const cycle = (count, per, o, offset = 0) =>
   o.stride === undefined ? null : (((Math.floor((o.stride / per) * count + offset) % count) + count) % count);
+
+// gunHeight is how far above its place on the ground a unit's weapon is, in the unit's own
+// pixels: what flies fires from where it is drawn, a little under its body, not from the
+// ground beneath it. A shot at it ends at the same height.
+export const gunHeight = (unit) => {
+  const up = sprites.units[unit]?.altitude ?? 0;
+  return up ? Math.max(12, up * METRE - 5) : 12;
+};
 
 // lift raises what flies to its height above its place on the ground, with a slow bob.
 // The shadow is drawn before this, so it stays on the ground.
@@ -803,7 +811,7 @@ export function drawStructurePicture(ctx, kind, { progress = 1, door = "closed",
   const body = (base.spin?.body && sprites.props[base.spin.prop]?.img && sprites.buildings[base.spin.body]) || base;
   const entry = (ruin ? sprites.buildings[`${kind}_ruin`] : stage < stages.length ? sprites.buildings[stages[stage]] : body) ?? base;
   const dark = done && !powered;
-  shadow(ctx, 30, 13, 0.3);
+  if (!base.door?.lift) shadow(ctx, 30, 13, 0.3); // an airfield is a slab on the ground: nothing in its middle to cast one
   drawSprite(ctx, dark ? dimmed(entry) : entry, height, 0);
   const patch = done && base.door?.frames?.[door];
   if (patch?.img) {

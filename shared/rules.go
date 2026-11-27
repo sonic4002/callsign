@@ -141,6 +141,22 @@ type Unit struct {
 	BlastRadius  float64 `json:"blastRadius,omitempty"`
 	RearmSeconds float64 `json:"rearmSeconds,omitempty"`
 	Evade        float64 `json:"evade,omitempty"`
+	// Salvo is a second weapon fired on an order of its own (server/sim/salvo.go), nil
+	// for a unit without one.
+	Salvo *Salvo `json:"salvo,omitempty"`
+}
+
+// Salvo is a load of small missiles a squad fires all at once over a piece of ground,
+// and then waits a long time to load again.
+type Salvo struct {
+	Name          Text    `json:"name"`
+	Missiles      int     `json:"missiles"`      // from each aircraft of the squad
+	Damage        float64 `json:"damage"`        // what one missile does at the middle of its blast
+	BlastRadius   float64 `json:"blastRadius"`   // how far one missile's blast reaches
+	Spread        float64 `json:"spread"`        // the radius of the ground the missiles fall on
+	Range         float64 `json:"range"`         // how near its target the squad flies before it fires
+	ReloadSeconds float64 `json:"reloadSeconds"` // until it can fire again
+	FlightSeconds float64 `json:"flightSeconds"` // from pod to ground
 }
 
 // Strike reports whether squads of this unit are strike aircraft: they fly sorties from
@@ -284,9 +300,15 @@ type Rules struct {
 	Version  int `json:"version"`
 	TickRate int `json:"tickRate"`
 	Match    struct {
-		LengthSeconds  int     `json:"lengthSeconds"`
-		StartGold      int     `json:"startGold"`
-		PopulationCap  int     `json:"populationCap"`
+		LengthSeconds int `json:"lengthSeconds"`
+		StartGold     int `json:"startGold"`
+		PopulationCap int `json:"populationCap"`
+		// PopulationCaps is how far a match's maker may raise the cap: the highest it goes
+		// on a map with at least so many points (the last step that fits a map is its limit).
+		PopulationCaps []struct {
+			Points int `json:"points"`
+			Max    int `json:"max"`
+		} `json:"populationCaps"`
 		CaptureSeconds float64 `json:"captureSeconds"`
 		CaptureRadius  float64 `json:"captureRadius"`
 		HoldRadius     float64 `json:"holdRadius"`
@@ -386,7 +408,7 @@ type Rules struct {
 	TechBuildings map[string]Structure `json:"techBuildings"`
 	// SuperPowers are the strategic and tactical super weapons players can choose from.
 	SuperPowers []SuperPower `json:"superPowers,omitempty"`
-	Radio         struct {
+	Radio       struct {
 		Marker  Text            `json:"marker"`
 		Over    Text            `json:"over"`
 		Out     Text            `json:"out"`
@@ -460,6 +482,18 @@ func (r *Rules) ForMap(id string) (*Rules, error) {
 	c := *r
 	c.Map = *m
 	return &c, nil
+}
+
+// PopulationCapMax is the most squads a side a match's maker may allow on a map: more on a
+// map with more points. Never below the usual cap.
+func (r *Rules) PopulationCapMax(m *Map) int {
+	top := r.Match.PopulationCap
+	for _, step := range r.Match.PopulationCaps {
+		if len(m.Points) >= step.Points && step.Max > top {
+			top = step.Max
+		}
+	}
+	return top
 }
 
 // MapIDs lists the maps, smallest first.
@@ -596,6 +630,9 @@ func (r *Rules) check() error {
 			}
 			if _, ok := r.Callsigns.Classes[u.CallClass()]; !ok && u.Class != HaulerClass {
 				return fmt.Errorf("unit %s has unknown callsign %q", id, u.Callsign)
+			}
+			if sv := u.Salvo; sv != nil && (sv.Name.En == "" || sv.Name.He == "" || sv.Missiles <= 0 || sv.Damage <= 0 || sv.BlastRadius <= 0 || sv.Spread <= 0 || sv.Range <= 0 || sv.ReloadSeconds <= 0 || sv.FlightSeconds <= 0 || u.Strike()) {
+				return fmt.Errorf("unit %s has a bad salvo", id)
 			}
 			if u.Hero && (u.Teams != 1 || u.Members != 1) {
 				return fmt.Errorf("hero %s must be a squad of one", id)

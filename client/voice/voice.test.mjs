@@ -257,17 +257,22 @@ test("careful tidying respells a map point only when it is plainly that point", 
   rules.map = rules.maps.large;
   const careful = (text, lang) => tidy(text, { lang, rules, careful: true });
   for (const [lang, text] of [
-    ["he", "סדן, כאן פטיש, קנה עוד כיתת קומנדו ושלח אותה לדוד, עבור."],
     ["he", "סדן, כמה זהב נשאר?"],
     ["he", "סדן, מה קורה עם המשאיות?"],
     ["he", "בז 1, כאן פטיש, סיור מעל הגר ואחר כך חזור לבסיס, סוף."],
-    ["he", "צפע 1, כאן פטיש, יפה מאוד, המשיכו כך, סוף."],
     ["he", "סדן, הוא יצא למסע ארוך"],
     ["en", "Viper 1, this is Hammer. Very good, carry on. Out."],
   ]) {
     assert.equal(careful(text, lang), text);
     assert.notEqual(tidy(text, { lang, rules }), text, "matching by sound does change this one");
   }
+  // A name with a single consonant sound (דוד, יואב, לאה) sounds like any short word, so it
+  // is matched the careful way whoever heard it: "עוד" is not דוד and "יפה" is not יואב.
+  for (const text of ["סדן, כאן פטיש, קנה עוד כיתת קומנדו ושלח אותה לדוד, עבור.", "צפע 1, כאן פטיש, יפה מאוד, המשיכו כך, סוף.", "קרנף 1, כאן פטיש, תחזיקו את העיירה, עבור."]) {
+    assert.equal(careful(text, "he"), text);
+    assert.equal(tidy(text, { lang: "he", rules }), text);
+  }
+  assert.equal(tidy("צפע 1 תקוף את דויד", { lang: "he", rules }), "צפע 1 תקוף את דוד");
   for (const text of ["Anvil, buy me a tank by the yard", "Anvil, call it a victory", "Viper 2 hold the hostel"]) assert.equal(careful(text, "en"), text);
   // The same name in another spelling, in two words, behind a glued letter, or as the letter itself.
   assert.equal(careful("צפע 1 תקוף את קרמל", "he"), "צפע 1 תקוף את כרמל");
@@ -279,6 +284,56 @@ test("careful tidying respells a map point only when it is plainly that point", 
   assert.equal(careful("Hawk 2 hold alfa", "en"), "Hawk 2 hold Alpha");
   // A letter that names no point on this map is left alone.
   assert.equal(careful("צפע 1, כאן פטיש, כיתה ב' נשארת, עבור.", "he"), "צפע 1, כאן פטיש, כיתה ב' נשארת, עבור.");
+});
+
+// The huge map names six more points. Their names are short and plain words lie close to
+// them, so the words of orders and reports are kept apart from them, whoever heard the call.
+test("on the huge map, the six new points are heard and the words of orders are not taken for them", () => {
+  const rules = JSON.parse(readFileSync(new URL("../../shared/rules.json", import.meta.url), "utf8"));
+  rules.map = rules.maps.huge;
+  assert.deepEqual(
+    ["Q", "C", "O", "E", "W", "X"].map((id) => Object.values(rules.map.points.find((p) => p.id === id).callsign).join(" ")),
+    ["Quebec קורח", "Charlie צפורה", "Oscar עין", "Echo חוה", "Whiskey שמיר", "X-ray טיח"],
+  );
+  for (const careful of [false, true]) {
+    const said = (text, lang) => tidy(text, { lang, rules, careful });
+    for (const text of [
+      "צפע 1, כאן פטיש, נועו לקורח, עבור.",
+      "צפע 1 נוע לשמיר",
+      "סדן, כאן פטיש, אין לנו זהב, עבור.",
+      "קרנף 2, כאן פטיש, שמרו על הגשר המערבי, עבור.",
+      "צפע 2, כאן פטיש, דווח מצב, עבור.",
+      "צפע 1, כאן פטיש, תקפו את טיח מימין, עבור.",
+      "בז 1, כאן פטיש, שמונה טנקים על הקרח ליד עין, עבור.",
+      "צפע 1, כאן פטיש, אני רואה אותך, חכה שם, עבור.",
+      "קרנף 1, כאן פטיש, נועו לצפורה ואחר כך לחוה, עבור.",
+    ]) assert.equal(said(text, "he"), text);
+    for (const text of [
+      "Viper 1, this is Hammer. Move to Echo and keep your eyes on each bridge. Over.",
+      "Rhino 2, this is Hammer. Use the road to Charlie. Over.",
+      "Anvil, this is Hammer. Buy six tanks. Over.",
+      "Viper 2, take the assay office north of Tango",
+      "Viper 1 check the mine and seek cover",
+      "Hawk 1 hold X-ray",
+      "Hawk 2, this is Hammer. Attack Whiskey, then Quebec and Oscar. Out.",
+    ]) assert.equal(said(text, "en"), text);
+    // The same names in another spelling, as a recogniser writes them.
+    assert.equal(said("צפע 1 תקוף את קורך", "he"), "צפע 1 תקוף את קורח");
+    assert.equal(said("צפע 2 נוע לציפורה", "he"), "צפע 2 נוע לצפורה");
+    assert.equal(said("צפע 2 החזק בע'", "he"), "צפע 2 החזק בעין");
+    assert.equal(said("צפע 2 נוע לחווה", "he"), "צפע 2 נוע לחוה");
+    assert.equal(said("Viper 1 hold x ray", "en"), "Viper 1 hold X-ray");
+    assert.equal(said("Viper 1 hold xray", "en"), "Viper 1 hold X-ray");
+    assert.equal(said("Hawk 1 attack whisky", "en"), "Hawk 1 attack Whiskey");
+    assert.equal(said("Hawk 1 attack quebeck", "en"), "Hawk 1 attack Quebec");
+    assert.equal(said("Hawk 1 attack oskar", "en"), "Hawk 1 attack Oscar");
+  }
+  // Every place of the map keeps its own name: a pass, an orchard or a gate is no callsign.
+  for (const p of rules.map.points) {
+    for (const lang of ["en", "he"]) {
+      for (const careful of [false, true]) assert.equal(tidy(p.name[lang], { lang, rules, careful }).toLowerCase(), p.name[lang].toLowerCase(), p.name[lang]);
+    }
+  }
 });
 
 test("gold is not a map point: a call for a gold truck keeps its words", () => {

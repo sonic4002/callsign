@@ -17,9 +17,16 @@ const notPlaces = new Set(["kill", "hold", "gold", "go", "hot", "hit", "all", "o
   // The words a place is described with: "the grove north of Foxtrot" is not "the Golf north of Foxtrot".
   "grove", "trees", "tree", "wood", "woods", "house", "building", "bunker", "ruin", "ruins", "rocks", "rock", "wall", "rubble", "bridge", "field", "cover", "inside", "enemy",
   "north", "south", "east", "west", "of", "metres", "meters",
-  "חורשה", "עצים", "עץ", "בית", "בניין", "בונקר", "חורבה", "סלעים", "סלע", "חומה", "הריסות", "גשר", "מחסה", "אויב", "צפון", "דרום", "מזרח", "מערב", "צפונית", "דרומית", "מזרחית", "מערבית", "מטר",
+  "חורשה", "עצים", "עץ", "בית", "בניין", "בונקר", "חורבה", "סלעים", "סלע", "חומה", "הריסות", "גשר", "מחסה", "אויב", "צפון", "דרום", "מזרח", "מערב", "צפונית", "דרומית", "מזרחית", "מערבית", "צפוני", "דרומי", "מזרחי", "מערבי", "מטר",
   // Selling and repairing a structure, and power: order words, never a place.
-  "sell", "repair", "power", "radar", "מכור", "מכרו", "למכור", "תקן", "תקנו", "לתקן", "חשמל", "כוח", "תחנת", "שלנו"]);
+  "sell", "repair", "power", "radar", "מכור", "מכרו", "למכור", "תקן", "תקנו", "לתקן", "חשמל", "כוח", "תחנת", "שלנו",
+  // Words of orders and reports that sound like a point of the huge map: none (אין) is not
+  // עין, report (דווח) and range (טווח) are not טיח, guard (שמור) and left (שמאל) are not שמיר,
+  // ice (קרח) and ground (קרקע) are not קורח, a number (מספר) is not צפורה; six is not
+  // Whiskey, and each, eyes and the assay office are not Echo.
+  "אין", "עוין", "דווח", "דווחו", "דיווח", "מדווח", "טווח", "תוך", "דקה", "דקות", "בטוח", "תותח", "אותך", "שמור", "שמרו", "שומר", "שמירה", "שמאל", "שמאלה",
+  "קרח", "הקרח", "קרקע", "הקרקע", "חלק", "מספר", "ספר", "הסבר", "שביל",
+  "six", "siege", "seek", "check", "sick", "each", "eye", "eyes", "easy", "use", "uses", "used", "assay", "office", "ray"]);
 
 // sound reduces a word to rough consonant classes, so "vapour" and "viper" come out alike.
 export function sound(word, lang) {
@@ -148,6 +155,12 @@ function contacts(body, lang, rules) {
 // it sounds roughly like it.
 function placeNames(body, lang, rules, careful = false) {
   const points = rules.map.points.map((p) => p.callsign[lang]);
+  // A name written with a hyphen ("X-ray") is heard as one word or as two: it gets the
+  // map's spelling here, and its halves are left alone below.
+  for (const name of points.filter((p) => /[^A-Za-zא-ת]/.test(p))) {
+    const loose = name.split(/[^A-Za-zא-ת]+/).join("[\\s-]?");
+    body = body.replace(new RegExp(`(^|[^A-Za-zא-ת])${loose}(?![A-Za-zא-ת])`, "gi"), (all, lead) => lead + name);
+  }
   if (lang === "he") {
     body = body.replace(/(^|[\s,.:;])([בלמהו]?)([א-ת])['׳](?=$|[\s,.:;!?])/g, (all, lead, glue, letter) => (points.includes(letters[letter]) ? lead + glue + letters[letter] : all));
   }
@@ -165,10 +178,15 @@ function placeNames(body, lang, rules, careful = false) {
     ),
   );
   const known = (word) => notPlaces.has(word.toLowerCase()) || stations.has(word.toLowerCase());
+  // A name with one consonant sound or none (עין, חוה, דוד) sounds like half the language
+  // ("נועו", "אני", "קחו", "אתה"), so its rough sound is no evidence: such a name is
+  // matched the careful way even in text from a small model.
+  const weak = new Set(points.filter((p) => sound(p, lang).length < 2));
+  const likeness = (word, p) => (weak.has(p) ? Number(sameName(word, p, lang)) : similarity(word, p, lang));
   const match = (word) => {
     if (word.length < 3 || known(word)) return null;
     if (careful) return points.find((p) => sameName(word, p, lang)) ?? null;
-    const best = points.map((p) => [similarity(word, p, lang), p]).sort((a, b) => b[0] - a[0])[0];
+    const best = points.map((p) => [likeness(word, p), p]).sort((a, b) => b[0] - a[0])[0];
     return best[0] >= 0.75 ? best[1] : null;
   };
   // Words and what lies between them, kept apart so the punctuation survives.

@@ -129,9 +129,10 @@ type Options struct {
 	Speed         string // how fast the match's clock runs, "" for normal (see Speeds)
 	Purse         bool   // the operators may buy on their own from the start
 	Map           string // the map id, "" for the default
-	StartGold   int    // gold each side starts with, 0 for the rules default
-	SuperPowers string // "0", "1".."4", "all" ("" defaults to "2")
-	Anvil       int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
+	StartGold     int    // gold each side starts with, 0 for the rules default
+	Units         int    // the most squads a side may field, 0 for the rules default
+	SuperPowers   string // "0", "1".."4", "all" ("" defaults to "2")
+	Anvil         int    // the rule-brain operator's initiative, 1 to 3; 0 for the server's usual
 	Fast          *bool  // squads take orders through the fast decision model; nil for the server's usual
 }
 
@@ -236,6 +237,15 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if o.StartGold != 0 && (o.StartGold < MinStartGold || o.StartGold > MaxStartGold) {
 		return nil, 0, "", fmt.Errorf("a match starts with %d to %d gold", MinStartGold, MaxStartGold)
 	}
+	if o.Units != 0 {
+		m := h.r.Maps[o.Map]
+		if m == nil {
+			m = h.r.Maps[shared.DefaultMap]
+		}
+		if low, top := h.r.Match.PopulationCap, h.r.PopulationCapMax(m); o.Units < low || o.Units > top {
+			return nil, 0, "", fmt.Errorf("a side fields %d to %d squads on this map", low, top)
+		}
+	}
 	_, _, spNorm, spOK := sim.ParseSuperPowers(o.SuperPowers, len(h.r.SuperPowers))
 	if !spOK {
 		return nil, 0, "", errors.New("super powers must be 0, 1, 2, 3, 4 or all")
@@ -264,11 +274,12 @@ func (h *Hub) Create(o Options) (*Room, int, string, error) {
 	if lesson {
 		length, o.Watch = lessonSeconds, false // nobody is hurried, and nobody watches
 		o.Map = ""                             // the lesson is written for the small map
-		spNorm = "0"                           // lessons stay focused on fundamentals
+		o.Units = 0
+		spNorm = "0" // lessons stay focused on fundamentals
 	}
 	cfg := Config{
 		Factions: h.cfg.Factions, LengthSeconds: length, Seats: true, FullBase: h.cfg.FullBase, Base: h.cfg.Base,
-		Map: o.Map, StartGold: o.StartGold, SuperPowers: spNorm,
+		Map: o.Map, StartGold: o.StartGold, SuperPowers: spNorm, Units: o.Units,
 		Opponent: o.Opponent, Watch: o.Watch, AgentKey: h.cfg.AgentKey, Tutorial: lesson, Speed: o.Speed, Purse: o.Purse,
 		Anvil: o.Anvil, Fast: fast && !lesson, // a lesson spends nothing
 	}
@@ -478,7 +489,8 @@ func (h *Hub) mapList() []map[string]any {
 	out := []map[string]any{}
 	for _, id := range h.r.MapIDs() {
 		m := h.r.Maps[id]
-		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points), "length": m.LengthSeconds})
+		out = append(out, map[string]any{"id": id, "name": m.Name, "width": m.Width, "height": m.Height, "points": len(m.Points), "length": m.LengthSeconds,
+			"units": []int{h.r.Match.PopulationCap, h.r.PopulationCapMax(m)}}) // the squads a side may field: the usual cap, and how far it can be raised here
 	}
 	return out
 }
@@ -490,37 +502,38 @@ func (h *Hub) getServer(w http.ResponseWriter, _ *http.Request) {
 		length = h.r.Match.LengthSeconds
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"factions":   h.cfg.Factions, // side 0, side 1
-		"bot":        h.cfg.Bot != "",
-		"levels":     BotLevels,    // the scripted enemies on offer, easiest first
-		"level":      h.usualBot(), // the one the lobby starts on
-		"length":     length,
+		"factions":          h.cfg.Factions, // side 0, side 1
+		"bot":               h.cfg.Bot != "",
+		"levels":            BotLevels,    // the scripted enemies on offer, easiest first
+		"level":             h.usualBot(), // the one the lobby starts on
+		"length":            length,
 		"startGolds":        StartGolds, // the starting gold on offer; any amount within the limits is taken
 		"startGold":         h.r.Match.StartGold,
 		"goldLimits":        []int{MinStartGold, MaxStartGold},
 		"superPowers":       SuperPowerModes,
 		"superPowerDefault": "2",
-		"speeds":     Speeds,      // the paces on offer, slowest first
-		"speed":      SpeedNormal, // the one the lobby starts on
-		"maps":       h.mapList(), // the maps on offer, smallest first
-		"share":      strings.TrimRight(h.cfg.Share, "/"),
-		"open":       h.open != nil,       // the open room of a server without an agent key
-		"locked":     h.cfg.HostKey != "", // making a match needs the host's password
-		"stt":        h.listen != nil,     // spoken calls can be transcribed here instead of in the browser
+		"speeds":            Speeds,      // the paces on offer, slowest first
+		"speed":             SpeedNormal, // the one the lobby starts on
+		"maps":              h.mapList(), // the maps on offer, smallest first
+		"share":             strings.TrimRight(h.cfg.Share, "/"),
+		"open":              h.open != nil,       // the open room of a server without an agent key
+		"locked":            h.cfg.HostKey != "", // making a match needs the host's password
+		"stt":               h.listen != nil,     // spoken calls can be transcribed here instead of in the browser
 	})
 }
 
 func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Opponent  string `json:"opponent"`
-		Side      *int   `json:"side"`
-		Length    int    `json:"length"`
-		Watch     bool   `json:"watch"`
-		Bot       string `json:"bot"`
-		Speed     string `json:"speed"`
-		Purse     bool   `json:"purse"`
+		Opponent    string `json:"opponent"`
+		Side        *int   `json:"side"`
+		Length      int    `json:"length"`
+		Watch       bool   `json:"watch"`
+		Bot         string `json:"bot"`
+		Speed       string `json:"speed"`
+		Purse       bool   `json:"purse"`
 		Map         string `json:"map"`
 		StartGold   int    `json:"startGold"`
+		Units       int    `json:"units"`
 		SuperPowers string `json:"superPowers"`
 		Anvil       int    `json:"anvil"`
 		Fast        *bool  `json:"fast"`
@@ -536,7 +549,7 @@ func (h *Hub) postRoom(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": ErrHostOnly.Error()})
 		return
 	}
-	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, SuperPowers: in.SuperPowers, Anvil: in.Anvil, Fast: in.Fast}
+	o := Options{Opponent: in.Opponent, Side: -1, LengthSeconds: in.Length, Watch: in.Watch, Bot: in.Bot, Speed: in.Speed, Purse: in.Purse, Map: in.Map, StartGold: in.StartGold, SuperPowers: in.SuperPowers, Units: in.Units, Anvil: in.Anvil, Fast: in.Fast}
 	if in.Side != nil {
 		o.Side = *in.Side
 	}

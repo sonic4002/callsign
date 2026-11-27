@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the three maps into shared/rules.json.
+"""Writes the four maps into shared/rules.json.
 
     python3 tools/mapgen.py            # rewrite the "maps" block of shared/rules.json
     python3 tools/mapgen.py --show     # print each map as text and change nothing
@@ -21,7 +21,11 @@ CALLSIGNS = {
     "H": ("Hotel", "הגר"), "F": ("Foxtrot", "פסל"), "K": ("Kilo", "כרמל"), "S": ("Sierra", "סמך"),
     "Z": ("Zulu", "זאב"), "L": ("Lima", "לאה"), "M": ("Mike", "משה"), "N": ("November", "נשר"),
     "T": ("Tango", "תמר"), "Y": ("Yankee", "יואב"), "V": ("Victor", "ואו"),
+    "Q": ("Quebec", "קורח"), "C": ("Charlie", "צפורה"), "O": ("Oscar", "עין"), "E": ("Echo", "חוה"),
+    "W": ("Whiskey", "שמיר"), "X": ("X-ray", "טיח"),
 }
+# Other ways a callsign gets written, which name the point as well.
+SPELLINGS = {"X": ["xray", "x ray"]}
 
 # Compass bearings, clockwise from north, as (dx, dy) with y growing south.
 BEARINGS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
@@ -108,7 +112,7 @@ class Map:
         self.points.append({
             "id": pid, "kind": kind, "owner": owner, "x": x, "y": y,
             "callsign": {"en": en, "he": he}, "name": {"en": name[0], "he": name[1]},
-            "aliases": [en.lower(), he] + aliases,
+            "aliases": [en.lower(), he] + SPELLINGS.get(pid, []) + aliases,
         })
 
     def pair(self, west, east, kind, x, y, name, aliases, owners=(-1, -1), east_name=None, east_aliases=None):
@@ -347,10 +351,14 @@ class Map:
         for m in self.landmarks():
             rows[int(m["y"] // CELL)][int(m["x"] // CELL)] = m["kind"][0]
         for t in self.tech_sites():
-            rows[int(t["y"] // CELL)][int(t["x"] // CELL)] = "T"
+            rows[int(t["y"] // CELL)][int(t["x"] // CELL)] = "+"
+        for f in self.fields:
+            rows[int(f["y"] // CELL)][int(f["x"] // CELL)] = "$"
         for p in self.points:
             rows[int(p["y"] // CELL)][int(p["x"] // CELL)] = p["id"]
-        print(f"{self.key}: {self.name[0]}  {self.w}x{self.h}  {len(self.points)} points, {len(self.bridges)} bridges, {len(self.landmarks())} landmarks")
+        print(f"{self.key}: {self.name[0]}  {self.w}x{self.h}  {len(self.points)} points, {len(self.fields)} gushers, {len(self.bridges)} bridges, "
+              f"{len(self.landmarks())} landmarks, {len(self.tech_sites())} tech buildings")
+        print("  . land  ~ water  = ice  ^ mountain  # bridge  A-Z point  $ gusher away from its point  + tech building  small letter: landmark")
         print("\n".join("".join(row) for row in rows))
 
 
@@ -604,6 +612,169 @@ def large():
     return m
 
 
+def huge():
+    """Great Moat: a river from one edge to the other, with a town on a moated island in
+    its middle. Five ways across: over the glacier behind the northern range, down the
+    north road between the range and the moat, through the island by its west and east
+    bridges (or onto it from the north over the frozen moat), and through the south
+    country, which the far bridges and the island's south bridges lead to. Boats sail the
+    river and the moat, and round both ends of the map to the sea in the south."""
+    m = Map("huge", ("Great Moat", "החפיר הגדול"), 170, 105, minutes=30, pace=2.5)
+    m.cells(0, 64, 85, 67, "W")              # the river, from edge to edge
+    m.cells(30, 65, 52, 68, "W")             # it swings south between the far bridge and the island
+    m.cells(30, 64, 52, 65, "L")
+    m.cells(63, 31, 66, 67, "W")             # the moat: the island's west side
+    m.cells(63, 31, 85, 34, "W")             # and its north side
+    m.cells(78, 31, 85, 34, "I")             # frozen in the middle
+    m.oval(300, 2700, 500, 140, "W")         # a harbour on the river below each base, for its dockyard
+    m.cells(0, 67, 3, 96, "W")               # the river's mouth runs down the edge of the map
+    m.cells(0, 96, 85, 105, "W")             # to the sea in the south
+    m.oval(0, 4000, 620, 560, "W")           # a bay where they meet
+    m.oval(2300, 3900, 260, 130, "W")        # a bight in the south shore
+    m.cells(58, 13, 85, 20, "M")             # the northern range
+    for x, y, rx, ry in ((2420, 660, 190, 210), (3020, 640, 170, 190), (3400, 700, 200, 170)):
+        m.oval(x, y, rx, ry, "M")            # its shoulders
+    m.cells(65, 11, 70, 22, "L")             # the pass through it, on each side
+    m.oval(3400, 0, 700, 300, "I")           # the glacier behind it
+    m.oval(0, 0, 460, 220, "M")              # the corner hills
+    m.oval(1380, 1020, 120, 170, "M")        # the western hills, between the north field and the fort
+    m.oval(1440, 1240, 90, 120, "M")
+    m.oval(1240, 1620, 100, 160, "M")        # the ridge between a base and its village
+    m.oval(2180, 2320, 140, 80, "M")         # a spur above the river
+    m.oval(860, 1420, 110, 70, "M")          # a knoll between a base and its north field
+    m.oval(2080, 1460, 150, 110, "I")        # a frozen pond on the way to the north road
+    m.oval(520, 1340, 120, 80, "I")          # and one behind each base
+    m.oval(3080, 1560, 130, 80, "M")         # the hills of the island, north and south of its gates
+    m.oval(3080, 2360, 130, 80, "M")
+    m.oval(1560, 3600, 190, 90, "M")         # the hills of the south country
+    m.oval(2720, 3100, 110, 150, "M")
+    m.oval(420, 3080, 130, 90, "M")
+    m.oval(1480, 3020, 120, 80, "I")         # a frozen pond in the south country
+    m.mirror()
+    hqs(m, 440, 2160)
+    m.pair("B", "K", "landRig", 900, 880, ("North-west field", "השדה הצפון-מערבי"), ["the north-west field", "north-west field", "השדה הצפון-מערבי"],
+           east_name=("North-east field", "השדה הצפון-מזרחי"), east_aliases=["the north-east field", "north-east field", "השדה הצפון-מזרחי"])
+    m.pair("D", "H", "landRig", 900, 3320, ("South-west field", "השדה הדרום-מערבי"), ["the south-west field", "south-west field", "השדה הדרום-מערבי"],
+           east_name=("South-east field", "השדה הדרום-מזרחי"), east_aliases=["the south-east field", "south-east field", "השדה הדרום-מזרחי"])
+    m.pair("L", "M", "point", 1720, 2100, ("West village", "הכפר המערבי"), ["the west village", "west village", "הכפר המערבי"],
+           east_name=("East village", "הכפר המזרחי"), east_aliases=["the east village", "east village", "הכפר המזרחי"])
+    m.pair("T", "Y", "point", 1860, 620, ("West fort", "המבצר המערבי"), ["the west fort", "west fort", "המבצר המערבי"],
+           east_name=("East fort", "המבצר המזרחי"), east_aliases=["the east fort", "east fort", "המבצר המזרחי"])
+    m.pair("Q", "C", "point", 2700, 660, ("West pass", "המעבר המערבי"), ["the west pass", "west pass", "המעבר המערבי"],
+           east_name=("East pass", "המעבר המזרחי"), east_aliases=["the east pass", "east pass", "המעבר המזרחי"])
+    m.pair("O", "E", "point", 2140, 3320, ("West orchard", "הפרדס המערבי"), ["the west orchard", "west orchard", "הפרדס המערבי"],
+           east_name=("East orchard", "הפרדס המזרחי"), east_aliases=["the east orchard", "east orchard", "הפרדס המזרחי"])
+    m.pair("W", "X", "point", 2860, 1960, ("West gate", "השער המערבי"), ["the west gate", "west gate", "השער המערבי"],
+           east_name=("East gate", "השער המזרחי"), east_aliases=["the east gate", "east gate", "השער המזרחי"])
+    m.point("N", "point", 3400, 160, ("Glacier", "הקרחון"), ["the glacier", "glacier", "הקרחון", "קרחון"])
+    m.point("G", "point", 3400, 1040, ("Mine", "המכרה"), ["the mine", "mine", "המכרה", "מכרה"])
+    m.point("F", "point", 3400, 1960, ("Town", "העיירה"), ["the town", "town", "העיירה", "עיירה"])
+    m.point("V", "point", 3400, 3560, ("Lighthouse", "המגדלור"), ["the lighthouse", "lighthouse", "המגדלור", "מגדלור"])
+    m.point("S", "seaRig", 3400, 4020, ("Sea rig", "האסדה הימית"), ["the sea rig", "sea rig", "האסדה הימית", "אסדה ימית"])
+    m.bridge("bridge-far-west", ("the far west bridge", "הגשר המערבי הרחוק"), (1000, 2560), (1000, 2680),
+             mirrored=("bridge-far-east", ("the far east bridge", "הגשר המזרחי הרחוק")))
+    m.bridge("bridge-west", ("the west bridge", "הגשר המערבי"), (2520, 1960), (2640, 1960),
+             mirrored=("bridge-east", ("the east bridge", "הגשר המזרחי")))
+    m.bridge("bridge-south-west", ("the south-west bridge", "הגשר הדרום-מערבי"), (3000, 2560), (3000, 2680),
+             mirrored=("bridge-south-east", ("the south-east bridge", "הגשר הדרום-מזרחי")))
+    m.gusher("A", 800, 1980, east="Z")       # a home field close to each headquarters
+    m.gusher("B", east="K")                  # the fields up north
+    m.gusher("D", poor=True, east="H")       # a small one across the river
+    m.gusher("O", poor=True, east="E")       # and another deeper in the south country
+    m.gusher("F", rich=True)                 # the rich ones: in the town on the island,
+    m.gusher("G", rich=True)                 # at the mine on the north road,
+    m.gusher("V", rich=True)                 # and by the lighthouse on the south shore
+    m.around("A", [("wall", "E", 100), ("grove", "N", 100), ("rocks", "S", 100)])
+    m.around("B", [("rocks", "E", 62), ("ruin", "W", 58), ("grove", "S", 90)])
+    m.around("D", [("rocks", "N", 62), ("ruin", "E", 58), ("grove", "W", 80)])
+    m.around("L", [("house", "N", 54), ("house", "S", 54), ("wall", "E", 64), ("grove", "W", 80)])
+    m.around("T", [("bunker", "N", 56), ("wall", "E", 62), ("rocks", "S", 64)])
+    m.around("Q", [("bunker", "N", 60), ("rocks", "S", 60)])
+    m.around("O", [("house", "N", 56), ("grove", "E", 70), ("grove", "SW", 80)])
+    m.around("W", [("wall", "W", 60), ("house", "N", 60), ("house", "S", 60)])
+    m.around("G", [("ruin", "N", 58), ("rocks", "SW", 70)])
+    m.around("F", [("house", "N", 56), ("house", "S", 56), ("rocks", "NW", 64), ("house", "SW", 80)])
+    m.around("V", [("house", "N", 54), ("rocks", "W", 70)])
+    m.mark("ruin", 560, 300)                 # the north-west corner
+    m.mark("grove", 300, 520)
+    m.mark("grove", 420, 600)
+    m.mark("grove", 240, 760)
+    m.mark("rocks", 1040, 300)
+    m.mark("house", 1400, 340)               # the hamlet on the way to the fort
+    m.mark("house", 1480, 420)
+    m.mark("grove", 1100, 620)
+    m.mark("rocks", 600, 1040)
+    m.mark("grove", 300, 1100)
+    m.mark("house", 700, 1200)
+    m.mark("ruin", 1160, 1340)
+    m.mark("rocks", 200, 1500)
+    m.mark("ruin", 1960, 260)                # the way round the range to the glacier
+    m.mark("rocks", 2560, 320)
+    m.mark("grove", 2800, 300)
+    m.mark("bunker", 3000, 420)
+    m.mark("grove", 1620, 860)               # below the fort
+    m.mark("house", 2060, 880)
+    m.mark("grove", 2300, 1000)
+    m.mark("rocks", 1700, 1160)
+    m.mark("bunker", 2360, 1260)
+    m.mark("ruin", 1820, 1380)
+    m.mark("grove", 2620, 1120)              # the north road
+    m.mark("bunker", 2900, 1000)
+    m.mark("house", 3180, 900)
+    m.mark("wall", 3100, 1140)
+    m.mark("ruin", 160, 1660)                # round each base
+    m.mark("grove", 700, 1700)
+    m.mark("rocks", 1000, 1780)
+    m.mark("house", 1000, 2240)
+    m.mark("house", 1060, 2440)              # the far west bridgehead
+    m.mark("grove", 150, 2380)
+    m.mark("rocks", 1640, 1640)              # between a base and its village
+    m.mark("grove", 1460, 1900)
+    m.mark("house", 1340, 2100)
+    m.mark("rocks", 1500, 2320)
+    m.mark("grove", 1200, 2480)
+    m.mark("grove", 1900, 2460)
+    m.mark("house", 1980, 1880)              # the road to the west bridge
+    m.mark("grove", 2300, 1760)
+    m.mark("ruin", 2380, 1620)
+    m.mark("wall", 2440, 1900)               # the west bridgehead
+    m.mark("house", 2420, 2080)
+    m.mark("rocks", 2400, 2460)
+    m.mark("grove", 2760, 1460)              # the island
+    m.mark("grove", 2760, 1700)
+    m.mark("rocks", 2740, 2200)
+    m.mark("ruin", 2780, 2440)
+    m.mark("house", 3120, 1800)
+    m.mark("wall", 3160, 1960)
+    m.mark("house", 3140, 2120)
+    m.mark("grove", 3300, 1480)
+    m.mark("rocks", 3300, 2420)
+    m.mark("bunker", 3400, 1440)             # its north shore, facing the frozen moat
+    m.mark("wall", 3400, 2500)               # and its south shore
+    m.mark("house", 1000, 2800)              # the south country: the far west bridgehead
+    m.mark("ruin", 300, 3300)
+    m.mark("grove", 560, 3560)
+    m.mark("rocks", 1240, 3000)
+    m.mark("grove", 1200, 3500)
+    m.mark("ruin", 1300, 3780)
+    m.mark("grove", 1800, 2900)
+    m.mark("house", 1740, 3340)
+    m.mark("rocks", 1900, 3740)
+    m.mark("house", 2400, 2820)
+    m.mark("ruin", 2420, 3180)
+    m.mark("grove", 2520, 3520)
+    m.mark("rocks", 2960, 2800)              # the south-west bridgehead
+    m.mark("wall", 3060, 2880)
+    m.mark("house", 3100, 3300)
+    m.mark("grove", 3000, 3700)
+    m.mark("grove", 3260, 3040)
+    m.mark("ruin", 3400, 2900)
+    m.tech("tech_goldworks", 2300, 300)      # at each end of the glacier
+    m.tech("tech_clinic", 2280, 2060)        # between each village and its bridge
+    m.tech("tech_garage", 1500, 3260)        # in the south country
+    return m
+
+
 def write(maps):
     """Replaces the "maps" value in rules.json, keeping the rest of the file as written."""
     path = ROOT / "shared" / "rules.json"
@@ -633,7 +804,7 @@ def write(maps):
 
 
 if __name__ == "__main__":
-    built = [small(), medium(), large()]
+    built = [small(), medium(), large(), huge()]
     if "--show" in sys.argv:
         for m in built:
             m.check()

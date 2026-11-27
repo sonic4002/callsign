@@ -13,7 +13,7 @@ tags:
   - topic/units
   - topic/air
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -65,6 +65,10 @@ Strike aircraft are squads of planes that stand at an airbase, fly a sortie to b
 | `noCapture` | true | true |
 
 A unit is a strike aircraft when `bombs > 0` (`Unit.Strike()` in `shared/rules.go`).
+
+## Four planes to an airbase
+
+An airbase holds four planes (`planes` on the airbase structure, with a pad for each in `pads`), by the owner's order of 2026-11-27 ("limit each airfield to 4 airplanes"). A squad's planes each take a pad: two strike-jet squads fill an Airbase, and one prop-bomber squad of three fills a Launch Yard (a second squad of three does not fit beside it). A squad is made only at an airbase with pads free for all its planes; with none, the purchase is refused ("every airbase is full of planes: build another"). Helicopters and drone swarms take no pad. Planes whose airbase falls are taken in by another airbase even over its number, rather than lost, and stand in a second row behind its pads; that airbase makes no new planes while it is over.
 
 ## How a sortie goes
 

@@ -75,6 +75,11 @@ export const plantTool = tool("plant", "Set a demolition charge. You walk to the
 export const seizeTool = tool("seize", "Take over an enemy vehicle squad in sight. You close with it and, after a few seconds near it, it fights for your side with a leader of its own, for as long as you live and stay near it. One at a time.", {
   contact: { type: "integer", description: "The enemy vehicle squad's contact id from your status." },
 });
+// A unit with missile pods (the attack helicopter) has a salvo beside its gun.
+export const salvoTool = tool("salvo", "Fire your squad's missile salvo: every aircraft empties its pods over a place, many small missiles that fall scattered across the ground around it and hit whatever of the enemy's is there. You fly to within range first and hold where you fired. The pods then take minutes to load again; your status shows `salvo.ready` (1 when loaded) and `salvo.wait` (seconds left).", {
+  place: { type: "string", description: 'Where the missiles fall: a point ("F"), a landmark, a bridge, an enemy structure by its id ("s7") or name, or an offset from a point ("N of F 100"). Leave empty when you give `contact`.' },
+  contact: { type: "integer", description: "An enemy squad in sight, by its contact id from your status, instead of a place." },
+});
 
 // A strike aircraft squad's orders are the same three tools with other meanings
 // (server/sim/sortie.go): it flies sorties and stands nowhere but at its airbase.
@@ -101,6 +106,7 @@ export const leaderToolsFor = (unit) => unit?.bombs > 0 ? strikeTools : [
   ...(unit?.class === "infantry" && unit.domain === "land" && !unit.hero ? [fortifyTool] : []),
   ...(unit?.chargeDamage > 0 ? [plantTool] : []),
   ...(unit?.seizeRadius > 0 ? [seizeTool] : []),
+  ...(unit?.salvo ? [salvoTool] : []),
 ];
 
 export const operatorTools = [

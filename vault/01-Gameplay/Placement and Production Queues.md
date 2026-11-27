@@ -13,7 +13,7 @@ tags:
   - topic/structures
   - topic/production
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -80,7 +80,7 @@ A fence is bought as a run of segments (Barrier Wall 6 x 50, Wire Fence 8 x 50).
 
 ## Rally points
 
-`CmdRally` sets where new units gather: for every structure of the side, or for one. The written place `home` (`RallyDefault`) puts them back beside their structure, each in its own spot a short way out of the door. A structure built later inherits the side's rally point.
+`CmdRally` sets where new units gather: for every structure of the side, or for one. The written place `home` (`RallyDefault`) puts them back beside their structure, each in its own spot a short way out of the door. A structure built later inherits the side's rally point. The place may be a named point, a landmark, a bridge, a tech building, or any spot on open ground written as an offset from the nearest point ("S60 W80 of B"); since 2026-11-27 the page sends that form when the player taps open ground while setting a rally point.
 
 ## Who may do these things
 

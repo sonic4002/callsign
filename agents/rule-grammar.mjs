@@ -78,6 +78,11 @@ export const leaderWords = {
     en: ["plant", "demolish", "demolition", "blow up", "blow", "charge"],
     he: ["הנח", "הניחו", "מטען", "פוצץ", "פוצצו", "לפוצץ", "תפוצצ"],
   },
+  // The missile salvo of a unit that carries one (the attack helicopter's honeycomb pods).
+  salvo: {
+    en: ["honeycomb", "honey comb", "salvo", "missiles", "missile", "rockets", "rocket", "barrage", "pods"],
+    he: ["חלת דבש", "חלת הדבש", "מטח", "טילים", "טילי", "רקטות"],
+  },
   seize: {
     en: ["seize", "hijack", "take over", "steal"],
     he: ["השתלט", "להשתלט", "תשתלט", "חטוף", "חטפו", "תחטפ"],
@@ -319,6 +324,8 @@ export const intents = {
   fortify: () => tool("dig", "dig", "fortify", {}),
   plant: (place) => tool(`plant:${place}`, "plant", "plant", { place }),
   seize: (contact) => tool(`seize:${contact}`, "seize", "seize", { contact }),
+  salvo: (place, label = `salvo:${place}`) => tool(label, "salvo", "salvo", { place, contact: 0 }),
+  salvoContact: (contact) => tool(`salvo:target:${contact}`, "salvo", "salvo", { place: "", contact }),
   say: (label, key, vars = {}, end = "over") => ({ label, kind: "say", say: { key, vars, end } }),
   negative: (why, vars = {}) => ({ label: `negative:${why}`, kind: "say", say: { key: "negative", vars, why: `why.${why}`, end: "over" } }),
   report: () => ({ label: "report", kind: "report" }),
@@ -400,7 +407,7 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
     return intents.unclear("sayAgainWhat", { verb: "verb.repair" });
   }
 
-  const acting = ["attack", "move", "hold", "fallBack", "cover", "enter", "leave", "stop"].some(has);
+  const acting = ["attack", "move", "hold", "fallBack", "cover", "enter", "leave", "stop"].some(has) || (unit.salvo && has("salvo"));
   if (has("report") && !acting) return intents.report();
 
   // Where the order points. Two points joined by "or" are a question back, not a choice of ours.
@@ -420,6 +427,17 @@ export function understandLeader({ call, status, rules, agent, level = 1 }) {
   if (escort) {
     const field = point ?? workedField(status, rules, agent.side);
     return intents.hold(field, `hold:${field}`);
+  }
+  // A unit with missile pods fires them over what the call names, whatever other verb it uses.
+  if (unit.salvo && has("salvo")) {
+    if (theirs) return intents.salvo(theirs.id);
+    if (named) return intents.salvoContact(named);
+    if (marks.length > 1) return which(marks);
+    if (marks.length === 1) return intents.salvo(marks[0], `salvo:lm:${marks[0]}`);
+    if (offPoint) return intents.salvo(call.body, "salvo:spot");
+    if (point) return intents.salvo(point);
+    if (enemyHome.test(text)) return intents.salvo(enemyHQ);
+    return intents.unclear("sayAgainWhere", { verb: "verb.salvo" });
   }
   if (has("attack")) {
     if (theirs) return intents.attack(theirs.id);

@@ -13,7 +13,7 @@ tags:
   - topic/map
   - topic/rendering
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -119,6 +119,10 @@ The server sends which cells this side has ever seen (`state.fog`: `cell`, `cols
 ## Labels
 
 Name plates are drawn above the fog: each point as `<letter> · <callsign>` in the page language with its name and income below; tech buildings with what holding them gives; enemy structures by name; own squads by callsign (with a cover percentage and `⛨` when in cover, brass chevrons for brain tier, silver marks for earned rank, a hero's health bar); enemy squads as "Target N" (`callsigns.contact`). Plates that would overlap move up or down (`clearOf`); each squad plate's box is remembered in `squadPlates` so a press on a name is a press on the squad ([[Selection and Map Orders]]). Health bars appear over anything damaged or still going up. Text direction of a plate follows its own script, not the page.
+
+## Shots and heights
+
+A tracer or a rocket starts at the height its shooter's weapon is drawn at and ends at the height of what it is shot at (`gunHeight` in `client/art.js`: a unit with an `altitude` in the sprite manifest fires from just under its body, everything else from 12 px up). Before 2026-11-27 every shot started 12 px above the shooter's place on the ground, so a helicopter's fire seemed to come from the ground beneath it. A salvo's missiles (`state.rockets`) are drawn as thin rockets from the helicopter's height to the ground, in real time scaled by the match's pace (`Scene.pace`); their blasts come from `state.blasts` with `kind: "missile"` and are drawn small, with no falling bomb.
 
 ## What the page infers
 

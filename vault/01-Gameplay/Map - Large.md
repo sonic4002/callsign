@@ -1,6 +1,6 @@
 ---
 title: Map - Large
-description: "Mountain Passes is the largest map."
+description: "Mountain Passes is the large map, second in size to Great Moat."
 type: reference
 status: current
 tags:
@@ -12,7 +12,7 @@ tags:
   - topic/game-design
   - topic/maps
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -21,6 +21,7 @@ related:
   - "[[Maps]]"
   - "[[Map - Small]]"
   - "[[Map - Medium]]"
+  - "[[Map - Huge]]"
   - "[[Terrain, Cover and Bridges]]"
   - "[[Map Point Letters]]"
   - "[[Places on the Radio]]"
@@ -34,7 +35,7 @@ paths:
 
 # Map - Large
 
-Mountain Passes is the largest map. A mountain range splits it, crossed by passes (Glacier, Middle pass, South gap), with four bridges in the south and a lake rig. All data below is the `maps.large` block of `shared/rules.json`, which `tools/mapgen.py` writes (`make maps`); nothing in it is edited by hand.
+Mountain Passes is the large map. It was the largest until Great Moat ([[Map - Huge]]) was added on 2026-11-27. A mountain range splits it, crossed by passes (Glacier, Middle pass, South gap), with four bridges in the south and a lake rig. All data below is the `maps.large` block of `shared/rules.json`, which `tools/mapgen.py` writes (`make maps`); nothing in it is edited by hand.
 
 ## Size and clock
 

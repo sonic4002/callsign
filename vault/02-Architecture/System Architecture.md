@@ -72,7 +72,7 @@ flowchart LR
 | `art/` | Python (Blender + ComfyUI) | Offline sprite pipelines (`units.py`, `props.py`, `paint.py`, `generate.py`, `sheet.py`). |
 
 ## Key Engineering Properties
-- **Determinism**: Same random seed + commands produces identical state hashes across all three maps, verified in `server/sim/` tests.
+- **Determinism**: Same random seed + commands produces identical state hashes across all four maps, verified in `server/sim/` tests.
 - **Prompt Injection Defense**: Agents never receive enemy free-text—only structured fog-filtered game snapshots and their own side's radio traffic.
 - **Resilience**: If a player backgrounds their phone or the relay goes down, squads keep executing their last orders and server fireteam AI keeps fighting.
 

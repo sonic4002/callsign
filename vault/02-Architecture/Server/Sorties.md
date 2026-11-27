@@ -13,7 +13,7 @@ tags:
   - topic/sim
   - topic/aircraft
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -113,6 +113,10 @@ A blast stays in the snapshots for 1.5 s (`strikeSeconds`) so the page can draw 
 ## Being shot at
 
 `Sim.evades`: a strike aircraft in flight slips its unit's `evade` share of squad fire, so with 0.75 "three shots in four from soldiers, vehicles and boats miss a plane in the air". On the ground it slips none. Defences are not fooled: the multiplier is applied only to squads' shots (`sim.go`), not to `defencesFire`, so a flak battery is what stops aircraft. The enemy sees parked aircraft as contacts marked `parked`.
+
+## Pads and the four-plane limit
+
+`Structure.Planes` and `Structure.Pads` (rules) say how many planes an airbase holds and where each stands, as offsets east and south of its middle. `Sim.based` lists the strike squads that belong to an airbase (flying from it, or still being made there), oldest first; `padSlot` gives each squad the next pads in that order, and a squad keeps its pads when it loses a plane. `padsFree` is what is left; `producer` (queue.go) skips an airbase without room for a squad's planes, and `buy` refuses with `ErrAirbaseFull` when none has. `airbaseFor` prefers an airbase with room when a squad's own is gone and falls back to the nearest one over its number; planes over the number stand 26 behind the pads.
 
 ## Losing the airbase
 

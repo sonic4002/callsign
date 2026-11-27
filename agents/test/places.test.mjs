@@ -58,10 +58,37 @@ test("prompts list the map's landmarks and bridges in both languages, and say ho
   assert.doesNotMatch(text, /\(or repair/);
   assert.match(leaderPrompt({ rules, side: 0, faction: "aegis", station: viper2, unit: { ...unit, repairPerSecond: 40 } }), /\(or repair, for a bridge\)/);
   assert.match(operatorPrompt({ rules, side: 0, faction: "aegis" }), /bridge-south/);
-  // The same on the largest map, which has six more points.
-  const large = { ...rules, map: rules.maps.large };
-  const big = leaderPrompt({ rules: large, side: 0, faction: "aegis", station: viper2, unit });
-  for (const p of large.map.points) assert.ok(big.includes(p.callsign.en) && big.includes(p.callsign.he), p.id);
+  // The same on the bigger maps, which have more points: every one is in the prompt.
+  for (const id of ["large", "huge"]) {
+    const on = { ...rules, map: rules.maps[id] };
+    const big = leaderPrompt({ rules: on, side: 0, faction: "aegis", station: viper2, unit });
+    for (const p of on.map.points) assert.ok(big.includes(p.callsign.en) && big.includes(p.callsign.he), `${id}: ${p.id}`);
+    for (const b of on.map.bridges) assert.ok(big.includes(b.id), `${id}: ${b.id}`);
+  }
+  assert.equal(rules.maps.huge.points.length, 21);
+});
+
+test("rule-brain leader on the huge map: an order to each of its points, in both languages, is that order", async () => {
+  const brain = ruleBrain();
+  const huge = { ...rules, map: rules.maps.huge };
+  const orders = { en: [["move", "Move to {p}"], ["hold", "Hold {p}"], ["attack", "Attack {p}"]], he: [["move", "נועו ל{p}"], ["hold", "תחזיקו את {p}"], ["attack", "תקפו את {p}"]] };
+  for (const p of huge.map.points) {
+    for (const lang of ["en", "he"]) {
+      for (const [tool, words] of orders[lang]) {
+        // A boat's point is not for a squad on foot; the brain's answer to that is its own test.
+        if (p.kind === "seaRig" || (p.kind === "hq" && tool !== "move")) continue;
+        const body = words.replace("{p}", p.callsign[lang]);
+        const did = await think(brain, { rules: huge, agent: { ...leader, lang }, wake: wake(call(body, { lang, points: [p.id] })) });
+        assert.equal(did[0]?.[0], tool, `${body}: ${JSON.stringify(did)}`);
+        assert.equal(did[0][1].place, p.id, body);
+      }
+    }
+  }
+  // Words that only sound like a point of this map are still the order they are.
+  for (const [body, lang, want] of [["שמרו על שמיר", "he", ["hold", "W"]], ["Guard Whiskey", "en", ["hold", "W"]], ["נועו לחוה ושמרו עליה", "he", ["hold", "E"]]]) {
+    const did = await think(brain, { rules: huge, agent: { ...leader, lang }, wake: wake(call(body, { lang, points: [want[1]] })) });
+    assert.deepEqual([did[0]?.[0], did[0]?.[1].place], want, `${body}: ${JSON.stringify(did)}`);
+  }
 });
 
 test("rule-brain leader: goes to a described landmark, asks when the words fit several", async () => {

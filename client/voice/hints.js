@@ -7,6 +7,9 @@
 // punctuation as well as its words. So the hint is written as radio traffic: a few calls
 // in the form the page itself writes, then the names that did not fit into them.
 
+// How much the game server's recogniser reads of a hint (MAX_HINT_CHARS in stt/server.py).
+const ROOM = 600;
+
 const orders = {
   en: ["Move to {p}", "Hold {p}", "Attack {p}"],
   he: ["נועו ל{p}", "תחזיקו את {p}", "תקפו את {p}"],
@@ -46,6 +49,11 @@ export function hintCalls(rules, lang) {
   const calls = Object.values(cs.classes).map((c, i) => call(`${c[lang]} ${(i % 3) + 1}`, orders[lang][i % 3].replace("{p}", points[i] ?? ""), i % 4 === 3 ? out : over));
   const used = Object.keys(cs.classes).length;
   if (prowords.length > 1) calls.push(call(cs.operator[lang], prowords[0], out), call(cs.allStations[lang], prowords[1], over));
-  const rest = [...points.slice(used), cs.contact?.[lang] && `${cs.contact[lang]} 2`, cs.hauler?.[lang], ...prowords.slice(2)].filter(Boolean);
-  return `${calls.join(" ")} ${rest.join(", ")}.`;
+  const names = [...points.slice(used), cs.contact?.[lang] && `${cs.contact[lang]} 2`, cs.hauler?.[lang]].filter(Boolean);
+  // A map with many points has a long list. Rather than have the service cut it short,
+  // the procedure words at its end are left out one by one: no name is ever lost.
+  const words = prowords.slice(2);
+  const text = () => `${calls.join(" ")} ${[...names, ...words].join(", ")}.`;
+  while (text().length >= ROOM && words.length > 0) words.pop();
+  return text();
 }

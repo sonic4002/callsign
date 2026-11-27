@@ -7,7 +7,11 @@
     "site": "Redraw this exact building as a construction site where it is only half built: {subject}. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow. No text, no letters, no numbers, no logos, no flags, no insignia.",
     "stage": "Redraw this exact building at an earlier moment of its construction: {subject}. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow, no smoke. No text, no letters, no numbers, no logos, no flags, no insignia. ",
     "door": "Redraw this exact building with one single change: {subject}. Everything else stays exactly as it is, every wall, roof and detail unchanged. Keep the same isometric camera angle, the same position and footprint in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid light grey studio background. No people, no vehicles, no surrounding ground, no cast shadow, no smoke. No text, no letters, no numbers, no logos, no flags, no insignia. ",
-    "portrait": "Character portrait for the roster of a 2D strategy game: {subject}. Head and shoulders, three-quarter view, filling the square picture. Hand-painted pixel-art look with crisp clean edges, muted military colours, soft light from the upper left, on a plain flat solid dark slate-blue background. One person only. No text, no letters, no numbers, no logos, no flags, no insignia. "
+    "portrait": "Character portrait for the roster of a 2D strategy game: {subject}. Head and shoulders, three-quarter view, filling the square picture. Hand-painted pixel-art look with crisp clean edges, muted military colours, soft light from the upper left, on a plain flat solid dark slate-blue background. One person only. No text, no letters, no numbers, no logos, no flags, no insignia. ",
+    "airfield": "Redraw this rough block-out as a finished, detailed isometric 2D strategy game sprite: {subject}. Keep everything exactly where the block-out has it: the same isometric camera angle, the same flat ground slab with the same outline, and the runway, the open apron, the two hangars, the tower and the helicopter pad at the same positions and the same sizes. Hand-painted pixel-art look with crisp clean edges, muted military colours, soft light from the upper left. The open ground in the middle stays empty and flat. On the same plain flat solid blue background with no surrounding ground, no scenery and no cast shadow. No aircraft, no helicopters, no vehicles, no people. No text, no letters, no numbers, no logos, no flags, no insignia, except the one white letter H painted on the helicopter pad. ",
+    "airfield_ruin": "Redraw this exact airfield long after it was destroyed by explosions, cold and burnt out: {subject}. Keep the same isometric camera angle, the same flat ground slab with the same outline at the same position in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid blue background. The runway, the apron and the helicopter pad stay where they are. Nothing burns any more: no flames, no fire, no embers, no orange glow, no smoke. No people, no aircraft, no vehicles, no surrounding ground, no cast shadow. No text, no letters, no numbers, no logos, no flags, no insignia, except the one white letter H on the helicopter pad where the subject says it is painted. ",
+    "airfield_stage": "Redraw this exact airfield at an earlier moment of its construction: {subject}. Keep the same isometric camera angle, the same flat ground slab with the same outline at the same position in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid blue background. No people, no aircraft, no vehicles, no surrounding ground, no cast shadow, no smoke. No text, no letters, no numbers, no logos, no flags, no insignia, except the one white letter H on the helicopter pad where the subject says it is painted. ",
+    "airfield_door": "Redraw this exact airfield with one single change: {subject}. Everything else stays exactly as it is, the runway, the apron, the helicopter pad, every wall, roof and detail unchanged. Keep the same isometric camera angle, the same flat ground slab with the same outline at the same position in the picture, the same scale, the same colours and the same hand-painted pixel-art style, on the same plain flat solid blue background. No people, no aircraft, no vehicles, no surrounding ground, no cast shadow, no smoke. No text, no letters, no numbers, no logos, no flags, no insignia, except the one white letter H on the helicopter pad where the subject says it is painted. "
   },
   "sprites": [
     {
@@ -378,118 +382,121 @@
     {
       "id": "aegis_airbase",
       "kind": "building",
-      "style": "building",
-      "height": 168,
+      "style": "airfield",
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118
       ],
-      "subject": "a compact military air base building made of clean angular prefabricated modules in blue-grey and white, a small control tower with a glass cab beside a low hangar with an open front, and a round helicopter landing pad on the flat roof",
-      "keep": 12,
+      "subject": "a small military airfield of clean angular prefabricated modules in blue-grey and white with olive drab trim, on a grey concrete slab: a dark asphalt runway strip with white centre-line dashes along the near edge, a flat pale concrete apron of large square slabs in the middle, two low hangars with barrel roofs of ribbed blue-grey metal and wide open arched fronts with dark empty interiors along the far edge, a small control tower with a glass cab beside them, and a round helicopter landing pad with a white ring and a white letter H",
+      "keep": 113,
       "door": {
         "box": [
-          0.3,
-          0.56,
-          0.44,
-          0.78
+          0.568,
+          0.386,
+          0.729,
+          0.641
         ],
         "exit": [
-          0.59,
-          0.27
+          0.882,
+          0.658
         ],
         "rally": [
-          0.59,
-          0.27
+          0.882,
+          0.658
         ],
         "faces": "SW",
         "lift": true
-      }
+      },
+      "plan": true,
+      "lamp": [
+        0.424,
+        0.045
+      ]
     },
     {
       "id": "aegis_airbase_open",
       "kind": "building",
-      "style": "door",
+      "style": "airfield_door",
       "from": "aegis_airbase",
-      "height": 168,
       "seeds": [
-        51,
-        52,
-        53
+        151,
+        152,
+        153
       ],
-      "subject": "its hangar door is now fully open, showing the dark empty interior of the hangar",
-      "keep": 53
+      "subject": "the right-hand hangar, the one next to the helicopter pad, stands wide open and empty, and the whole inside of its arched front is one flat pitch-black opening",
+      "keep": 153
     },
     {
       "id": "aegis_airbase_ruin",
       "kind": "building",
-      "style": "ruin",
+      "style": "airfield_ruin",
       "from": "aegis_airbase",
-      "height": 168,
       "seeds": [
-        21,
-        22,
-        23
+        141,
+        142,
+        143,
+        144
       ],
-      "subject": "the roof has collapsed inward, the walls are broken, torn open and blackened with soot, and heaps of grey rubble, bent panels and twisted metal lie inside the footprint",
-      "keep": 23
+      "subject": "the two hangars are flattened wrecks, their barrel roofs fallen in and torn open, the steel ribs bent and bare, the walls broken down to stumps and blackened with soot; the control tower is snapped off at half its height and its top lies in pieces; the runway and the concrete apron are cracked and pitted with blast craters and strewn with heaps of grey rubble and twisted metal; the helicopter pad is cracked and sooty but its white H still shows",
+      "keep": 142
     },
     {
       "id": "aegis_airbase_stage1",
       "kind": "building",
-      "style": "stage",
+      "style": "airfield_stage",
       "from": "aegis_airbase",
-      "height": 168,
       "seeds": [
-        41,
-        42,
-        43
+        131,
+        132,
+        133
       ],
-      "subject": "nothing has been built yet and there is no building at all, only a flat pale grey concrete foundation slab lying exactly on the building's footprint, with painted guide lines, rows of anchor bolts, two neat stacks of blue-grey prefabricated wall panels and a few crates on the slab",
-      "keep": 42
+      "subject": "nothing has been built yet: there is only the bare flat grey concrete ground slab, with thin painted guide lines where the runway and the hangars will be, rows of anchor bolts, two neat stacks of blue-grey prefabricated panels and a few crates lying on it; no runway, no hangars, no tower and no helicopter pad at all",
+      "keep": 132
     },
     {
       "id": "aegis_airbase_stage2",
       "kind": "building",
-      "style": "stage",
+      "style": "airfield_stage",
       "from": "aegis_airbase",
-      "height": 168,
       "seeds": [
-        41,
-        42,
-        43
+        131,
+        132,
+        133
       ],
-      "subject": "only the bare structural skeleton stands on its concrete foundation slab, clean steel columns and beams outlining the building's shape up to its full height with no walls and no roof at all, a small yellow crane arm holding one blue-grey wall panel, and stacked panels on the slab",
-      "keep": 43
+      "subject": "the ground slab is laid and the dark asphalt runway is paved but has no painted markings yet; where the two hangars and the tower will stand there are only bare steel skeletons, curved steel ribs and columns with no walls and no roof at all; stacks of blue-grey panels lie on the apron; the helicopter pad is not there yet",
+      "keep": 133
     },
     {
       "id": "aegis_airbase_stage3",
       "kind": "building",
-      "style": "site",
+      "style": "airfield_stage",
       "from": "aegis_airbase",
-      "height": 168,
       "seeds": [
-        31,
-        32,
-        33
+        131,
+        132,
+        133
       ],
-      "subject": "only the lower half of the walls stands and the rest is an open steel frame wrapped in scaffolding, with stacked wall panels, girders and building materials inside the footprint and no roof yet",
-      "keep": 32
+      "subject": "the runway is paved and marked; the two hangars are open frames of curved steel ribs with only the lower half of their walls in place, wrapped in scaffolding, with no roof yet; the tower is a bare frame half its height; stacked wall panels and girders lie on the apron; the helicopter pad is a plain dark circle with no letter painted on it yet",
+      "keep": 133
     },
     {
       "id": "aegis_airbase_stage4",
       "kind": "building",
-      "style": "stage",
+      "style": "airfield_stage",
       "from": "aegis_airbase",
-      "height": 168,
       "seeds": [
-        41,
-        42,
-        43
+        131,
+        132,
+        133
       ],
-      "subject": "the building is almost finished, with all its walls and most of its roof in place, but a few wall and roof panels are still missing so the steel frame shows through the gaps, light scaffolding stands against one side, a small yellow crane arm rises beside it, and none of the rooftop equipment is fitted yet",
-      "keep": 42
+      "subject": "the airfield is almost finished: the runway, the apron and the helicopter pad with its white H are done, but the barrel roofs of the two hangars still miss several panels so the steel ribs show through the gaps, light scaffolding stands against the tower, whose glass cab is not fitted yet, and a small yellow crane arm rises behind the hangars",
+      "keep": 133
     },
     {
       "id": "aegis_dockyard",
@@ -954,118 +961,123 @@
     {
       "id": "ashfall_launchYard",
       "kind": "building",
-      "style": "building",
-      "height": 150,
+      "style": "airfield",
       "seeds": [
-        11,
-        12,
-        13,
-        14
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118
       ],
-      "subject": "a rugged improvised militia drone launch yard, a small walled compound with a low concrete shed, launch rails made of welded scaffolding on the flat roof, camouflage netting, antenna poles and crates",
-      "keep": 13,
+      "subject": "a small improvised insurgent airstrip built from scrap, on a slab of packed brown earth: a landing strip of rusty perforated steel planks laid on the dirt along the near edge, a flat apron of trodden earth in the middle, two sheds of rusty corrugated scrap metal with wide open fronts and dark empty interiors along the far edge, patched with tarpaulin and camouflage netting, one small lookout post of welded scaffolding beside them and no other tower, a few oil drums and crates against the shed walls, and a rough round helicopter landing pad of flattened earth with a hand-painted white ring and a white letter H",
+      "keep": 113,
       "door": {
         "box": [
-          0.24,
-          0.48,
-          0.4,
-          0.7
+          0.567,
+          0.337,
+          0.727,
+          0.61
         ],
         "exit": [
-          0.5,
-          0.27
+          0.878,
+          0.628
         ],
         "rally": [
-          0.5,
-          0.27
+          0.878,
+          0.628
         ],
         "faces": "SW",
         "lift": true
-      }
+      },
+      "plan": true,
+      "lamp": [
+        0.423,
+        0.06
+      ]
     },
     {
       "id": "ashfall_launchYard_open",
       "kind": "building",
-      "style": "door",
+      "style": "airfield_door",
       "from": "ashfall_launchYard",
-      "height": 150,
       "seeds": [
-        51,
-        52,
-        53
+        151,
+        152,
+        153
       ],
-      "subject": "the door of its launch shed is now fully open, showing a dark empty interior",
-      "keep": 52
+      "subject": "the right-hand shed, the one next to the helicopter pad, stands wide open and empty, and the whole inside of its open front is one flat pitch-black opening",
+      "keep": 152
     },
     {
       "id": "ashfall_launchYard_ruin",
       "kind": "building",
-      "style": "ruin",
+      "style": "airfield_ruin",
       "from": "ashfall_launchYard",
-      "height": 150,
       "seeds": [
-        21,
-        22,
-        23
+        141,
+        142,
+        143,
+        144
       ],
-      "subject": "the roof has caved in, the walls are cracked, broken open and scorched black, and heaps of rubble, bent corrugated sheets and charred timber lie inside the footprint",
-      "keep": 21
+      "subject": "the two scrap sheds are flattened wrecks, their corrugated roofs fallen to the ground and their walls broken down to stumps and scorched black, the camouflage netting gone; the lookout post is knocked over and splintered; the rusty steel planks of the landing strip are buckled and scattered and the earth is pitted with blast craters and strewn with bent corrugated sheets and charred timber; the helicopter pad is sooty but its white H still shows",
+      "keep": 142
     },
     {
       "id": "ashfall_launchYard_stage1",
       "kind": "building",
-      "style": "stage",
+      "style": "airfield_stage",
       "from": "ashfall_launchYard",
-      "height": 150,
       "seeds": [
-        41,
-        42,
-        43
+        131,
+        132,
+        133
       ],
-      "subject": "nothing has been built yet and there is no building at all, only a levelled patch of packed earth with rough concrete footings lying exactly on the building's footprint, with wooden stakes and string, a pile of rusty scrap metal sheets, timber and a few oil drums on it",
-      "keep": 41
+      "subject": "nothing has been built yet: there is only the bare levelled slab of packed brown earth, with wooden stakes and string marking where the landing strip and the sheds will be, a pile of rusty scrap metal sheets, a stack of timber and a few oil drums lying on it; no landing strip, no sheds, no lookout post and no helicopter pad at all",
+      "keep": 132
     },
     {
       "id": "ashfall_launchYard_stage2",
       "kind": "building",
-      "style": "stage",
+      "style": "airfield_stage",
       "from": "ashfall_launchYard",
-      "height": 150,
       "seeds": [
-        41,
-        42,
-        43
+        131,
+        132,
+        133
       ],
-      "subject": "only a rough skeleton stands on its footings, welded scrap-metal posts and timber beams outlining the building's shape, wrapped in rickety wooden scaffolding, with no walls and no roof at all, and folded tarpaulins and corrugated sheets stacked on the ground inside",
-      "keep": 43
+      "subject": "the earth is levelled and the first few rusty steel planks of the landing strip are laid, the rest of it still bare earth; where the two sheds and the lookout post will stand there are only rough skeletons of welded scrap-metal posts and timber beams with no walls and no roof at all; corrugated sheets and folded tarpaulins are stacked on the ground; the helicopter pad is not there yet",
+      "keep": 132
     },
     {
       "id": "ashfall_launchYard_stage3",
       "kind": "building",
-      "style": "site",
+      "style": "airfield_stage",
       "from": "ashfall_launchYard",
-      "height": 150,
       "seeds": [
-        31,
-        32,
-        33
+        141,
+        142,
+        143,
+        144
       ],
-      "subject": "only the lower walls stand and the rest is a rough frame of timber and scaffolding poles hung with tarpaulins, with piles of bricks, sandbags and sheets of corrugated metal inside the footprint and no roof yet",
-      "keep": 33
+      "subject": "the landing strip of rusty perforated steel planks is laid exactly as it is in the finished picture, the same rust-red colour; the two sheds are rough frames of timber and scaffolding poles with only their lower walls of corrugated sheet in place, hung with tarpaulins, with no roof yet; the lookout post is half built; piles of sandbags and corrugated sheets lie beside the sheds; the helicopter pad is a plain circle of flattened earth with no letter painted on it yet",
+      "keep": 144
     },
     {
       "id": "ashfall_launchYard_stage4",
       "kind": "building",
-      "style": "stage",
+      "style": "airfield_stage",
       "from": "ashfall_launchYard",
-      "height": 150,
       "seeds": [
-        41,
-        42,
-        43
+        141,
+        142,
+        143,
+        144
       ],
-      "subject": "the building is almost finished, with all its walls standing and most of its roof on, but part of the roof is still open and covered by a tied-down tarpaulin, patches of the walls are still bare frame, and wooden scaffolding and a ladder lean against one side",
-      "keep": 43
+      "subject": "the airstrip is almost finished: the landing strip of rusty perforated steel planks and the helicopter pad with its white H are done and unchanged, but part of each shed roof is still open and covered by a tied-down grey tarpaulin, patches of the shed walls are still bare timber frame, there is no camouflage netting yet, and wooden scaffolding and a ladder lean against the lookout post",
+      "keep": 143
     },
     {
       "id": "ashfall_boatShed",

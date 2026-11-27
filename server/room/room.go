@@ -37,9 +37,10 @@ type Config struct {
 	Factions      [2]string
 	LengthSeconds int       // 0 uses the rules default
 	Map           string    // the map to play on, "" for the default
-	StartGold   int       // gold each side starts with, 0 for the rules default
-	SuperPowers string    // "0", "1".."4", "all" ("" defaults to "2")
-	Bots        [2]string // scripted player style per side, "" for none
+	StartGold     int       // gold each side starts with, 0 for the rules default
+	Units         int       // the most squads a side may field, 0 for the rules default
+	SuperPowers   string    // "0", "1".."4", "all" ("" defaults to "2")
+	Bots          [2]string // scripted player style per side, "" for none
 	AutoStart     bool      // start the clock at once instead of when the first Hammer joins
 	FullBase      bool      // both sides start with every base structure standing
 	Base          []string  // both sides start with these base structures, by role (tests)
@@ -156,11 +157,33 @@ func New(r *shared.Rules, cfg Config) (*Room, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cfg.Units > 0 && cfg.Units != r.Match.PopulationCap {
+		// This room's own cap: in the rules the simulation, the scripted enemy, the pages
+		// and the agents all read (r is this room's copy).
+		r.Match.PopulationCap = cfg.Units
+		if rulesJSON, err = withCap(rulesJSON, cfg.Units); err != nil {
+			return nil, err
+		}
+	}
 	rm := &Room{r: r, rulesJSON: rulesJSON, net: radio.NewNet(r), cfg: cfg, clients: map[*Client]struct{}{}, quiet: time.Now()}
 	if err := rm.reset(); err != nil {
 		return nil, err
 	}
 	return rm, nil
+}
+
+// withCap is the rules as clients read them with another population cap.
+func withCap(rules []byte, units int) ([]byte, error) {
+	var all, match map[string]json.RawMessage
+	if err := json.Unmarshal(rules, &all); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(all["match"], &match); err != nil {
+		return nil, err
+	}
+	match["populationCap"], _ = json.Marshal(units)
+	all["match"], _ = json.Marshal(match)
+	return json.Marshal(all)
 }
 
 func (rm *Room) reset() error {

@@ -98,8 +98,8 @@ func (s *Sim) decide(tr *teamRef, live []*teamRef) plan {
 	// A hero sent to plant a charge or to seize a vehicle keeps going under fire: being
 	// shaken does not stop it or turn it back, only being pinned does.
 	onTask := sq.unit.Hero && (order == OrderPlant || order == OrderSeize)
-	if order == OrderCapture || order == OrderPlant || order == OrderSeize {
-		order = OrderMove // engineers and heroes walk to their work and do not stop to fight
+	if order == OrderCapture || order == OrderPlant || order == OrderSeize || order == OrderSalvo {
+		order = OrderMove // engineers and heroes walk to their work and do not stop to fight; a salvo is flown in to
 	}
 	if order == OrderRepair || order == OrderFortify {
 		order = OrderHold // engineers at a bridge, and a squad digging in, fight like any squad holding ground

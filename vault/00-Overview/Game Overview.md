@@ -101,7 +101,7 @@ This hub lists every note about what the game is and how it plays: factions, uni
 
 ### Battlefields
 
-- [[Maps]]: the three maps side by side.
+- [[Maps]]: the four maps side by side.
 - [[Map - Small]], [[Map - Medium]], [[Map - Large]]: points, gushers, bridges, tech buildings.
 - [[Terrain, Cover and Bridges]]: terrain kinds, landmarks, garrisons, sandbags, bridges.
 

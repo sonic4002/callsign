@@ -90,6 +90,8 @@ type SquadView struct {
 	Dug int     `json:"dug,omitempty"`
 	// Sortie is set for a strike aircraft: where it is in its sortie and what it carries.
 	Sortie *SortieView `json:"sortie,omitempty"`
+	// Salvo is set for a unit with a missile salvo: how far its pods are loaded.
+	Salvo *SalvoView `json:"salvo,omitempty"`
 }
 
 // ContactView is an enemy squad as the other side sees it: only the teams in sight.
@@ -156,12 +158,13 @@ type Snapshot struct {
 	Contacts  []ContactView  `json:"contacts"`
 	// Structures are this side's own and the other side's as last seen. ForeignUnits are
 	// the other factions' units this side can buy through structures it has captured.
-	Structures   []StructureView `json:"structures"`
-	ForeignUnits []string        `json:"foreignUnits,omitempty"`
-	Fields       []FieldView     `json:"fields"`  // every gold field; out of sight, as last seen
-	Haulers      []HaulerView    `json:"haulers"` // own haulers, then enemy ones as last seen
+	Structures   []StructureView   `json:"structures"`
+	ForeignUnits []string          `json:"foreignUnits,omitempty"`
+	Fields       []FieldView       `json:"fields"`  // every gold field; out of sight, as last seen
+	Haulers      []HaulerView      `json:"haulers"` // own haulers, then enemy ones as last seen
 	Charges      []ChargeView      `json:"charges"` // demolition charges burning down: own, and enemy ones in sight
 	Blasts       []BlastView       `json:"blasts"`  // bombs that have just gone off: own, and enemy ones in sight
+	Rockets      []RocketView      `json:"rockets"` // missiles of a salvo in flight: own, and enemy ones in sight
 	SuperPowers  *SuperPowerView   `json:"superPowers,omitempty"`
 	SuperStrikes []SuperStrikeView `json:"superStrikes,omitempty"`
 	Craters      []Crater          `json:"craters,omitempty"`
@@ -253,6 +256,7 @@ func (s *Sim) Snapshot(side int) Snapshot {
 	s.snapCharges(&snap, side)
 	s.snapBlasts(&snap, side)
 	s.snapSuperPowers(&snap, side)
+	s.snapRockets(&snap, side)
 	return snap
 }
 
@@ -269,6 +273,9 @@ func (s *Sim) squadView(sq *Squad) SquadView {
 	s.viewExtras(sq, &v)
 	if sq.sortie != nil {
 		v.Sortie = s.sortieView(sq)
+	}
+	if sq.unit.Salvo != nil {
+		v.Salvo = s.salvoView(sq)
 	}
 	for i := range sq.Teams {
 		if t := &sq.Teams[i]; t.Members > 0 {
@@ -385,6 +392,7 @@ func (s *Sim) Hash() uint64 {
 	s.hashHeroes(put, f)
 	s.hashSorties(put)
 	s.hashSuperPowers(h, put, f)
+	s.hashSalvos(put, f)
 	return h.Sum64()
 }
 

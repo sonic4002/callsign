@@ -77,6 +77,10 @@ Push-to-talk uses the selection too: a spoken order that opens with no known cal
 
 A press while a structure is being placed moves or confirms the ghost instead, and while a rally point is being picked sets it ([[Build Bar]]). Hero-specific actions (`plant`, `seize`) are added by `heroOrders` ([[Heroes]]).
 
+A press on the player's own headquarters, on the building or on its point, switches the build bar to the Structures tab (2026-11-27): the headquarters makes no units, and what is built from it is the structures. With a squad selected the orders menu for the point still opens.
+
+While a rally point is being set, a press on open ground sets it to that spot (an offset from the nearest point), not only a press on a named place. While a helicopter's salvo is being aimed (`placing.mode === "salvo"`, started from the squad's roster row) a ring the size of the salvo's spread follows the pointer (`Scene.drawAim`) and a press fires there: at an enemy or an enemy structure under the press by name, otherwise at the spot. See [[Honeycomb Salvo]].
+
 ## How each becomes a frame
 
 | Order | Sent as | Detail |

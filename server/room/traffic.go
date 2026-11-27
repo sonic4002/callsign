@@ -91,8 +91,8 @@ func noticeOf(e sim.Event) (kind, key string, ok bool) {
 		return KindStatus, "", true
 	case sim.EvPinned, sim.EvFortified, sim.EvChargePlanted, sim.EvCrushed, sim.EvOverhead, sim.EvRearmed:
 		return KindStatus, "", true
-	case sim.EvStrike:
-		return KindObjective, "", true // a strike aircraft's bombs have fallen (sim/sortie.go)
+	case sim.EvStrike, sim.EvSalvo:
+		return KindObjective, "", true // a strike aircraft's bombs have fallen (sim/sortie.go), or a salvo was fired (sim/salvo.go)
 	}
 	return "", "", false
 }

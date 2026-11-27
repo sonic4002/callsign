@@ -11,7 +11,7 @@ tags:
   - area/status-and-reference
   - topic/glossary
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -121,6 +121,7 @@ See [[Procedure Words]].
 | Twin Bridges | שני הגשרים | the small map |
 | Frozen Lake | האגם הקפוא | the medium map |
 | Mountain Passes | מעברי ההרים | the large map |
+| Great Moat | החפיר הגדול | the huge map |
 | West HQ / East HQ | המפקדה המערבית / המפקדה המזרחית | Alpha and Zulu |
 | Town | העיירה | Foxtrot, on every map |
 | Sea rig / Lake rig | האסדה הימית / אסדת האגם | Sierra |

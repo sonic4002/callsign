@@ -1,6 +1,6 @@
 ---
 title: Match Rules and Winning
-description: "A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of three maps until a headquarters falls or the timer runs out."
+description: "A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of four maps until a headquarters falls or the timer runs out."
 type: concept
 status: current
 tags:
@@ -13,7 +13,7 @@ tags:
   - topic/match
   - topic/rules
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -38,7 +38,7 @@ paths:
 
 # Match Rules and Winning
 
-A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of three maps until a headquarters falls or the timer runs out. This note gives the opening state, the standing limits and the exact order in which a winner is decided.
+A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of four maps until a headquarters falls or the timer runs out. This note gives the opening state, the standing limits and the exact order in which a winner is decided.
 
 ## How a match opens
 
@@ -56,7 +56,7 @@ The opening the game teaches and its scripted players follow is power, refinery 
 
 | Limit | Value |
 |---|---|
-| Squads per side, living or deploying (`match.populationCap`) | 12 |
+| Squads per side, living or deploying (`match.populationCap`) | 12, or what the match's maker chose (below) |
 | Haulers per side (`match.haulerCap`) | 4, not counted as squads |
 | Heroes alive per side | 1 |
 | Base structures / power structures / defences / fence runs | 10 / 3 / 6 / 4 |
@@ -102,6 +102,8 @@ When the match ends Anvil signs off with the result (`radio.signOff`: won, lost,
 | Lesson | 1800 seconds, no spectators, the small map |
 
 ## Options when making a match
+
+The most squads a side may field can be raised when the match is made (`Options.Units`, owner's order of 2026-11-27): from the usual 12 up to 16 on any map, up to 22 on a map with 15 points, up to 30 on a map with 16 or more (`match.populationCaps`, `Rules.PopulationCapMax`). It is never lowered below 12. The room plays on its own copy of the rules with the chosen cap, and sends that copy to its pages and agents, so the simulation, the scripted enemy and the brains all read the same number.
 
 `Options` in `server/room/hub.go`: opponent (scripted enemy or a friend), side, length, whether others may watch, the enemy's level, speed, whether the operators hold the purse from the start, the map, starting gold, the rule-brain Anvil's initiative (1 to 3) and whether squads use the fast brain. See [[Rooms, Hub and Lobby]] and [[Lobby Page]].
 

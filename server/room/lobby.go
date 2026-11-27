@@ -50,23 +50,24 @@ type SeatView struct {
 
 // LobbyView is the state of a room around the match: who sits where and whether it runs.
 type LobbyView struct {
-	Room      string      `json:"room"`
-	Opponent  string      `json:"opponent"`
-	Length    int         `json:"length"` // seconds
-	Map       string      `json:"map"`    // the map id
-	Watch     bool        `json:"watch"`
-	Level     string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
-	Speed     string      `json:"speed"`           // the pace: "relaxed", "normal" or "fast"
-	Pace      float64     `json:"pace"`            // match seconds per real second at that pace
-	Purse     bool        `json:"purse"`           // the operators may buy on their own from the start
-	Anvil     int         `json:"anvil"`           // the rule-brain operator's initiative, 1 to 3
-	Fast      bool        `json:"fast"`            // squads take orders through the fast decision model
-	StartGold   int         `json:"startGold"`   // gold each side starts with
-	SuperPowers string      `json:"superPowers"` // "0", "1".."4" or "all"
-	Phase       string      `json:"phase"`       // "lobby", "playing" or "over"
-	Match     int         `json:"match"`
-	Seats     [2]SeatView `json:"seats"`
-	Tutorial  bool        `json:"tutorial,omitempty"` // the first lesson (see Config.Tutorial)
+	Room        string      `json:"room"`
+	Opponent    string      `json:"opponent"`
+	Length      int         `json:"length"` // seconds
+	Map         string      `json:"map"`    // the map id
+	Watch       bool        `json:"watch"`
+	Level       string      `json:"level,omitempty"` // the scripted enemy's level, when one plays
+	Speed       string      `json:"speed"`           // the pace: "relaxed", "normal" or "fast"
+	Pace        float64     `json:"pace"`            // match seconds per real second at that pace
+	Purse       bool        `json:"purse"`           // the operators may buy on their own from the start
+	Anvil       int         `json:"anvil"`           // the rule-brain operator's initiative, 1 to 3
+	Fast        bool        `json:"fast"`            // squads take orders through the fast decision model
+	StartGold   int         `json:"startGold"`       // gold each side starts with
+	Units       int         `json:"units"`           // the most squads a side may field
+	SuperPowers string      `json:"superPowers"`     // "0", "1".."4" or "all"
+	Phase       string      `json:"phase"`           // "lobby", "playing" or "over"
+	Match       int         `json:"match"`
+	Seats       [2]SeatView `json:"seats"`
+	Tutorial    bool        `json:"tutorial,omitempty"` // the first lesson (see Config.Tutorial)
 }
 
 // ErrNoLesson refuses a lesson frame outside a lesson.
@@ -92,7 +93,7 @@ func (rm *Room) lobby() LobbyView {
 		Room: rm.cfg.Code, Opponent: rm.cfg.Opponent, Watch: rm.cfg.Watch, Match: rm.match,
 		Length: rm.sim.LengthTicks() / rm.r.TickRate, Phase: "lobby", Tutorial: rm.cfg.Tutorial, Speed: SpeedNormal, Pace: 1, Purse: rm.cfg.Purse, StartGold: rm.cfg.StartGold,
 		SuperPowers: rm.sim.SuperSetting(),
-		Map:         rm.r.Map.ID,
+		Map:         rm.r.Map.ID, Units: rm.r.Match.PopulationCap,
 	}
 	if v.StartGold == 0 {
 		v.StartGold = rm.r.Match.StartGold

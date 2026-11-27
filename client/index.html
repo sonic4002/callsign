@@ -87,6 +87,7 @@
           <button type="button" data-order="fortify" data-i18n="act.fortify" hidden></button>
           <button type="button" data-order="plant" data-i18n="act.plant" hidden></button>
           <button type="button" data-order="seize" data-i18n="act.seize" hidden></button>
+          <button type="button" data-order="salvo" data-i18n="act.salvo" hidden></button>
           <button type="button" data-order="rally" hidden><span class="icon"></span><span data-i18n="act.rally"></span></button>
           <button type="button" data-order="cancel" hidden><span data-i18n="act.cancel"></span></button>
           <button type="button" data-order="repair" hidden><span class="icon"></span><span data-i18n="act.repair"></span><bdi dir="ltr" class="gold"></bdi></button>
@@ -222,6 +223,15 @@
       <fieldset id="lobby-maps">
         <legend data-i18n="lobby.map"></legend>
         <div id="lobby-map-cards"></div>
+        <div id="lobby-units-row">
+          <span id="lobby-units-label" data-i18n="lobby.units"></span>
+          <span class="stepper" role="group" aria-labelledby="lobby-units-label">
+            <button type="button" id="lobby-units-down" data-i18n-aria="lobby.unitsLess">▼</button>
+            <output id="lobby-units" dir="ltr"></output>
+            <button type="button" id="lobby-units-up" data-i18n-aria="lobby.unitsMore">▲</button>
+          </span>
+          <small id="lobby-units-about"></small>
+        </div>
       </fieldset>
       <label id="lobby-superpowers-row"><span data-i18n="lobby.superPowers"></span>
         <select name="superPowers" id="lobby-superpowers">

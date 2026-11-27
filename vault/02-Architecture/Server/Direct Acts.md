@@ -12,7 +12,7 @@ tags:
   - topic/server
   - topic/protocol
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -94,6 +94,8 @@ The `direct` frame is broadcast to the side (operator, squad leaders, hosts) and
 1. The order is applied through the same `orderSquad` path a squad leader's own tool uses (one place resolver for points, landmarks, bridges, structures and "bearing of point" spots).
 2. The squad is marked as Hammer's own: `rm.traffic[side].hammers[squad] = true`. The operator is told which squads those are (`hammerOrdered` in its report) and gives them no task until it is handed the fight afresh.
 3. The squad answers on the net **by code**, with no thought of its leader's: "Wilco" (Hebrew "יבוצע") ending in Out, composed with `radio.Net.Compose` and transmitted with kind `ack`.
+
+Since 2026-11-27 `directOrder` also takes `salvo` (a helicopter squad's missile salvo, see [[Honeycomb Salvo]]) beside move, hold and attack.
 
 ## The page's language (`lang` frame)
 
