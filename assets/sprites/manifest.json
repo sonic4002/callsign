@@ -13,7 +13,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "fps": {
         "walk": 16,
@@ -21,12 +21,12 @@
       },
       "image": "units/commandos.png",
       "frame": [
-        138,
-        119
+        184,
+        156
       ],
       "anchor": [
-        0.5,
-        0.6385
+        0.4946,
+        0.6406
       ],
       "anims": {
         "idle": [
@@ -72,7 +72,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "fps": {
         "walk": 16,
@@ -80,12 +80,12 @@
       },
       "image": "units/militia.png",
       "frame": [
-        138,
-        119
+        184,
+        151
       ],
       "anchor": [
-        0.5,
-        0.6385
+        0.4946,
+        0.6287
       ],
       "anims": {
         "idle": [
@@ -139,15 +139,15 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "image": "units/tank.png",
       "frame": [
-        258,
-        150
+        434,
+        251
       ],
       "anchor": [
         0.5,
-        0.6817
+        0.6973
       ],
       "anims": {
         "idle": [
@@ -166,12 +166,12 @@
       "turret": {
         "image": "units/tank_turret.png",
         "frame": [
-          314,
-          173
+          460,
+          275
         ],
         "anchor": [
-          0.5,
-          0.7471
+          0.4978,
+          0.7165
         ],
         "anims": {
           "idle": [
@@ -207,15 +207,15 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "image": "units/technical.png",
       "frame": [
-        200,
-        130
+        270,
+        173
       ],
       "anchor": [
         0.5,
-        0.7091
+        0.7077
       ],
       "anims": {
         "idle": [
@@ -234,12 +234,12 @@
       "turret": {
         "image": "units/technical_turret.png",
         "frame": [
-          170,
-          90
+          244,
+          126
         ],
         "anchor": [
           0.5,
-          1.1353
+          1.1145
         ],
         "anims": {
           "idle": [
@@ -251,7 +251,7 @@
             3
           ]
         },
-        "pivot": -1.05
+        "pivot": -1.02
       }
     },
     "patrolBoat": {
@@ -275,15 +275,15 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "image": "units/patrolBoat.png",
       "frame": [
-        244,
-        169
+        323,
+        236
       ],
       "anchor": [
         0.5,
-        0.6405
+        0.6526
       ],
       "anims": {
         "idle": [
@@ -302,12 +302,12 @@
       "turret": {
         "image": "units/patrolBoat_turret.png",
         "frame": [
-          183,
-          96
+          247,
+          127
         ],
         "anchor": [
-          0.4973,
-          0.8568
+          0.5,
+          0.8585
         ],
         "anims": {
           "idle": [
@@ -343,15 +343,15 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "image": "units/speedboat.png",
       "frame": [
-        204,
-        136
+        265,
+        177
       ],
       "anchor": [
         0.5,
-        0.6161
+        0.6188
       ],
       "anims": {
         "idle": [
@@ -370,12 +370,12 @@
       "turret": {
         "image": "units/speedboat_turret.png",
         "frame": [
-          152,
-          80
+          199,
+          103
         ],
         "anchor": [
           0.5,
-          0.9348
+          0.9371
         ],
         "anims": {
           "idle": [
@@ -403,7 +403,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "altitude": 3.0,
       "fps": {
         "idle": 16,
@@ -413,12 +413,12 @@
       },
       "image": "units/helicopter.png",
       "frame": [
-        418,
-        300
+        543,
+        389
       ],
       "anchor": [
-        0.5,
-        0.7099
+        0.4982,
+        0.7045
       ],
       "anims": {
         "idle": [
@@ -445,12 +445,12 @@
       "turret": {
         "image": "units/helicopter_turret.png",
         "frame": [
-          149,
-          79
+          199,
+          103
         ],
         "anchor": [
-          0.5034,
-          0.797
+          0.5,
+          0.7966
         ],
         "anims": {
           "idle": [
@@ -486,15 +486,15 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "image": "units/rocketLauncher.png",
       "frame": [
-        224,
-        183
+        299,
+        241
       ],
       "anchor": [
         0.5,
-        0.7357
+        0.7325
       ],
       "anims": {
         "idle": [
@@ -513,12 +513,12 @@
       "turret": {
         "image": "units/rocketLauncher_turret.png",
         "frame": [
-          252,
-          161
+          325,
+          199
         ],
         "anchor": [
           0.5,
-          1.0723
+          1.1233
         ],
         "anims": {
           "idle": [
@@ -546,7 +546,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "altitude": 1.5,
       "fps": {
@@ -556,12 +556,12 @@
       },
       "image": "units/fpvSwarm.png",
       "frame": [
-        82,
-        124
+        103,
+        160
       ],
       "anchor": [
         0.5,
-        0.6832
+        0.6845
       ],
       "anims": {
         "idle": [
@@ -595,7 +595,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "fps": {
         "walk": 16,
@@ -603,12 +603,12 @@
       },
       "image": "units/rpgTeam.png",
       "frame": [
-        138,
-        123
+        184,
+        160
       ],
       "anchor": [
-        0.5,
-        0.6503
+        0.4946,
+        0.6495
       ],
       "anims": {
         "idle": [
@@ -654,7 +654,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "fps": {
         "move": 6,
         "moveFull": 6,
@@ -663,12 +663,12 @@
       },
       "image": "units/crawler.png",
       "frame": [
-        326,
-        220
+        428,
+        315
       ],
       "anchor": [
-        0.5,
-        0.6984
+        0.4977,
+        0.7176
       ],
       "anims": {
         "idle": [
@@ -714,7 +714,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "fps": {
         "move": 6,
         "moveFull": 6,
@@ -723,12 +723,12 @@
       },
       "image": "units/dumpTruck.png",
       "frame": [
-        330,
-        223
+        428,
+        292
       ],
       "anchor": [
-        0.5,
-        0.6935
+        0.4977,
+        0.6885
       ],
       "anims": {
         "idle": [
@@ -774,7 +774,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "fps": {
         "walk": 16,
@@ -783,12 +783,12 @@
       },
       "image": "units/engineers.png",
       "frame": [
-        138,
-        119
+        184,
+        156
       ],
       "anchor": [
-        0.5,
-        0.6385
+        0.4946,
+        0.6406
       ],
       "anims": {
         "idle": [
@@ -838,7 +838,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "fps": {
         "walk": 16,
@@ -847,12 +847,12 @@
       },
       "image": "units/sappers.png",
       "frame": [
-        138,
-        119
+        184,
+        151
       ],
       "anchor": [
-        0.5,
-        0.6385
+        0.4946,
+        0.6287
       ],
       "anims": {
         "idle": [
@@ -902,7 +902,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "hero": true,
       "fps": {
@@ -912,12 +912,12 @@
       },
       "image": "units/sentinel.png",
       "frame": [
-        226,
-        174
+        293,
+        225
       ],
       "anchor": [
-        0.5,
-        0.6332
+        0.4966,
+        0.6401
       ],
       "anims": {
         "idle": [
@@ -975,7 +975,7 @@
         "NE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "per": "member",
       "hero": true,
       "fps": {
@@ -986,12 +986,12 @@
       },
       "image": "units/oracle.png",
       "frame": [
-        178,
-        150
+        231,
+        191
       ],
       "anchor": [
-        0.5,
-        0.6461
+        0.4957,
+        0.6664
       ],
       "anims": {
         "idle": [
@@ -1057,16 +1057,16 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "altitude": 7.0,
       "image": "units/strikeJet.png",
       "frame": [
-        358,
-        285
+        474,
+        376
       ],
       "anchor": [
         0.5,
-        0.6469
+        0.6444
       ],
       "anims": {
         "idle": [
@@ -1112,7 +1112,7 @@
         "ENE"
       ],
       "heading": "map",
-      "ppm": 40,
+      "ppm": 52,
       "altitude": 6.0,
       "fps": {
         "move": 14,
@@ -1121,12 +1121,12 @@
       },
       "image": "units/propBomber.png",
       "frame": [
-        378,
-        326
+        494,
+        425
       ],
       "anchor": [
         0.5,
-        0.606
+        0.6072
       ],
       "anims": {
         "idle": [
@@ -4106,5 +4106,6 @@
         96
       ]
     }
-  }
+  },
+  "stamp": 1795776494
 }

@@ -28,8 +28,10 @@ Runs in the callsign-art image with the network off: make art-paint.
 import argparse
 import hashlib
 import json
+import os
 import pathlib
 import shutil
+import time
 
 import numpy as np
 from PIL import Image, ImageFilter
@@ -38,17 +40,17 @@ import generate as G
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-PLAIN = ROOT / "assets" / "raw" / "plain"
-KEPT = ROOT / "assets" / "raw" / "paint"
-OUT = ROOT / "assets" / "sprites"
+PLAIN = pathlib.Path(os.environ.get("CALLSIGN_PLAIN_ROOT", ROOT / "assets" / "raw" / "plain"))
+KEPT = pathlib.Path(os.environ.get("CALLSIGN_KEPT_ROOT", ROOT / "assets" / "raw" / "paint"))
+OUT = pathlib.Path(os.environ.get("CALLSIGN_OUT_ROOT", ROOT / "assets" / "sprites"))
 
 CANVAS = 1024
-GREY = (190, 190, 190)
+GREY = (182, 184, 186)
 OUTLINE = (22, 26, 30)
-START = 1  # of the model's four steps, the first is skipped: the render stands in for it
-SPREAD = 5  # pixels over which a frame's colour is compared with its render's
-KEEP = 0.75  # how far the painted colours are pulled back to the render's (0 = not at all)
-MAX_ZOOM = 4.0  # a frame is enlarged at most this much before it is painted
+START = 1  # full photorealistic military miniature detail pass over our realistic AgX PBR renders
+SPREAD = 5  # pixels over which a frame's luminance is anchored to the render
+KEEP = 0.62  # keeps FLUX's natural rust/dust weathering while preventing rainbow chroma drift
+MAX_ZOOM = 4.5  # enlarge compact infantry cleanly on the 1024 canvas
 
 
 def flow(prompt, seed, image):
@@ -100,50 +102,54 @@ def layout(frames, grid):
 
 
 def finish(plain, painted, keep=0.0, edge=True):
-    """The painted colours inside the render's own shape, with a dark edge round it."""
-    alpha = np.asarray(plain.getchannel("A"), dtype=np.float32) / 255
-    solid = Image.fromarray(((alpha > 0.6) * 255).astype(np.uint8))
-    # The edge: the outermost pixel of the solid shape, and one pixel outside it.
-    inner = np.asarray(solid, dtype=np.float32) / 255 - np.asarray(solid.filter(ImageFilter.MinFilter(3)), dtype=np.float32) / 255
-    outer = np.asarray(solid.filter(ImageFilter.MaxFilter(3)), dtype=np.float32) / 255
+    """Blends photorealistic FLUX micro-detail & weathering onto the AgX PBR render
+    (zero cartoon black outlines, zero rainbow chroma speckles, crisp untouched muzzle flashes)."""
+    alpha = np.asarray(plain.getchannel("A"), dtype=np.float32) / 255.0
+    flat = np.asarray(plain.convert("RGB"), dtype=np.float32)
     rgb = np.asarray(painted.convert("RGB"), dtype=np.float32)
-    # The model paints darker and greyer than the army's colours. Each part is brought
-    # back to the brightness and colour the render has there, keeping the painted detail:
-    # that is what holds an army to its palette and a walk to one colour from frame to frame.
-    if keep:
-        weight = Image.fromarray((alpha * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(SPREAD))
-        w = np.asarray(weight, dtype=np.float32)[..., None] / 255 + 1e-3
 
-        def soft(pixels):
-            pre = Image.fromarray((pixels * alpha[..., None]).round().astype(np.uint8)).filter(ImageFilter.GaussianBlur(SPREAD))
+    if keep:
+        # Work in YCbCr: take FLUX's crisp photorealistic luminance micro-detail (rivets, folds, scuffs)
+        # while pulling chrominance back toward the realistic AgX PBR faction palette.
+        to_y = lambda c: 0.299 * c[..., 0] + 0.587 * c[..., 1] + 0.114 * c[..., 2]
+        y_flat, y_paint = to_y(flat), to_y(rgb)
+        cb_flat, cr_flat = flat[..., 2] - y_flat, flat[..., 0] - y_flat
+        cb_paint, cr_paint = rgb[..., 2] - y_paint, rgb[..., 0] - y_paint
+
+        weight = Image.fromarray((alpha * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(SPREAD))
+        w = np.asarray(weight, dtype=np.float32) / 255.0 + 1e-3
+
+        def soft_y(vals):
+            pre = Image.fromarray(np.clip(vals * alpha, 0, 255).round().astype(np.uint8)).filter(ImageFilter.GaussianBlur(SPREAD))
             return np.asarray(pre, dtype=np.float32) / w
 
-        flat = np.asarray(plain.convert("RGB"), dtype=np.float32)
-        gain = np.clip((soft(flat) + 6) / (soft(rgb) + 6), 0.5, 2.2)
-        rgb = np.clip(rgb * (1 + (gain - 1) * keep), 0, 255)
-    ink = np.array(OUTLINE, dtype=np.float32)
-    if not edge:  # a piece of a run: an edge would show as a seam where two pieces meet
-        return Image.fromarray(np.dstack([rgb, alpha * 255]).round().astype(np.uint8), "RGBA")
-    # What glows (a muzzle flash, a lamp) has no dark edge: neither a new one nor the one
-    # the render came with.
-    lit = np.asarray(plain.convert("RGB"), dtype=np.float32)
-    glow = (lit.max(axis=2) > 238) & (np.sort(lit, axis=2)[..., 1] > 180) & (alpha > 0.3)  # white or yellow
-    near = np.asarray(Image.fromarray((glow * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
-    inner = inner * ~near
-    k = (inner * 0.8)[..., None]
-    rgb = rgb * (1 - k) + ink * k
-    a = np.maximum(alpha, outer * 0.8 * ~near)
-    a[near & (lit.max(axis=2) < 70)] = 0
-    # Outside the solid shape there is only edge: a half-covered pixel of the render holds
-    # the studio grey of the painting, which would show as a pale fringe.
-    rgb = np.where(((alpha <= 0.6) & ~near)[..., None], ink, rgb)
-    return Image.fromarray(np.dstack([rgb, a * 255]).round().astype(np.uint8), "RGBA")
+        y_gain = np.clip((soft_y(y_flat) + 10.0) / (soft_y(y_paint) + 10.0), 0.78, 1.32)
+        y_adj = np.clip(y_paint * (1.0 + (y_gain - 1.0) * 0.55), 0.0, 255.0)
+        y_out = 0.85 * y_adj + 0.15 * y_flat
+
+        cb_out = cb_flat * keep + cb_paint * (1.0 - keep)
+        cr_out = cr_flat * keep + cr_paint * (1.0 - keep)
+
+        r_out = y_out + cr_out
+        b_out = y_out + cb_out
+        g_out = (y_out - 0.299 * r_out - 0.114 * b_out) / 0.587
+        rgb = np.clip(np.dstack([r_out, g_out, b_out]), 0.0, 255.0)
+
+    # Preserve glowing emissive pixels (muzzle flashes, warm headlights, sparks, hero orbs) untouched
+    glow = (flat.max(axis=2) > 230) & (np.sort(flat, axis=2)[..., 1] > 165) & (alpha > 0.12)
+    near_glow = np.asarray(Image.fromarray((glow * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+    rgb = np.where(near_glow[..., None], flat, rgb)
+
+    # On semi-transparent silhouette boundary pixels, use the clean darkened PBR edge so grey studio
+    # background never leaks as a halo—with ZERO heavy cartoon black outline!
+    fringe = (alpha > 0.02) & (alpha < 0.72) & (~near_glow)
+    rgb = np.where(fringe[..., None], flat * 0.78, rgb)
+    return Image.fromarray(np.dstack([rgb, alpha * 255.0]).round().astype(np.uint8), "RGBA")
 
 
 def save_small(image, path):
-    """256 colours with their own alpha: a fifth of the size, and the look is a painted
-    one with few colours anyway."""
-    image.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(path, optimize=True)
+    """256 colours with Floyd-Steinberg dithering to preserve smooth realistic PBR shading cleanly."""
+    image.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG).save(path, optimize=True)
 
 
 def paint_sheet(name, part, words, style, seed, plain_only, comfy):
@@ -199,10 +205,24 @@ def paint_sheet(name, part, words, style, seed, plain_only, comfy):
 
 
 def main():
+    global PLAIN, KEPT, OUT
     ap = argparse.ArgumentParser()
     ap.add_argument("units", nargs="*")
     ap.add_argument("--plain", action="store_true", help="outline only, no model")
+    ap.add_argument("--out-root", type=pathlib.Path, help="output sprite directory (default: assets/sprites)")
+    ap.add_argument("--plain-root", type=pathlib.Path, help="input plain render directory (default: assets/raw/plain)")
+    ap.add_argument("--kept-root", type=pathlib.Path, help="paint cache directory (default: assets/raw/paint)")
     args = ap.parse_args()
+    if args.out_root:
+        OUT = args.out_root.resolve()
+        if not args.plain_root and "CALLSIGN_PLAIN_ROOT" not in os.environ:
+            PLAIN = OUT.parent / "plain"
+        if not args.kept_root and "CALLSIGN_KEPT_ROOT" not in os.environ:
+            KEPT = OUT.parent / "paint"
+    if args.plain_root:
+        PLAIN = args.plain_root.resolve()
+    if args.kept_root:
+        KEPT = args.kept_root.resolve()
     spec = json.loads((HERE / "paint.json").read_text())
     manifest = json.loads((OUT / "manifest.json").read_text())
     jobs = []
@@ -239,6 +259,10 @@ def main():
     try:
         for name, part, words in jobs:
             paint_sheet(name, part, words, spec["style"], words.get("seed", spec["seed"]), args.plain, comfy)
+        # Painted sheets are new pictures at the same addresses: a new stamp makes the page ask again.
+        manifest = json.loads((OUT / "manifest.json").read_text())
+        manifest["stamp"] = int(time.time())
+        (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     finally:
         for proc in running:
             proc.terminate()

@@ -1,221 +1,163 @@
 {
-  "seed": 7,
-  "style": "Repaint this plain flat 3D render as a finished hand-painted pixel-art sprite for an isometric strategy game: {subject}. The picture holds separate views of the same subject; keep every view exactly where it is, with exactly the same shape, pose, size, proportions and camera angle. Add crisp dark outlines, painted panel lines, seams, small equipment details and light weathering; clear light from the upper left with darker shaded sides; muted military colours. Same plain flat solid light grey background, no ground, no cast shadow. No text, no letters, no numbers, no logos, no flags, no insignia.",
+  "seed": 17,
+  "style": "Photorealistic high-detail isometric 3D military strategy game render: {subject}. The picture holds separate views of the same subject; keep every view exactly where it is, with the exact same shape, pose, size, proportions and 30-degree isometric camera angle. Enhance with realistic weathered matte painted steel, subtle panel bolts and scuffs, authentic fabric creases, stitched webbing and combat boot leather, dusty tracks and tires, crisp desert sunlight from the upper left and deep realistic ambient occlusion shadows. Modern realistic military miniature style. NO cartoon outlines, NO black ink lines, NO pixel art, NO ground, NO cast shadow, plain solid neutral grey studio background. No text, no letters, no numbers, no logos, no flags, no roundels, no markings, no insignia.",
   "units": {
     "commandos": {
-      "subject": "a modern special-forces soldier in a blue-grey uniform with a dark vest, a blue-grey helmet with a pale visor, and a short black rifle",
-      "die": "a modern special-forces soldier in a blue-grey uniform and helmet, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic modern special-forces tactical soldier in a weathered olive drab green combat uniform with a vivid cobalt-blue cloth armband on each upper arm and a cobalt-blue cloth band tied round the helmet, coyote-tan Cordura MOLLE plate carrier vest with rifle mag pouches, high-cut ballistic helmet with ear-pro headset and dark smoked goggles, combat boots, holding a modern suppressed tactical carbine",
+      "die": "a realistic modern special-forces soldier in an olive drab green uniform and ballistic helmet, hit and falling to lie on the ground"
     },
     "engineers": {
-      "subject": "a military engineer in a blue-grey uniform with a yellow hard hat, a yellow tool pack on his back and a short black rifle",
-      "die": "a military engineer in a blue-grey uniform and yellow hard hat, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic military combat engineer in a weathered olive drab green uniform with a vivid cobalt-blue cloth armband on each upper arm and a blue band round a matte yellow protective hard hat, coyote plate carrier, heavy strapped field tool pack, cable spool and compact carbine",
+      "die": "a realistic military combat engineer in an olive drab green uniform and yellow hard hat, hit and falling to lie on the ground"
     },
     "sentinel": {
-      "subject": "an elite sniper in a dark charcoal uniform with a dark helmet, a pale visor and a very long black sniper rifle",
-      "die": "an elite sniper in a dark charcoal uniform, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic elite special-forces recon marksman in a dark olive green uniform, draped overhanging peaked hood and flowing cloth mantle cloak, a vivid cobalt-blue cloth scarf at the throat and blue armbands, demolition satchel and long-barrel anti-materiel sniper rifle with muzzle brake",
+      "die": "a realistic elite marksman in a dark olive green uniform and recon cloak, hit and falling to lie on the ground"
     },
     "militia": {
-      "subject": "an irregular desert fighter in sand-coloured and olive clothes with a tan head wrap, a chest rig and a wooden assault rifle",
-      "die": "an irregular desert fighter in sand-coloured clothes, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic desert guerrilla fighter in a weathered earth-khaki tunic, dark olive trousers and boots, layered tan keffiyeh headwrap with dark agal cord, faded dark olive chest rig with magazine pouches, canvas rucksack and wood-and-steel assault rifle",
+      "die": "a realistic desert guerrilla fighter in earth-khaki clothes and keffiyeh headwrap, hit and falling to lie on the ground"
     },
     "rpgTeam": {
-      "subject": "an irregular desert fighter in sand-coloured and olive clothes with a tan head wrap, carrying a rocket launcher tube on his shoulder",
-      "die": "an irregular desert fighter in sand-coloured clothes, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic desert anti-tank guerrilla fighter in a weathered earth-khaki tunic, dark olive trousers, tan keffiyeh headwrap, olive chest rig and shoulder-fired steel rocket-propelled grenade launcher with spare rockets on his back, earth-toned desert gear only with no blue accents",
+      "die": "a realistic desert fighter in earth-khaki clothes, hit and falling to lie on the ground"
     },
     "sappers": {
-      "subject": "an irregular desert sapper in sand-coloured clothes with an orange head scarf, a satchel on his back and a wooden assault rifle",
-      "die": "an irregular desert sapper in sand-coloured clothes and an orange head scarf, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic desert sapper engineer in a weathered earth-khaki tunic, dark olive trousers, dusty terracotta-orange headwrap, rugged satchel of tools and cable spool on his back and wood-and-steel assault rifle, earth-toned desert gear only with no blue accents",
+      "die": "a realistic desert sapper in earth-khaki clothes and terracotta headwrap, hit and falling to lie on the ground"
     },
     "oracle": {
-      "subject": "a mysterious agent in a long pale cream hooded robe with an orange scarf, the face in shadow",
-      "die": "a figure in a long pale cream hooded robe, hit and falling to lie on the ground"
+      "grid": [4, 2],
+      "subject": "a realistic mysterious desert operative in a plain weathered woven pale-sand hooded travelling robe with deep shadowed cowl and burnt-orange woven shawl and waist sash, holding a compact carbine, warm sand and terracotta fabric only with no blue accents",
+      "die": "a realistic figure in a weathered pale-sand hooded robe, hit and falling to lie on the ground"
     },
     "fpvSwarm": {
-      "subject": "a small dark quadcopter attack drone with four rotors and a rust-red body",
-      "die": "a small quadcopter drone breaking apart as it falls"
+      "grid": [4, 2],
+      "subject": "a realistic compact carbon-fibre tactical quadcopter FPV attack drone with four 3-blade rotors, strapped battery pack, front FPV lens and underslung finned munition warhead",
+      "die": "a realistic damaged quadcopter attack drone breaking apart as it falls"
     },
     "tank": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "the hull of a modern blue-grey main battle tank with dark tracks and road wheels, seen without its turret",
-      "wreck": "the burnt-out blackened wreck of a main battle tank, scorched dark steel, no flames, no smoke",
+      "grid": [2, 2],
+      "subject": "the hull of a realistic modern olive drab green main battle tank with weathered matte CARC steel armour, bolted hinged side skirts, braided steel tow cable, recessed engine deck louvers, dusty rubber-padded tracks and seven dished road wheels, seen without its turret",
+      "wreck": "the burnt-out blackened scorched steel wreck of a modern main battle tank, charred soot and battle damage, no flames, no smoke",
       "turret": {
-        "grid": [
-          2,
-          2
-        ],
-        "subject": "the angular turret and long gun barrel of a modern blue-grey main battle tank, seen alone"
+        "grid": [2, 2],
+        "subject": "the realistic angular composite wedge turret and long thermal-sleeved 120mm smoothbore cannon with bore evacuator, smoke launchers, gunner thermal sight, pintle machine gun and bustle rack with a vivid cobalt-blue recognition band on the gun barrel, fluttering cobalt-blue aerial pennants and a blue cloth panel on the rear bustle of a modern olive drab green main battle tank, seen alone"
       }
     },
     "rocketLauncher": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a blue-grey six-wheeled military rocket artillery truck with an armoured cab and a flat bed, seen without its launcher",
-      "wreck": "the burnt-out blackened wreck of a military truck, scorched dark steel, no flames, no smoke",
+      "grid": [2, 2],
+      "subject": "a realistic olive drab green six-wheeled military armoured artillery truck with sloped split-windshield cab, vivid cobalt-blue recognition band round the cab and fluttering blue aerial pennant, heavy dusty off-road treaded tires, hydraulic outriggers and flat rear chassis, seen without its launcher",
+      "wreck": "the burnt-out blackened scorched steel wreck of a six-wheeled military artillery truck, no flames, no smoke",
       "turret": {
-        "grid": [
-          1,
-          2
-        ],
-        "subject": "a blue-grey box launcher of rocket tubes on its swivel mount, seen alone"
+        "grid": [2, 2],
+        "subject": "a realistic weathered olive drab green armoured twelve-tube rocket launcher pod with dark steel tube mouths and a vivid cobalt-blue recognition band round its rear on a steel turntable mount, seen alone"
       }
     },
     "helicopter": {
-      "grid": [
-        1,
-        1
-      ],
-      "subject": "a blue-grey attack helicopter with a dark glass canopy, stub wings with rocket pods and a spinning rotor",
-      "wreck": "the burnt-out blackened wreck of a crashed helicopter, scorched dark steel, no flames, no smoke",
+      "grid": [2, 2],
+      "subject": "a realistic matte olive drab green modern tandem-seat attack helicopter with faceted tinted glass cockpit, nose electro-optical sensor turret, stub wings with rocket pods and guided missiles, twin turbine nacelles, mast radar dome and main rotor, with a vivid cobalt-blue recognition band round the tail boom",
+      "wreck": "the burnt-out blackened scorched metal wreck of a crashed military attack helicopter, no flames, no smoke",
       "turret": {
-        "grid": [
-          2,
-          2
-        ],
-        "subject": "a small dark chin gun turret of a helicopter, seen alone"
+        "grid": [2, 2],
+        "subject": "a realistic dark gunmetal 30mm chin autocannon turret of a military attack helicopter, seen alone"
       }
     },
     "strikeJet": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a compact blue-grey military ground-attack jet aeroplane with swept wings, pale grey wing tips, two tail fins and a dark glass canopy",
-      "wreck": "the burnt-out blackened wreck of a crashed jet aeroplane, scorched dark steel, no flames, no smoke"
+      "grid": [2, 2],
+      "subject": "a realistic matte tactical haze-grey modern supersonic ground-attack strike fighter aircraft with pointed radome nose, sculpted dark tinted bubble canopy, swept wings, side air intakes, twin canted tail fins with vivid cobalt-blue tips, twin exhaust nozzles and underwing precision bombs",
+      "wreck": "the burnt-out blackened scorched metal wreck of a crashed military strike jet, no flames, no smoke"
     },
     "propBomber": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "an old patched sand-coloured single-propeller aeroplane with straight wings, a rust-red engine cowl and tail fin, olive and rust repair panels and a dark glass canopy",
-      "wreck": "the burnt-out blackened wreck of a crashed propeller aeroplane, scorched dark steel, no flames, no smoke"
+      "grid": [2, 2],
+      "subject": "a realistic weathered desert-sand rugged single-propeller light attack aircraft with plain unpainted riveted sand-and-olive aluminum skin, oxidized rust radial engine cowl, framed greenhouse canopy, olive repair panels, fixed landing gear and underwing iron bombs, completely blank wings with zero markings, zero symbols, zero stripes, zero blue paint",
+      "wreck": "the burnt-out blackened scorched metal wreck of a crashed propeller attack aircraft, no flames, no smoke"
     },
     "patrolBoat": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a blue-grey naval patrol boat with a wheelhouse, dark windows, a radar mast and a grey deck, seen from above",
+      "grid": [2, 2],
+      "subject": "a realistic matte naval haze-grey fast military V-hull patrol boat with sloped armoured wheelhouse, vivid cobalt-blue recognition band round the cabin and fluttering cobalt-blue mast pennant, framed dark tinted bridge windows, swept radar arch and non-slip deck, seen from above",
       "turret": {
-        "grid": [
-          2,
-          2
-        ],
-        "subject": "a small blue-grey naval deck gun with a short barrel, seen alone"
+        "grid": [2, 2],
+        "subject": "a realistic matte haze-grey naval faceted remote autocannon deck turret, seen alone"
       }
     },
     "crawler": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
-      "wreck": "the burnt-out blackened wreck of a six-wheeled hauler truck, scorched dark steel, no flames, no smoke",
-      "move": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
-      "full": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is heaped with gold nuggets",
-      "moveFull": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop; the cargo bed is heaped with gold nuggets",
-      "load": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop",
-      "unload": "a blue-grey six-wheeled military ore hauler truck with an armoured cab, an open cargo bed, yellow hazard markings and a loading scoop"
+      "grid": [2, 2],
+      "subject": "a realistic heavy olive drab green six-wheeled military armoured mining ore hauler truck with dusty treaded tires, cab-guard canopy, ribbed steel hopper with a vivid cobalt-blue stripe along the top rail, hydraulic front loading scoop and empty bare steel cargo bed with no gold",
+      "wreck": "the burnt-out blackened scorched steel wreck of a heavy six-wheeled military hauler truck, no flames, no smoke",
+      "move": "a realistic heavy olive drab green six-wheeled military armoured ore hauler truck with dusty treaded tires, ribbed steel hopper with a vivid cobalt-blue stripe along the top rail and empty bare steel cargo bed with no gold",
+      "full": "a realistic heavy olive drab green six-wheeled military armoured ore hauler truck with dusty treaded tires, ribbed steel hopper with a vivid cobalt-blue stripe along the top rail and cargo bed heaped with raw gold ore nuggets",
+      "moveFull": "a realistic heavy olive drab green six-wheeled military armoured ore hauler truck with dusty treaded tires, ribbed steel hopper with a vivid cobalt-blue stripe along the top rail and cargo bed heaped with raw gold ore nuggets",
+      "load": "a realistic heavy olive drab green six-wheeled military armoured ore hauler truck scooping gold ore with its front hydraulic loading arm",
+      "unload": "a realistic heavy olive drab green six-wheeled military armoured ore hauler truck tipping its ribbed steel cargo bed"
     },
     "technical": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a battered sand-coloured pickup truck with a dark windscreen, rust and dents, an open bed with a fighter sitting in it",
-      "wreck": "the burnt-out blackened wreck of a pickup truck, scorched dark steel, no flames, no smoke",
+      "grid": [2, 2],
+      "subject": "a realistic battered desert-sand 4x4 military pickup gun truck with dusty treaded off-road tires, heavy steel bullbar and winch, louvered grille, slat-armoured dark windshield, riveted rusted steel door plates, roof olive camo tarp, burlap sandbags and wooden ammo crate in the bed",
+      "wreck": "the burnt-out blackened scorched steel wreck of a desert pickup truck, no flames, no smoke",
       "turret": {
-        "grid": [
-          2,
-          2
-        ],
-        "subject": "a heavy machine gun on a post with a gunner in sand-coloured clothes and a tan head wrap standing behind it, seen alone"
+        "grid": [2, 2],
+        "subject": "a realistic heavy gunmetal machine gun on a braced steel post with an angled rusted steel gun shield and a desert fighter gunner in earth-khaki clothes and keffiyeh headwrap standing behind it, seen alone"
       }
     },
     "speedboat": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a small open wooden motor boat with a brown hull, an outboard engine and two fighters in sand-coloured clothes sitting in it",
+      "grid": [2, 2],
+      "subject": "a realistic weathered timber and rusted steel deep-V desert-raider motorboat with bolted scrap armor patches, cowled outboard engine, fuel drum and fighter helmsman in earth-khaki clothes and keffiyeh",
       "turret": {
-        "grid": [
-          2,
-          2
-        ],
-        "subject": "a heavy machine gun on a post with a gunner in sand-coloured clothes standing behind it, seen alone"
+        "grid": [2, 2],
+        "subject": "a realistic heavy gunmetal machine gun on a steel tripod with a desert fighter gunner in earth-khaki clothes and keffiyeh standing behind it, seen alone"
       }
     },
     "dumpTruck": {
-      "grid": [
-        1,
-        2
-      ],
-      "subject": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
-      "wreck": "the burnt-out blackened wreck of a dump truck, scorched dark steel, no flames, no smoke",
-      "move": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is empty, a bare steel floor with no cargo and no gold in it",
-      "full": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is heaped with gold nuggets",
-      "moveFull": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm; the cargo bed is heaped with gold nuggets",
-      "load": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm",
-      "unload": "a battered rusty brown and sand-coloured civilian dump truck with a dented cab, an open tipping bed and a loading arm"
+      "grid": [2, 2],
+      "subject": "a realistic battered rusty brown and desert-sand civilian tipper dump truck with contoured bonnet, slatted grille, dusty treaded tires, ribbed timber-and-iron tipping bed, front loading arm and empty bare steel cargo bed with no gold",
+      "wreck": "the burnt-out blackened scorched steel wreck of a civilian dump truck, no flames, no smoke",
+      "move": "a realistic battered rusty brown and desert-sand civilian dump truck with dusty treaded tires and empty ribbed timber cargo bed with no gold",
+      "full": "a realistic battered rusty brown and desert-sand civilian dump truck with dusty treaded tires and ribbed timber cargo bed heaped with raw gold ore nuggets",
+      "moveFull": "a realistic battered rusty brown and desert-sand civilian dump truck with dusty treaded tires and ribbed timber cargo bed heaped with raw gold ore nuggets",
+      "load": "a realistic battered rusty brown and desert-sand civilian dump truck scooping gold ore with its front loading arm",
+      "unload": "a realistic battered rusty brown and desert-sand civilian dump truck tipping its ribbed timber cargo bed"
     }
   },
   "pieces": {
     "barrierWall": {
       "folder": "segments",
-      "grid": [
-        1,
-        1
-      ],
+      "grid": [1, 1],
       "edge": false,
-      "subject": "one section of a modern prefabricated blue-grey armoured barrier wall made of steel panels on a concrete footing",
-      "ruin": "one section of a blue-grey armoured barrier wall smashed down to broken stumps and rubble"
+      "subject": "one section of a realistic prefabricated slate-grey concrete and steel armoured barrier wall",
+      "ruin": "one section of a realistic slate-grey armoured barrier wall smashed down to broken concrete stumps and rubble"
     },
     "wireFence": {
       "folder": "segments",
-      "grid": [
-        1,
-        1
-      ],
+      "grid": [1, 1],
       "edge": false,
-      "subject": "one section of an improvised fence of rusty corrugated metal sheets, timber posts and barbed wire",
-      "ruin": "one section of an improvised fence of rusty metal and timber, torn down and lying flat in pieces"
+      "subject": "one section of a realistic improvised fence of rusty corrugated metal sheets, weathered timber posts and barbed wire",
+      "ruin": "one section of a realistic improvised fence of rusty metal and timber, torn down and lying flat in pieces"
     },
     "wall": {
       "folder": "segments",
-      "grid": [
-        1,
-        1
-      ],
+      "grid": [1, 1],
       "edge": false,
-      "subject": "one section of a low dry-stone field wall of pale rough sandstone blocks"
+      "subject": "one section of a realistic low dry-stone field wall of rough weathered sandstone blocks"
     },
     "bridge": {
       "folder": "segments",
-      "grid": [
-        1,
-        1
-      ],
+      "grid": [1, 1],
       "edge": false,
-      "subject": "one span of a concrete road bridge with a dark asphalt deck, pale lane marks, steel railings and grey concrete sides",
-      "broken": "one span of a concrete road bridge broken in the middle, the asphalt deck cracked and fallen in, bent railings"
+      "subject": "one span of a realistic concrete military road bridge with dark weathered asphalt deck, steel guardrails and concrete sides",
+      "broken": "one span of a realistic concrete road bridge collapsed in the middle, cracked asphalt and bent steel railings"
     },
     "sandbags": {
       "folder": "landmarks",
-      "frame": [
-        202,
-        117
-      ],
-      "grid": [
-        2,
-        2
-      ],
-      "subject": "a curved fighting position built of stacked tan burlap sandbags; some views show it knocked apart with torn bags and spilled sand"
+      "frame": [202, 117],
+      "grid": [2, 2],
+      "subject": "a realistic curved military fighting position built of stacked weathered tan burlap sandbags"
     }
   }
 }
