@@ -257,17 +257,22 @@ test("careful tidying respells a map point only when it is plainly that point", 
   rules.map = rules.maps.large;
   const careful = (text, lang) => tidy(text, { lang, rules, careful: true });
   for (const [lang, text] of [
-    ["he", "סדן, כאן פטיש, קנה עוד כיתת קומנדו ושלח אותה לדוד, עבור."],
     ["he", "סדן, כמה זהב נשאר?"],
     ["he", "סדן, מה קורה עם המשאיות?"],
     ["he", "בז 1, כאן פטיש, סיור מעל הגר ואחר כך חזור לבסיס, סוף."],
-    ["he", "צפע 1, כאן פטיש, יפה מאוד, המשיכו כך, סוף."],
     ["he", "סדן, הוא יצא למסע ארוך"],
     ["en", "Viper 1, this is Hammer. Very good, carry on. Out."],
   ]) {
     assert.equal(careful(text, lang), text);
     assert.notEqual(tidy(text, { lang, rules }), text, "matching by sound does change this one");
   }
+  // A name with a single consonant sound (דוד, יואב, לאה) sounds like any short word, so it
+  // is matched the careful way whoever heard it: "עוד" is not דוד and "יפה" is not יואב.
+  for (const text of ["סדן, כאן פטיש, קנה עוד כיתת קומנדו ושלח אותה לדוד, עבור.", "צפע 1, כאן פטיש, יפה מאוד, המשיכו כך, סוף.", "קרנף 1, כאן פטיש, תחזיקו את העיירה, עבור."]) {
+    assert.equal(careful(text, "he"), text);
+    assert.equal(tidy(text, { lang: "he", rules }), text);
+  }
+  assert.equal(tidy("צפע 1 תקוף את דויד", { lang: "he", rules }), "צפע 1 תקוף את דוד");
   for (const text of ["Anvil, buy me a tank by the yard", "Anvil, call it a victory", "Viper 2 hold the hostel"]) assert.equal(careful(text, "en"), text);
   // The same name in another spelling, in two words, behind a glued letter, or as the letter itself.
   assert.equal(careful("צפע 1 תקוף את קרמל", "he"), "צפע 1 תקוף את כרמל");
