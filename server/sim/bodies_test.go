@@ -257,7 +257,7 @@ func TestFriendsPassEachOtherInACorridorOneCellWide(t *testing.T) {
 
 func TestATankDrivesOverInfantryAndALightVehicleGoesRoundThem(t *testing.T) {
 	drive := func(unit string, side int) (lost int, nearest float64, crossed bool) {
-		s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 24, StartGold: 5000, Base: []string{"barracks", "works"}})
+		s, _ := simOn(t, rules, drillGround, sim.Config{Seed: 24, StartGold: 5000, Base: []string{"power", "barracks", "works"}})
 		aside(s)
 		v := buyFielded(t, s, side, unit)
 		foot := s.Squad(3) // militia

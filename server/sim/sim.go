@@ -213,6 +213,7 @@ type PointState struct {
 }
 
 type Sim struct {
+	stagedPower [2]float64 // power to spare that a staged base starts with (initStructures)
 	R     *shared.Rules
 	Tick  int
 	Sides [2]Side

@@ -32,6 +32,9 @@ export const stands = (state, side, role) => mine(state, side).some((s) => s.rol
 // when the unit is unlocked.
 export function unitLock(state, rules, faction, side, unitId) {
   const u = rules.factions[faction]?.units[unitId];
+  // A base short of power makes no units: what is needed first is power.
+  const p = state?.power;
+  if (u && p && (p.use ?? 0) > (p.supply ?? 0)) return ofRole(rules, faction, "power");
   if (!u?.requires || stands(state, side, u.requires)) return null;
   return ofRole(rules, faction, u.requires);
 }
@@ -60,6 +63,8 @@ export function structureCards(state, rules, faction, side) {
       if (going) Object.assign(card, { state: "rising", progress: going.building });
       else if (def.role === "power" && count("power") >= (rules.match.powerStructures ?? Infinity)) card.state = "full";
       else if (missing) Object.assign(card, { state: "needs", needs: ofRole(rules, faction, missing) });
+      // Nothing that uses power is started on power the side does not have.
+      else if ((def.power ?? 0) < 0 && state?.power && (state.power.use ?? 0) - def.power > (state.power.supply ?? 0)) Object.assign(card, { state: "needs", needs: ofRole(rules, faction, "power") });
       else if (rising(base(def))) card.state = "busy";
       else if (base(def) && bases >= (rules.match.baseCap ?? Infinity)) card.state = "full";
       else if (def.role === "defence" && count("defence") >= rules.match.defenceCap) card.state = "full";

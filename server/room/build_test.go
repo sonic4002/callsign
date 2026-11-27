@@ -15,7 +15,7 @@ import (
 // barracks and the refinery has to be built.
 func baseRoom(t *testing.T) *Room {
 	t.Helper()
-	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, Purse: true, Base: []string{"refinery", "barracks"}}) // these tests are about the build tree, not about who may spend
+	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, Purse: true, Base: []string{"power", "refinery", "barracks"}}) // these tests are about the build tree, not about who may spend
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestSquadsAreSentAtStructuresAndOnlyEngineersCapture(t *testing.T) {
 // Building is spending: the operator builds on Hammer's order, or on its own only while
 // it holds the purse, and then the net tells Hammer what was started.
 func TestBuildingFollowsThePurse(t *testing.T) {
-	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, Base: []string{"refinery", "barracks"}})
+	rm, err := New(rules, Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, AutoStart: true, Base: []string{"power", "refinery", "barracks"}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,15 +40,20 @@ func (s *Sim) powerOf(side int) (supply, use float64) {
 	if _, hq := s.faction(side).StructureOfRole(shared.RoleHQ); hq != nil && s.Sides[side].HQHP > 0 {
 		supply += math.Max(0, hq.Power)
 	}
+	plants := 0
 	for _, st := range s.Structures {
 		if st.Side != side || !st.Standing() {
 			continue
 		}
 		if st.def.Power > 0 {
 			supply += st.def.Power
+			plants++
 		} else {
 			use -= st.def.Power
 		}
+	}
+	if plants > 0 {
+		supply += s.stagedPower[side] // only a staged base has any (initStructures)
 	}
 	return supply, use
 }

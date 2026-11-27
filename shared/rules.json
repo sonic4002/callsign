@@ -713,7 +713,7 @@
       "startUnits": ["commandos", "commandos"],
       "structures": {
         "commandPost": { "name": { "en": "Command Post", "he": "מוצב הפיקוד" }, "role": "hq",
-          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 30 },
+          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 0 },
         "powerPlant": { "name": { "en": "Power Plant", "he": "תחנת כוח" }, "role": "power", "capturable": true,
           "cost": 140, "buildSeconds": 5, "hp": 700, "armor": 0.3, "requires": [], "unlocks": [], "footprint": 44, "sight": 180, "power": 100 },
         "barracks": { "name": { "en": "Barracks", "he": "מגורי הלוחמים" }, "role": "barracks", "capturable": true,
@@ -829,7 +829,7 @@
       "startUnits": ["militia", "militia"],
       "structures": {
         "den": { "name": { "en": "The Den", "he": "המאורה" }, "role": "hq",
-          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 30 },
+          "cost": 0, "buildSeconds": 0, "hp": 3000, "armor": 0.5, "requires": [], "unlocks": [], "footprint": 60, "sight": 300, "power": 0 },
         "generatorYard": { "name": { "en": "Generator Yard", "he": "חצר הגנרטורים" }, "role": "power", "capturable": true,
           "cost": 130, "buildSeconds": 5, "hp": 550, "armor": 0.2, "requires": [], "unlocks": [], "footprint": 44, "sight": 180, "power": 100 },
         "safehouse": { "name": { "en": "Safehouse", "he": "בית המסתור" }, "role": "barracks", "capturable": true,

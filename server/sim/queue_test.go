@@ -207,7 +207,7 @@ func TestUnitsComeOutOfTheirStructureAndGather(t *testing.T) {
 }
 
 func TestARefineryBringsItsHaulerOutOfItsOwnBay(t *testing.T) {
-	s, err := sim.New(rules, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}})
+	s, err := sim.New(rules, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, Base: []string{"power"}})
 	if err != nil {
 		t.Fatal(err)
 	}

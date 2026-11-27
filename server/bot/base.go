@@ -72,8 +72,24 @@ func (p *Player) raise(snap sim.Snapshot, role string, depth int) baseStep {
 		}
 	}
 	// Power first: what would leave the side short waits for another power structure.
-	if role != shared.RolePower && def.Power < 0 && p.spare(snap)+def.Power < 0 && p.powerCount(snap) < p.R.Match.PowerStructures {
-		return p.raise(snap, shared.RolePower, depth+1)
+	// The game starts nothing on power the side does not have (sim: ErrNoPower): standing
+	// supply, less what stands and what is going up.
+	if role != shared.RolePower && def.Power < 0 {
+		have := float64(snap.Power.Supply - snap.Power.Use)
+		for _, st := range snap.Structures {
+			if pw := p.R.Factions[st.Faction].Structures[st.Kind].Power; st.Side == p.Side && !st.Ruin && st.Building < 1 && pw < 0 {
+				have += pw
+			}
+		}
+		if have+def.Power < 0 {
+			switch {
+			case p.rising(snap, shared.RolePower):
+				return baseStep{wait: true}
+			case p.powerCount(snap) < p.R.Match.PowerStructures:
+				return p.raise(snap, shared.RolePower, depth+1)
+			}
+			return baseStep{} // no more power to be had: it does without
+		}
 	}
 	if snap.Gold < def.Cost {
 		return baseStep{wait: true}

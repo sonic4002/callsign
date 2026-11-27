@@ -33,9 +33,16 @@ func TestTheOpeningIsARefineryThatBringsAHauler(t *testing.T) {
 			barracks = def
 		}
 	}
-	if spare := snap.Gold - refinery.Cost - barracks.Cost - rules.Factions["aegis"].Units["commandos"].Cost; spare < 0 {
-		t.Fatalf("the starting gold (%d) does not pay for a refinery, a barracks and a first squad", snap.Gold)
+	plant := rules.Factions["aegis"].Structures["powerPlant"]
+	if spare := snap.Gold - plant.Cost - refinery.Cost - barracks.Cost - rules.Factions["aegis"].Units["commandos"].Cost; spare < 0 {
+		t.Fatalf("the starting gold (%d) does not pay for power, a refinery, a barracks and a first squad", snap.Gold)
 	}
+	// Nothing that uses power goes up before there is power.
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "refinery"}, sim.ErrNoPower, "Power Plant")
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "powerPlant"}); err != nil {
+		t.Fatal(err)
+	}
+	run(s, plant.BuildSeconds+1)
 	// No refinery, no barracks: nothing can be bought yet, and the refusal says what to build.
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}, sim.ErrNeedsStructure, "Barracks")
 	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "crawler"}, sim.ErrNeedsStructure, "Vehicle Works")
@@ -72,12 +79,19 @@ func TestTheTrickleRecoversASideWithNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "refinery"}, sim.ErrNoGold, "")
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "powerPlant"}, sim.ErrNoGold, "")
+	// Power first, then the refinery, both out of the trickle.
+	for i := 0; i < 120*rules.TickRate && s.Gold(0) < 140; i++ {
+		s.Step()
+	}
+	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "powerPlant"}); err != nil {
+		t.Fatalf("the trickle did not pay for power (%d gold): %v", s.Gold(0), err)
+	}
 	for i := 0; i < 120*rules.TickRate && s.Gold(0) < 400; i++ {
 		s.Step()
 	}
 	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "refinery"}); err != nil {
-		t.Fatalf("after two minutes of the trickle (%d gold): %v", s.Gold(0), err)
+		t.Fatalf("after four minutes of the trickle (%d gold): %v", s.Gold(0), err)
 	}
 	run(s, 20)
 	if len(haulersOf(s.Snapshot(0), 0)) != 1 {

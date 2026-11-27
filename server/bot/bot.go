@@ -127,6 +127,8 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		}
 	}
 
+	// A base short of power makes no units (sim: ErrNoPower); upkeep below puts power back.
+	short := snap.Power.Use > snap.Power.Supply
 	// Squads on their way count as already there, or the bot would buy them twice.
 	haulers := 0
 	for _, d := range snap.Deploying {
@@ -156,7 +158,7 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 					return cmds // save for it
 				}
 			}
-		} else if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) {
+		} else if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) && !short {
 			return append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: id})
 		} else if haulers == 0 {
 			return cmds // save for the hauler
@@ -208,7 +210,7 @@ func (p *Player) Act(snap sim.Snapshot) []sim.Command {
 		}
 		return cmds
 	}
-	if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) {
+	if snap.Gold >= u.Cost && !p.lineFull(snap, u.Requires) && !short {
 		cmds = append(cmds, sim.Command{Side: p.Side, Kind: sim.CmdBuy, Unit: buy})
 		p.lastBuy = snap.Tick + 1
 		if u.Hero {

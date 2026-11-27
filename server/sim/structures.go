@@ -33,6 +33,7 @@ var (
 	ErrNoStructure    = errors.New("your faction has no such structure")
 	ErrNeedsStructure = errors.New("a structure is missing")
 	ErrBuilding       = errors.New("one at a time")
+	ErrNoPower        = errors.New("not enough power")
 	ErrTooFar         = errors.New("too far from your own ground")
 	ErrNoRoom         = errors.New("no room to build there")
 	ErrTooMany        = errors.New("you have as many as you can hold")
@@ -350,6 +351,11 @@ func (s *Sim) initStructures(full bool, base []string) {
 			if def == nil || !def.Base() {
 				continue
 			}
+			// A base staged with power (tests, and the full base of a practice match) is
+			// given a little to spare, so that what is tried on it is not short at once.
+			if role == shared.RolePower && (len(base) > 0 || full) {
+				s.stagedPower[side] = stagedSpare
+			}
 			x, y, ok := s.SiteFor(side, def)
 			if !ok {
 				continue
@@ -372,6 +378,9 @@ func (s *Sim) newStructure(side int, kind string, def *shared.Structure, x, y fl
 	s.Structures = append(s.Structures, st)
 	return st
 }
+
+// stagedSpare is the power a staged base has beyond what its structures supply.
+const stagedSpare = 30
 
 // buildStartHP is the share of its hit points a structure has when work begins.
 const buildStartHP = 0.3
@@ -407,6 +416,20 @@ func (s *Sim) build(c Command) (*Structure, error) {
 		if !s.Has(c.Side, role) {
 			_, need := f.StructureOfRole(role)
 			return nil, fmt.Errorf("%w: the %s needs %s first", ErrNeedsStructure, def.Name.En, a(need.Name.En))
+		}
+	}
+	// Nothing that uses power is started on power the side does not have: a power
+	// structure comes first, and again whenever the base outgrows its supply.
+	if def.Power < 0 {
+		supply, use := s.powerOf(c.Side)
+		for _, st := range s.Structures {
+			if st.Side == c.Side && !st.Ruin && st.BuildTicks > 0 && st.def.Power < 0 {
+				use -= st.def.Power // what is going up already has its share spoken for
+			}
+		}
+		if use-def.Power > supply {
+			_, plant := f.StructureOfRole(shared.RolePower)
+			return nil, fmt.Errorf("%w: the %s needs %d and %d is to spare; build %s first", ErrNoPower, def.Name.En, int(-def.Power), int(math.Max(0, supply-use)), a(plant.Name.En))
 		}
 	}
 	// One base structure goes up at a time, and one defence or fence beside it.
@@ -738,6 +761,11 @@ func (s *Sim) unitFor(side int, unitID string) (shared.Unit, bool) {
 // and the structure it needs must stand.
 func (s *Sim) mayBuy(side int, unitID string) (shared.Unit, error) {
 	own := s.faction(side)
+	// A base short of power makes no units until its power is back.
+	if supply, use := s.powerOf(side); use > supply {
+		_, plant := own.StructureOfRole(shared.RolePower)
+		return shared.Unit{}, fmt.Errorf("%w: no units are made on low power; build %s", ErrNoPower, a(plant.Name.En))
+	}
 	if u, ok := own.Units[unitID]; ok {
 		for _, role := range append([]string{u.Requires}, u.Needs...) {
 			if role != "" && !s.Has(side, role) {

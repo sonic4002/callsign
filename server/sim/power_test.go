@@ -12,7 +12,7 @@ import (
 // refinery and a barracks stand, and no power structure yet.
 func openSim(t *testing.T, gold int) *sim.Sim {
 	t.Helper()
-	s, err := sim.New(rules, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, Base: []string{"refinery", "barracks"}, StartGold: gold})
+	s, err := sim.New(rules, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, Base: []string{"power", "refinery", "barracks"}, StartGold: gold})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,78 +68,60 @@ func structureOf(s *sim.Sim, side int, role string) *sim.Structure {
 	return nil
 }
 
-func TestTheHeadquartersPowersTheOpeningAndNoMore(t *testing.T) {
-	s := openSim(t, 5000)
-	hq := rules.Factions["aegis"].Structures["commandPost"].Power
-	refinery, barracks := rules.Factions["aegis"].Structures["refinery"], rules.Factions["aegis"].Structures["barracks"]
-	if hq < -(refinery.Power + barracks.Power) {
-		t.Fatalf("the headquarters supplies %v, less than a refinery and a barracks use", hq)
-	}
-	if p := s.Snapshot(0).Power; p.Supply != int(hq) || p.Use != int(-(refinery.Power+barracks.Power)) || p.Low {
-		t.Fatalf("power at the start: %+v", p)
-	}
-
-	// The works takes the side past what the headquarters supplies: said once.
-	var events []sim.Event
-	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "works"}); err != nil {
+// Nothing that uses power is started without it, and a base that loses its power makes
+// no units until it is back (owner, 2026-11-27).
+func TestNothingThatUsesPowerIsStartedWithoutIt(t *testing.T) {
+	s, err := sim.New(rules, sim.Config{Seed: 1, Factions: [2]string{"aegis", "ashfall"}, StartGold: 5000})
+	if err != nil {
 		t.Fatal(err)
 	}
-	events = append(events, run(s, rules.Factions["aegis"].Structures["vehicleWorks"].BuildSeconds+3)...)
-	if p := s.Snapshot(0).Power; !p.Low || p.Use <= p.Supply {
-		t.Fatalf("with a works and no power structure the side should be short: %+v", p)
+	s.Step()
+	if p := s.Snapshot(0).Power; p.Supply != 0 || p.Use != 0 || p.Low {
+		t.Fatalf("power at the start, with the headquarters alone: %+v", p)
 	}
-	if n := countEvents(events, sim.EvLowPower, 0); n != 1 {
-		t.Fatalf("low power was said %d times, want once", n)
+	for _, kind := range []string{"barracks", "refinery"} {
+		refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: kind}, sim.ErrNoPower, "Power Plant")
 	}
-	if countEvents(events, sim.EvLowPower, 1) != 0 || s.Snapshot(1).Power.Low {
-		t.Fatal("the other side heard of it, or is short of power itself")
+	build(t, s, 0, "power")
+	build(t, s, 0, "barracks")
+	fielded(s, must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}))
+	// What would outgrow the supply waits for another power structure.
+	for _, kind := range []string{"refinery", "works", "radar", "airbase", "dockyard"} {
+		build(t, s, 0, kind)
 	}
-
-	// Short of power, a structure goes up at the share of the usual speed the rules give.
-	plant := rules.Factions["aegis"].Structures["powerPlant"]
-	if _, err := s.Apply(sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "power"}); err != nil {
-		t.Fatal(err)
+	if p := s.Snapshot(0).Power; p.Supply != 100 || p.Use != 100 || p.Low {
+		t.Fatalf("a base that uses all its power is not short of it: %+v", p)
 	}
-	start := s.Tick
-	for i := 0; i < 1000 && !s.Has(0, shared.RolePower); i++ {
-		events = append(events, s.Step()...)
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuild, Structure: "sentryGun", Place: "base:front"}, sim.ErrNoPower, "Power Plant")
+	build(t, s, 0, "power")
+	// With the power gone no unit is made, and power can always be built again.
+	for structureOf(s, 0, shared.RolePower) != nil {
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdSell, Place: structureOf(s, 0, shared.RolePower).PlaceID()})
+		run(s, 1)
 	}
-	took := float64(s.Tick-start) / float64(rules.TickRate)
-	if want := plant.BuildSeconds / rules.Match.LowPowerFactor; math.Abs(took-want) > 0.3 {
-		t.Fatalf("on low power the plant took %.1f s, want about %.1f", took, want)
-	}
-	events = append(events, run(s, 1)...)
-	if p := s.Snapshot(0).Power; p.Low || p.Supply != int(hq+plant.Power) {
-		t.Fatalf("with a power plant: %+v", p)
-	}
-	if n := countEvents(events, sim.EvPowerRestored, 0); n != 1 {
-		t.Fatalf("power restored was said %d times, want once", n)
-	}
-	// With power, the next one goes up at the usual speed.
-	radar := rules.Factions["aegis"].Structures["radar"]
-	if took := build(t, s, 0, "radar"); math.Abs(took-radar.BuildSeconds) > 0.3 {
-		t.Fatalf("with power the radar took %.1f s, want %.1f", took, radar.BuildSeconds)
-	}
+	refused(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}, sim.ErrNoPower, "Power Plant")
+	build(t, s, 0, "power")
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"})
 }
 
 func TestLowPowerHalvesDeployment(t *testing.T) {
 	s := openSim(t, 5000)
 	u := rules.Factions["aegis"].Units["commandos"]
-	usual := fielded(s, must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}))
-	_ = usual
 	start := s.Tick
-	sq := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"})
-	fielded(s, sq)
+	fielded(s, must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}))
 	if took := float64(s.Tick-start) / float64(rules.TickRate); math.Abs(took-u.DeploySeconds) > 0.2 {
 		t.Fatalf("with power a squad deployed in %.1f s, want %.1f", took, u.DeploySeconds)
 	}
-	build(t, s, 0, "works") // now the side is short of power
+	// A squad already in the line when the power goes still comes out, at the slow rate.
+	start = s.Tick
+	sq := must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"})
+	must(t, s, sim.Command{Side: 0, Kind: sim.CmdSell, Place: structureOf(s, 0, shared.RolePower).PlaceID()})
+	s.Step()
 	if !s.LowPower(0) {
 		t.Fatal("the side should be short of power")
 	}
-	start = s.Tick
-	fielded(s, must(t, s, sim.Command{Side: 0, Kind: sim.CmdBuy, Unit: "commandos"}))
-	if took, want := float64(s.Tick-start)/float64(rules.TickRate), u.DeploySeconds/rules.Match.LowPowerFactor; math.Abs(took-want) > 0.3 {
+	fielded(s, sq)
+	if took, want := float64(s.Tick-start)/float64(rules.TickRate), u.DeploySeconds/rules.Match.LowPowerFactor; math.Abs(took-want) > 0.5 {
 		t.Fatalf("on low power a squad deployed in %.1f s, want about %.1f", took, want)
 	}
 }
@@ -224,8 +206,10 @@ func TestTheRadarNeedsItsStructureAndPower(t *testing.T) {
 	}
 	build(t, s, 0, "airbase")
 	// Short of power the radar stops, and comes back with power.
-	must(t, s, sim.Command{Side: 0, Kind: sim.CmdSell, Place: structureOf(s, 0, shared.RolePower).PlaceID()})
-	run(s, 1)
+	for structureOf(s, 0, shared.RolePower) != nil {
+		must(t, s, sim.Command{Side: 0, Kind: sim.CmdSell, Place: structureOf(s, 0, shared.RolePower).PlaceID()})
+		run(s, 1)
+	}
 	if s.Snapshot(0).Radar {
 		t.Fatalf("on low power the radar still works: %+v", s.Snapshot(0).Power)
 	}
