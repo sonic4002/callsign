@@ -13,7 +13,7 @@ tags:
   - topic/stt
   - topic/voice
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -51,7 +51,7 @@ A radio call has a fixed frame and a closed set of names, and the game uses that
 | `hintPhrases(rules, lang)` | The same list; in Hebrew also the glued forms: ו + each station ("וקרנף") and ל, ב, מ + each point ("לכרמל") | The Hebrew model in the browser, as its phrase bonus ([[In-Browser Recognition]]) |
 | `hintCalls(rules, lang)` | The vocabulary written as radio traffic: one call to each kind of squad with a rotating order (Move to / Hold / Attack a point), one to the operator and one to all stations, then the remaining names as a list | The server's Whisper, as `hints` (its `initial_prompt`) |
 
-Why traffic and not a list: Whisper takes its hint as "what was said just before" and follows its spelling and punctuation as well as its words. Written as calls in the form the page itself writes, Hebrew exact calls rose from 76% to 91% ([[Recognition Evaluation]]). The server cuts hints at 600 characters.
+Why traffic and not a list: Whisper takes its hint as "what was said just before" and follows its spelling and punctuation as well as its words. Written as calls in the form the page itself writes, Hebrew exact calls rose from 76% to 91% ([[Recognition Evaluation]]). The server cuts hints at 600 characters. On the huge map the English traffic would be 610, so `hintCalls` leaves procedure words off the end of the list, one by one, until it fits (there: "radio silence"); a name is never left out.
 
 One cost was seen in the measurements: a noisy "Buy one vehicle squad" once came back as "Viper 1, vehicle squad", a callsign taken from the hint.
 
@@ -83,6 +83,9 @@ One cost was seen in the measurements: a noisy "Buy one vehicle squad" once came
 - The words of procedure and of command are never respelled as map points ("Run the fight" is not "Lima the fight") (commit 7eca980).
 - The `notPlaces` list: ordinary words that sound like a point (hold, gold, go, all, out, over, זהב, סוף, ...), the words a place is described with (grove, house, bridge, north, מטר, ...), and the order words for selling, repairing and power.
 - Words shorter than three letters.
+- **A name with one consonant sound or none** (דוד, לאה, יואב, and on the huge map עין and חוה) is matched the careful way even in rough text, since by `sound()` it is like any short word: "עוד" and "אתה" were דוד, "העיירה" (the town) was "הלאה", and on the huge map "נועו" (move) would have been עין. Added 2026-11-27; on the game's own texts it removed about a hundred such respellings on the medium and large maps and added none.
+- **Words of orders that sound like a point of the huge map** are in `notPlaces` too: אין, דווח, טווח, שמור, שמאל, קרח, קרקע, מספר and their like; six, check, seek, each, eyes, use, assay, office. So are the compass adjectives (צפוני, דרומי, מזרחי, מערבי), which are in the names of points.
+- **A name with a hyphen** ("X-ray") is given the map's spelling whether it was written as one word, as two or with the hyphen, and its halves are not matched again.
 - **Typed text** (`typed`): only a misspelled callsign at its front is put right; the rest is sent as the player wrote it, because matching by sound "on typed words only does harm" ("זהב" is not "זאב") (commit 99e245c).
 - **Careful mode** (`careful`, used when the server transcribed): a word becomes a map point only when it reads aloud as that point's name and is spelled within one or two letters of it (`sameName`): "קרמל" is כרמל and "Gulf" is Golf, but "עוד" is not דוד and "carry" is not Kilo.
 

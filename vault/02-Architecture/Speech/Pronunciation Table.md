@@ -13,7 +13,7 @@ tags:
   - topic/tts
   - topic/hebrew
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: code
 confidence: medium
@@ -73,6 +73,7 @@ The table has 63 Hebrew entries. English has none.
 | Stations | רפאים, עורב, שביט | `ʁefaʔˈim`, `ʔoʁˈev`, `ʃavˈit` | the `ghost`, `raven`, `comet` callsign classes |
 | Map points | אלף, בועז, גימל, דוד, הגר, פסל, כרמל, סמך, זאב | for example `ʔˈalef`, `davˈid`, `sˈameχ`, `zeʔˈev` | see [[Map Point Letters]] |
 | Map points | לאה, משה, נשר, תמר, יואב, ואו | for example `leʔˈa`, `nˈeʃeʁ` | points of the larger maps |
+| Map points | קורח, צפורה, עין, חוה, שמיר, טיח | `kˈoʁaχ`, `tsipoʁˈa`, `ʔˈajin`, `χavˈa`, `ʃamˈiʁ`, `tˈiaχ` | the six points only the huge map has (added 2026-11-27; the readings were written by hand and not listened to) |
 | Rank | סמל | `samˈal` | "sergeant", not "semel" (commit 25efe83) |
 | Abbreviation | סוללת, נון, מם | `solelˈat`, `nˈun`, `mˈem` | "סוללת נ"מ" is said "solelat nun-mem" (commit 20ddecb); the page rewrites נ"מ to "נון מם" first |
 | Places | גשר, בונקר, חורבה, חורשה, סלעים, חומה, הריסות | for example `ɡˈeʃeʁ` | landmark words, see [[Places on the Radio]] |

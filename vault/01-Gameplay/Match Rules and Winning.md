@@ -1,6 +1,6 @@
 ---
 title: Match Rules and Winning
-description: "A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of three maps until a headquarters falls or the timer runs out."
+description: "A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of four maps until a headquarters falls or the timer runs out."
 type: concept
 status: current
 tags:
@@ -38,7 +38,7 @@ paths:
 
 # Match Rules and Winning
 
-A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of three maps until a headquarters falls or the timer runs out. This note gives the opening state, the standing limits and the exact order in which a winner is decided.
+A match is two sides, west (side 0) and east (side 1), each with a headquarters, played on one of four maps until a headquarters falls or the timer runs out. This note gives the opening state, the standing limits and the exact order in which a winner is decided.
 
 ## How a match opens
 

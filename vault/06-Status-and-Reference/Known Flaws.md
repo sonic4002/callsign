@@ -1,6 +1,6 @@
 ---
 title: Known Flaws
-description: "Defects, limits and stale text known on 2026-11-26, grouped by area, each with where it is recorded."
+description: "Defects, limits and stale text known on 2026-11-27, grouped by area, each with where it is recorded."
 type: reference
 status: current
 tags:
@@ -12,7 +12,7 @@ tags:
   - topic/flaws
   - topic/limits
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 agent: CLD
 origin: mixed
 confidence: medium
@@ -109,6 +109,8 @@ See [[AI Brains and Model Relay]], [[Fast Brain - Jev]].
 | The phone breakpoint is repeated by hand in three files | `client/mobile.css`, `client/mobile.js`, `client/debug.js` |
 | One music track's loudness figure is far from the others (`battle-urgent.mp3`, -43.1) | `assets/audio/manifest.json` |
 | No automated test drives the page or the phone layout in a browser; client tests cover pure modules only | `client/*.test.mjs` |
+| The lobby's four map cards (one row on a desktop, two rows of two on a phone) and the huge map on the page were not looked at in a browser when the map was added (2026-11-27) | `client/debug.css`, `client/mobile.css` |
+| One grove of the small map has no mirror image (`K-grove-2`, west of Kilo): its twin fell on the edge of a hill in the generator and was left out; a test names it as the one exception | `tools/mapgen.py`, `TestEverythingOnEveryMapIsMirrored` in `server/sim/terrain_test.go` |
 
 See [[Client]].
 
@@ -116,6 +118,8 @@ See [[Client]].
 
 | Flaw or limit | Source |
 |---|---|
+| Rough tidying still takes ordinary English words for a point with the same consonants on every map: "quarry" and "carry" become Kilo (X-ray on the huge map), "shore" becomes Sierra (Charlie on the huge map), although Quarry is itself a point's name on two maps (measured 2026-11-27) | `placeNames` in `client/voice/normalize.js`, [[Map Point Letters]] |
+| The six point names of the huge map were never spoken to a recogniser or heard from the speech service: their hints, tidy rules and pinned readings are checked by tests on text only | `client/voice/voice.test.mjs`, `tts/pronounce.json` |
 | Every recognition score is from synthetic voices; no recording of a real player exists; the phrase bonus and the tidy step are tuned on them | `stt/eval/RESULTS.md` |
 | Phone performance was imitated by slowing a desktop; no phone was measured, and the live path never ran on an iPhone | the same |
 | The speech service mispronounces Hebrew "נועו" and sometimes swallows "רות"; 17 of the 19 lost Hebrew orders are those two words | the same |
